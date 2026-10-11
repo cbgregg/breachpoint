@@ -83,9 +83,12 @@ export class PlayerController {
       holder.visible = false;
       this.vmRoot.add(holder);
       const pistol = w.id === 'pistol';
+      const touch = this.game.input.isTouch;
       return {
         id: w.id, holder, gun,
-        hip: pistol ? new THREE.Vector3(0.11, -0.12, -0.34) : new THREE.Vector3(0.13, -0.15, -0.22),
+        // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
+        hip: touch ? (pistol ? new THREE.Vector3(0.12, -0.14, -0.34) : new THREE.Vector3(0.14, -0.17, -0.22))
+          : pistol ? new THREE.Vector3(0.11, -0.12, -0.34) : new THREE.Vector3(0.13, -0.15, -0.22),
         ads: new THREE.Vector3(0, -gun.sightY, EYE_RELIEF - gun.sightZ),
       };
     });

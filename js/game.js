@@ -38,7 +38,8 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.04, 600);
     this.scene.add(this.camera);
     this.vmScene = new THREE.Scene();
-    this.vmCamera = new THREE.PerspectiveCamera(66, window.innerWidth / window.innerHeight, 0.01, 10);
+    // a wider viewmodel FOV on phones makes the gun and optic take up less of the small screen
+    this.vmCamera = new THREE.PerspectiveCamera(window.matchMedia('(pointer: coarse)').matches ? 80 : 66, window.innerWidth / window.innerHeight, 0.01, 10);
     this.renderer = new Renderer(container, this.scene, this.camera, this.vmScene, this.vmCamera);
     this.vmScene.environment = this.scene.environment;
     this.vmScene.add(new THREE.HemisphereLight(0xc8d4e4, 0x4a4034, 0.6));

@@ -143,7 +143,9 @@ export class Renderer {
   applyQuality(name) {
     const q = QUALITY[name] || QUALITY.high;
     this.quality = q;
-    const pr = Math.min(window.devicePixelRatio || 1, q.pixelRatio);
+    // phones: never render below 1.25× CSS pixels, or distant players blur into the background
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    const pr = Math.min(window.devicePixelRatio || 1, touch ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
     this.renderer.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
     this.renderer.shadowMap.enabled = q.shadows > 0;

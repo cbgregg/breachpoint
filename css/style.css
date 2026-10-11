@@ -271,18 +271,22 @@ body.ingame #touch.on { display: block; }
 #stick.sprint #stick-knob { background: rgba(232, 176, 74, 0.55); }
 /* while aiming: a bigger fire button, plus a second one on the left so the right thumb can hold ADS and aim */
 #tb-fire, #tb-fire2 { transition: width .12s, height .12s; }
-#tb-fire2 { left: 92px; bottom: 96px; width: 96px; height: 96px; display: none; }
+#tb-fire2 { left: 24px; bottom: 92px; width: 92px; height: 92px; display: none; }
 body.ads-on #tb-fire2 { display: block; }
 body.ads-on #tb-fire { width: 104px; height: 104px; right: 18px; bottom: 86px; }
 
 @media (pointer: coarse) {
-  #tl { width: 130px; top: 8px; left: 8px; }
-  #mm-wrap { width: 130px; height: 130px; }
+  #tl { width: 116px; top: 8px; left: 8px; gap: 5px; }
+  #mm-wrap { width: 116px; height: 116px; }
+  /* sprint is the stick pushed fully forward on touch, so the button isn't needed */
+  #tb-sprint { display: none; }
+  #fps { top: 14px; right: 150px; }
+  .tag .tn { font-size: 13px; }
   .srow { grid-template-columns: 52px 1fr 26px; font-size: 10px; }
   .srow b { font-size: 16px; }
   .smeta { font-size: 11px; }
   #compass { width: 34vw; top: 6px; }
-  #killfeed { bottom: auto; top: 205px; left: 8px; font-size: 12px; }
+  #killfeed { bottom: auto; top: 50px; left: 50%; transform: translateX(-50%); align-items: center; font-size: 11px; opacity: 0.92; }
   #ammo { top: 54px; bottom: auto; right: 130px; }
   #ammo-mag { font-size: 38px; }
   #ammo-res { font-size: 16px; }
