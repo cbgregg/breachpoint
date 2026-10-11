@@ -30,17 +30,19 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Fire | Left click | RT | FIRE |
 | Aim down sights | Right click | LT | ADS (toggle) |
 | Jump | `Space` | A | JUMP |
-| Crouch / slide while sprinting | `C` / `Ctrl` | B | CROUCH |
-| Sprint / hold breath (scoped) | `Shift` | L3 (click) | SPRINT |
+| Crouch / slide while sprinting | `C` / `Ctrl` | B (tap) | CROUCH |
+| Sprint (cancels reload) / hold breath (scoped) | `Shift` | L3 (click) | SPRINT |
 | Reload | `R` | X | RELOAD |
-| Swap weapon | `Q`, `1` `2`, wheel | Y / D-pad up | SWAP |
-| Frag grenade | `G` | RB / LB | FRAG |
+| Swap weapon | `Q`, `1` `2`, wheel | Y | SWAP |
+| Frag grenade | `G` | LB (hold to aim, release to throw) | FRAG |
 | Melee | `V` | R3 | MELEE |
 | Scoreboard | `Tab` (hold) | View (hold) | TAB |
 | Pause | `Esc` / `P` | Menu | ❚❚ |
 | Menu tabs | `Q` / `E` | LB / RB | tap |
 
-Browsers only expose a controller after you press a button on it, so press any button once the page is open.
+The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and the D-pad (killstreaks) are unused because the game has neither.
+
+Browsers only expose a controller after you press a button on it, so press any button once the page is open. Xbox controllers that a browser reports without the standard layout (common in Firefox on macOS and Linux) are remapped automatically.
 
 ## Online play
 

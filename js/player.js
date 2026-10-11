@@ -151,9 +151,16 @@ export class PlayerController {
     if (_wish.lengthSq() > 1) _wish.normalize();
     if (!canAct) _wish.set(0, 0, 0);
 
-    if (inp.action('sprint')) this.padSprint = !this.padSprint;
+    // L3 starts sprinting (it doesn't toggle off); letting go of forward, aiming or firing ends it.
+    // Sprinting cancels a reload, as in Call of Duty.
+    const shift = inp.down('ShiftLeft') || inp.down('ShiftRight');
+    const sprintPress = inp.action('sprint') || (shift && !this.prevShift);
+    this.prevShift = shift;
+    if (sprintPress) this.padSprint = true;
     if (f < 0.35 || inp.ads || inp.fire) this.padSprint = false;
-    const sprint = canAct && (inp.down('ShiftLeft') || inp.down('ShiftRight') || this.padSprint) && f > 0.4 && !inp.ads && !inp.fire && !c.weapon.reloading;
+    const sprintWant = canAct && (shift || this.padSprint) && f > 0.4 && !inp.ads && !inp.fire;
+    if (sprintWant && sprintPress && c.weapon.reloading) c.weapon.cancelReload();
+    const sprint = sprintWant && !c.weapon.reloading;
 
     let slideReq = false;
     const crouchPress = inp.action('crouch'), slidePress = inp.action('slide');
@@ -175,7 +182,7 @@ export class PlayerController {
       if (inp.action('slot1')) c.switchTo(0);
       if (inp.action('slot2')) c.switchTo(1);
       if (inp.action('swap') || inp.wheel !== 0) c.switchTo(c.prev);
-      if (inp.action('reload')) c.reload();
+      if (inp.action('reload')) { c.reload(); this.padSprint = false; }
       if (inp.action('grenade')) c.throwGrenade();
       if (inp.action('melee')) c.melee();
     }

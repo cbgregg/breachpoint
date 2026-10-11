@@ -8,10 +8,43 @@ const KEY_ACTIONS = {
 };
 // Standard gamepad mapping (Xbox layout)
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+// Call of Duty "Default" layout. LT/RT (aim/fire), View (scoreboard) and LB (frag, thrown on release)
+// are handled separately below. RB (tactical) and the D-pad (killstreaks etc.) have nothing to do here.
 const PAD_ACTIONS = {
-  [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap', [PAD.RB]: 'grenade', [PAD.LB]: 'grenade',
+  [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap',
   [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee',
 };
+
+// Some browsers (Firefox on Linux/macOS, older Safari) report Xbox pads without the "standard"
+// mapping: different button numbers and triggers on axes. Rebuild a standard-layout view of them.
+const XBOX_ID = /xbox|xinput|x-box|045e|microsoft/i;
+function stdButtons(n) { return Array.from({ length: n }, () => ({ pressed: false, value: 0 })); }
+function normalizePad(p, seen) {
+  if (p.mapping === 'standard' || !XBOX_ID.test(p.id)) return p;
+  const B = stdButtons(17);
+  const raw = (i) => p.buttons[i] || { pressed: false, value: 0 };
+  const ax = (i) => p.axes[i] || 0;
+  // triggers on axes rest at -1, but read 0 until first touched
+  const trig = (i) => { const v = ax(i); if (v !== 0) seen[i] = true; return seen[i] ? (v + 1) / 2 : 0; };
+  const set = (std, b) => { B[std] = { pressed: !!b.pressed, value: b.value ?? (b.pressed ? 1 : 0) }; };
+  const setV = (std, v) => { B[std] = { pressed: v > 0.5, value: v }; };
+  let axes;
+  if (p.buttons.length >= 15 && p.axes.length <= 6) {
+    // macOS driver layout: A B X Y LB RB L3 R3 Start Back Guide Up Down Left Right; axes LX LY LT RX RY RT
+    [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 10], [7, 11], [8, 9], [9, 8], [11, 12], [12, 13], [13, 14], [14, 15]]
+      .forEach(([r, st]) => set(st, raw(r)));
+    setV(PAD.LT, trig(2)); setV(PAD.RT, trig(5));
+    axes = [ax(0), ax(1), ax(3), ax(4)];
+  } else {
+    // Linux xpad layout: A B X Y LB RB Back Start Guide L3 R3; axes LX LY LT RX RY RT DPadX DPadY
+    [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 8], [7, 9], [8, 16], [9, 10], [10, 11]].forEach(([r, st]) => set(st, raw(r)));
+    setV(PAD.LT, trig(2)); setV(PAD.RT, trig(5));
+    setV(PAD.LEFT, ax(6) < -0.5 ? 1 : 0); setV(PAD.RIGHT, ax(6) > 0.5 ? 1 : 0);
+    setV(PAD.UP, ax(7) < -0.5 ? 1 : 0); setV(PAD.DOWN, ax(7) > 0.5 ? 1 : 0);
+    axes = [ax(0), ax(1), ax(3), ax(4)];
+  }
+  return { id: p.id, buttons: B, axes, vibrationActuator: p.vibrationActuator, connected: true };
+}
 
 export class Input {
   constructor(canvas) {
@@ -119,6 +152,7 @@ export class Input {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     let pad = null;
     for (const p of pads) if (p && p.connected) { pad = p; break; }
+    if (pad) pad = normalizePad(pad, this.trigSeen || (this.trigSeen = {}));
     if (!!pad !== this.padConnected) {
       this.padConnected = !!pad;
       if (this.onPadChange) this.onPadChange(this.padConnected, pad ? pad.id : '');
@@ -162,9 +196,13 @@ export class Input {
         const a = PAD_ACTIONS[i];
         if (a) this.actions.add(a);
       }
-      if (edges.includes(PAD.UP)) this.actions.add('swap');
+      // lethal: hold LB to line it up, release to throw
+      const lb = btn(PAD.LB);
+      if (this.lbHeld && !lb) this.actions.add('grenade');
+      this.lbHeld = lb;
     } else if (this.onNav) {
       // menu navigation with D-pad / left stick (with key-repeat)
+      this.lbHeld = false;
       for (const i of edges) {
         const m = { [PAD.UP]: 'up', [PAD.DOWN]: 'down', [PAD.LEFT]: 'left', [PAD.RIGHT]: 'right', [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab' }[i];
         if (m) this.onNav(m);

@@ -418,6 +418,10 @@ export class HostSession {
     const sy = Math.sin(c.yaw), cy = Math.cos(c.yaw);
     _wish.set(-sy * f + cy * rr, 0, -cy * f - sy * rr);
     if (_wish.lengthSq() > 1) _wish.normalize();
+    // a fresh sprint press cancels a reload (mirrors PlayerController)
+    const spEdge = cmd.sp && !r.prevSp;
+    r.prevSp = cmd.sp;
+    if (canAct && spEdge && f > 0.4 && !cmd.ads && !cmd.f && c.weapon.reloading) c.weapon.cancelReload();
     const sprint = canAct && cmd.sp && f > 0.4 && !cmd.ads && !cmd.f && !c.weapon.reloading;
     c.wantCrouch = cmd.cr;
     c.updateMovement(cmd.dt, _wish, sprint, canAct && cmd.j, canAct && cmd.sl);

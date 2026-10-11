@@ -9,7 +9,7 @@ export const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.fl
 
 const PAD_GLYPH = {
   accept: ['A', 'a'], back: ['B', 'b'], jump: ['A', 'a'], crouch: ['B', 'b'], reload: ['X', 'x'], swap: ['Y', 'y'],
-  grenade: ['RB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'],
+  grenade: ['LB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'],
   pause: ['☰', 'bump'], scoreboard: ['⧉', 'bump'], alt: ['Y', 'y'],
 };
 const KEY_GLYPH = {
