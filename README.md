@@ -71,10 +71,12 @@ There is no game server. The host's browser runs the match and everyone else con
 
 **Limits to know:**
 - The host can cheat, since their browser is the referee. Play with people you'd hand the code to.
-- Players connect directly, so each player's IP address is visible to the others in the match (as in any peer-to-peer game). In quick match those are strangers; a TURN relay would hide IPs but needs a small credential service outside GitHub Pages.
+- **IP addresses:** quick matches go through a Cloudflare TURN relay (relay-only ICE), so no player sees another's IP; the lobby shows "Connected through Cloudflare relay" when that's active. Private matches connect directly (players can see each other's IPs) and use the relay only if a direct connection fails, unless *Options → Hide my IP in private matches* is on. If the relay is unreachable the game falls back to direct and says so.
 - Six digits keep codes easy to type, but someone could guess an active code. Leave *Approve each player* on if that matters to you.
 - Some strict networks (certain corporate or mobile carriers) block direct WebRTC connections. Without a TURN relay server, roughly 1 in 10 player pairs may fail to connect; try another network, or have someone else host.
 - Online play needs the game served over HTTPS (GitHub Pages is fine) or `localhost`.
+
+**TURN relay setup:** `cloudflare/turn-worker.js` is a Cloudflare Worker that turns a Cloudflare Realtime TURN key into short-lived credentials (the key's token stays in the Worker as a secret). Deploy it, set `TURN_KEY_ID` (text) and `TURN_KEY_API_TOKEN` (secret), and put its URL in `TURN_ENDPOINT` in `js/config.js`. It only answers requests from `ALLOWED_ORIGINS` (default `https://cbgregg.github.io`) and rate-limits per IP.
 
 **Advanced URL options:** `?relay=wss://relay1,wss://relay2` uses your own Nostr relays; `?stun=0` skips public STUN servers (LAN play).
 

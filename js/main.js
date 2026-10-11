@@ -267,6 +267,9 @@ function renderLobby() {
   const quickish = quickIntro || lobby.quickMode || lobby.public;
   $('join-label').textContent = quickish ? 'PUBLIC MATCH' : 'ENTER MATCH CODE';
   $('lobby-hints').style.visibility = quickish ? 'hidden' : '';
+  const cn = $('conn-note');
+  cn.textContent = !lobby.active || quickIntro ? '' : lobby.net.relayed ? '● Connected through Cloudflare relay: your IP address is hidden' : lobby.net.room ? 'Direct peer-to-peer connection' : '';
+  cn.classList.toggle('hidden-ip', !!lobby.net.relayed);
   if (quickIntro) { $('lobby-leave').textContent = 'BACK'; return; }
   if (host) {
     $('host-code').textContent = fmtCode(lobby.code);

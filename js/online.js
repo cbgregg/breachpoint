@@ -81,7 +81,7 @@ export class Lobby {
     this.hostPrimary = primary;
     this.hostTeam = 0;
     this.status = 'open';
-    this.net.open(this.code, { relayOnly });
+    this.openNet(this.code, relayOnly);
     clearInterval(this.pingTimer);
     this.pingTimer = setInterval(() => this.pingAll(), 2000);
     this.changed();
@@ -194,6 +194,13 @@ export class Lobby {
     this.hostPublic();
   }
 
+  openNet(code, relayOnly) {
+    this.net.open(code, { relayOnly }).then(() => {
+      if (relayOnly && !this.net.relayed && this.net.room) this.toast('RELAY UNAVAILABLE — CONNECTING DIRECTLY');
+      this.changed();
+    });
+  }
+
   // public matches always relay when the TURN Worker is set up; private ones when the player opts in
   wantRelay(pub) { return pub || !!(this.game.settings || {}).privateRelay || !!this.privateRelay; }
 
@@ -226,7 +233,7 @@ export class Lobby {
     this.myPrimary = primary;
     this.status = 'searching';
     this.lastError = '';
-    this.net.open(code, { relayOnly: this.wantRelay(quick) });
+    this.openNet(code, this.wantRelay(quick));
     clearTimeout(this.findTimer);
     this.findTimer = setTimeout(() => {
       if (this.role === 'guest' && !this.hostId) {
