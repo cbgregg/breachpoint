@@ -120,7 +120,12 @@
               <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
-          <button id="play" class="cta" data-nav><span>DEPLOY</span><span class="glyph" data-act="accept"></span></button>
+          <button id="play" class="cta" data-nav><span>DEPLOY VS BOTS</span><span class="glyph" data-act="accept"></span></button>
+          <div class="online-row">
+            <button id="host-btn" class="menu-btn" data-nav>HOST ONLINE MATCH</button>
+            <button id="join-btn" class="menu-btn" data-nav>JOIN WITH CODE</button>
+          </div>
+          <p class="pane-note">Online play is peer-to-peer: the host's browser runs the match, friends join with a 6-digit code. Bots fill empty slots.</p>
         </section>
 
         <section class="pane" id="pane-loadout">
@@ -192,9 +197,61 @@
         <div class="row"><label for="opt-padsens2">Stick sensitivity <output id="out-padsens2"></output></label><input type="range" id="opt-padsens2" min="0.3" max="2.5" step="0.05" data-nav></div>
         <div class="row"><label for="opt-vol2">Volume <output id="out-vol2"></output></label><input type="range" id="opt-vol2" min="0" max="1" step="0.05" data-nav></div>
         <button id="restart" class="menu-btn" data-nav>RESTART MATCH</button>
+        <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
+        <button id="pause-end" class="menu-btn online-only host-only" data-nav>END MATCH FOR EVERYONE</button>
         <button id="quit" class="menu-btn" data-nav>QUIT TO MENU</button>
+        <p class="pane-note online-only">The match keeps running while this menu is open.</p>
       </div>
       <footer class="mw-foot" id="pause-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ Online lobby ============ -->
+  <div id="lobby" class="screen">
+    <div class="mw narrow lobby">
+      <header class="mw-head"><div class="logo"><span class="mark"></span><span id="lobby-title">ONLINE MATCH</span></div></header>
+
+      <!-- host view -->
+      <div id="lobby-host" class="lobby-view">
+        <div class="code-label">MATCH CODE</div>
+        <div class="code-big" id="host-code">––– –––</div>
+        <div class="code-actions">
+          <button id="copy-code" class="menu-btn small" data-nav>COPY CODE</button>
+          <button id="copy-link" class="menu-btn small" data-nav>COPY INVITE LINK</button>
+        </div>
+        <div class="row"><label for="opt-approve">Approve each player before they join</label><input type="checkbox" id="opt-approve" data-nav checked></div>
+        <div id="pending-wrap" class="lobby-block">
+          <div class="group">JOIN REQUESTS</div>
+          <div id="pending-list" class="plist"></div>
+        </div>
+        <div class="lobby-block">
+          <div class="group">PLAYERS <span id="host-count"></span></div>
+          <div id="host-players" class="plist"></div>
+        </div>
+        <p class="pane-note" id="host-note">Match settings come from the Play tab. Bots fill any empty slots.</p>
+        <button id="lobby-start" class="cta" data-nav><span>START MATCH</span></button>
+        <button id="lobby-back" class="cta" data-nav><span>BACK TO MATCH</span></button>
+      </div>
+
+      <!-- join view -->
+      <div id="lobby-join" class="lobby-view">
+        <div class="code-label">ENTER MATCH CODE</div>
+        <div class="code-slots" id="code-slots"><i></i><i></i><i></i><b></b><i></i><i></i><i></i></div>
+        <div class="keypad" id="keypad">
+          <button data-key="1" data-nav>1</button><button data-key="2" data-nav>2</button><button data-key="3" data-nav>3</button>
+          <button data-key="4" data-nav>4</button><button data-key="5" data-nav>5</button><button data-key="6" data-nav>6</button>
+          <button data-key="7" data-nav>7</button><button data-key="8" data-nav>8</button><button data-key="9" data-nav>9</button>
+          <button data-key="del" data-nav>⌫</button><button data-key="0" data-nav>0</button><button data-key="go" class="go" data-nav>JOIN</button>
+        </div>
+        <div class="join-status" id="join-status"></div>
+        <div class="lobby-block" id="join-players-wrap">
+          <div class="group">PLAYERS</div>
+          <div id="join-players" class="plist"></div>
+        </div>
+      </div>
+
+      <button id="lobby-leave" class="menu-btn" data-nav>LEAVE</button>
+      <footer class="mw-foot" id="lobby-hints"></footer>
     </div>
   </div>
 

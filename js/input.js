@@ -18,6 +18,7 @@ export class Input {
     this.canvas = canvas;
     this.keys = new Set();
     this.actions = new Set();
+    this.used = []; // actions consumed this frame (sent to the host in online play)
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
     this.mouseFire = false; this.mouseAds = false;
     this.locked = false;
@@ -100,7 +101,7 @@ export class Input {
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
   down(code) { return this.keys.has(code); }
-  action(name) { if (this.actions.has(name)) { this.actions.delete(name); return true; } return false; }
+  action(name) { if (this.actions.has(name)) { this.actions.delete(name); this.used.push(name); return true; } return false; }
   padHeld(name) {
     if (!this.pad) return false;
     const idx = { sprint: PAD.L3, scoreboard: PAD.VIEW }[name];
@@ -177,6 +178,7 @@ export class Input {
 
   endFrame() {
     this.actions.clear();
+    this.used.length = 0;
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
   }
 
@@ -184,6 +186,8 @@ export class Input {
     this.keys.clear(); this.actions.clear();
     this.mouseFire = this.mouseAds = this.touchFire = this.touchAds = false;
     this.touchMoveX = this.touchMoveY = 0;
+    this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
+    this.padAds = this.padFire = this.padScore = false;
   }
 
   setupTouch() {

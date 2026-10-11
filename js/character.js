@@ -229,8 +229,11 @@ function aimArm(arm, S, H, pole) {
 
 // ---------- character ----------
 export class Character {
-  constructor(game, { name, team, isBot, primary }) {
+  constructor(game, { name, team, isBot, primary, remote = false, puppet = false, id }) {
     this.game = game;
+    this.id = id ?? (Character.nextId = (Character.nextId || 0) + 1);
+    this.remote = remote;   // host side: a human on another machine, driven by their inputs
+    this.puppet = puppet;   // guest side: anyone but ourselves, driven by host snapshots
     this.name = name;
     this.team = team;
     this.isBot = isBot;
@@ -258,7 +261,7 @@ export class Character {
     this.killer = null; this.deathT = 0; this.deathDir = 1;
     this.stepAccum = 0; this.animPhase = 0;
     this.model = null;
-    if (isBot) {
+    if (isBot || remote || puppet) {
       this.model = buildSoldierModel(team, primary, name) || buildOperator(team, primary, name);
       game.scene.add(this.model.root);
       this.model.root.visible = false;
@@ -266,6 +269,9 @@ export class Character {
   }
 
   get weapon() { return this.weapons[this.cur]; }
+  // the character this machine looks through; its sounds play unpositioned
+  get local() { return this === this.game.player; }
+  get spos() { return this.local ? null : this.pos; }
   get eyeHeight() { return lerp(PLAYER.eye, PLAYER.crouchEye, this.crouchT); }
   eyePos(out) { return out.set(this.pos.x, this.pos.y + this.eyeHeight, this.pos.z); }
   chestPos(out) { return out.set(this.pos.x, this.pos.y + this.height * 0.68, this.pos.z); }
@@ -307,12 +313,12 @@ export class Character {
     this.cur = i;
     this.switchT = 0.4;
     if (this.model) setOperatorWeapon(this.model, this.weapon.id);
-    this.game.audio.play('switch', this.isBot ? this.pos : null);
+    this.game.audio.play('switch', this.spos);
   }
 
   reload() {
     if (this.meleeT > 0) return;
-    if (this.weapon.startReload()) this.game.audio.play('reload', this.isBot ? this.pos : null, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
+    if (this.weapon.startReload()) this.game.audio.play('reload', this.spos, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
   }
 
   currentSpread() {
@@ -329,7 +335,7 @@ export class Character {
     const w = this.weapon;
     if (!this.alive || this.switchT > 0 || w.reloading || w.cooldown > 0 || this.meleeT > 0) return false;
     if (w.mag <= 0) {
-      if (!w.dryClicked) { this.game.audio.play('dry', this.isBot ? this.pos : null); w.dryClicked = true; }
+      if (!w.dryClicked) { this.game.audio.play('dry', this.spos); w.dryClicked = true; }
       if (w.reserve > 0) this.reload();
       return false;
     }
@@ -364,7 +370,7 @@ export class Character {
   }
 
   takeDamage(amount, attacker, weaponId, headshot, fromPos) {
-    if (!this.alive || this.spawnProtect > 0 || this.game.state !== 'playing') return;
+    if (!this.alive || this.spawnProtect > 0 || !this.game.live || this.game.mode === 'guest') return;
     if (attacker && attacker !== this && attacker.team === this.team && !this.game.settings.friendlyFire) return;
     this.health -= amount;
     this.lastDamageT = this.game.time;
@@ -403,7 +409,7 @@ export class Character {
       this.slideDir.set(this.vel.x, 0, this.vel.z).normalize();
       this.vel.x = this.slideDir.x * PLAYER.slideSpeed;
       this.vel.z = this.slideDir.z * PLAYER.slideSpeed;
-      this.game.audio.play('slide', this.isBot ? this.pos : null);
+      this.game.audio.play('slide', this.spos);
     }
     const sliding = this.slideT > 0;
     let target = (this.wantCrouch || sliding) ? 1 : 0;
@@ -435,13 +441,13 @@ export class Character {
       this.vel.y = PLAYER.jump;
       this.onGround = false;
       this.wantCrouch = false;
-      this.game.audio.play('jump', this.isBot ? this.pos : null);
+      this.game.audio.play('jump', this.spos);
     }
     const wasGround = this.onGround;
     const fallSpeed = this.vel.y;
     this.vel.y -= PLAYER.gravity * dt;
     phys.moveEntity(this, dt);
-    if (!wasGround && this.onGround && fallSpeed < -7) this.game.audio.play('land', this.isBot ? this.pos : null);
+    if (!wasGround && this.onGround && fallSpeed < -7) this.game.audio.play('land', this.spos);
 
     const hs = Math.hypot(this.vel.x, this.vel.z);
     if (this.onGround && hs > 1.5 && !sliding) {
@@ -449,7 +455,7 @@ export class Character {
       const stride = this.sprinting ? 2.5 : 1.9;
       if (this.stepAccum > stride) {
         this.stepAccum = 0;
-        if (this.crouchT < 0.5) this.game.audio.play('step', this.isBot ? this.pos : null, { self: !this.isBot, run: this.sprinting });
+        if (this.crouchT < 0.5) this.game.audio.play('step', this.spos, { self: this.local, run: this.sprinting });
       }
     }
     if (this.pos.y < -15) this.takeDamage(999, null, 'fall', false, this.pos);

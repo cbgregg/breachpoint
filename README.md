@@ -1,6 +1,6 @@
 # Breachpoint
 
-A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from one rigged soldier model, every texture, gun, building and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
+A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** or **online with friends using a 6-digit code** (peer-to-peer, no server), on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from one rigged soldier model, every texture, gun, building and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
 
 **Play:** `https://<your-username>.github.io/breachpoint/` (after enabling Pages — see below)
 
@@ -13,6 +13,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Operators | Rigged, textured soldier model with motion-captured idle/walk/run animation, blended by speed; legs turn toward movement while the upper body stays on the aim; IK arms grip each weapon's pistol grip and foregrip; crouch, slide and death poses layered on top. The same rig provides the first-person arms and gloves. Falls back to procedural operators if the model can't load |
 | Weapons | Guns built from real side-profile silhouettes with rounded edges, lathed barrels, muzzle devices and scopes. MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
 | Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
+| Online | Host a match and share a 6-digit code (or invite link); friends type it in and join. Peer-to-peer over WebRTC, so it runs on GitHub Pages with no game server. Host-authoritative with input validation, lag compensation, client-side prediction and wallhack-resistant culling (see below). Up to 8 humans, bots fill the rest, players can drop in mid-match |
 | Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
 | HUD | Compass with enemy gunfire pings, rotating minimap rendered from the actual map, friendly/enemy score widget, ammo cluster with fire mode and equipment, score pop-ups beside the crosshair, medals (multikills, streaks, payback), killfeed, hitmarkers, directional damage, red-out damage effect, death card with killer distance and HP, scoreboard with K/D, device-aware button prompts |
 | Controller | Xbox / standard gamepads: radial deadzone, response curve, separate sensitivity, aim assist (slowdown, rotational tracking, ADS snap), rumble, full menu navigation with D-pad/stick, bumpers switch tabs, glyphs swap automatically between keyboard and controller |
@@ -40,6 +41,35 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Menu tabs | `Q` / `E` | LB / RB | tap |
 
 Browsers only expose a controller after you press a button on it, so press any button once the page is open.
+
+## Online play
+
+1. **Host:** Play tab → set match size, limits and friendly fire → **HOST ONLINE MATCH**. You get a code like `482 913` and an invite link.
+2. **Friends:** **JOIN WITH CODE** → type the code (keyboard, controller or on-screen keypad) → **JOIN**. Opening the invite link fills the code in.
+3. With *Approve each player* on (default), the host accepts or denies each request. The host can switch players' squads, kick (which also bans for the session), and accept people mid-match from **Pause → Players & join requests**; each new player takes a bot's slot.
+4. **START MATCH**. Empty slots are filled with bots. After the match everyone returns to the lobby for a rematch.
+
+The match keeps running while the pause menu is open in online play. The host should keep their tab in the foreground: browsers slow down background tabs.
+
+### How it's secured
+
+There is no game server. The host's browser runs the match and everyone else connects to it directly.
+
+- **Host-authoritative:** guests only ever send inputs (stick axes, view angles, buttons). The host checks every field, rejects anything malformed, and simulates the movement, shots, damage and scoring itself. A modified client can't teleport, fly, give itself ammo or health, or report hits.
+- **Speed-hack guard:** a guest's inputs are spent against a real-time budget, so sending inputs faster than real time doesn't make them move faster.
+- **Lag compensation:** the host rewinds other players to where the shooter actually saw them (up to 0.5 s), so hits register fairly on normal connections.
+- **Anti-wallhack:** each guest is only sent enemies they could plausibly see (line-of-sight checked from their eye to the enemy's head, chest and legs, plus anyone very close). Enemies behind walls aren't in the data, so there's nothing to reveal.
+- **Join control:** optional per-player approval, kick and ban. Guests ignore game messages from anyone except the host, and every peer is rate-limited.
+- **Encrypted transport:** the code is used to find the host through public Nostr relays. That signaling is encrypted with a key derived from the code, and game traffic is WebRTC (DTLS), end to end between players.
+
+**Limits to know:**
+- The host can cheat, since their browser is the referee. Play with people you'd hand the code to.
+- Players connect directly, so each player's IP address is visible to the others in the match (as in any peer-to-peer game).
+- Six digits keep codes easy to type, but someone could guess an active code. Leave *Approve each player* on if that matters to you.
+- Some strict networks (certain corporate or mobile carriers) block direct WebRTC connections. Without a TURN relay server, roughly 1 in 10 player pairs may fail to connect; try another network, or have someone else host.
+- Online play needs the game served over HTTPS (GitHub Pages is fine) or `localhost`.
+
+**Advanced URL options:** `?relay=wss://relay1,wss://relay2` uses your own Nostr relays; `?stun=0` skips public STUN servers (LAN play).
 
 ## Deploy to GitHub Pages
 
@@ -72,7 +102,10 @@ npx serve .            # or: python3 -m http.server 8000
 | `index.html` | Page shell, HUD, menus, import map for Three.js + addons (CDN) |
 | `css/style.css` | Menus, HUD, scoreboard, touch controls |
 | `js/main.js` | Boot, menu tabs, controller/keyboard menu navigation, settings persistence |
-| `js/game.js` | Match loop, hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
+| `js/game.js` | Match loop (local / host / guest modes), hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
+| `js/net.js` | Peer-to-peer transport: 6-digit codes, Nostr signaling, WebRTC data channels |
+| `js/online.js` | Lobby (approval, kick, teams), host session (input validation, lag compensation, culled snapshots), guest session (prediction, reconciliation, interpolation) |
+| `lib/trystero.js` | Vendored [Trystero](https://github.com/dmotz/trystero) 0.25 (Nostr strategy), MIT |
 | `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
 | `js/world.js` | Map layout (mirrored), dressing merged per material, minimap render |
@@ -108,6 +141,7 @@ npx serve .            # or: python3 -m http.server 8000
 ## Credits
 
 - Soldier model and animations (`assets/models/soldier.glb`): the *Soldier* sample from the [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf), a Mixamo character. Mixamo assets are royalty-free for use in projects under Adobe's terms; check those terms before commercial use, or swap in your own rigged `.glb` with a Mixamo skeleton.
+- Peer-to-peer matchmaking: [Trystero](https://github.com/dmotz/trystero) by Dan Motzenbecker (MIT), vendored in `lib/`.
 - Everything else (code, textures, guns, map, audio) is generated in this repo.
 
 ## License

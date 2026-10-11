@@ -134,6 +134,7 @@ export class GameAudio {
   }
 
   play(name, pos, opts = {}) {
+    if (this.muted) return;
     if (!this.ctx || this.ctx.state !== 'running') return;
     const sp = opts.ui ? { gain: 1, pan: 0, dist: 0 } : this.spatial(pos);
     if (sp.gain < 0.05) return;

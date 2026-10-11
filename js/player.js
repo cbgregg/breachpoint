@@ -44,6 +44,8 @@ export class PlayerController {
     this.crouchToggle = false; this.padSprint = false;
     this.assist = { target: null, yaw: 0, pitch: 0, snapT: 0, wasAds: false };
     this.cycleT = 0; // bolt / pump cycle after a shot
+    this.correction = new THREE.Vector3(); // smooths network position corrections (camera only)
+    this.cmd = null;
     this.lastFov = 0;
     this.buildArms();
     this.fp = createFpBody(char.team);
@@ -162,6 +164,9 @@ export class PlayerController {
     const jump = canAct && (inp.down('Space') || inp.action('jump'));
     if (jump) this.crouchToggle = false;
     c.updateMovement(dt, _wish, sprint, jump, slideReq && canAct);
+    // the exact command that produced this frame's movement (sent to the host when playing online)
+    const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+    this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, cr: c.wantCrouch ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
     if (!this.wasGround && c.onGround) this.landDip = 1;
     this.wasGround = c.onGround;
 
@@ -175,6 +180,10 @@ export class PlayerController {
       if (inp.action('melee')) c.melee();
     }
     const adsWant = canAct && inp.ads && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
+    this.cmd.ads = adsWant;
+    this.cmd.f = canAct && inp.fire ? 1 : 0;
+    const acts = inp.used.filter(a => a === 'reload' || a === 'grenade' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
+    if (acts.length) this.cmd.a = acts;
     c.adsT = clamp(c.adsT + Math.sign(adsWant - c.adsT) * dt / def.adsTime, 0, 1);
 
     if (canAct && inp.fire && this.cycleT <= 0) {
@@ -207,7 +216,7 @@ export class PlayerController {
     const fwd = c.forward(_b);
     let best = null, bestAng = 0.16;
     for (const e of g.characters) {
-      if (!e.alive || e.team === c.team) continue;
+      if (!e.alive || e.hidden || e.team === c.team) continue;
       const dist = e.pos.distanceTo(c.pos);
       if (dist > 70) continue;
       e.chestPos(_c).sub(eye);
@@ -284,6 +293,7 @@ export class PlayerController {
     const bobAmt = Math.min(1, hs / 6) * (1 - 0.85 * c.adsT);
     this.landDip = Math.max(0, this.landDip - dt * 4);
     c.eyePos(cam.position);
+    if (this.correction) { cam.position.add(this.correction); this.correction.multiplyScalar(Math.max(0, 1 - dt * 12)); }
     cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.03 * bobAmt - Math.sin(this.landDip * Math.PI) * 0.07;
     this.shake = Math.max(0, this.shake - dt * 4);
     const sh = this.shake * this.shake * 0.018;

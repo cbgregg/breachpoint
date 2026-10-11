@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, MAP_NAME
 import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
+import { Lobby, MAX_HUMANS } from './online.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -151,12 +152,13 @@ pauseSlider('opt-padsens2', 'padSensitivity', 'out-padsens2', v => v.toFixed(2))
 pauseSlider('opt-vol2', 'volume', 'out-vol2', v => `${Math.round(v * 100)}%`, () => game.audio.setVolume(settings.volume));
 
 game.onPause = (paused) => {
+  syncOnlineFlags();
   if (paused) { syncPause(); showScreen('pause'); }
   else showScreen(null);
 };
 $('resume').addEventListener('click', () => game.resume());
 $('restart').addEventListener('click', () => { showScreen(null); game.startMatch(settings); });
-$('quit').addEventListener('click', () => { game.quitToMenu(); writeForm(); showScreen('menu'); });
+$('quit').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
 // end of match
 game.onEnd = (r) => {
@@ -170,10 +172,204 @@ game.onEnd = (r) => {
   const mvp = r.mvp;
   $('end-mvp').textContent = `MVP  ${mvp.name.toUpperCase()}  ·  ${mvp.score} PTS  ·  ${mvp.kills}/${mvp.deaths}`;
   game.hud.renderScoreboard($('end-board'));
-  setTimeout(() => showScreen('end'), 900);
+  $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
+  setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
 };
-$('again').addEventListener('click', () => { showScreen(null); game.startMatch(settings); });
-$('menu-btn').addEventListener('click', () => { game.quitToMenu(); writeForm(); showScreen('menu'); });
+$('again').addEventListener('click', () => {
+  if (lobby.active) { openLobby(); return; }
+  showScreen(null); game.startMatch(settings);
+});
+$('menu-btn').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
+
+// ---------- online (peer-to-peer, 6-digit codes) ----------
+const lobby = new Lobby(game);
+window.__lobby = lobby;
+let joinCode = '';
+let joinError = '';
+const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const fmtCode = (c) => `${c.slice(0, 3)} ${c.slice(3)}`;
+const teamName = (t) => (t === 0 ? 'SQUAD A' : 'SQUAD B');
+// only touch the DOM when a list really changed, so buttons aren't swapped out under the cursor
+const setHTML = (id, html) => { const el = $(id); if (el.__html !== html) { el.__html = html; el.innerHTML = html; } };
+
+function syncOnlineFlags() {
+  document.body.classList.toggle('online', lobby.active && game.mode !== 'local' && game.state !== 'menu');
+  document.body.classList.toggle('is-host', lobby.role === 'host');
+}
+
+function leaveOnline() {
+  if (lobby.active) lobby.close();
+  syncOnlineFlags();
+}
+
+function openLobby() {
+  readAll();
+  joinError = '';
+  showScreen('lobby');
+  renderLobby();
+}
+
+function readAll() {
+  for (const [id, key, type] of bindings) readField(id, key, type);
+  saveSettings(settings);
+}
+
+function playerRow(p, actions) {
+  return `<div class="prow t${p.team}"><span class="pn">${esc(p.name)}${p.tag ? ` <span class="pt">${p.tag}</span>` : ''}</span>
+    <span class="pt">${teamName(p.team)}</span>${p.ping !== undefined ? `<span class="pp">${p.ping ? p.ping + ' ms' : '—'}</span>` : ''}${actions || ''}</div>`;
+}
+
+function renderLobby() {
+  syncOnlineFlags();
+  if (screen !== 'lobby') return;
+  const host = lobby.role === 'host';
+  const inMatch = host && game.mode === 'host' && game.live;
+  $('lobby-host').classList.toggle('on', host);
+  $('lobby-join').classList.toggle('on', !host);
+  $('lobby-title').textContent = host ? 'HOSTING' : 'JOIN MATCH';
+  if (host) {
+    $('host-code').textContent = fmtCode(lobby.code);
+    $('opt-approve').checked = lobby.approval;
+    const pend = [...lobby.pending.values()];
+    $('pending-wrap').style.display = pend.length || lobby.approval ? '' : 'none';
+    setHTML('pending-list', pend.length
+      ? pend.map(p => `<div class="prow req"><span class="pn">${esc(p.name)}</span><span class="pt">${esc((p.primary || '').toUpperCase())}</span>
+          <button class="ok" data-accept="${esc(p.peerId)}" data-nav>ACCEPT</button><button data-deny="${esc(p.peerId)}" data-nav>DENY</button></div>`).join('')
+      : '<div class="empty">No one is waiting. Share the code above.</div>');
+    const swap = (id) => (inMatch ? '' : `<button data-swap="${esc(id)}" data-nav title="Switch team">⇄</button>`);
+    const rows = [playerRow({ name: settings.name || 'Operator', team: lobby.hostTeam, tag: 'HOST (YOU)' }, swap('host'))];
+    for (const p of lobby.players.values()) rows.push(playerRow(p, swap(p.peerId) + `<button class="warn" data-kick="${esc(p.peerId)}" data-nav>KICK</button>`));
+    setHTML('host-players', rows.join(''));
+    $('host-count').textContent = `${lobby.players.size + 1}/${MAX_HUMANS}`;
+    $('lobby-start').style.display = inMatch ? 'none' : '';
+    $('lobby-back').style.display = inMatch ? '' : 'none';
+    $('host-note').textContent = inMatch
+      ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
+      : `${settings.teamSize}v${settings.teamSize} · ${settings.scoreLimit} kills · ${settings.timeLimit} min${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
+    $('lobby-leave').textContent = inMatch ? 'END SESSION' : 'CLOSE LOBBY';
+  } else {
+    const slots = $('code-slots').querySelectorAll('i');
+    const shown = lobby.role === 'guest' ? lobby.code : joinCode;
+    slots.forEach((el, i) => { el.textContent = shown[i] || ''; el.classList.toggle('cur', lobby.role !== 'guest' && i === joinCode.length); });
+    const busy = lobby.role === 'guest';
+    $('keypad').querySelectorAll('button').forEach(b => { b.disabled = busy || (b.dataset.key === 'go' && joinCode.length !== 6); });
+    $('keypad').style.display = busy ? 'none' : '';
+    const st = $('join-status');
+    st.className = 'join-status';
+    let html = '';
+    if (joinError) { html = esc(joinError); st.classList.add('bad'); }
+    else if (!busy) html = 'Ask the host for their 6-digit code.';
+    else if (lobby.status === 'searching') html = '<span class="spin"></span>Looking for the match…';
+    else if (lobby.status === 'pending') html = '<span class="spin"></span>Found it. Waiting for the host to let you in…';
+    else if (lobby.status === 'accepted' || lobby.status === 'ingame') {
+      st.classList.add('good');
+      html = lobby.hostInGame ? '<span class="spin"></span>Joining the match in progress…' : '<span class="spin"></span>You\'re in. Waiting for the host to start…';
+    }
+    setHTML('join-status', html);
+    const ro = lobby.roster || [];
+    $('join-players-wrap').style.display = ro.length ? '' : 'none';
+    setHTML('join-players', ro.map(p => playerRow({ name: p.n, team: p.tm, tag: p.h ? 'HOST' : '' })).join(''));
+    $('lobby-leave').textContent = busy ? 'LEAVE' : 'BACK';
+  }
+  if (game.input.lastDevice === 'pad' && !document.querySelector('#lobby .pad-focus')) focusFirst();
+}
+lobby.onUpdate = () => renderLobby();
+lobby.onToast = (s) => game.hud.toast(s);
+
+$('host-btn').addEventListener('click', () => {
+  readAll();
+  game.audio.init();
+  lobby.host(settings.name, settings.primary);
+  openLobby();
+});
+$('join-btn').addEventListener('click', () => {
+  readAll();
+  if (!lobby.active) joinCode = '';
+  openLobby();
+});
+$('opt-approve').addEventListener('change', (e) => lobby.setApproval(e.target.checked));
+$('copy-code').addEventListener('click', () => copyText(lobby.code, 'CODE COPIED'));
+$('copy-link').addEventListener('click', () => copyText(`${location.origin}${location.pathname}?join=${lobby.code}`, 'INVITE LINK COPIED'));
+function copyText(text, done) {
+  const ok = () => game.hud.toast(done);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, () => game.hud.toast(text));
+  else game.hud.toast(text);
+}
+$('lobby').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.accept) lobby.accept(b.dataset.accept);
+  else if (b.dataset.deny) lobby.deny(b.dataset.deny);
+  else if (b.dataset.kick) lobby.kick(b.dataset.kick);
+  else if (b.dataset.swap) lobby.swapTeam(b.dataset.swap);
+  else if (b.dataset.key) keypad(b.dataset.key);
+});
+function keypad(k) {
+  if (lobby.role === 'guest') return;
+  joinError = '';
+  if (k === 'del') joinCode = joinCode.slice(0, -1);
+  else if (k === 'go') { tryJoin(); return; }
+  else if (/^\d$/.test(k) && joinCode.length < 6) joinCode += k;
+  game.audio.play('ui', null, { ui: true, freq: 2600 });
+  renderLobby();
+  if (joinCode.length === 6 && game.input.lastDevice === 'pad') focusEl($('keypad').querySelector('.go'));
+}
+function tryJoin() {
+  if (joinCode.length !== 6) return;
+  readAll();
+  game.audio.init();
+  joinError = '';
+  lobby.join(joinCode, settings.name, settings.primary);
+}
+$('lobby-start').addEventListener('click', () => {
+  readAll();
+  showScreen(null);
+  game.startMatch(settings, { mode: 'host', lobby });
+  lobby.broadcastLobby();
+  syncOnlineFlags();
+});
+$('lobby-back').addEventListener('click', () => showScreen('pause'));
+$('lobby-leave').addEventListener('click', () => {
+  const wasPlaying = game.state !== 'menu';
+  leaveOnline();
+  if (wasPlaying) game.quitToMenu();
+  writeForm();
+  showScreen('menu');
+});
+$('pause-lobby').addEventListener('click', () => openLobby());
+$('pause-end').addEventListener('click', () => game.endMatch());
+
+lobby.onStart = (m) => {
+  try {
+    game.startMatch(settings, { mode: 'guest', lobby, start: m });
+    syncOnlineFlags();
+    showScreen(null);
+  } catch (err) {
+    console.error(err);
+    lobby.close('The host sent a match this version can\'t load.');
+  }
+};
+lobby.onClosed = (reason) => {
+  if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
+  syncOnlineFlags();
+  joinError = reason;
+  showScreen('lobby');
+  renderLobby();
+};
+
+// digits typed on the join screen
+window.addEventListener('keydown', (e) => {
+  if (screen !== 'lobby' || lobby.role === 'host' || game.input.enabled) return;
+  if (/^\d$/.test(e.key)) keypad(e.key);
+  else if (e.key === 'Backspace') keypad('del');
+  else if (e.key === 'Enter') { e.preventDefault(); tryJoin(); }
+});
+window.addEventListener('paste', (e) => {
+  if (screen !== 'lobby' || lobby.role) return;
+  const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+  if (digits) { joinCode = digits; joinError = ''; renderLobby(); }
+});
+for (const ev of ['beforeunload', 'pagehide']) window.addEventListener(ev, () => { if (lobby.active) lobby.close(); });
 
 // re-capture the mouse if lock was lost without pausing
 $('app').addEventListener('click', () => {
@@ -197,7 +393,9 @@ function focusEl(el) {
 }
 function focusFirst() {
   const items = navItems();
-  const pref = screen === 'menu' ? $('play') : screen === 'pause' ? $('resume') : $('again');
+  const pref = screen === 'menu' ? $('play') : screen === 'pause' ? $('resume')
+    : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
+    : $('again');
   focusEl(items.includes(pref) && pref.offsetParent ? pref : items[0]);
 }
 function cycleSelect(el, d) {
@@ -241,11 +439,18 @@ game.input.onNav = (dir) => {
     case 'back':
       if (screen === 'pause') game.resume();
       else if (screen === 'menu' && tab !== 'play') { setTab('play'); focusFirst(); }
+      else if (screen === 'lobby') {
+        if (game.mode === 'host' && game.live) showScreen('pause');
+        else if (lobby.role !== 'guest' && joinCode.length) keypad('del');
+        else $('lobby-leave').click();
+      }
       break;
     case 'start':
       if (screen === 'pause') game.resume();
       else if (screen === 'menu') deploy();
       else if (screen === 'end') $('again').click();
+      else if (screen === 'lobby' && lobby.role === 'host' && $('lobby-start').offsetParent) $('lobby-start').click();
+      else if (screen === 'lobby' && !lobby.role) tryJoin();
       break;
     case 'prevTab': case 'nextTab':
       if (screen === 'menu') {
@@ -272,6 +477,7 @@ function renderHints(device) {
     ? [hint('accept', 'Select'), hint('back', 'Back'), `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} Tabs</span>`, hint('pause', 'Deploy')].join('')
     : device === 'touch' ? '' : [hint('accept', 'Deploy'), `<span><kbd>Q</kbd><kbd>E</kbd> Tabs</span>`, hint('back', 'Back')].join('');
   $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Resume')].join('') : device === 'touch' ? '' : hint('back', 'Resume');
+  $('lobby-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : '<span><kbd>0</kbd>–<kbd>9</kbd> Code</span><span><kbd>Enter</kbd> Join</span>' + hint('back', 'Back');
   $('intel-input').textContent = device === 'pad' ? 'CONTROLLER' : device === 'touch' ? 'TOUCH' : 'KEYBOARD & MOUSE';
   game.hud.setDevice(device);
 }
@@ -299,3 +505,7 @@ document.addEventListener('mousemove', () => { if (screen) focusEl(null); }, { p
 writeForm();
 renderHints(game.input.lastDevice);
 showScreen('menu');
+{
+  const inv = new URLSearchParams(location.search).get('join');
+  if (inv && /^\d{6}$/.test(inv)) { joinCode = inv; openLobby(); }
+}
