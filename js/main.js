@@ -4,7 +4,7 @@ import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS } from './online.js';
-import { turnAvailable } from './net.js';
+import { turnAvailable, turnServers, turnStatus } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -164,6 +164,7 @@ for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListen
 
 game.onPause = (paused) => {
   syncOnlineFlags();
+  $('pause-conn').textContent = !lobby.active ? '' : lobby.net.relayed ? 'Connection: Cloudflare relay (your IP is hidden)' : `Connection: direct peer-to-peer${turnAvailable() && !turnStatus.ok ? ` (relay unavailable: ${turnStatus.detail})` : ''}`;
   if (paused) { syncPause(); showScreen('pause'); }
   else showScreen(null);
 };
@@ -231,6 +232,13 @@ function leaveOnline() {
 }
 
 let quickIntro = false;
+$('relay-test').addEventListener('click', async () => {
+  const out = $('relay-status');
+  out.className = ''; out.textContent = 'Testing…';
+  await turnServers(true);
+  out.textContent = turnStatus.detail;
+  out.className = turnStatus.ok ? 'ok' : 'bad';
+});
 document.body.classList.toggle('has-relay', turnAvailable());
 if (turnAvailable()) {
   document.getElementById('quick-ipnote').innerHTML = 'Quick match puts you in a game with strangers. Your connection goes through <b>Cloudflare\'s relay, so other players can\'t see your IP address</b>. Whoever hosts runs the match.';

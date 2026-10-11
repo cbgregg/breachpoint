@@ -159,6 +159,7 @@
             <div class="row"><label for="opt-vib">Vibration</label><input type="checkbox" id="opt-vib" data-nav></div>
             <div class="group relay-only">ONLINE</div>
             <div class="row relay-only"><label for="opt-relay">Hide my IP in private matches</label><input type="checkbox" id="opt-relay" data-nav></div>
+            <div class="row relay-only"><label>Cloudflare relay <output id="relay-status"></output></label><button id="relay-test" class="menu-btn small" data-nav>TEST</button></div>
             <div class="group">AUDIO</div>
             <div class="row"><label for="opt-vol">Master volume <output id="out-vol"></output></label><input type="range" id="opt-vol" min="0" max="1" step="0.05" data-nav></div>
             <div class="row"><label for="opt-music">Music volume <output id="out-music"></output></label><input type="range" id="opt-music" min="0" max="1" step="0.05" data-nav></div>
@@ -210,6 +211,7 @@
         <button id="pause-end" class="menu-btn online-only host-only" data-nav>END MATCH FOR EVERYONE</button>
         <button id="quit" class="menu-btn" data-nav>QUIT TO MENU</button>
         <p class="pane-note online-only">The match keeps running while this menu is open.</p>
+        <p class="pane-note online-only" id="pause-conn"></p>
       </div>
       <footer class="mw-foot" id="pause-hints"></footer>
     </div>

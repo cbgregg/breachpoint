@@ -340,6 +340,10 @@ body.online #restart { display: none; }
 #lobby-leave { text-align: center; }
 .conn-note { font-size: 12px; letter-spacing: 0.06em; color: var(--ink-faint); text-align: center; min-height: 14px; }
 .conn-note.hidden-ip { color: #7fd08a; }
+#relay-status { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--ink-dim); white-space: normal; }
+#relay-status.ok { color: #7fd08a; }
+#relay-status.bad { color: var(--enemy); }
+.row:has(#relay-status) label { flex-wrap: wrap; }
 .online-row .menu-btn.quick { grid-column: 1 / -1; background: rgba(232, 176, 74, 0.14); border-color: rgba(232, 176, 74, 0.5); display: flex; justify-content: space-between; align-items: baseline; }
 .online-row .menu-btn.quick small { font-size: 11px; letter-spacing: 0.16em; color: var(--ink-dim); }
 .notice { font-size: 14px; line-height: 1.55; color: var(--ink); margin: 0; padding: 10px 12px; background: var(--panel); border-left: 3px solid var(--amber); }

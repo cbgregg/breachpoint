@@ -8,21 +8,39 @@ import { TURN_ENDPOINT } from './config.js';
 let turnCache = null;
 const turnUrl = () => new URLSearchParams(location.search).get('turn') || TURN_ENDPOINT; // ?turn= for testing
 export const turnAvailable = () => !!turnUrl();
-export async function turnServers() {
-  if (!turnUrl()) return null;
-  if (turnCache && Date.now() < turnCache.until) return turnCache.servers;
+// last result, in plain words, for the Options "Test relay" button
+export const turnStatus = { ok: false, detail: 'Not checked yet' };
+export async function turnServers(fresh = false) {
+  if (!turnUrl()) { turnStatus.ok = false; turnStatus.detail = 'No relay configured'; return null; }
+  if (!fresh && turnCache && Date.now() < turnCache.until) return turnCache.servers;
   try {
-    const res = await Promise.race([
-      fetch(turnUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
-    ]);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data.iceServers) || !data.iceServers.length) throw new Error('no servers');
+    let res;
+    try {
+      res = await Promise.race([
+        fetch(turnUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 6 s')), 6000)),
+      ]);
+    } catch (e) {
+      throw new Error(e.message === 'timed out after 6 s' ? 'Worker timed out' : 'Could not reach the Worker (wrong URL, or its code blocks this site)');
+    }
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (_) { /* not JSON */ }
+    if (!data) throw new Error(`Worker replied "${text.slice(0, 40)}" — it is still running other code (paste turn-worker.js and deploy)`);
+    if (!res.ok) {
+      const why = data.error || `HTTP ${res.status}`;
+      const hint = /not configured/.test(why) ? ' — add TURN_KEY_ID and TURN_KEY_API_TOKEN in the Worker settings'
+        : /TURN API 40[13]/.test(why) ? ' — TURN_KEY_ID or TURN_KEY_API_TOKEN is wrong'
+        : /origin/.test(why) ? ` — add ${location.origin} to ALLOWED_ORIGINS` : '';
+      throw new Error(why + hint);
+    }
+    if (!Array.isArray(data.iceServers) || !data.iceServers.length) throw new Error('Worker returned no relay servers');
     turnCache = { servers: data.iceServers, until: Date.now() + (data.ttl || 3600) * 800 };
+    turnStatus.ok = true; turnStatus.detail = 'Working — Cloudflare relay ready';
     return turnCache.servers;
   } catch (e) {
-    console.warn('TURN relay unavailable, connecting directly', e);
+    turnStatus.ok = false; turnStatus.detail = e.message;
+    console.warn('TURN relay unavailable, connecting directly:', e.message);
     return null;
   }
 }

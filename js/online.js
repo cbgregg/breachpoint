@@ -197,6 +197,7 @@ export class Lobby {
   openNet(code, relayOnly) {
     this.net.open(code, { relayOnly }).then(() => {
       if (relayOnly && !this.net.relayed && this.net.room) this.toast('RELAY UNAVAILABLE — CONNECTING DIRECTLY');
+      else if (this.net.relayed) this.toast('IP HIDDEN — CLOUDFLARE RELAY');
       this.changed();
     });
   }
