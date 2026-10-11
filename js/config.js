@@ -103,6 +103,9 @@ export const QUALITY = {
 
 const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
+// Quick match (public) rules: the same for every public lobby
+export const PUBLIC_MATCH = { teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false };
+
 // Optional: your own music files (paths in the repo, e.g. 'assets/music/menu.mp3'). null = the built-in score.
 export const MUSIC_FILES = { menu: null, action: null };
 

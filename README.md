@@ -47,6 +47,10 @@ Browsers only expose a controller after you press a button on it, so press any b
 
 ## Online play
 
+**Quick match** puts you in a public game with no code: the game checks for open public lobbies for a few seconds and drops you into the fullest one, mid-match if one is running, taking a bot's slot. If none are open, you host one and others drop in. Public matches use fixed rules (6v6 with bots, 75 kills, 10 minutes, no friendly fire), start the next match automatically, and if the host leaves everyone is moved to another match. Finding a match only reads small public notices on Nostr relays, so nothing connects to you until you join one. The first time, the game explains that other players in a public match can see your IP address.
+
+**Private matches** use a code:
+
 1. **Host:** Play tab → set match size, limits and friendly fire → **HOST ONLINE MATCH**. You get a code like `482 913` and an invite link.
 2. **Friends:** **JOIN WITH CODE** → type the code (keyboard, controller or on-screen keypad) → **JOIN**. Opening the invite link fills the code in.
 3. With *Approve each player* on (default), the host accepts or denies each request. The host can switch players' squads, kick (which also bans for the session), and accept people mid-match from **Pause → Players & join requests**; each new player takes a bot's slot.
@@ -62,12 +66,12 @@ There is no game server. The host's browser runs the match and everyone else con
 - **Speed-hack guard:** a guest's inputs are spent against a real-time budget, so sending inputs faster than real time doesn't make them move faster.
 - **Lag compensation:** the host rewinds other players to where the shooter actually saw them (up to 0.5 s), so hits register fairly on normal connections.
 - **Anti-wallhack:** each guest is only sent enemies they could plausibly see (line-of-sight checked from their eye to the enemy's head, chest and legs, plus anyone very close). Enemies behind walls aren't in the data, so there's nothing to reveal.
-- **Join control:** optional per-player approval, kick and ban. Guests ignore game messages from anyone except the host, and every peer is rate-limited.
+- **Join control:** optional per-player approval (private matches), kick and ban. Offensive callsigns (including letter swaps like `4`→`a`) are replaced with `Operator-123` on every screen. Guests ignore game messages from anyone except the host, and every peer is rate-limited.
 - **Encrypted transport:** the code is used to find the host through public Nostr relays. That signaling is encrypted with a key derived from the code, and game traffic is WebRTC (DTLS), end to end between players.
 
 **Limits to know:**
 - The host can cheat, since their browser is the referee. Play with people you'd hand the code to.
-- Players connect directly, so each player's IP address is visible to the others in the match (as in any peer-to-peer game).
+- Players connect directly, so each player's IP address is visible to the others in the match (as in any peer-to-peer game). In quick match those are strangers; a TURN relay would hide IPs but needs a small credential service outside GitHub Pages.
 - Six digits keep codes easy to type, but someone could guess an active code. Leave *Approve each player* on if that matters to you.
 - Some strict networks (certain corporate or mobile carriers) block direct WebRTC connections. Without a TURN relay server, roughly 1 in 10 player pairs may fail to connect; try another network, or have someone else host.
 - Online play needs the game served over HTTPS (GitHub Pages is fine) or `localhost`.
@@ -108,6 +112,8 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/game.js` | Match loop (local / host / guest modes), hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
 | `js/net.js` | Peer-to-peer transport: 6-digit codes, Nostr signaling, WebRTC data channels |
 | `js/online.js` | Lobby (approval, kick, teams), host session (input validation, lag compensation, culled snapshots), guest session (prediction, reconciliation, interpolation) |
+| `js/quickplay.js` | Quick match: public lobby notices over Nostr, choosing a lobby |
+| `js/names.js` | Callsign filter |
 | `lib/trystero.js` | Vendored [Trystero](https://github.com/dmotz/trystero) 0.25 (Nostr strategy), MIT |
 | `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |

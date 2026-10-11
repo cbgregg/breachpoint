@@ -123,10 +123,11 @@
           </div>
           <button id="play" class="cta" data-nav><span>DEPLOY VS BOTS</span><span class="glyph" data-act="accept"></span></button>
           <div class="online-row">
+            <button id="quick-btn" class="menu-btn quick" data-nav>QUICK MATCH <small>PUBLIC · DROP IN</small></button>
             <button id="host-btn" class="menu-btn" data-nav>HOST ONLINE MATCH</button>
             <button id="join-btn" class="menu-btn" data-nav>JOIN WITH CODE</button>
           </div>
-          <p class="pane-note">Online play is peer-to-peer: the host's browser runs the match, friends join with a 6-digit code. Bots fill empty slots.</p>
+          <p class="pane-note">Online play is peer-to-peer: the host's browser runs the match. Quick match puts you in a public game; host/join use a private 6-digit code. Bots fill empty slots.</p>
         </section>
 
         <section class="pane" id="pane-loadout">
@@ -239,9 +240,17 @@
         <button id="lobby-back" class="cta" data-nav><span>BACK TO MATCH</span></button>
       </div>
 
+      <!-- quick match notice (first time only) -->
+      <div id="lobby-quickintro" class="lobby-view">
+        <div class="code-label">PUBLIC MATCH</div>
+        <p class="notice">Quick match puts you in a game with strangers. Like any peer-to-peer game, <b>the other players in your match can see your IP address</b>, and whoever hosts runs the match.</p>
+        <p class="notice dim">There's no chat. Offensive callsigns are replaced automatically. Use <b>Host online match</b> for a private game with friends.</p>
+        <button id="quick-go" class="cta" data-nav><span>FIND A MATCH</span></button>
+      </div>
+
       <!-- join view -->
       <div id="lobby-join" class="lobby-view">
-        <div class="code-label">ENTER MATCH CODE</div>
+        <div class="code-label" id="join-label">ENTER MATCH CODE</div>
         <div class="code-slots" id="code-slots"><i></i><i></i><i></i><b></b><i></i><i></i><i></i></div>
         <div class="keypad" id="keypad">
           <button data-key="1" data-nav>1</button><button data-key="2" data-nav>2</button><button data-key="3" data-nav>3</button>

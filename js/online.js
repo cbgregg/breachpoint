@@ -12,6 +12,8 @@
 //    WebRTC (DTLS) end to end and never touches a server.
 import * as THREE from 'three';
 import { Net, newCode } from './net.js';
+import { Board } from './quickplay.js';
+import { safeName } from './names.js';
 import { PRIMARIES, PLAYER, MELEE, WEAPONS } from './config.js';
 import { Character } from './character.js';
 
@@ -29,7 +31,7 @@ const fin = (v) => typeof v === 'number' && Number.isFinite(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const angLerp = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * t; };
-export const cleanName = (n) => String(n || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Operator';
+export const cleanName = (n) => safeName(String(n || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Operator');
 const cleanLabel = (s) => String(s ?? '').replace(/[^A-Z0-9 +\-]/g, '').slice(0, 28);
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _wish = new THREE.Vector3();
 
@@ -54,6 +56,10 @@ export class Lobby {
     this.onStart = null;       // guest: host started a match
     this.onClosed = null;      // guest: session ended (reason)
     this.onToast = null;
+    this.onQuickHost = null;   // quick match found nothing: we host a public match
+    this.board = new Board();  // public lobby notices (quick match)
+    this.quickMode = false;    // looking for / playing a quick match
+    this.public = false;       // this session is a public quick match
     this.net.on('msg', (m, id) => this.receive(m, id));
     this.net.on('peerJoin', (id) => this.peerJoin(id));
     this.net.on('peerLeave', (id) => this.peerLeave(id));
@@ -165,7 +171,51 @@ export class Lobby {
   }
 
   // ---------- guest ----------
-  join(code, name, primary) {
+  // ---------- quick match ----------
+  // read public lobby notices for a few seconds, join the fullest open one, or host if there are none
+  quick(name, primary) {
+    this.close();
+    this.quickMode = true;
+    this.quickTried = new Set();
+    this.quickName = name; this.quickPrimary = primary;
+    this.status = 'matching';
+    this.board.connect();
+    clearTimeout(this.quickTimer);
+    this.quickTimer = setTimeout(() => this.quickNext(), 4500);
+    this.changed();
+  }
+
+  quickNext() {
+    if (!this.quickMode) return;
+    this.net.close();
+    this.role = null;
+    const c = this.board.candidates(PROTO, this.quickTried)[0];
+    if (c) { this.quickTried.add(c.code); this.join(c.code, this.quickName, this.quickPrimary, true); return; }
+    this.hostPublic();
+  }
+
+  hostPublic() {
+    this.host(this.quickName, this.quickPrimary);
+    this.public = true;
+    this.approval = false;
+    clearInterval(this.adTimer);
+    const advertise = () => {
+      if (!this.public || this.role !== 'host') return;
+      this.board.publish({ v: PROTO, code: this.code, n: this.players.size + 1, max: MAX_HUMANS, ig: this.inMatch ? 1 : 0, open: 1 }).catch(() => {});
+    };
+    advertise();
+    this.adTimer = setInterval(advertise, 4000);
+    if (this.onQuickHost) this.onQuickHost();
+    this.changed();
+  }
+
+  // a quick-match join attempt failed: try the next lobby instead of giving up
+  fail(reason) {
+    if (this.quickMode && !this.public) { this.quickNext(); return; }
+    this.close(reason);
+  }
+
+  join(code, name, primary, quick = false) {
     this.reset();
     this.role = 'guest';
     this.code = code;
@@ -177,11 +227,11 @@ export class Lobby {
     clearTimeout(this.findTimer);
     this.findTimer = setTimeout(() => {
       if (this.role === 'guest' && !this.hostId) {
-        this.close(this.lastError
+        this.fail(this.lastError
           ? 'Found the match but couldn\'t open a direct connection to the host (a strict firewall or mobile network can block this). Try another network, or let someone else host.'
           : 'No match found with that code. Check the number and that the host is still in the lobby.');
       }
-    }, 45000);
+    }, quick ? 15000 : 45000);
     this.changed();
   }
 
@@ -258,12 +308,14 @@ export class Lobby {
         if (st === 'pending') this.status = 'pending';
         else if (st === 'accepted') {
           this.status = this.game.mode === 'guest' && this.game.live ? 'ingame' : 'accepted';
+          if (this.quickMode && !this.public) { this.public = true; this.board.close(); clearTimeout(this.quickTimer); }
           if (Array.isArray(m.ps)) this.roster = m.ps.slice(0, MAX_HUMANS).map(p => ({ n: cleanName(p && p.n), tm: p && p.tm === 1 ? 1 : 0, h: p && p.h ? 1 : 0 }));
           this.hostInGame = !!m.ig;
-        } else if (st === 'denied') return this.close('The host declined your request.');
+        } else if (st === 'pending' && this.quickMode && !this.public) return this.fail(); // public lobbies don't make you wait
+        else if (st === 'denied') return this.fail('The host declined your request.');
         else if (st === 'kicked') return this.close('You were removed from the match by the host.');
-        else if (st === 'full') return this.close('That match is full.');
-        else if (st === 'version') return this.close('The host is running a different version of Breachpoint. Both of you should reload the page.');
+        else if (st === 'full') return this.fail('That match is full.');
+        else if (st === 'version') return this.fail('The host is running a different version of Breachpoint. Both of you should reload the page.');
         this.changed();
         break;
       }
@@ -278,10 +330,18 @@ export class Lobby {
   }
 
   close(reason) {
-    const wasGuest = this.role === 'guest';
+    const wasGuest = this.role === 'guest' || this.quickMode;
+    const wasPublic = this.public;
     if (this.role === 'guest' && this.hostId) this.net.send({ t: 'bye' }, this.hostId);
+    if (this.public && this.role === 'host') this.board.publish({ v: PROTO, code: this.code, n: 0, max: MAX_HUMANS, open: 0 }).catch(() => {});
+    clearInterval(this.adTimer);
+    clearTimeout(this.quickTimer);
+    const board = this.board;
+    setTimeout(() => { if (!this.quickMode) board.close(); }, 600); // let the closing notice go out
+    this.quickMode = false;
+    this.public = false;
     this.reset();
-    if (wasGuest && reason && this.onClosed) this.onClosed(reason);
+    if (wasGuest && reason && this.onClosed) this.onClosed(reason, wasPublic);
     this.changed();
   }
 

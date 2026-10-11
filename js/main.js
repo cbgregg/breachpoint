@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, MAP_NAME } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, MAP_NAME, PUBLIC_MATCH } from './config.js';
 import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
@@ -184,7 +184,19 @@ game.onEnd = (r) => {
   game.hud.renderScoreboard($('end-board'));
   $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
   setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
+  if (lobby.public && lobby.role === 'host') {
+    clearTimeout(nextMatchT);
+    nextMatchT = setTimeout(() => {
+      if (!lobby.public || lobby.role !== 'host' || game.state !== 'ended') return;
+      game.startMatch(publicSettings(), { mode: 'host', lobby });
+      lobby.broadcastLobby();
+      syncOnlineFlags();
+      showScreen(null);
+    }, 15000);
+    game.hud.toast('NEXT PUBLIC MATCH IN 15 SECONDS');
+  }
 };
+let nextMatchT = 0;
 $('again').addEventListener('click', () => {
   if (lobby.active) { openLobby(); return; }
   showScreen(null); game.startMatch(settings);
@@ -217,6 +229,7 @@ function leaveOnline() {
   syncOnlineFlags();
 }
 
+let quickIntro = false;
 function openLobby() {
   readAll();
   joinError = '';
@@ -239,9 +252,16 @@ function renderLobby() {
   if (screen !== 'lobby') return;
   const host = lobby.role === 'host';
   const inMatch = host && game.mode === 'host' && game.live;
-  $('lobby-host').classList.toggle('on', host);
-  $('lobby-join').classList.toggle('on', !host);
-  $('lobby-title').textContent = host ? 'HOSTING' : 'JOIN MATCH';
+  $('lobby-host').classList.toggle('on', host && !quickIntro);
+  $('lobby-join').classList.toggle('on', !host && !quickIntro);
+  $('lobby-quickintro').classList.toggle('on', quickIntro);
+  $('lobby-title').textContent = quickIntro || lobby.quickMode || lobby.public ? 'QUICK MATCH' : host ? 'HOSTING' : 'JOIN MATCH';
+  $('opt-approve').closest('.row').style.display = lobby.public ? 'none' : '';
+  $('code-slots').style.display = lobby.quickMode && !lobby.code ? 'none' : '';
+  const quickish = quickIntro || lobby.quickMode || lobby.public;
+  $('join-label').textContent = quickish ? 'PUBLIC MATCH' : 'ENTER MATCH CODE';
+  $('lobby-hints').style.visibility = quickish ? 'hidden' : '';
+  if (quickIntro) { $('lobby-leave').textContent = 'BACK'; return; }
   if (host) {
     $('host-code').textContent = fmtCode(lobby.code);
     $('opt-approve').checked = lobby.approval;
@@ -266,7 +286,7 @@ function renderLobby() {
     const slots = $('code-slots').querySelectorAll('i');
     const shown = lobby.role === 'guest' ? lobby.code : joinCode;
     slots.forEach((el, i) => { el.textContent = shown[i] || ''; el.classList.toggle('cur', lobby.role !== 'guest' && i === joinCode.length); });
-    const busy = lobby.role === 'guest';
+    const busy = lobby.role === 'guest' || lobby.quickMode;
     $('keypad').querySelectorAll('button').forEach(b => { b.disabled = busy || (b.dataset.key === 'go' && joinCode.length !== 6); });
     $('keypad').style.display = busy ? 'none' : '';
     const st = $('join-status');
@@ -274,6 +294,7 @@ function renderLobby() {
     let html = '';
     if (joinError) { html = esc(joinError); st.classList.add('bad'); }
     else if (!busy) html = 'Ask the host for their 6-digit code.';
+    else if (lobby.status === 'matching' || (lobby.quickMode && lobby.status === 'searching')) html = '<span class="spin"></span>Looking for an open public match…';
     else if (lobby.status === 'searching') html = '<span class="spin"></span>Looking for the match…';
     else if (lobby.status === 'pending') html = '<span class="spin"></span>Found it. Waiting for the host to let you in…';
     else if (lobby.status === 'accepted' || lobby.status === 'ingame') {
@@ -297,6 +318,33 @@ $('host-btn').addEventListener('click', () => {
   lobby.host(settings.name, settings.primary);
   openLobby();
 });
+// ---------- quick match ----------
+const ACK = 'breachpoint.publicAck.v1';
+const acked = () => { try { return localStorage.getItem(ACK) === '1'; } catch (_) { return false; } };
+function startQuick() {
+  readAll();
+  game.audio.init();
+  quickIntro = false;
+  joinError = '';
+  lobby.quick(settings.name, settings.primary);
+  showScreen('lobby');
+  renderLobby();
+}
+$('quick-btn').addEventListener('click', () => {
+  if (acked()) { startQuick(); return; }
+  quickIntro = true;
+  showScreen('lobby');
+  renderLobby();
+});
+$('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, '1'); } catch (_) { /* ignore */ } startQuick(); });
+const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH });
+lobby.onQuickHost = () => {
+  game.startMatch(publicSettings(), { mode: 'host', lobby });
+  syncOnlineFlags();
+  showScreen(null);
+  game.hud.toast('NO OPEN MATCHES — YOU\'RE HOSTING. PLAYERS WILL DROP IN');
+};
+
 $('join-btn').addEventListener('click', () => {
   readAll();
   if (!lobby.active) joinCode = '';
@@ -339,12 +387,14 @@ function tryJoin() {
 $('lobby-start').addEventListener('click', () => {
   readAll();
   showScreen(null);
-  game.startMatch(settings, { mode: 'host', lobby });
+  clearTimeout(nextMatchT);
+  game.startMatch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby });
   lobby.broadcastLobby();
   syncOnlineFlags();
 });
 $('lobby-back').addEventListener('click', () => showScreen('pause'));
 $('lobby-leave').addEventListener('click', () => {
+  if (quickIntro) { quickIntro = false; showScreen('menu'); return; }
   const wasPlaying = game.state !== 'menu';
   leaveOnline();
   if (wasPlaying) game.quitToMenu();
@@ -364,8 +414,16 @@ lobby.onStart = (m) => {
     lobby.close('The host sent a match this version can\'t load.');
   }
 };
-lobby.onClosed = (reason) => {
+lobby.onClosed = (reason, wasPublic) => {
   if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
+  // a public host went away: find another match automatically
+  if (wasPublic && /host closed|Lost connection/.test(reason)) {
+    lobby.quick(settings.name, settings.primary);
+    game.hud.toast('HOST LEFT — FINDING ANOTHER MATCH');
+    showScreen('lobby');
+    renderLobby();
+    return;
+  }
   syncOnlineFlags();
   joinError = reason;
   showScreen('lobby');
