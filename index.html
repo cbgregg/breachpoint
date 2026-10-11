@@ -80,6 +80,7 @@
     <button data-btn="pause" class="tb small" id="tb-pause">❚❚</button>
     <button data-btn="score" class="tb small" id="tb-score">TAB</button>
     <button data-btn="fire" class="tb big" id="tb-fire">FIRE</button>
+    <button data-btn="fire" class="tb big" id="tb-fire2">FIRE</button>
     <button data-btn="ads" class="tb" id="tb-ads">ADS</button>
     <button data-btn="jump" class="tb" id="tb-jump">JUMP</button>
     <button data-btn="crouch" class="tb" id="tb-crouch">CROUCH</button>
@@ -144,6 +145,9 @@
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
             <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
             <div class="row"><label for="opt-fps">FPS counter</label><input type="checkbox" id="opt-fps" data-nav></div>
+            <div class="group">AIMING</div>
+            <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
+              <option value="hold">Hold</option><option value="toggle">Toggle</option></select></div>
             <div class="group">MOUSE &amp; KEYBOARD</div>
             <div class="row"><label for="opt-sens">Mouse sensitivity <output id="out-sens"></output></label><input type="range" id="opt-sens" min="0.2" max="3" step="0.05" data-nav></div>
             <div class="row"><label for="opt-invert">Invert look</label><input type="checkbox" id="opt-invert" data-nav></div>

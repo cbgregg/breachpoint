@@ -66,6 +66,7 @@ export class Input {
     this.prevBtn = []; this.padMoveX = 0; this.padMoveY = 0; this.lookX = 0; this.lookY = 0;
     this.padFire = false; this.padAds = false; this.padScore = false;
     this.deadzone = 0.12;
+    this.adsMode = 'hold'; this.adsToggled = false; this.prevLT = false; this.touchAdsHeld = false; this.adsClass = false;
     this.vibration = true;
     this.navRepeat = 0; this.navDir = null;
     this.onLockChange = null; this.onNav = null; this.onPadChange = null; this.onDeviceChange = null;
@@ -84,7 +85,7 @@ export class Input {
       if (!this.enabled || this.isTouch) return;
       if (!this.locked && !this.fallback) return;
       if (e.button === 0) this.mouseFire = true;
-      if (e.button === 2) this.mouseAds = true;
+      if (e.button === 2) { this.mouseAds = true; this.adsPress(); }
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseFire = false;
@@ -116,7 +117,10 @@ export class Input {
   }
 
   get fire() { return this.mouseFire || this.touchFire || this.padFire; }
-  get ads() { return this.mouseAds || this.touchAds || this.padAds; }
+  // hold: aim while any aim input is held. toggle: each press flips it; clearAds() drops it.
+  get ads() { return this.adsMode === 'toggle' ? this.adsToggled : (this.mouseAds || this.touchAdsHeld || this.padAds); }
+  adsPress() { if (this.adsMode === 'toggle' && this.enabled) this.adsToggled = !this.adsToggled; }
+  clearAds() { this.adsToggled = false; }
   get moveX() { return Math.max(-1, Math.min(1, this.touchMoveX + this.padMoveX)); }
   get moveY() { return Math.max(-1, Math.min(1, this.touchMoveY + this.padMoveY)); }
   get scoreboard() { return this.keys.has('Tab') || this.touchScore || this.padScore; }
@@ -190,6 +194,8 @@ export class Input {
       this.padMoveX = lx; this.padMoveY = -ly;
       this.lookX = rx; this.lookY = ry;
       this.padAds = val(PAD.LT) > 0.25;
+      if (this.padAds && !this.prevLT) this.adsPress();
+      this.prevLT = this.padAds;
       this.padFire = val(PAD.RT) > 0.3;
       this.padScore = btn(PAD.VIEW);
       for (const i of edges) {
@@ -214,7 +220,18 @@ export class Input {
     }
   }
 
+  // touch: highlight the ADS button and enlarge the fire buttons while aiming
+  syncTouchAds() {
+    const on = this.isTouch && this.enabled && this.ads;
+    if (on === this.adsClass) return;
+    this.adsClass = on;
+    document.body.classList.toggle('ads-on', on);
+    const b = document.getElementById('tb-ads');
+    if (b) b.classList.toggle('active', on);
+  }
+
   endFrame() {
+    this.syncTouchAds();
     this.actions.clear();
     this.used.length = 0;
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
@@ -222,7 +239,8 @@ export class Input {
 
   reset() {
     this.keys.clear(); this.actions.clear();
-    this.mouseFire = this.mouseAds = this.touchFire = this.touchAds = false;
+    this.mouseFire = this.mouseAds = this.touchFire = this.touchAdsHeld = false;
+    this.adsToggled = false; this.prevLT = false;
     this.touchMoveX = this.touchMoveY = 0;
     this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
     this.padAds = this.padFire = this.padScore = false;
@@ -250,7 +268,7 @@ export class Input {
           const k = btn.dataset.btn;
           btn.classList.add('down');
           if (k === 'fire') { this.touchFire = true; if (lookId === null) lookStart(t); }
-          else if (k === 'ads') { this.touchAds = !this.touchAds; btn.classList.toggle('active', this.touchAds); }
+          else if (k === 'ads') { this.touchAdsHeld = true; this.adsPress(); if (lookId === null) lookStart(t); }
           else if (k === 'score') this.touchScore = true;
           else this.actions.add(k);
           continue;
@@ -292,6 +310,7 @@ export class Input {
         if (btn) {
           btn.classList.remove('down');
           if (btn.dataset.btn === 'fire') this.touchFire = false;
+          if (btn.dataset.btn === 'ads') this.touchAdsHeld = false;
           if (btn.dataset.btn === 'score') this.touchScore = false;
         }
       }

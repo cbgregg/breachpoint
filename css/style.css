@@ -267,6 +267,11 @@ body.ingame #touch.on { display: block; }
 #tb-frag { right: 192px; bottom: 106px; }
 #tb-melee { right: 34px; bottom: 196px; }
 #tb-sprint { left: 22px; bottom: 112px; }
+/* while aiming: a bigger fire button, plus a second one on the left so the right thumb can hold ADS and aim */
+#tb-fire, #tb-fire2 { transition: width .12s, height .12s; }
+#tb-fire2 { left: 92px; bottom: 96px; width: 96px; height: 96px; display: none; }
+body.ads-on #tb-fire2 { display: block; }
+body.ads-on #tb-fire { width: 104px; height: 104px; right: 18px; bottom: 86px; }
 
 @media (pointer: coarse) {
   #tl { width: 130px; top: 8px; left: 8px; }

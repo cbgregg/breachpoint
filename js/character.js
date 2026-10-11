@@ -472,7 +472,11 @@ export class Character {
         if (!this.alive && this.game.time - this.deathT > 5) m.root.visible = false;
         return;
       }
-      if (lod === 2 && (m.skip = !m.skip)) return;
+      // distant: the body still moves every frame, only the skeleton pose updates at ~30 Hz
+      if (lod === 2 && m.accDt < 1 / 30) {
+        if (this.alive) { m.root.position.copy(this.pos); m.root.rotation.set(0, this.yaw, 0); }
+        return;
+      }
       animateSoldier(this, m.accDt, showName);
       m.accDt = 0;
       return;

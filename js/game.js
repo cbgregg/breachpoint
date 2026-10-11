@@ -97,6 +97,7 @@ export class Game {
     if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); }
     this.audio.setVolume(s.volume);
     this.input.deadzone = s.padDeadzone;
+    if (this.input.adsMode !== (s.adsMode || 'hold')) { this.input.adsMode = s.adsMode || 'hold'; this.input.clearAds(); }
     this.input.vibration = s.vibration;
   }
 
@@ -230,6 +231,7 @@ export class Game {
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused';
+    this.input.clearAds();
     if (this.playerCtl) this.playerCtl.triggerLatch = false;
     this.input.reset();
     this.input.enabled = false;
@@ -417,11 +419,12 @@ export class Game {
       case 'score': hud.scoreEvent(a[0], a[1]); break;
       case 'medal': hud.medal(a[0], a[1]); break;
       case 'death': {
+        inp.clearAds();
         const killer = this.charById ? this.charById(a[0]) : null;
         if (this.player) this.player.killer = killer;
         hud.showDeath(killer, a[1]); inp.rumble(0.9, 0.5, 350); break;
       }
-      case 'spawn': hud.hideDeath(); this.audio.play('spawn', null, { ui: true }); if (ctl) { ctl.lastFov = 0; ctl.recoilDebt = 0; ctl.crouchToggle = false; } break;
+      case 'spawn': inp.clearAds(); hud.hideDeath(); this.audio.play('spawn', null, { ui: true }); if (ctl) { ctl.lastFov = 0; ctl.recoilDebt = 0; ctl.crouchToggle = false; } break;
       case 'pickup': this.audio.play('pickup', null, { ui: true }); hud.message(a[0] === 'health' ? '+50 HEALTH' : 'AMMO RESUPPLIED'); break;
       case 'msg': hud.message(a[0]); break;
       default: break;

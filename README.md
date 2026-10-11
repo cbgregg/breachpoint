@@ -28,7 +28,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Move | `W` `A` `S` `D` | Left stick | Left-side joystick |
 | Look | Mouse | Right stick | Drag right side |
 | Fire | Left click | RT | FIRE |
-| Aim down sights | Right click | LT | ADS (toggle) |
+| Aim down sights (Hold by default; Toggle in Options) | Right click | LT | ADS (drag it to aim; a second FIRE button appears on the left while aiming) |
 | Jump | `Space` | A | JUMP |
 | Crouch / slide while sprinting | `C` / `Ctrl` | B (tap) | CROUCH |
 | Sprint (cancels reload) / hold breath (scoped) | `Shift` | L3 (click) | SPRINT |

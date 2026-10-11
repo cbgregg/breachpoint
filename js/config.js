@@ -111,6 +111,7 @@ export const DEFAULT_SETTINGS = {
   timeLimit: 10,
   primary: 'rifle',
   sensitivity: 1,
+  adsMode: 'hold', // 'hold' or 'toggle'
   fov: 80,
   volume: 0.7,
   showFps: false,

@@ -186,6 +186,8 @@ export class PlayerController {
       if (inp.action('grenade')) c.throwGrenade();
       if (inp.action('melee')) c.melee();
     }
+    // toggle ADS drops out on reload, weapon swap, sprint, melee and throws, like hold ADS would
+    if (c.weapon.reloading || c.switchT > 0 || c.sprinting || c.meleeT > 0 || c.grenadeCd > 0.6) inp.clearAds();
     const adsWant = canAct && inp.ads && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
     this.cmd.ads = adsWant;
     this.cmd.f = canAct && inp.fire ? 1 : 0;
