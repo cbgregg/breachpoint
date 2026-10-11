@@ -101,7 +101,8 @@ export class Game {
     this.audio.setVolume(s.volume);
     this.music.setVolume(s.musicVolume ?? 0.5);
     this.input.deadzone = s.padDeadzone;
-    if (this.input.adsMode !== (s.adsMode || 'hold')) { this.input.adsMode = s.adsMode || 'hold'; this.input.clearAds(); }
+    const adsMode = this.input.isTouch ? (s.touchAds || 'toggle') : (s.adsMode || 'hold');
+    if (this.input.adsMode !== adsMode) { this.input.adsMode = adsMode; this.input.clearAds(); }
     this.input.vibration = s.vibration;
   }
 

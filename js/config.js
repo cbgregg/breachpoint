@@ -115,7 +115,9 @@ export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
   musicVolume: 0.5,
-  privateRelay: false, // route private matches through the TURN relay too (hides your IP)
+  privateRelay: false,
+  touchAds: 'toggle',   // touch screens: tap ADS once to aim, again to stop
+  touchAutoFire: true,  // touch screens: fire automatically while the crosshair is on an enemy // route private matches through the TURN relay too (hides your IP)
   name: 'Operator',
   teamSize: 6,
   difficulty: 'normal',

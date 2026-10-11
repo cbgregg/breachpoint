@@ -8,7 +8,7 @@
 //   TURN_KEY_ID          (text)    the TURN key ID from Realtime → TURN Server
 //   TURN_KEY_API_TOKEN   (secret)  that TURN key's API token
 //   ALLOWED_ORIGINS      (text, optional) comma-separated origins allowed to call this Worker,
-//                                  default "https://cbgregg.github.io"
+//                                  default: breach-point.net, www.breach-point.net, cbgregg.github.io
 
 const TTL = 4 * 3600;               // credentials last 4 hours (longer than any match)
 const PER_IP_PER_MINUTE = 10;       // light abuse guard (per Worker instance)
@@ -17,7 +17,7 @@ const hits = new Map();
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
-    const allowed = (env.ALLOWED_ORIGINS || 'https://cbgregg.github.io').split(',').map(s => s.trim()).filter(Boolean);
+    const allowed = (env.ALLOWED_ORIGINS || 'https://breach-point.net,https://www.breach-point.net,https://cbgregg.github.io').split(',').map(s => s.trim()).filter(Boolean);
     const okOrigin = allowed.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     const cors = {
       'Access-Control-Allow-Origin': okOrigin ? origin : allowed[0] || '',

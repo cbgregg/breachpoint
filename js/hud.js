@@ -48,7 +48,45 @@ export class HUD {
     if (game.minimap) this.mmCtx.drawImage(game.minimap.canvas, 0, 0, 2, 2);
   }
 
-  show(on) { this.el.classList.toggle('on', on); }
+  show(on) { this.el.classList.toggle('on', on); if (!on) this.clearTags(); }
+
+  // ---------- name tags ----------
+  clearTags() { if (this.tags) { for (const t of this.tags.values()) t.el.remove(); this.tags.clear(); } }
+
+  updateTags() {
+    const g = this.game, p = g.player, cam = g.camera;
+    if (!this.tags) { this.tags = new Map(); this.tagBox = $('tags'); this.tagV = new g.camera.position.constructor(); }
+    const W = window.innerWidth, H = window.innerHeight;
+    const seen = new Set();
+    const scoped = p.alive && p.weapon.def.scope && p.adsT > 0.85;
+    for (const c of g.characters) {
+      if (c === p || !c.alive || c.hidden) continue;
+      const friend = c.team === p.team;
+      if (!friend && c !== g.aimTarget) continue;
+      if (scoped && friend) continue;
+      const v = c.headPos(this.tagV); v.y += 0.42;
+      const dist = v.distanceTo(cam.position);
+      v.project(cam);
+      if (v.z > 1 || v.x < -1.1 || v.x > 1.1 || v.y < -1.1 || v.y > 1.1) continue;
+      let t = this.tags.get(c);
+      if (!t) {
+        const el = document.createElement('div');
+        el.className = 'tag';
+        el.innerHTML = '<span class="tn"></span><span class="tc"></span>';
+        el.firstChild.textContent = c.name.toUpperCase();
+        this.tagBox.appendChild(el);
+        t = { el, key: '' };
+        this.tags.set(c, t);
+      }
+      seen.add(c);
+      const x = (v.x * 0.5 + 0.5) * W, y = (-v.y * 0.5 + 0.5) * H;
+      const s = Math.max(0.7, Math.min(1.15, 9 / Math.max(1, dist) + 0.62));
+      t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(2)})`;
+      const key = (friend ? 'f' : 'e') + (friend && dist > 45 ? ' far' : '');
+      if (key !== t.key) { t.key = key; t.el.className = 'tag ' + key; }
+    }
+    for (const [c, t] of this.tags) if (!seen.has(c)) { t.el.remove(); this.tags.delete(c); }
+  }
 
   setDevice(d) {
     this.device = d;
@@ -67,6 +105,7 @@ export class HUD {
 
   update(dt) {
     const g = this.game, p = g.player;
+    this.updateTags();
     this.frames++; this.fpsT += dt;
     if (this.fpsT >= 0.5) { $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS`; this.frames = 0; this.fpsT = 0; }
     this.sty('fps', 'display', g.settings.showFps ? 'block' : 'none');

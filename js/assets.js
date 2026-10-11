@@ -38,27 +38,39 @@ export async function loadAssets(onProgress) {
   }
 }
 
-// team 0 keeps the original kit; team 1 gets a darker, desaturated kit so the sides read differently
+// Readability (Black Ops 2 style): both kits stay bright, and every soldier gets a soft rim light
+// so silhouettes separate from walls and shadows. Team 1 wears a cool slate kit.
 const tintCache = new Map();
-function teamMaterial(mat, team) {
-  if (team === 0) return mat;
-  const key = mat.uuid;
+function addRim(m) {
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.rimColor = { value: new THREE.Color(0.95, 0.92, 0.85).multiplyScalar(0.9) };
+    sh.fragmentShader = 'uniform vec3 rimColor;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.6);
+      totalEmissiveRadiance += rimColor * rimF * 0.55;`);
+  };
+  m.customProgramCacheKey = () => 'soldier-rim';
+}
+function teamMaterial(mat, team, rim = true) {
+  const key = mat.uuid + ':' + team + ':' + rim;
   if (!tintCache.has(key)) {
     const m = mat.clone();
-    m.color = new THREE.Color(0.17, 0.17, 0.155);
+    if (team === 1) m.color = new THREE.Color(0.46, 0.5, 0.58); // cool slate: stands out from the warm desert and from team 0
+    m.roughness = 0.72;
+    m.envMapIntensity = 1.25;
+    if (rim) addRim(m);
     tintCache.set(key, m);
   }
   return tintCache.get(key);
 }
 
-export function cloneSoldier(team) {
+export function cloneSoldier(team, { rim = true } = {}) {
   const src = ASSETS.soldier;
   if (!src) return null;
   const root = SkeletonUtils.clone(src.scene);
   const bones = {};
   root.traverse((o) => {
     if (o.isBone) bones[o.name.replace(/^mixamorig:?/, '')] = o;
-    if (o.isMesh) o.material = teamMaterial(o.material, team);
+    if (o.isMesh) o.material = teamMaterial(o.material, team, rim);
   });
   const mixer = new THREE.AnimationMixer(root);
   const actions = {};

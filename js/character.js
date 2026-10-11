@@ -533,8 +533,7 @@ export class Character {
     m.head.rotation.x = this.pitch * 0.5 - m.spine.rotation.x;
     if (this.meleeT > 0) m.aim.rotation.x -= Math.sin((1 - this.meleeT / MELEE.time) * Math.PI) * 0.8;
     m.aim.rotation.z = this.weapon.reloading ? Math.sin(this.weapon.reloadProgress * Math.PI) * 0.5 : 0;
-    m.nameTag.visible = showName;
-    m.nameTag.position.y = this.height + 0.38;
+    m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
   }
 
   muzzleWorld(out) {
@@ -715,8 +714,7 @@ function animateSoldier(c, dt, showName) {
   _w3.add(_w1.set(-0.03, -0.03, 0.05).applyQuaternion(_qAim));
   ikArms(m, rt, _w3.clone(), _qAim);
 
-  m.nameTag.visible = showName;
-  m.nameTag.position.y = c.height + 0.38;
+  m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
 }
 
 function ikArms(m, rightTarget, leftTarget, aimQ) {
@@ -737,7 +735,7 @@ function ikArms(m, rightTarget, leftTarget, aimQ) {
 // First-person body: the same rig placed under the camera with the head collapsed, so only
 // real sleeves and gloved hands show. Returns null when the model isn't loaded.
 export function createFpBody(team) {
-  const sol = cloneSoldier(team);
+  const sol = cloneSoldier(team, { rim: false });
   if (!sol) return null;
   const root = new THREE.Group();
   root.add(sol.root);

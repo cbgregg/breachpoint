@@ -20,8 +20,8 @@ const GradeShader = {
     ca: { value: 0.0011 },
     damage: { value: 0 },
     flash: { value: 0 },
-    saturation: { value: 0.86 },
-    contrast: { value: 1.1 },
+    saturation: { value: 1.0 },
+    contrast: { value: 1.06 },
     lift: { value: new THREE.Vector3(0.012, 0.016, 0.02) },
     gain: { value: new THREE.Vector3(1.04, 1.0, 0.93) },
   },
@@ -66,7 +66,7 @@ export class Renderer {
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
     r.setSize(window.innerWidth, window.innerHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 0.62;
+    r.toneMappingExposure = 0.7;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;

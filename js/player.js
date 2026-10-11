@@ -195,14 +195,21 @@ export class PlayerController {
     if (acts.length) this.cmd.a = acts;
     c.adsT = clamp(c.adsT + Math.sign(adsWant - c.adsT) * dt / def.adsTime, 0, 1);
 
-    if (canAct && inp.fire && this.cycleT <= 0) {
-      if (def.auto || !this.triggerLatch) {
-        if (c.tryFire(c.eyePos(_a), c.forward(_b))) this.onFired(c.weapon.def);
+    // touch auto-fire: shoot while the crosshair is on an enemy in range (Call of Duty Mobile "simple mode")
+    const t = g.aimTarget;
+    const auto = canAct && inp.isTouch && s.touchAutoFire !== false && !inp.fire && t && t.alive && !t.hidden
+      && t.pos.distanceTo(c.pos) < def.range * 0.9 && c.sprinting === false;
+    let fired = false;
+    if (canAct && (inp.fire || auto) && this.cycleT <= 0) {
+      if (def.auto || !this.triggerLatch || auto) {
+        if (c.tryFire(c.eyePos(_a), c.forward(_b))) { this.onFired(c.weapon.def); fired = true; }
       }
       this.triggerLatch = true;
     } else if (!inp.fire) {
       this.triggerLatch = false;
     }
+    // semi-auto weapons on auto-fire: send the trigger as a pulse so the host's trigger latch resets
+    if (auto) this.cmd.f = def.auto || fired ? 1 : 0;
 
     // recoil recovery (pulls most of the climb back down after you stop firing)
     if (g.time - this.lastShotT > 0.09 && this.recoilDebt > 0) {

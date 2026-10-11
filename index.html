@@ -37,6 +37,7 @@
     </div>
 
     <div id="compass"><canvas id="compass-c" width="1040" height="64"></canvas><div id="bearing">000</div></div>
+    <div id="tags"></div>
     <div id="killfeed"></div>
     <div id="fps"></div>
 
@@ -149,6 +150,9 @@
             <div class="group">AIMING</div>
             <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
               <option value="hold">Hold</option><option value="toggle">Toggle</option></select></div>
+            <div class="row touch-only"><label for="opt-touchads">Touch: aim down sights</label><select id="opt-touchads" data-nav>
+              <option value="toggle">Tap</option><option value="hold">Hold</option></select></div>
+            <div class="row touch-only"><label for="opt-autofire">Touch: auto-fire on target</label><input type="checkbox" id="opt-autofire" data-nav></div>
             <div class="group">MOUSE &amp; KEYBOARD</div>
             <div class="row"><label for="opt-sens">Mouse sensitivity <output id="out-sens"></output></label><input type="range" id="opt-sens" min="0.2" max="3" step="0.05" data-nav></div>
             <div class="row"><label for="opt-invert">Invert look</label><input type="checkbox" id="opt-invert" data-nav></div>
