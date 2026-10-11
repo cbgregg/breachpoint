@@ -223,18 +223,24 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     asphalt: pbr(tex.asphalt), dirt: pbr(tex.dirt), tile: pbr(tex.tile),
     metal: pbr(tex.metal, { metalness: 0.35 }), wood: pbr(tex.wood), sand: pbr(tex.sand), hesco: pbr(tex.hesco),
     dark: std({ color: 0x3a3c3f, roughness: 0.5, metalness: 0.65 }),
+    woodOld: pbr(tex.woodold || tex.wood),
     glass: std({ color: 0x1c2229, roughness: 0.08, metalness: 0.6, envMapIntensity: 1.6 }),
-    cloth: pbr(tex.fabric, { side: THREE.DoubleSide }),
-    rubber: std({ color: 0x161616, roughness: 0.92 }),
-    paint: std({ roughness: 0.42, metalness: 0.35 }),
+    cloth: pbr(tex.cloth || tex.fabric, { side: THREE.DoubleSide }),
+    rubber: tex.rubber ? pbr(tex.rubber, { color: 0x3a3a3a }) : std({ color: 0x161616, roughness: 0.92 }),
+    paint: tex.paint ? pbr(tex.paint, { roughness: 0.85, metalness: 0.35 }) : std({ roughness: 0.42, metalness: 0.35 }),
     leaf: std({ color: 0x5b6a2e, roughness: 0.8, side: THREE.DoubleSide }),
-    rust: std({ color: 0x5c3a26, roughness: 0.8, metalness: 0.4 }),
+    rust: tex.paint ? pbr(tex.paint, { color: 0x8a5a3a, metalness: 0.4 }) : std({ color: 0x5c3a26, roughness: 0.8, metalness: 0.4 }),
     line: std({ color: 0xd8d0b8, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
     lamp: new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffd9a0, emissiveIntensity: 2 }),
   };
-  M.bag = pbr(tex.fabric);
+  M.bag = pbr(tex.bag || tex.fabric);
   M.bag.normalScale = new THREE.Vector2(1.5, 1.5);
-  const S = { plaster: 3, concrete: 3, brick: 2, asphalt: 7, dirt: 9, tile: 2.2, metal: 2.4, wood: 1.2, sand: 1.2, hesco: 1.75, cloth: 1 };
+  // metres per texture repeat; photo sets are real-world scale, so they tile tighter than the generated ones
+  const photo = (k) => !!(tex[k] && tex[k].photo);
+  const S = {
+    plaster: 3, concrete: photo('concrete') ? 2.5 : 3, brick: photo('brick') ? 2.2 : 2, asphalt: photo('asphalt') ? 4 : 7, dirt: photo('dirt') ? 5 : 9,
+    tile: photo('tile') ? 2.6 : 2.2, metal: 2.4, wood: photo('wood') ? 1.6 : 1.2, woodOld: 1.6, sand: 1.2, hesco: 1.75, cloth: photo('cloth') ? 1.5 : 1, paint: 1.6, rust: 1.6, rubber: 1,
+  };
   const scaleOf = (mat) => { for (const k in M) if (M[k] === mat) return S[k] || 0; return 0; };
 
   const batch = new Batcher();
@@ -351,7 +357,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'pallet': {
-        B(M.wood, w, 0.14, d, cx, 0, cz, 0, { grime: 0.2, tint: 0xb59a74 });
+        B(M.woodOld, w, 0.14, d, cx, 0, cz, 0, { grime: 0.2, tint: 0xd8c4a4 });
         // shrink-wrapped supply sacks
         const rows = Math.round(h / 0.4);
         for (let r = 0; r < rows; r++) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
@@ -547,7 +553,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const px = ox + ax * t, pz = oz + az * t, y = f * 3.2 + 1.5;
           put(worldBox(1.3, 1.6, 0.1, 3), M.concrete, px + nx * 0.05, y, pz + nz * 0.05, ry, { tint: 0xe9e3d6, grime: 0.05, base: y });
           const shut = rnd();
-          if (shut < 0.25) put(worldBox(1.1, 1.4, 0.06, 1.2), M.wood, px + nx * 0.09, y, pz + nz * 0.09, ry, { tint: 0x7a6a50, grime: 0, base: y });
+          if (shut < 0.25) put(worldBox(1.1, 1.4, 0.06, 1.2), M.woodOld, px + nx * 0.09, y, pz + nz * 0.09, ry, { tint: 0x7a6a50, grime: 0, base: y });
           else put(worldBox(1.1, 1.4, 0.06, 0), M.glass, px + nx * 0.08, y, pz + nz * 0.08, ry, { grime: 0, tint: shut < 0.35 ? 0x050505 : 0xffffff });
           if (rnd() < 0.3) put(worldBox(0.8, 0.5, 0.4, 0), M.paint, px + ax * 0.9 + nx * 0.25, y - 0.9, pz + az * 0.9 + nz * 0.25, ry, { tint: 0xd2d2cc, grime: 0.05, base: y - 2 });
           if (rnd() < 0.15) {

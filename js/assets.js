@@ -4,9 +4,32 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-export const ASSETS = { soldier: null };
+export const ASSETS = { soldier: null, photo: {} };
 
-export async function loadAssets(onProgress) {
+// Photo-scanned PBR sets (CC0, from ambientCG and Poly Haven) in assets/textures/<name>/.
+// Any set that fails to load falls back to the generated texture of the same name.
+export const PHOTO_SETS = ['asphalt', 'concrete', 'plaster', 'brick', 'metal', 'paint', 'wood', 'woodold', 'dirt', 'tile', 'bag', 'cloth', 'hesco', 'rubber'];
+async function loadPhotoTextures(onProgress) {
+  const loader = new THREE.TextureLoader();
+  let done = 0;
+  const total = PHOTO_SETS.length;
+  await Promise.all(PHOTO_SETS.map(async (name) => {
+    try {
+      const [map, normalMap, roughnessMap] = await Promise.all(['color', 'normal', 'rough'].map(k => loader.loadAsync(`assets/textures/${name}/${k}.jpg`)));
+      for (const t of [map, normalMap, roughnessMap]) {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 8;
+        t.userData.keep = true; // shared across map changes
+      }
+      map.colorSpace = THREE.SRGBColorSpace;
+      ASSETS.photo[name] = { map, normalMap, roughnessMap, photo: true };
+    } catch (e) { console.warn('Texture set missing, using generated:', name); }
+    if (onProgress) onProgress(++done / total);
+  }));
+}
+
+export async function loadAssets(onProgress, onTexProgress) {
+  const textures = loadPhotoTextures(onTexProgress);
   const loader = new GLTFLoader();
   try {
     let gltf;
@@ -36,6 +59,7 @@ export async function loadAssets(onProgress) {
   } catch (err) {
     console.warn('Soldier model unavailable, using procedural operators.', err);
   }
+  await textures;
 }
 
 // Readability (Black Ops 2 style): both kits stay bright, and every soldier gets a soft rim light

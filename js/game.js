@@ -785,7 +785,7 @@ export class Game {
       this.scene.remove(this.world.group);
       this.world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
       for (const m of Object.values(this.world.materials)) m.dispose();
-      for (const set of Object.values(this.world.textures)) for (const t of Object.values(set)) if (t && t.isTexture) t.dispose();
+      for (const set of Object.values(this.world.textures)) for (const t of Object.values(set)) if (t && t.isTexture && !t.userData.keep) t.dispose();
     }
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);

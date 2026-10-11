@@ -1,5 +1,6 @@
 // Procedural PBR texture sets (albedo + normal + roughness), generated at load. No image assets.
 import * as THREE from 'three';
+import { ASSETS } from './assets.js';
 
 // ---------- tileable value noise ----------
 function rng(seed) {
@@ -276,6 +277,8 @@ export function makeTextureSets() {
     }, 2);
   }
 
+  // photo-scanned sets replace the generated ones where available (see assets.js)
+  for (const [k, set] of Object.entries(ASSETS.photo)) sets[k] = set;
   return sets;
 }
 

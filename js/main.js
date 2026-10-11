@@ -25,7 +25,11 @@ const settings = loadSettings();
 // ---------- game bootstrap ----------
 let game;
 // let the loading screen paint before the (synchronous) world build
-await loadAssets((f) => { $('load-text').textContent = `Loading operators… ${Math.round(f * 100)}%`; });
+{
+  let op = 0, tx = 0;
+  const show = () => { $('load-text').textContent = `Loading operators ${Math.round(op * 100)}% · textures ${Math.round(tx * 100)}%`; };
+  await loadAssets((f) => { op = f; show(); }, (f) => { tx = f; show(); });
+}
 $('load-text').textContent = 'Building Tarsa Market…';
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
 try {
