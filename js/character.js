@@ -1,96 +1,225 @@
-// Shared character logic (player + bots): movement, health, weapons, model
+// Shared character logic (player + bots): movement, health, weapons, operator model + animation
 import * as THREE from 'three';
-import { PLAYER, GRENADE, TEAMS } from './config.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
-const _v = new THREE.Vector3();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3();
+const DOWN = new THREE.Vector3(0, -1, 0);
 
-const sharedMats = {
-  skin: new THREE.MeshStandardMaterial({ color: 0xc99472, roughness: 0.8 }),
-  pants: new THREE.MeshStandardMaterial({ color: 0x2c3138, roughness: 0.9 }),
-  boot: new THREE.MeshStandardMaterial({ color: 0x17181a, roughness: 0.9 }),
-  visor: new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.2, metalness: 0.6 }),
-  vest: new THREE.MeshStandardMaterial({ color: 0x3a3f36, roughness: 0.85 }),
-};
-const teamMats = TEAMS.map(t => ({
-  shirt: new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.75 }),
-  helmet: new THREE.MeshStandardMaterial({ color: t.dark, roughness: 0.6 }),
-  band: new THREE.MeshStandardMaterial({ color: t.color, emissive: t.color, emissiveIntensity: 0.5 }),
-}));
+// ---------- operator model ----------
+let fabricNormal = null;
+export function setCharacterDetail(fabricSet) { fabricNormal = fabricSet ? fabricSet.normalMap : null; }
 
-function box(w, h, d, mat, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  return m;
+const teamMats = [];
+export function teamMat(team) {
+  if (!teamMats[team]) {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0.02 });
+    if (fabricNormal) {
+      const n = fabricNormal.clone();
+      n.repeat.set(3, 3);
+      n.needsUpdate = true;
+      m.normalMap = n;
+      m.normalScale = new THREE.Vector2(0.6, 0.6);
+    }
+    teamMats[team] = m;
+  }
+  return teamMats[team];
+}
+
+export class Seg {
+  constructor() { this.geos = []; }
+  add(geo, color, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+    geo.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+    const c = new THREE.Color(color);
+    const n = g.attributes.position.count;
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    this.geos.push(g);
+    return this;
+  }
+  box(color, w, h, d, x, y, z, rx, ry, rz) { return this.add(new THREE.BoxGeometry(w, h, d), color, x, y, z, rx, ry, rz); }
+  cap(color, r, len, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) { return this.add(new THREE.CapsuleGeometry(r, len, 3, 10), color, x, y, z, rx, ry, rz, sx, sy, sz); }
+  build(parent, mat) {
+    const mesh = new THREE.Mesh(mergeGeometries(this.geos, false), mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    this.geos.forEach(g => g.dispose());
+    return mesh;
+  }
 }
 
 function makeNameSprite(text, color) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
   const g = c.getContext('2d');
-  g.font = '600 30px "Chakra Petch", system-ui, sans-serif';
+  g.font = '600 30px "Barlow Condensed", "Arial Narrow", sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.75)';
-  g.strokeText(text, 128, 32);
+  g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 6;
   g.fillStyle = color;
-  g.fillText(text, 128, 32);
+  g.fillText(text.toUpperCase(), 128, 26);
+  g.beginPath(); g.moveTo(120, 48); g.lineTo(136, 48); g.lineTo(128, 58); g.closePath(); g.fill();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  s.scale.set(1.6, 0.4, 1);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, toneMapped: false }));
+  s.scale.set(1.3, 0.325, 1);
   s.renderOrder = 10;
   return s;
 }
 
-export function buildHumanoid(team, weaponId, name) {
-  const tm = teamMats[team];
-  const root = new THREE.Group();
-  root.rotation.order = 'YXZ';
-  const hips = new THREE.Group();
-  hips.position.y = 0.86;
-  root.add(hips);
-  const mkLeg = (x) => {
-    const leg = new THREE.Group();
-    leg.position.x = x;
-    leg.add(box(0.2, 0.86, 0.22, sharedMats.pants, 0, -0.43, 0));
-    leg.add(box(0.22, 0.12, 0.3, sharedMats.boot, 0, -0.8, -0.04));
-    hips.add(leg);
-    return leg;
-  };
-  const legL = mkLeg(-0.12), legR = mkLeg(0.12);
-  const torso = new THREE.Group();
-  hips.add(torso);
-  torso.add(box(0.5, 0.62, 0.28, tm.shirt, 0, 0.31, 0));
-  torso.add(box(0.54, 0.38, 0.32, sharedMats.vest, 0, 0.36, 0));
-  torso.add(box(0.545, 0.06, 0.325, tm.band, 0, 0.5, 0));
-  const head = new THREE.Group();
-  head.position.y = 0.66;
-  torso.add(head);
-  head.add(box(0.26, 0.28, 0.26, sharedMats.skin, 0, 0.13, 0));
-  head.add(box(0.3, 0.13, 0.31, tm.helmet, 0, 0.26, 0.01));
-  head.add(box(0.24, 0.07, 0.03, sharedMats.visor, 0, 0.16, -0.135));
-  const arms = new THREE.Group();
-  arms.position.y = 0.53;
-  torso.add(arms);
-  const armR = box(0.13, 0.13, 0.5, tm.shirt, 0.24, -0.06, -0.2);
-  armR.rotation.y = 0.35;
-  arms.add(armR);
-  const armL = box(0.13, 0.13, 0.52, tm.shirt, -0.16, -0.04, -0.3);
-  armL.rotation.y = -0.4;
-  arms.add(armL);
-  const gunHolder = new THREE.Group();
-  gunHolder.position.set(0.1, -0.02, -0.45);
-  arms.add(gunHolder);
-  const gun = buildGun(weaponId);
-  gunHolder.add(gun.group);
-  const nameTag = makeNameSprite(name, TEAMS[team].css);
-  nameTag.position.y = 2.15;
-  root.add(nameTag);
-  return { root, hips, legL, legR, torso, head, arms, gunHolder, gun, nameTag };
+// two-bone IK: returns elbow position
+function solveElbow(S, H, a, b, pole, out) {
+  const d = _v.subVectors(H, S);
+  let len = d.length();
+  len = clamp(len, 0.05, a + b - 0.002);
+  d.normalize();
+  const cosA = clamp((a * a + len * len - b * b) / (2 * a * len), -1, 1);
+  const along = a * cosA, h = Math.sqrt(Math.max(0, a * a - along * along));
+  const pd = _v2.copy(pole).addScaledVector(d, -pole.dot(d)).normalize();
+  return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
+}
+const _E = new THREE.Vector3(), _H = new THREE.Vector3();
+function aimLimb(group, from, to) {
+  group.position.copy(from);
+  _v.subVectors(to, from).normalize();
+  group.quaternion.setFromUnitVectors(DOWN, _v);
 }
 
+export function buildOperator(team, weaponId, name) {
+  const k = TEAMS[team].kit;
+  const mat = teamMat(team);
+  const skin = 0xb98463;
+  const root = new THREE.Group();
+  root.rotation.order = 'YXZ';
+  const pelvis = new THREE.Group();
+  pelvis.position.y = 0.95;
+  root.add(pelvis);
+  new Seg()
+    .box(k.pants, 0.34, 0.2, 0.22, 0, 0, 0)
+    .box(k.vest, 0.37, 0.06, 0.25, 0, 0.08, 0)
+    .box(k.pouch, 0.08, 0.12, 0.06, 0.17, -0.02, 0.06)
+    .box(k.pouch, 0.07, 0.1, 0.07, -0.18, -0.02, 0.0)
+    .build(pelvis, mat);
+
+  const mkLeg = (x) => {
+    const thigh = new THREE.Group();
+    thigh.position.set(x, -0.05, 0);
+    pelvis.add(thigh);
+    new Seg()
+      .cap(k.pants, 0.078, 0.28, 0, -0.2, 0)
+      .box(k.pouch, 0.05, 0.12, 0.08, x > 0 ? 0.07 : -0.07, -0.18, 0)
+      .box(k.vest, 0.11, 0.1, 0.05, 0, -0.42, -0.07)
+      .build(thigh, mat);
+    const shin = new THREE.Group();
+    shin.position.y = -0.43;
+    thigh.add(shin);
+    new Seg()
+      .cap(k.pants, 0.064, 0.3, 0, -0.21, 0)
+      .box(k.boot, 0.12, 0.13, 0.27, 0, -0.415, -0.04)
+      .box(k.boot, 0.13, 0.1, 0.14, 0, -0.33, 0.0)
+      .build(shin, mat);
+    return { thigh, shin };
+  };
+  const L = mkLeg(-0.1), R = mkLeg(0.1);
+
+  const spine = new THREE.Group();
+  spine.position.y = 0.08;
+  pelvis.add(spine);
+  const torso = new Seg()
+    .box(k.shirt, 0.36, 0.48, 0.22, 0, 0.27, 0)
+    .cap(k.shirt, 0.085, 0.06, -0.19, 0.45, 0, 0, 0, Math.PI / 2)
+    .cap(k.shirt, 0.085, 0.06, 0.19, 0.45, 0, 0, 0, Math.PI / 2)
+    .box(k.vest, 0.39, 0.36, 0.29, 0, 0.27, 0)
+    .box(k.vest, 0.06, 0.08, 0.29, -0.17, 0.48, 0)
+    .box(k.vest, 0.06, 0.08, 0.29, 0.17, 0.48, 0);
+  for (let i = 0; i < 3; i++) torso.box(k.pouch, 0.1, 0.13, 0.06, -0.12 + i * 0.12, 0.2, -0.17);
+  torso.box(k.pouch, 0.12, 0.1, 0.05, 0, 0.36, -0.165)
+    .box(k.pouch, 0.07, 0.16, 0.06, -0.21, 0.24, 0.04)
+    .box(k.vest, 0.28, 0.34, 0.1, 0, 0.27, 0.19)
+    .cap(0x1a1a1a, 0.012, 0.18, -0.13, 0.42, -0.12, 0.2)
+    .box(k.accent, 0.06, 0.04, 0.005, 0.12, 0.42, -0.148)
+    .add(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 10), skin, 0, 0.54, 0);
+  torso.build(spine, mat);
+
+  const head = new THREE.Group();
+  head.position.y = 0.6;
+  spine.add(head);
+  const hs = new Seg();
+  if (team === 0) {
+    hs.add(new THREE.SphereGeometry(0.105, 14, 10), skin, 0, 0.1, 0, 0, 0, 0, 0.92, 1.08, 1)
+      .add(new THREE.SphereGeometry(0.135, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), k.helmet, 0, 0.12, 0.005, 0, 0, 0, 1, 0.92, 1.06)
+      .box(k.helmet, 0.26, 0.02, 0.26, 0, 0.125, 0.005)
+      .box(0x1a1a1a, 0.05, 0.035, 0.03, 0, 0.21, -0.12)
+      .box(0x1a1a1a, 0.02, 0.03, 0.12, -0.13, 0.15, 0)
+      .box(0x1a1a1a, 0.02, 0.03, 0.12, 0.13, 0.15, 0)
+      .add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 12), 0x2a2b2c, -0.115, 0.085, 0.0, 0, 0, Math.PI / 2)
+      .add(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 12), 0x2a2b2c, 0.115, 0.085, 0.0, 0, 0, Math.PI / 2)
+      .box(0x0c0d0e, 0.17, 0.04, 0.03, 0, 0.115, -0.095);
+  } else {
+    hs.add(new THREE.SphereGeometry(0.11, 14, 10), k.shirt, 0, 0.1, 0, 0, 0, 0, 0.94, 1.1, 1.02)
+      .add(new THREE.SphereGeometry(0.118, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), k.helmet, 0, 0.13, 0.005)
+      .box(skin, 0.13, 0.03, 0.02, 0, 0.115, -0.1)
+      .box(0x0a0a0a, 0.1, 0.012, 0.022, 0, 0.115, -0.101)
+      .add(new THREE.TorusGeometry(0.085, 0.045, 6, 14), k.accent, 0, -0.03, 0, Math.PI / 2);
+  }
+  hs.build(head, mat);
+
+  const aim = new THREE.Group();
+  aim.position.set(0, 0.42, 0);
+  spine.add(aim);
+  const gunHolder = new THREE.Group();
+  aim.add(gunHolder);
+
+  const mkArm = () => {
+    const upper = new THREE.Group(), fore = new THREE.Group();
+    new Seg().cap(k.shirt, 0.058, 0.2, 0, -0.14, 0).box(k.vest, 0.12, 0.08, 0.13, 0, -0.04, 0).build(upper, mat);
+    new Seg().cap(k.shirt, 0.05, 0.19, 0, -0.13, 0).box(k.glove, 0.075, 0.1, 0.09, 0, -0.29, 0).build(fore, mat);
+    aim.add(upper, fore);
+    return { upper, fore };
+  };
+  const armR = mkArm(), armL = mkArm();
+
+  const nameTag = makeNameSprite(name, team === 0 ? FRIENDLY_CSS : ENEMY_CSS);
+  nameTag.position.y = 2.15;
+  root.add(nameTag);
+
+  const model = { root, pelvis, L, R, spine, head, aim, gunHolder, armR, armL, nameTag, gun: null, weaponId: null, kick: 0, team };
+  setOperatorWeapon(model, weaponId);
+  return model;
+}
+
+const POLE_R = new THREE.Vector3(0.7, -1, 0.4), POLE_L = new THREE.Vector3(-0.8, -1, 0.1);
+const SH_R = new THREE.Vector3(0.19, 0.03, 0), SH_L = new THREE.Vector3(-0.19, 0.03, 0);
+
+export function setOperatorWeapon(model, weaponId) {
+  if (model.weaponId === weaponId) return;
+  model.gunHolder.clear();
+  const gun = buildGun(weaponId);
+  model.gun = gun;
+  model.weaponId = weaponId;
+  model.gunHolder.add(gun.group);
+  if (weaponId === 'pistol') model.gunHolder.position.set(0.04, -0.02, -0.46);
+  else model.gunHolder.position.set(0.12, -0.06, -0.26);
+  // hand targets in aim-group space
+  _H.copy(model.gunHolder.position);
+  aimArm(model.armR, SH_R, _H, POLE_R);
+  _H.copy(gun.foregrip.position).add(model.gunHolder.position);
+  aimArm(model.armL, SH_L, _H, POLE_L);
+}
+
+function aimArm(arm, S, H, pole) {
+  solveElbow(S, H, 0.29, 0.29, pole, _E);
+  aimLimb(arm.upper, S, _E);
+  aimLimb(arm.fore, _E, H);
+}
+
+// ---------- character ----------
 export class Character {
   constructor(game, { name, team, isBot, primary }) {
     this.game = game;
@@ -110,17 +239,19 @@ export class Character {
     this.weapons = [new WeaponState(primary), new WeaponState('pistol')];
     this.cur = 0; this.prev = 1; this.switchT = 0;
     this.grenades = GRENADE.start; this.grenadeCd = 0;
+    this.meleeCd = 0; this.meleeT = 0;
+    this.slideT = 0; this.slideDir = new THREE.Vector3();
     this.kills = 0; this.deaths = 0; this.assists = 0; this.score = 0; this.streak = 0;
     this.respawnT = 0; this.spawnProtect = 0;
     this.lastDamageT = -99; this.lastFireT = -99;
     this.damagers = new Map();
     this.bloom = 0; this.adsT = 0; this.sprinting = false;
     this.lastAttacker = null; this.lastAttackerT = -99;
-    this.killer = null; this.deathT = 0;
+    this.killer = null; this.deathT = 0; this.deathDir = 1;
     this.stepAccum = 0; this.animPhase = 0;
     this.model = null;
     if (isBot) {
-      this.model = buildHumanoid(team, primary, name);
+      this.model = buildOperator(team, primary, name);
       game.scene.add(this.model.root);
       this.model.root.visible = false;
     }
@@ -143,9 +274,10 @@ export class Character {
     this.health = PLAYER.maxHealth;
     this.alive = true;
     this.crouchT = 0; this.wantCrouch = false; this.height = PLAYER.height;
+    this.slideT = 0; this.meleeT = 0; this.meleeCd = 0;
     this.weapons.forEach(w => w.refill());
-    if (this.cur !== 0) { this.cur = 0; this.setGunModel(this.weapon.id); }
-    this.prev = 1; this.switchT = 0.3;
+    this.cur = 0; this.prev = 1; this.switchT = 0.4;
+    if (this.model) setOperatorWeapon(this.model, this.weapon.id);
     this.grenades = GRENADE.start;
     this.spawnProtect = PLAYER.spawnProtect;
     this.damagers.clear();
@@ -165,13 +297,14 @@ export class Character {
     this.weapon.cancelReload();
     this.prev = this.cur;
     this.cur = i;
-    this.switchT = 0.35;
-    this.setGunModel(this.weapon.id);
-    this.game.audio.play('switch', this.pos);
+    this.switchT = 0.4;
+    if (this.model) setOperatorWeapon(this.model, this.weapon.id);
+    this.game.audio.play('switch', this.isBot ? this.pos : null);
   }
 
   reload() {
-    if (this.weapon.startReload()) this.game.audio.play('reload', this.pos, { duration: this.weapon.def.reload });
+    if (this.meleeT > 0) return;
+    if (this.weapon.startReload()) this.game.audio.play('reload', this.isBot ? this.pos : null, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
   }
 
   currentSpread() {
@@ -180,15 +313,15 @@ export class Character {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     s += d.moveSpread * Math.min(1, hs / PLAYER.walk) * (1 - 0.6 * this.adsT);
     if (!this.onGround) s += 0.05;
-    if (this.crouchT > 0.5) s *= 0.75;
+    if (this.crouchT > 0.5 && this.slideT <= 0) s *= 0.75;
     return s + this.bloom;
   }
 
   tryFire(origin, dir) {
     const w = this.weapon;
-    if (!this.alive || this.switchT > 0 || w.reloading || w.cooldown > 0) return false;
+    if (!this.alive || this.switchT > 0 || w.reloading || w.cooldown > 0 || this.meleeT > 0) return false;
     if (w.mag <= 0) {
-      if (!w.dryClicked) { this.game.audio.play('dry', this.pos); w.dryClicked = true; }
+      if (!w.dryClicked) { this.game.audio.play('dry', this.isBot ? this.pos : null); w.dryClicked = true; }
       if (w.reserve > 0) this.reload();
       return false;
     }
@@ -196,18 +329,29 @@ export class Character {
     w.cooldown = 60 / w.def.rpm;
     this.lastFireT = this.game.time;
     this.spawnProtect = 0;
+    this.sprinting = false;
     this.game.shoot(this, w.def, origin, dir, this.currentSpread());
     this.bloom = Math.min(0.06, this.bloom + w.def.recoilPitch * 0.35);
-    if (w.mag === 0 && w.reserve > 0) setTimeout(() => this.alive && this.reload(), 180);
+    if (this.model) this.model.kick = 1;
+    if (w.mag === 0 && w.reserve > 0) setTimeout(() => this.alive && this.reload(), 220);
     return true;
   }
 
   throwGrenade(target) {
-    if (!this.alive || this.grenades <= 0 || this.grenadeCd > 0) return false;
+    if (!this.alive || this.grenades <= 0 || this.grenadeCd > 0 || this.meleeT > 0) return false;
     this.grenades--;
     this.grenadeCd = GRENADE.cooldown;
     this.weapon.cancelReload();
     this.game.throwGrenade(this, target);
+    return true;
+  }
+
+  melee() {
+    if (!this.alive || this.meleeCd > 0 || this.switchT > 0) return false;
+    this.weapon.cancelReload();
+    this.meleeCd = MELEE.cooldown;
+    this.meleeT = MELEE.time;
+    this.game.melee(this);
     return true;
   }
 
@@ -233,6 +377,8 @@ export class Character {
     for (const w of this.weapons) w.update(dt);
     if (this.switchT > 0) this.switchT -= dt;
     if (this.grenadeCd > 0) this.grenadeCd -= dt;
+    if (this.meleeCd > 0) this.meleeCd -= dt;
+    if (this.meleeT > 0) this.meleeT -= dt;
     if (this.spawnProtect > 0) this.spawnProtect -= dt;
     this.bloom = Math.max(0, this.bloom - dt * 0.12);
     if (this.alive && this.health < PLAYER.maxHealth && this.game.time - this.lastDamageT > PLAYER.regenDelay) {
@@ -240,41 +386,62 @@ export class Character {
     }
   }
 
-  updateMovement(dt, wish, sprint, jump) {
+  // slideReq: crouch was just pressed this frame (starts a slide when sprinting)
+  updateMovement(dt, wish, sprint, jump, slideReq = false) {
     const phys = this.game.physics;
-    let target = this.wantCrouch ? 1 : 0;
+    const hs0 = Math.hypot(this.vel.x, this.vel.z);
+    if (slideReq && this.sprinting && this.onGround && hs0 > PLAYER.walk && this.slideT <= 0) {
+      this.slideT = PLAYER.slideTime;
+      this.slideDir.set(this.vel.x, 0, this.vel.z).normalize();
+      this.vel.x = this.slideDir.x * PLAYER.slideSpeed;
+      this.vel.z = this.slideDir.z * PLAYER.slideSpeed;
+      this.game.audio.play('slide', this.isBot ? this.pos : null);
+    }
+    const sliding = this.slideT > 0;
+    let target = (this.wantCrouch || sliding) ? 1 : 0;
     if (target === 0 && this.crouchT > 0 && phys.overlap(this.pos.x, this.pos.y + 0.05, this.pos.z, this.radius * 0.95, PLAYER.height - 0.05)) target = 1;
-    this.crouchT += Math.sign(target - this.crouchT) * Math.min(Math.abs(target - this.crouchT), dt * 7);
+    this.crouchT += Math.sign(target - this.crouchT) * Math.min(Math.abs(target - this.crouchT), dt * (sliding ? 10 : 7));
     this.height = lerp(PLAYER.height, PLAYER.crouchHeight, this.crouchT);
 
-    this.sprinting = sprint && this.crouchT < 0.3;
-    let speed = this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.sprinting ? PLAYER.sprint : PLAYER.walk;
-    speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
-    const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
-    const tx = wish.x * speed, tz = wish.z * speed;
-    let dx = tx - this.vel.x, dz = tz - this.vel.z;
-    const dl = Math.hypot(dx, dz), maxC = accel * dt;
-    if (dl > maxC) { dx *= maxC / dl; dz *= maxC / dl; }
-    this.vel.x += dx; this.vel.z += dz;
+    if (sliding) {
+      this.slideT -= dt;
+      const k = Math.max(0, this.slideT / PLAYER.slideTime);
+      const sp = lerp(PLAYER.crouchSpeed, PLAYER.slideSpeed, k * k);
+      this.vel.x = this.slideDir.x * sp + wish.x * 1.2;
+      this.vel.z = this.slideDir.z * sp + wish.z * 1.2;
+      this.sprinting = false;
+      if (jump && this.onGround) { this.slideT = 0; }
+    } else {
+      this.sprinting = sprint && this.crouchT < 0.3;
+      let speed = this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.sprinting ? PLAYER.sprint : PLAYER.walk;
+      speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
+      const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
+      const tx = wish.x * speed, tz = wish.z * speed;
+      let dx = tx - this.vel.x, dz = tz - this.vel.z;
+      const dl = Math.hypot(dx, dz), maxC = accel * dt;
+      if (dl > maxC) { dx *= maxC / dl; dz *= maxC / dl; }
+      this.vel.x += dx; this.vel.z += dz;
+    }
 
-    if (jump && this.onGround && this.crouchT < 0.5) {
+    if (jump && this.onGround && (this.crouchT < 0.5 || sliding)) {
       this.vel.y = PLAYER.jump;
       this.onGround = false;
-      this.game.audio.play('jump', this.pos);
+      this.wantCrouch = false;
+      this.game.audio.play('jump', this.isBot ? this.pos : null);
     }
     const wasGround = this.onGround;
     const fallSpeed = this.vel.y;
     this.vel.y -= PLAYER.gravity * dt;
     phys.moveEntity(this, dt);
-    if (!wasGround && this.onGround && fallSpeed < -8) this.game.audio.play('land', this.pos);
+    if (!wasGround && this.onGround && fallSpeed < -7) this.game.audio.play('land', this.isBot ? this.pos : null);
 
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    if (this.onGround && hs > 1.5) {
+    if (this.onGround && hs > 1.5 && !sliding) {
       this.stepAccum += hs * dt;
-      const stride = this.sprinting ? 2.6 : 2.0;
+      const stride = this.sprinting ? 2.5 : 1.9;
       if (this.stepAccum > stride) {
         this.stepAccum = 0;
-        if (this.crouchT < 0.5) this.game.audio.play('step', this.pos, { self: !this.isBot });
+        if (this.crouchT < 0.5) this.game.audio.play('step', this.isBot ? this.pos : null, { self: !this.isBot, run: this.sprinting });
       }
     }
     if (this.pos.y < -15) this.takeDamage(999, null, 'fall', false, this.pos);
@@ -286,36 +453,56 @@ export class Character {
     const r = m.root;
     if (!this.alive) {
       const t = this.game.time - this.deathT;
-      r.rotation.x = -Math.min(1, t / 0.45) * Math.PI / 2;
-      r.position.y = this.pos.y + 0.12 * Math.min(1, t / 0.45);
+      const k1 = Math.min(1, t / 0.3), k2 = clamp((t - 0.15) / 0.55, 0, 1);
+      const e2 = k2 * k2 * (3 - 2 * k2);
+      m.L.thigh.rotation.x = m.R.thigh.rotation.x = lerp(0, 1.3, k1);
+      m.L.shin.rotation.x = m.R.shin.rotation.x = lerp(0, -1.9, k1);
+      m.pelvis.position.y = lerp(0.95, 0.5, k1) - e2 * 0.3;
+      m.aim.rotation.x = lerp(m.aim.rotation.x, -1.2, Math.min(1, dt * 6));
+      m.head.rotation.x = lerp(0, 0.5, e2);
+      r.rotation.x = -this.deathDir * e2 * Math.PI / 2.2;
+      r.rotation.z = e2 * 0.2 * this.deathDir;
       m.nameTag.visible = false;
-      if (t > 4) r.visible = false;
+      if (t > 5) r.visible = false;
       return;
     }
-    r.visible = this.spawnProtect > 0 ? Math.floor(this.game.time * 12) % 2 === 0 : true;
+    r.visible = true;
     r.position.copy(this.pos);
     r.rotation.set(0, this.yaw, 0);
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    const fwd = -(this.vel.x * s + this.vel.z * c);
+    const side = this.vel.x * c - this.vel.z * s;
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    this.animPhase += hs * dt * 2.1;
-    const amt = Math.min(1, hs / 5) * (this.onGround ? 1 : 0.3);
-    m.hips.position.y = lerp(0.86, 0.55, this.crouchT);
-    const legScale = lerp(1, 0.64, this.crouchT);
-    m.legL.scale.y = m.legR.scale.y = legScale;
-    m.legL.rotation.x = Math.sin(this.animPhase) * 0.65 * amt;
-    m.legR.rotation.x = -Math.sin(this.animPhase) * 0.65 * amt;
-    m.torso.rotation.x = -0.08 * amt;
-    m.arms.rotation.x = this.pitch;
-    m.head.rotation.x = this.pitch * 0.6;
+    const sliding = this.slideT > 0;
+    this.animPhase += hs * dt * (this.sprinting ? 1.7 : 2.3);
+    const amt = Math.min(1, hs / 5) * (this.onGround && !sliding ? 1 : 0.15);
+    const fr = hs > 0.2 ? fwd / hs : 1, sr = hs > 0.2 ? side / hs : 0;
+    const sw = Math.sin(this.animPhase) * (this.sprinting ? 0.85 : 0.55) * amt;
+    const cr = this.crouchT;
+    const bend = (ph) => Math.max(0, Math.sin(ph + 1.3)) * (this.sprinting ? 1.4 : 0.9) * amt;
+    m.L.thigh.rotation.x = lerp(0, 1.15, cr) + sw * fr;
+    m.R.thigh.rotation.x = lerp(0, 1.15, cr) - sw * fr;
+    m.L.thigh.rotation.z = -sw * sr * 0.5;
+    m.R.thigh.rotation.z = sw * sr * 0.5;
+    m.L.shin.rotation.x = lerp(0, -1.95, cr) - bend(this.animPhase);
+    m.R.shin.rotation.x = lerp(0, -1.95, cr) - bend(this.animPhase + Math.PI);
+    if (sliding) {
+      m.L.thigh.rotation.x = 1.4; m.L.shin.rotation.x = -0.4;
+      m.R.thigh.rotation.x = 0.9; m.R.shin.rotation.x = -2.0;
+    }
+    m.pelvis.position.y = lerp(0.95, 0.6, cr) - Math.abs(Math.sin(this.animPhase)) * 0.035 * amt;
+    m.spine.rotation.x = -(this.sprinting ? 0.22 : 0.05 * amt) - cr * 0.15;
+    m.spine.rotation.y = Math.sin(this.animPhase) * 0.06 * amt;
+    m.kick = Math.max(0, m.kick - dt * 12);
+    const sprintLower = this.sprinting ? 0.55 : 0;
+    m.aim.rotation.x = this.pitch - m.spine.rotation.x - sprintLower;
+    m.aim.rotation.y = this.sprinting ? 0.5 : 0;
+    m.aim.position.z = m.kick * 0.03;
+    m.head.rotation.x = this.pitch * 0.5 - m.spine.rotation.x;
+    if (this.meleeT > 0) m.aim.rotation.x -= Math.sin((1 - this.meleeT / MELEE.time) * Math.PI) * 0.8;
+    m.aim.rotation.z = this.weapon.reloading ? Math.sin(this.weapon.reloadProgress * Math.PI) * 0.5 : 0;
     m.nameTag.visible = showName;
-    m.nameTag.position.y = this.height + 0.35;
-  }
-
-  setGunModel(id) {
-    if (!this.model) return;
-    const holder = this.model.gunHolder;
-    holder.clear();
-    this.model.gun = buildGun(id);
-    holder.add(this.model.gun.group);
+    m.nameTag.position.y = this.height + 0.38;
   }
 
   muzzleWorld(out) {
@@ -326,6 +513,11 @@ export class Character {
     this.eyePos(out);
     const f = this.forward(_v);
     return out.addScaledVector(f, 0.6).add({ x: Math.cos(this.yaw) * 0.18, y: -0.18, z: -Math.sin(this.yaw) * 0.18 });
+  }
+
+  ejectWorld(out) {
+    if (this.model) return this.model.gun.eject.getWorldPosition(out);
+    return this.eyePos(out);
   }
 
   dispose() {

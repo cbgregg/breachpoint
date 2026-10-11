@@ -1,155 +1,303 @@
-// HUD: DOM overlay for health, ammo, scores, killfeed, minimap, scoreboard, etc.
-import { TEAMS, WEAPONS, PLAYER } from './config.js';
+// HUD (modern military shooter style): compass, rotating minimap, score widget, ammo cluster,
+// score popups, medals, killfeed, prompts with device-aware button glyphs, scoreboard.
+import { WEAPONS, PLAYER, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
 import { MAP } from './world.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+export const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+const PAD_GLYPH = {
+  accept: ['A', 'a'], back: ['B', 'b'], jump: ['A', 'a'], crouch: ['B', 'b'], reload: ['X', 'x'], swap: ['Y', 'y'],
+  grenade: ['RB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'],
+  pause: ['☰', 'bump'], scoreboard: ['⧉', 'bump'], alt: ['Y', 'y'],
+};
+const KEY_GLYPH = {
+  accept: 'Enter', back: 'Esc', jump: 'Space', crouch: 'C', reload: 'R', swap: 'Q', grenade: 'G', melee: 'V', sprint: 'Shift',
+  prevTab: 'Q', nextTab: 'E', pause: 'Esc', scoreboard: 'Tab', alt: 'Y',
+};
+export function glyph(act, device) {
+  if (device === 'pad') { const [t, c] = PAD_GLYPH[act] || ['?', '']; return `<i class="pg ${c}">${t}</i>`; }
+  if (device === 'touch') return '';
+  return `<kbd>${KEY_GLYPH[act] || act}</kbd>`;
+}
 
 export class HUD {
+  txt(id, v) { v = String(v); if (this.cache[id] !== v) { this.cache[id] = v; $(id).textContent = v; } }
+  sty(id, prop, v) { const k = id + '.' + prop; if (this.cache[k] !== v) { this.cache[k] = v; $(id).style[prop] = v; } }
+  cls(id, c, on) { const k = id + '#' + c; if (this.cache[k] !== on) { this.cache[k] = on; $(id).classList.toggle(c, on); } }
+
   constructor(game) {
+    this.cache = {};
+    this.drawT = 0;
     this.game = game;
     this.el = $('hud');
     this.ch = $('crosshair');
     this.hm = $('hitmarker');
     this.mm = $('minimap');
     this.mmCtx = this.mm.getContext('2d');
+    this.cc = $('compass-c');
+    this.ccCtx = this.cc.getContext('2d');
     this.hitT = 0;
     this.sbT = 0;
     this.fpsT = 0; this.frames = 0;
-    this.msgQueue = [];
-    this.lastHealth = 100;
+    this.popTotal = 0; this.popT = 0;
+    this.promptKey = '';
+    this.device = 'kbm';
+    // warm up the minimap canvas so the first in-game draw doesn't hitch
+    if (game.minimap) this.mmCtx.drawImage(game.minimap.canvas, 0, 0, 2, 2);
   }
 
   show(on) { this.el.classList.toggle('on', on); }
 
+  setDevice(d) {
+    this.device = d;
+    document.querySelectorAll('.glyph[data-act]').forEach(el => { el.innerHTML = glyph(el.dataset.act, d); });
+    this.promptKey = '';
+  }
+
   reset() {
-    $('killfeed').innerHTML = '';
-    $('center-msg').innerHTML = '';
-    $('dmg-ind').innerHTML = '';
+    this.cache = {};
+    ['killfeed', 'center-msg', 'dmg-ind', 'score-pop', 'medal'].forEach(id => { $(id).innerHTML = ''; });
     $('death').classList.remove('on');
     $('scoreboard').classList.remove('on');
     $('countdown').classList.remove('on');
-    $('hurt-flash').style.opacity = 0;
+    this.popTotal = 0;
   }
 
   update(dt) {
-    const g = this.game, p = g.player, ctl = g.playerCtl;
-    // fps
+    const g = this.game, p = g.player;
     this.frames++; this.fpsT += dt;
     if (this.fpsT >= 0.5) { $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS`; this.frames = 0; this.fpsT = 0; }
-    $('fps').style.display = g.settings.showFps ? 'block' : 'none';
+    this.sty('fps', 'display', g.settings.showFps ? 'block' : 'none');
 
-    // scores & timer
-    $('score-blue').textContent = g.scores[0];
-    $('score-red').textContent = g.scores[1];
-    $('timer').textContent = fmtTime(g.timeLeft);
-    $('timer').classList.toggle('low', g.timeLeft < 30);
-    $('bar-blue').style.width = `${Math.min(100, g.scores[0] / g.settings.scoreLimit * 100)}%`;
-    $('bar-red').style.width = `${Math.min(100, g.scores[1] / g.settings.scoreLimit * 100)}%`;
+    const mine = p.team, theirs = 1 - mine;
+    this.txt('score-f', g.scores[mine]);
+    this.txt('score-e', g.scores[theirs]);
+    this.sty('bar-f', 'width', `${Math.min(100, g.scores[mine] / g.settings.scoreLimit * 100).toFixed(1)}%`);
+    this.sty('bar-e', 'width', `${Math.min(100, g.scores[theirs] / g.settings.scoreLimit * 100).toFixed(1)}%`);
+    this.txt('timer', fmtTime(g.timeLeft));
+    this.cls('timer', 'low', g.timeLeft < 30);
+    this.txt('limit', g.settings.scoreLimit);
 
-    // health
-    const hp = Math.ceil(p.health);
-    $('health-num').textContent = hp;
-    $('health-fill').style.width = `${p.health / PLAYER.maxHealth * 100}%`;
-    $('health-fill').classList.toggle('low', p.health < 35);
-    const low = p.alive ? Math.max(0, 1 - p.health / 45) : 0;
-    $('vignette').style.opacity = low.toFixed(2);
+    // health: only shown while hurt
+    const hurt = p.alive && p.health < PLAYER.maxHealth - 0.5;
+    this.cls('health-wrap', 'on', hurt);
+    this.sty('health-fill', 'width', `${Math.round(p.health / PLAYER.maxHealth * 100)}%`);
+    this.cls('health-fill', 'low', p.health < 35);
 
     // ammo
     const w = p.weapon;
-    $('weapon-name').textContent = w.def.name;
-    $('ammo-mag').textContent = w.mag;
-    $('ammo-mag').classList.toggle('low', w.mag <= Math.ceil(w.def.mag * 0.25));
-    $('ammo-res').textContent = w.reserve;
-    $('grenades').textContent = '●'.repeat(p.grenades) + '○'.repeat(Math.max(0, 3 - p.grenades));
-    const rl = $('reload-wrap');
-    rl.classList.toggle('on', w.reloading);
-    if (w.reloading) $('reload-fill').style.width = `${w.reloadProgress * 100}%`;
-    $('protect').classList.toggle('on', p.alive && p.spawnProtect > 0);
+    this.txt('weapon-name', w.def.name.toUpperCase());
+    this.txt('ammo-mag', w.mag);
+    this.cls('ammo-mag', 'low', w.mag > 0 && w.mag <= Math.ceil(w.def.mag * 0.25));
+    this.cls('ammo-mag', 'empty', w.mag === 0);
+    this.txt('ammo-res', w.reserve);
+    this.txt('fire-mode', w.def.mode);
+    this.txt('grenades', p.grenades);
 
-    // crosshair
-    const scoped = w.def.scope && p.adsT > 0.85;
-    $('scope').classList.toggle('on', scoped && p.alive);
-    const showCh = p.alive && p.adsT < 0.5 && !p.sprinting;
-    this.ch.style.opacity = showCh ? 1 : 0;
+    // prompt
+    let key = '', html = '', warn = false;
+    if (p.alive && !w.reloading) {
+      if (w.mag === 0 && w.reserve === 0) { key = 'noammo'; html = 'NO AMMO'; warn = true; }
+      else if (w.mag <= Math.ceil(w.def.mag * 0.25) && w.reserve > 0) { key = 'reload' + this.device; html = `${glyph('reload', this.device)} RELOAD`; }
+      else if (w.mag + w.reserve <= w.def.mag) { key = 'low'; html = 'LOW AMMO'; warn = true; }
+    }
+    if (key !== this.promptKey) {
+      this.promptKey = key;
+      $('prompt').innerHTML = html;
+      $('prompt').classList.toggle('warn', warn);
+    }
+    this.cls('protect', 'on', p.alive && p.spawnProtect > 0);
+
+    // crosshair / scope
+    const scoped = !!w.def.scope && p.adsT > 0.85;
+    this.cls('scope', 'on', scoped && p.alive);
+    const showCh = p.alive && p.adsT < 0.4 && !p.sprinting && p.slideT <= 0;
+    this.sty('crosshair', 'opacity', showCh ? '1' : '0');
     if (showCh) {
-      const cam = g.camera;
-      const gap = Math.tan(p.currentSpread()) / Math.tan(cam.fov * Math.PI / 360) * (window.innerHeight / 2) + 4;
-      this.ch.style.setProperty('--gap', `${Math.min(80, gap).toFixed(1)}px`);
-      this.ch.classList.toggle('enemy', !!g.aimTarget);
+      const gap = Math.tan(p.currentSpread()) / Math.tan(g.camera.fov * Math.PI / 360) * (window.innerHeight / 2) + 3;
+      const gp = `${Math.min(70, gap).toFixed(0)}px`;
+      if (this.cache.gap !== gp) { this.cache.gap = gp; this.ch.style.setProperty('--gap', gp); }
+      this.cls('crosshair', 'enemy', !!g.aimTarget);
     }
     this.hitT -= dt;
-    this.hm.style.opacity = this.hitT > 0 ? Math.min(1, this.hitT * 5) : 0;
+    this.sty('hitmarker', 'opacity', this.hitT > 0 ? Math.min(1, this.hitT * 6).toFixed(2) : '0');
 
-    // scoreboard
-    const tab = g.input.down('Tab') || g.state === 'ended';
-    $('scoreboard').classList.toggle('on', tab && g.state !== 'ended');
+    this.popT -= dt;
+    if (this.popT <= 0 && this.popTotal) {
+      this.popTotal = 0;
+      [...$('score-pop').children].forEach(c => c.classList.add('fade'));
+      setTimeout(() => { if (!this.popTotal) $('score-pop').innerHTML = ''; }, 500);
+    }
+
+    const tab = g.input.scoreboard;
+    this.cls('scoreboard', 'on', tab);
     if (tab) { this.sbT -= dt; if (this.sbT <= 0) { this.renderScoreboard($('scoreboard')); this.sbT = 0.25; } }
 
-    // death overlay
-    if (!p.alive && g.state === 'playing') $('death-timer').textContent = `Respawning in ${Math.max(0, p.respawnT).toFixed(1)}s`;
+    if (!p.alive && g.state === 'playing') this.txt('death-timer', `RESPAWNING IN ${Math.max(0, p.respawnT).toFixed(1)}`);
 
-    this.drawMinimap();
+    // canvases at ~30 Hz
+    this.drawT -= dt;
+    if (this.drawT <= 0) {
+      this.drawT = 1 / 30;
+      this.drawCompass();
+      this.drawMinimap();
+    }
+  }
+
+  heading(yaw) { let h = (-yaw * 180 / Math.PI) % 360; if (h < 0) h += 360; return h; }
+
+  drawCompass() {
+    const g = this.game, p = g.player, ctx = this.ccCtx;
+    const W = this.cc.width, H = this.cc.height;
+    ctx.clearRect(0, 0, W, H);
+    const yaw = p.alive ? p.yaw : g.camera.rotation.y;
+    const hd = this.heading(yaw);
+    const span = 120, ppd = W / span;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    const labels = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    for (let d = Math.floor((hd - span / 2) / 5) * 5; d <= hd + span / 2; d += 5) {
+      const x = W / 2 + (d - hd) * ppd;
+      const dd = ((d % 360) + 360) % 360;
+      const fade = 1 - Math.abs(x - W / 2) / (W / 2);
+      ctx.globalAlpha = Math.max(0, fade) * 0.95;
+      ctx.fillStyle = '#ece9e1';
+      if (labels[dd] !== undefined) {
+        ctx.font = '700 30px "Barlow Condensed", sans-serif';
+        ctx.fillText(labels[dd], x, 30);
+        ctx.fillRect(x - 1.5, 38, 3, 14);
+      } else if (dd % 15 === 0) {
+        ctx.font = '600 22px "Barlow Condensed", sans-serif';
+        ctx.fillStyle = '#a7a49b';
+        ctx.fillText(String(dd), x, 28);
+        ctx.fillRect(x - 1, 40, 2, 10);
+      } else {
+        ctx.fillStyle = '#a7a49b';
+        ctx.fillRect(x - 1, 44, 2, 6);
+      }
+    }
+    // enemy pings (recent gunfire)
+    for (const c of g.characters) {
+      if (!c.alive || c.team === p.team || g.time - c.lastFireT > 1.5) continue;
+      const b = this.heading(Math.atan2(-(c.pos.x - p.pos.x), -(c.pos.z - p.pos.z)));
+      let delta = b - hd; if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
+      if (Math.abs(delta) > span / 2) continue;
+      const x = W / 2 + delta * ppd;
+      ctx.globalAlpha = 1 - (g.time - c.lastFireT) / 1.5;
+      ctx.fillStyle = ENEMY_CSS;
+      ctx.beginPath(); ctx.moveTo(x - 9, 52); ctx.lineTo(x + 9, 52); ctx.lineTo(x, 64); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ece9e1';
+    ctx.beginPath(); ctx.moveTo(W / 2 - 7, 64); ctx.lineTo(W / 2 + 7, 64); ctx.lineTo(W / 2, 55); ctx.closePath(); ctx.fill();
+    const txt = String(Math.round(hd) % 360).padStart(3, '0');
+    if (txt !== this.lastBearing) { $('bearing').textContent = txt; this.lastBearing = txt; }
   }
 
   drawMinimap() {
-    const g = this.game, ctx = this.mmCtx, mm = g.world.minimap;
+    const g = this.game, ctx = this.mmCtx, mm = g.minimap;
     const W = this.mm.width, H = this.mm.height;
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(mm.canvas, 0, 0, W, H);
-    const sx = W / (MAP.maxX - MAP.minX), sz = H / (MAP.maxZ - MAP.minZ);
-    const toX = (x) => (x - MAP.minX) * sx, toY = (z) => (z - MAP.minZ) * sz;
-    for (const c of g.characters) {
-      if (!c.alive || c === g.player) continue;
-      const friend = c.team === g.player.team;
-      if (!friend && g.time - c.lastFireT > 1.5) continue;
-      ctx.fillStyle = TEAMS[c.team].css;
-      ctx.beginPath();
-      ctx.arc(toX(c.pos.x), toY(c.pos.z), friend ? 3 : 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
     const p = g.player;
-    if (p.alive) {
+    ctx.fillStyle = '#121515';
+    ctx.fillRect(0, 0, W, H);
+    if (!mm) return;
+    const pxPerM = W / 64; // ~64 m across
+    const sc = pxPerM / mm.scale;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(p.yaw);
+    ctx.scale(sc, sc);
+    ctx.translate(-(p.pos.x - MAP.minX) * mm.scale, -(p.pos.z - MAP.minZ) * mm.scale);
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(mm.canvas, 0, 0);
+    ctx.globalAlpha = 1;
+    const toX = (x) => (x - MAP.minX) * mm.scale, toY = (z) => (z - MAP.minZ) * mm.scale;
+    const r = 4.5 / sc * 2;
+    for (const c of g.characters) {
+      if (!c.alive || c === p) continue;
+      const friend = c.team === p.team;
+      const since = g.time - c.lastFireT;
+      if (!friend && since > 2) continue;
+      ctx.globalAlpha = friend ? 1 : Math.max(0.2, 1 - since / 2);
+      ctx.fillStyle = friend ? FRIENDLY_CSS : ENEMY_CSS;
       ctx.save();
-      ctx.translate(toX(p.pos.x), toY(p.pos.z));
-      ctx.rotate(-p.yaw);
-      ctx.fillStyle = '#ffffff';
+      ctx.translate(toX(c.pos.x), toY(c.pos.z));
+      ctx.rotate(-c.yaw);
       ctx.beginPath();
-      ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(0, -r * 1.3); ctx.lineTo(r, r); ctx.lineTo(-r, r); ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    // player chevron + view cone
+    ctx.fillStyle = 'rgba(236,233,225,0.12)';
+    ctx.beginPath(); ctx.moveTo(W / 2, H / 2); ctx.arc(W / 2, H / 2, W * 0.45, -Math.PI / 2 - 0.6, -Math.PI / 2 + 0.6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ece9e1';
+    ctx.beginPath(); ctx.moveTo(W / 2, H / 2 - 16); ctx.lineTo(W / 2 + 11, H / 2 + 11); ctx.lineTo(W / 2, H / 2 + 5); ctx.lineTo(W / 2 - 11, H / 2 + 11); ctx.closePath(); ctx.fill();
   }
 
   renderScoreboard(el) {
     const g = this.game;
-    const teams = [0, 1].map(t => g.characters.filter(c => c.team === t).sort((a, b) => b.score - a.score || b.kills - a.kills));
-    const row = (c) => `<tr class="${c === g.player ? 'me' : ''} ${c.alive ? '' : 'dead'}"><td>${esc(c.name)}${c.isBot ? ' <span class="tag">BOT</span>' : ''}</td><td>${c.score}</td><td>${c.kills}</td><td>${c.deaths}</td><td>${c.assists}</td></tr>`;
-    el.innerHTML = [0, 1].map(t => `
-      <div class="sb-team" style="--tc:${TEAMS[t].css}">
-        <div class="sb-head"><span>${TEAMS[t].label}</span><b>${g.scores[t]}</b></div>
-        <table><thead><tr><th>Name</th><th>Score</th><th>K</th><th>D</th><th>A</th></tr></thead>
-        <tbody>${teams[t].map(row).join('')}</tbody></table>
+    const mine = g.player.team;
+    const order = [mine, 1 - mine];
+    const teams = order.map(t => g.characters.filter(c => c.team === t).sort((a, b) => b.score - a.score || b.kills - a.kills));
+    const row = (c) => `<tr class="${c === g.player ? 'me' : ''} ${c.alive ? '' : 'dead'}"><td>${esc(c.name)}${c.isBot ? ' <span class="tag">BOT</span>' : ''}</td><td>${c.score}</td><td>${c.kills}</td><td>${c.deaths}</td><td>${c.assists}</td><td>${c.deaths ? (c.kills / c.deaths).toFixed(2) : c.kills.toFixed(2)}</td></tr>`;
+    el.innerHTML = order.map((t, i) => `
+      <div class="sb-team" style="--tc:${t === mine ? FRIENDLY_CSS : ENEMY_CSS}">
+        <div class="sb-head"><span>${t === mine ? 'FRIENDLY' : 'ENEMY'}</span><b>${g.scores[t]}</b></div>
+        <table><thead><tr><th>Name</th><th>Score</th><th>K</th><th>D</th><th>A</th><th>K/D</th></tr></thead>
+        <tbody>${teams[i].map(row).join('')}</tbody></table>
       </div>`).join('');
   }
 
   killfeed(killer, victim, weaponId, headshot) {
+    const g = this.game;
     const kf = $('killfeed');
     const d = document.createElement('div');
-    d.className = 'kf' + ((killer === this.game.player || victim === this.game.player) ? ' mine' : '');
-    const wname = WEAPONS[weaponId]?.short || (weaponId === 'grenade' ? 'FRAG' : weaponId === 'fall' ? 'FALL' : '✖');
-    const kName = killer && killer !== victim ? `<span style="color:${TEAMS[killer.team].css}">${esc(killer.name)}</span>` : '';
-    d.innerHTML = `${kName}<span class="kw">[${wname}${headshot ? ' ⌖' : ''}]</span><span style="color:${TEAMS[victim.team].css}">${esc(victim.name)}</span>`;
-    kf.prepend(d);
-    while (kf.children.length > 6) kf.lastChild.remove();
+    d.className = 'kf' + ((killer === g.player || victim === g.player) ? ' mine' : '');
+    const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', melee: 'MELEE', fall: 'FALL' }[weaponId] || '✖');
+    const col = (c) => (c.team === g.player.team ? FRIENDLY_CSS : ENEMY_CSS);
+    const kName = killer && killer !== victim ? `<span style="color:${col(killer)}">${esc(killer.name)}</span>` : '';
+    d.innerHTML = `${kName}<span class="kw">${wname}${headshot ? ' ◎' : ''}</span><span style="color:${col(victim)}">${esc(victim.name)}</span>`;
+    kf.appendChild(d);
+    while (kf.children.length > 6) kf.firstChild.remove();
     setTimeout(() => d.classList.add('fade'), 5000);
     setTimeout(() => d.remove(), 5600);
   }
 
   hitmarker(kill, headshot) {
-    this.hitT = kill ? 0.45 : 0.22;
+    this.hitT = kill ? 0.4 : 0.18;
     this.hm.className = kill ? 'kill' : headshot ? 'head' : '';
+  }
+
+  // MW-style score events next to the crosshair: running total + event lines
+  scoreEvent(label, pts) {
+    const box = $('score-pop');
+    if (this.popT <= 0) { box.innerHTML = ''; this.popTotal = 0; }
+    this.popTotal += pts;
+    this.popT = 2.2;
+    let total = box.querySelector('.total');
+    if (!total) { total = document.createElement('div'); total.className = 'sp total'; box.prepend(total); }
+    total.textContent = `+${this.popTotal}`;
+    const d = document.createElement('div');
+    d.className = 'sp';
+    d.textContent = pts ? `${label} +${pts}` : label;
+    box.appendChild(d);
+    while (box.children.length > 5) box.children[1].remove();
+  }
+
+  medal(title, sub = '') {
+    const box = $('medal');
+    box.innerHTML = '';
+    const d = document.createElement('div');
+    d.className = 'medal';
+    d.innerHTML = `${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+    box.appendChild(d);
+    setTimeout(() => d.classList.add('fade'), 1800);
+    setTimeout(() => d.remove(), 2300);
   }
 
   message(text, cls = '') {
@@ -158,35 +306,45 @@ export class HUD {
     d.className = 'msg ' + cls;
     d.textContent = text;
     box.appendChild(d);
-    while (box.children.length > 4) box.firstChild.remove();
+    while (box.children.length > 3) box.firstChild.remove();
     setTimeout(() => d.classList.add('fade'), 1400);
     setTimeout(() => d.remove(), 1900);
+  }
+
+  toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('on');
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(() => t.classList.remove('on'), 2600);
   }
 
   damageFrom(pos) {
     const g = this.game, p = g.player;
     const dx = pos.x - p.pos.x, dz = pos.z - p.pos.z;
-    const ang = Math.atan2(-dx, -dz) - p.yaw; // relative bearing (0 = in front)
+    const ang = Math.atan2(-dx, -dz) - p.yaw;
     const d = document.createElement('div');
     d.className = 'dmg';
     d.style.transform = `rotate(${-ang}rad)`;
     $('dmg-ind').appendChild(d);
-    setTimeout(() => d.classList.add('fade'), 50);
+    setTimeout(() => d.classList.add('fade'), 60);
     setTimeout(() => d.remove(), 1200);
-    const hf = $('hurt-flash');
-    hf.style.transition = 'none';
-    hf.style.opacity = 0.35;
-    requestAnimationFrame(() => { hf.style.transition = 'opacity .5s'; hf.style.opacity = 0; });
   }
 
   showDeath(killer, weaponId) {
-    const el = $('death');
-    const wname = WEAPONS[weaponId]?.name || (weaponId === 'grenade' ? 'Frag Grenade' : 'the environment');
-    $('death-killer').innerHTML = killer && killer !== this.game.player
-      ? `Killed by <b style="color:${TEAMS[killer.team].css}">${esc(killer.name)}</b> <span>(${Math.ceil(killer.health)} HP left)</span>`
-      : 'You died';
-    $('death-weapon').textContent = wname;
-    el.classList.add('on');
+    const g = this.game;
+    const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', melee: 'Melee', fall: 'Fall damage' }[weaponId] || '');
+    if (killer && killer !== g.player) {
+      $('death-killer').textContent = killer.name.toUpperCase();
+      $('death-killer').style.color = killer.team === g.player.team ? FRIENDLY_CSS : ENEMY_CSS;
+      const dist = Math.round(killer.pos.distanceTo(g.player.pos));
+      $('death-detail').textContent = `${wname.toUpperCase()} · ${dist} M · ${Math.ceil(killer.health)} HP LEFT`;
+    } else {
+      $('death-killer').textContent = 'YOURSELF';
+      $('death-killer').style.color = 'var(--ink)';
+      $('death-detail').textContent = wname.toUpperCase();
+    }
+    $('death').classList.add('on');
   }
 
   hideDeath() { $('death').classList.remove('on'); }
@@ -194,9 +352,9 @@ export class HUD {
   countdown(n) {
     const el = $('countdown');
     if (n <= 0) { el.classList.remove('on'); return; }
-    el.classList.add('on');
-    el.textContent = n;
+    if (el.textContent !== String(n)) {
+      el.textContent = n;
+      el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    }
   }
 }
-
-export { esc, fmtTime };

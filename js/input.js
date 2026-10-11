@@ -1,30 +1,52 @@
-// Keyboard, mouse (pointer lock) and touch input
-const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+// Input: keyboard + mouse (pointer lock), Xbox / standard gamepads, touch.
+// Everything funnels into: analog move/look, held fire/ads, and one-shot "actions".
+
+const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const KEY_ACTIONS = {
+  KeyR: 'reload', KeyG: 'grenade', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
+  KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause',
+};
+// Standard gamepad mapping (Xbox layout)
+export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+const PAD_ACTIONS = {
+  [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap', [PAD.RB]: 'grenade', [PAD.LB]: 'grenade',
+  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee',
+};
 
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
     this.keys = new Set();
-    this.pressed = new Set();
+    this.actions = new Set();
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
     this.mouseFire = false; this.mouseAds = false;
     this.locked = false;
     this.fallback = false; // free-look without pointer lock (sandboxed iframes)
     this.enabled = false;
-    this.moveX = 0; this.moveY = 0;
-    this.touchFire = false; this.touchAds = false; this.crouchToggle = false; this.touchSprint = false;
+    this.lastDevice = 'kbm';
+    // touch
+    this.touchMoveX = 0; this.touchMoveY = 0; this.touchFire = false; this.touchAds = false; this.touchScore = false;
     this.isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
-    this.onLockChange = null;
+    // gamepad
+    this.pad = null; this.padConnected = false;
+    this.prevBtn = []; this.padMoveX = 0; this.padMoveY = 0; this.lookX = 0; this.lookY = 0;
+    this.padFire = false; this.padAds = false; this.padScore = false;
+    this.deadzone = 0.12;
+    this.vibration = true;
+    this.navRepeat = 0; this.navDir = null;
+    this.onLockChange = null; this.onNav = null; this.onPadChange = null; this.onDeviceChange = null;
 
     window.addEventListener('keydown', (e) => {
+      this.setDevice('kbm');
       if (!this.enabled) return;
       if (GAME_KEYS.has(e.code)) e.preventDefault();
-      if (!this.keys.has(e.code)) this.pressed.add(e.code);
+      if (!this.keys.has(e.code) && KEY_ACTIONS[e.code]) this.actions.add(KEY_ACTIONS[e.code]);
       this.keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
     window.addEventListener('blur', () => { this.keys.clear(); this.mouseFire = false; this.mouseAds = false; });
     canvas.addEventListener('mousedown', (e) => {
+      this.setDevice('kbm');
       if (!this.enabled || this.isTouch) return;
       if (!this.locked && !this.fallback) return;
       if (e.button === 0) this.mouseFire = true;
@@ -36,8 +58,8 @@ export class Input {
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
+      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) this.setDevice('kbm');
       if (!this.enabled || (!this.locked && !this.fallback)) return;
-      // clamp spikes some browsers emit on lock
       this.mouseDX += Math.max(-300, Math.min(300, e.movementX || 0));
       this.mouseDY += Math.max(-300, Math.min(300, e.movementY || 0));
     });
@@ -48,11 +70,22 @@ export class Input {
       if (!this.locked) { this.mouseFire = false; this.mouseAds = false; }
       if (this.onLockChange) this.onLockChange(this.locked);
     });
+    window.addEventListener('gamepadconnected', () => this.poll(0));
     if (this.isTouch) this.setupTouch();
   }
 
-  get fire() { return this.mouseFire || this.touchFire; }
-  get ads() { return this.mouseAds || this.touchAds; }
+  setDevice(d) {
+    if (this.lastDevice === d) return;
+    this.lastDevice = d;
+    document.body.dataset.device = d;
+    if (this.onDeviceChange) this.onDeviceChange(d);
+  }
+
+  get fire() { return this.mouseFire || this.touchFire || this.padFire; }
+  get ads() { return this.mouseAds || this.touchAds || this.padAds; }
+  get moveX() { return Math.max(-1, Math.min(1, this.touchMoveX + this.padMoveX)); }
+  get moveY() { return Math.max(-1, Math.min(1, this.touchMoveY + this.padMoveY)); }
+  get scoreboard() { return this.keys.has('Tab') || this.touchScore || this.padScore; }
 
   lock() {
     if (this.isTouch) return;
@@ -67,46 +100,117 @@ export class Input {
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
   down(code) { return this.keys.has(code); }
-  consume(code) { if (this.pressed.has(code)) { this.pressed.delete(code); return true; } return false; }
+  action(name) { if (this.actions.has(name)) { this.actions.delete(name); return true; } return false; }
+  padHeld(name) {
+    if (!this.pad) return false;
+    const idx = { sprint: PAD.L3, scoreboard: PAD.VIEW }[name];
+    const b = this.pad.buttons[idx];
+    return !!(b && b.pressed);
+  }
+
+  rumble(strong, weak, ms) {
+    if (!this.vibration || !this.pad || this.lastDevice !== 'pad') return;
+    const a = this.pad.vibrationActuator;
+    if (a && a.playEffect) a.playEffect('dual-rumble', { startDelay: 0, duration: ms, strongMagnitude: Math.min(1, strong), weakMagnitude: Math.min(1, weak) }).catch(() => {});
+  }
+
+  poll(dt) {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let pad = null;
+    for (const p of pads) if (p && p.connected) { pad = p; break; }
+    if (!!pad !== this.padConnected) {
+      this.padConnected = !!pad;
+      if (this.onPadChange) this.onPadChange(this.padConnected, pad ? pad.id : '');
+    }
+    this.pad = pad;
+    this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
+    this.padFire = this.padAds = this.padScore = false;
+    if (!pad) return;
+    const btn = (i) => { const b = pad.buttons[i]; return !!b && (b.pressed || b.value > 0.5); };
+    const val = (i) => (pad.buttons[i] ? pad.buttons[i].value : 0);
+    const ax = (i) => pad.axes[i] || 0;
+    let activity = false;
+    const edges = [];
+    for (let i = 0; i < pad.buttons.length; i++) {
+      const pr = btn(i);
+      if (pr && !this.prevBtn[i]) edges.push(i);
+      if (pr) activity = true;
+      this.prevBtn[i] = pr;
+    }
+    const dz = this.deadzone;
+    const radial = (x, y, curve) => {
+      const m = Math.hypot(x, y);
+      if (m < dz) return [0, 0];
+      const s = Math.min(1, (m - dz) / (1 - dz));
+      const c = Math.pow(s, curve) / m;
+      return [x * c, y * c];
+    };
+    const [lx, ly] = radial(ax(0), ax(1), 1);
+    const [rx, ry] = radial(ax(2), ax(3), 1.8);
+    if (lx || ly || rx || ry) activity = true;
+    if (val(PAD.LT) > 0.25 || val(PAD.RT) > 0.25) activity = true;
+    if (activity) this.setDevice('pad');
+
+    if (this.enabled) {
+      this.padMoveX = lx; this.padMoveY = -ly;
+      this.lookX = rx; this.lookY = ry;
+      this.padAds = val(PAD.LT) > 0.25;
+      this.padFire = val(PAD.RT) > 0.3;
+      this.padScore = btn(PAD.VIEW);
+      for (const i of edges) {
+        const a = PAD_ACTIONS[i];
+        if (a) this.actions.add(a);
+      }
+      if (edges.includes(PAD.UP)) this.actions.add('swap');
+    } else if (this.onNav) {
+      // menu navigation with D-pad / left stick (with key-repeat)
+      for (const i of edges) {
+        const m = { [PAD.UP]: 'up', [PAD.DOWN]: 'down', [PAD.LEFT]: 'left', [PAD.RIGHT]: 'right', [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab' }[i];
+        if (m) this.onNav(m);
+      }
+      const sx = ax(0), sy = ax(1);
+      const dir = Math.abs(sy) > 0.6 ? (sy < 0 ? 'up' : 'down') : Math.abs(sx) > 0.6 ? (sx < 0 ? 'left' : 'right') : null;
+      if (dir !== this.navDir) { this.navDir = dir; this.navRepeat = 0.38; if (dir) this.onNav(dir); }
+      else if (dir) { this.navRepeat -= dt; if (this.navRepeat <= 0) { this.navRepeat = 0.12; this.onNav(dir); } }
+    }
+  }
 
   endFrame() {
-    this.pressed.clear();
+    this.actions.clear();
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
   }
 
   reset() {
-    this.keys.clear(); this.pressed.clear();
+    this.keys.clear(); this.actions.clear();
     this.mouseFire = this.mouseAds = this.touchFire = this.touchAds = false;
-    this.moveX = this.moveY = 0;
+    this.touchMoveX = this.touchMoveY = 0;
   }
 
   setupTouch() {
     const ui = document.getElementById('touch');
     ui.classList.add('on');
     document.body.classList.add('touch');
+    this.setDevice('touch');
     const stick = document.getElementById('stick');
     const knob = document.getElementById('stick-knob');
     let stickId = null, sx = 0, sy = 0;
     let lookId = null, lx = 0, ly = 0;
     const R = 55;
-
     const lookStart = (t) => { lookId = t.identifier; lx = t.clientX; ly = t.clientY; };
     const lookMove = (t) => { this.mouseDX += (t.clientX - lx) * 1.6; this.mouseDY += (t.clientY - ly) * 1.6; lx = t.clientX; ly = t.clientY; };
 
     ui.addEventListener('touchstart', (e) => {
+      this.setDevice('touch');
       if (!this.enabled) return;
       for (const t of e.changedTouches) {
         const btn = t.target.closest('[data-btn]');
         if (btn) {
           const k = btn.dataset.btn;
           btn.classList.add('down');
-          if (k === 'fire') { this.touchFire = true; if (lookId === null) lookStart(t); btn.dataset.tid = t.identifier; }
+          if (k === 'fire') { this.touchFire = true; if (lookId === null) lookStart(t); }
           else if (k === 'ads') { this.touchAds = !this.touchAds; btn.classList.toggle('active', this.touchAds); }
-          else if (k === 'crouch') { this.crouchToggle = !this.crouchToggle; btn.classList.toggle('active', this.crouchToggle); }
-          else if (k === 'sprint') { this.touchSprint = !this.touchSprint; btn.classList.toggle('active', this.touchSprint); }
-          else if (k === 'pause') this.pressed.add('Escape');
-          else if (k === 'score') this.keys.add('Tab');
-          else this.pressed.add(k);
+          else if (k === 'score') this.touchScore = true;
+          else this.actions.add(k);
           continue;
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
@@ -127,7 +231,7 @@ export class Input {
           const len = Math.hypot(dx, dy);
           if (len > R) { dx *= R / len; dy *= R / len; }
           knob.style.transform = `translate(${dx}px, ${dy}px)`;
-          this.moveX = dx / R; this.moveY = -dy / R;
+          this.touchMoveX = dx / R; this.touchMoveY = -dy / R;
         } else if (t.identifier === lookId) {
           lookMove(t);
         }
@@ -138,7 +242,7 @@ export class Input {
     const end = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === stickId) {
-          stickId = null; this.moveX = this.moveY = 0;
+          stickId = null; this.touchMoveX = this.touchMoveY = 0;
           knob.style.transform = ''; stick.classList.remove('show');
         }
         if (t.identifier === lookId) lookId = null;
@@ -146,7 +250,7 @@ export class Input {
         if (btn) {
           btn.classList.remove('down');
           if (btn.dataset.btn === 'fire') this.touchFire = false;
-          if (btn.dataset.btn === 'score') this.keys.delete('Tab');
+          if (btn.dataset.btn === 'score') this.touchScore = false;
         }
       }
     };

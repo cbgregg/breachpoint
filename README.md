@@ -1,6 +1,6 @@
 # Breachpoint
 
-A browser-based first-person shooter with **Team Deathmatch** and **AI bots**, built with [Three.js](https://threejs.org/). No build step, no assets to download — every texture and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
+A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step and no asset downloads — every texture, model and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
 
 **Play:** `https://<your-username>.github.io/breachpoint/` (after enabling Pages — see below)
 
@@ -8,35 +8,38 @@ A browser-based first-person shooter with **Team Deathmatch** and **AI bots**, b
 
 | Area | What's included |
 |---|---|
-| Game mode | Team Deathmatch, Blue vs Red, configurable score limit (25–150) and time limit (5–20 min), 3-second pre-match countdown, victory/defeat/draw screen with MVP |
-| Bots | Up to 15 bots (8v8). Vision cone + line-of-sight perception, hearing gunfire, team intel sharing, A* pathfinding on a nav grid, strafing, crouching, jumping, stuck recovery, health/ammo seeking, grenade throws, weapon swapping by range. Three difficulties (reaction time, aim error, tracking lag, turn rate, headshot chance) |
-| Weapons | AR-7 Rifle, VX-9 SMG, M12 Shotgun (9 pellets), LR-50 Sniper (scope overlay), P-45 Pistol sidearm, frag grenades. Per-weapon fire rate, damage falloff, headshot multipliers, spread, bloom, recoil, ADS zoom, reload times |
-| Movement | Walk, sprint, crouch, jump, step-up onto stairs/ledges, air control, collision with wall sliding |
-| Combat | Hitscan with head/body hitboxes, falloff, friendly-fire toggle, spawn protection, health regen, assists, kill streaks and multikills |
-| Map | Symmetric arena: central raised platform with stairs, lane walls, containers, a hut on each flank, sandbag cover, team bases with colored zones. Spawn selection avoids enemies and line of sight |
-| Pickups | Health packs (incl. contested one on the platform), ammo crates, ammo drops from eliminated players |
-| HUD | Health, ammo, grenades, team score bars, timer, dynamic crosshair (red on enemy), hitmarkers (headshot/kill variants), damage direction indicators, low-health vignette, killfeed, minimap (enemies show when firing), scoreboard (Tab), death screen with killer HP, FPS counter |
-| Effects | Tracers, muzzle flashes with dynamic lights, bullet decals, sparks, blood, explosions with smoke and camera shake, real-time shadows, fog, sky dome |
-| Audio | Fully synthesized WebAudio: per-weapon gunshots, stereo-panned and distance-attenuated; reloads, footsteps, hit/headshot/kill confirms, explosions, pickups |
-| Platforms | Desktop (pointer lock, with free-look fallback) and touch devices (virtual joystick, look-drag, on-screen buttons) |
-| Settings | Callsign, primary weapon, team size, difficulty, limits, sensitivity, FOV, volume, invert Y, friendly fire, FPS — saved to `localStorage` |
+| Look | Physical sky with image-based lighting, low warm sun, real-time soft shadows, ground-truth ambient occlusion (GTAO), bloom, filmic tone mapping, color grade, vignette, chromatic aberration, film grain, SMAA. Procedural PBR materials (albedo + normal + roughness) for asphalt, concrete, plaster, brick, corrugated metal, wood, sandbags, HESCO. Quality presets Low → Ultra |
+| Map | *Tarsa Market*: perimeter of multi-storey buildings with shop shutters, signage, awnings, balconies, AC units, water tanks and dishes; central concrete building with rooftop access, compound walls, jersey barriers, shipping containers, wrecked cars, market stalls, sandbag positions, HESCO forward bases, palms, power cables, distant skyline. Symmetric layout for fair TDM |
+| Operators | Articulated soldiers (thighs, shins, IK arms that actually hold each weapon), plate carriers, pouches, helmets with NVG mounts vs. balaclavas and shemaghs. Walk/sprint/strafe/crouch/slide animation and a procedural death collapse |
+| Weapons | MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
+| Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
+| Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
+| HUD | Compass with enemy gunfire pings, rotating minimap rendered from the actual map, friendly/enemy score widget, ammo cluster with fire mode and equipment, score pop-ups beside the crosshair, medals (multikills, streaks, payback), killfeed, hitmarkers, directional damage, red-out damage effect, death card with killer distance and HP, scoreboard with K/D, device-aware button prompts |
+| Controller | Xbox / standard gamepads: radial deadzone, response curve, separate sensitivity, aim assist (slowdown, rotational tracking, ADS snap), rumble, full menu navigation with D-pad/stick, bumpers switch tabs, glyphs swap automatically between keyboard and controller |
+| Audio | Synthesized: layered gunshots (crack, body, thump, tail) with distance filtering and street reverb, bolt/pump foley, bullet whiz on near misses, casing tinkles, footsteps, explosions, hit/headshot/kill confirms |
+| Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons) |
+| Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, FOV, mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
 
 ## Controls
 
-| Action | Keyboard / Mouse | Touch |
-|---|---|---|
-| Move | `W` `A` `S` `D` / arrows | Left-side joystick |
-| Look | Mouse | Drag right side |
-| Fire | Left click | FIRE (drag to aim while firing) |
-| Aim down sights | Right click (hold) | ADS (toggle) |
-| Sprint | `Shift` | SPRINT (toggle) |
-| Jump | `Space` | JUMP |
-| Crouch | `C` / `Ctrl` | CROUCH (toggle) |
-| Reload | `R` | RELOAD |
-| Switch weapon | `1` `2` / `Q` / wheel | SWAP |
-| Frag grenade | `G` | FRAG |
-| Scoreboard | `Tab` (hold) | TAB (hold) |
-| Pause | `Esc` / `P` | ❚❚ |
+| Action | Keyboard & mouse | Xbox controller | Touch |
+|---|---|---|---|
+| Move | `W` `A` `S` `D` | Left stick | Left-side joystick |
+| Look | Mouse | Right stick | Drag right side |
+| Fire | Left click | RT | FIRE |
+| Aim down sights | Right click | LT | ADS (toggle) |
+| Jump | `Space` | A | JUMP |
+| Crouch / slide while sprinting | `C` / `Ctrl` | B | CROUCH |
+| Sprint / hold breath (scoped) | `Shift` | L3 (click) | SPRINT |
+| Reload | `R` | X | RELOAD |
+| Swap weapon | `Q`, `1` `2`, wheel | Y / D-pad up | SWAP |
+| Frag grenade | `G` | RB / LB | FRAG |
+| Melee | `V` | R3 | MELEE |
+| Scoreboard | `Tab` (hold) | View (hold) | TAB |
+| Pause | `Esc` / `P` | Menu | ❚❚ |
+| Menu tabs | `Q` / `E` | LB / RB | tap |
+
+Browsers only expose a controller after you press a button on it, so press any button once the page is open.
 
 ## Deploy to GitHub Pages
 
@@ -44,72 +47,62 @@ The repo ships with `.github/workflows/pages.yml`, which publishes the repositor
 
 1. Push this repo to GitHub (see below).
 2. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Push to `main` (or run the workflow manually from the **Actions** tab). The site URL appears in the workflow summary.
+3. Push to `main` (or run the workflow from the **Actions** tab). The site URL appears in the workflow summary.
 
-Alternative without Actions: **Settings → Pages → Source: Deploy from a branch → `main` / root**. The `.nojekyll` file is already included.
-
-### Create the repo from this folder
+Alternative without Actions: **Settings → Pages → Source: Deploy from a branch → `main` / root**. `.nojekyll` is included.
 
 ```bash
-# with the GitHub CLI
 gh repo create breachpoint --public --source=. --remote=origin --push
-
-# or manually
-git remote add origin https://github.com/<your-username>/breachpoint.git
-git push -u origin main
+# or
+git remote add origin https://github.com/<your-username>/breachpoint.git && git push -u origin main
 ```
 
 ## Run locally
 
-ES modules need to be served over HTTP (opening `index.html` from disk won't work):
+ES modules need HTTP (opening `index.html` from disk won't work):
 
 ```bash
 npx serve .            # or: python3 -m http.server 8000
 ```
 
-Then open the printed URL.
-
 ## Project structure
 
 | Path | Purpose |
 |---|---|
-| `index.html` | Page shell, HUD markup, menus, import map for Three.js (CDN) |
+| `index.html` | Page shell, HUD, menus, import map for Three.js + addons (CDN) |
 | `css/style.css` | Menus, HUD, scoreboard, touch controls |
-| `js/main.js` | Boot, menu wiring, settings persistence |
-| `js/game.js` | Match loop, rendering, hitscan resolution, grenades, kills/assists/scoring, spawns, pickups |
-| `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, defaults |
-| `js/character.js` | Shared player/bot logic: movement, health, weapon handling, humanoid model + animation |
-| `js/player.js` | Local player input, first-person camera, viewmodel animation (bob, sway, recoil, reload, ADS) |
-| `js/bot.js` | Bot AI: perception, goal selection, pathing, aiming, firing, grenades |
-| `js/nav.js` | Navigation grid, A* with octile heuristic, path smoothing |
-| `js/physics.js` | AABB collision, character movement with step-up, raycasts |
-| `js/world.js` | Map layout (mirrored for symmetry), lighting, sky, spawns, minimap render |
-| `js/weapons.js` | Weapon state (ammo/reload), gun meshes, spread cone |
-| `js/effects.js` | Instanced particles, tracers, decals, lights, explosions |
-| `js/audio.js` | Synthesized positional sound |
-| `js/hud.js` | HUD updates, minimap, scoreboard, killfeed |
-| `js/input.js` | Keyboard, mouse/pointer lock, touch controls |
-| `js/textures.js` | Procedural canvas textures |
+| `js/main.js` | Boot, menu tabs, controller/keyboard menu navigation, settings persistence |
+| `js/game.js` | Match loop, hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
+| `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
+| `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
+| `js/world.js` | Map layout (mirrored), dressing merged per material, minimap render |
+| `js/textures.js` | Procedural PBR texture sets |
+| `js/character.js` | Shared player/bot logic, operator model, IK arm posing, animation |
+| `js/player.js` | Local player: input → movement/weapons, camera, viewmodel with IK arms, aim assist |
+| `js/weapons.js` | Weapon state, detailed gun models, spread cone |
+| `js/bot.js` | Bot AI |
+| `js/nav.js` | Navigation grid, A*, path smoothing |
+| `js/physics.js` | AABB collision, step-up movement, raycasts |
+| `js/effects.js` | Soft particles, tracers, casings, debris, decals, explosions |
+| `js/audio.js` | Synthesized positional audio with reverb |
+| `js/hud.js` | Compass, minimap, score events, killfeed, scoreboard, button glyphs |
+| `js/input.js` | Keyboard, mouse, gamepad (mapping, curves, rumble, menu nav), touch |
 
 ## Tuning
 
-Everything gameplay-related lives in `js/config.js`:
-
 | Want to… | Edit |
 |---|---|
-| Change weapon damage / fire rate / spread / mag size | `WEAPONS.<id>` |
-| Make bots harder or easier | `DIFFICULTY.<level>` — `reaction`, `aimError`, `aimFloor`, `lag`, `turnRate`, `headChance` |
-| Change movement feel | `PLAYER` — `walk`, `sprint`, `jump`, `gravity`, `accel*` |
-| Change grenade behavior | `GRENADE` |
-| Change default match settings | `DEFAULT_SETTINGS` |
-| Edit the map | `HALF` / `CENTER` arrays in `js/world.js` (entries in `HALF` are mirrored automatically) |
+| Change weapon damage / fire rate / recoil / mag size | `WEAPONS.<id>` in `js/config.js` |
+| Make bots harder or easier | `DIFFICULTY.<level>` |
+| Change movement / slide feel | `PLAYER` |
+| Change graphics presets | `QUALITY` |
+| Edit the map | `HALF` / `CENTER` arrays in `js/world.js` (entries in `HALF` are mirrored) |
+| Change the color grade | `GradeShader` uniforms in `js/render.js` |
 
-## Tech notes
+## Performance notes
 
-- Three.js r160 loaded from jsDelivr via an import map; no bundler.
-- The viewmodel renders in a second pass with a cleared depth buffer so the gun never clips into walls.
-- Collision uses axis-aligned boxes; the nav grid is baked from the same colliders at load.
-- `window.__game` exposes the running game in the console for debugging.
+- High uses GTAO + bloom + SMAA at 1.25× pixel ratio; drop to **Medium** on integrated GPUs and **Low** on phones (the default on touch devices).
+- Static map geometry is merged per material, so the whole district renders in a few dozen draw calls.
 
 ## License
 

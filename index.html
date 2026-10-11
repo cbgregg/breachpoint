@@ -3,174 +3,217 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Breachpoint — Team Deathmatch</title>
-  <meta name="description" content="Breachpoint: a browser-based first-person shooter with team deathmatch and AI bots. Built with Three.js.">
-  <meta name="theme-color" content="#0d1117">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a4a' stroke-width='5'/%3E%3Cpath d='M32 2v18M32 44v18M2 32h18M44 32h18' stroke='%23fff' stroke-width='5'/%3E%3C/svg%3E">
+  <title>Breachpoint</title>
+  <meta name="description" content="Breachpoint: a browser first-person shooter with team deathmatch, AI bots and controller support. Built with Three.js.">
+  <meta name="theme-color" content="#0b0d0e">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0d0e'/%3E%3Cpath d='M32 8v14M32 42v14M8 32h14M42 32h14' stroke='%23e8e4da' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23ff4d4d'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
   </script>
 </head>
-<body>
+<body data-device="kbm">
   <div id="app"></div>
 
-  <!-- In-game HUD -->
+  <!-- ============ HUD ============ -->
   <div id="hud">
-    <div id="vignette"></div>
-    <div id="hurt-flash"></div>
-    <div id="scope"><div class="lens"></div></div>
+    <div id="scope"><div class="lens"><i class="h"></i><i class="v"></i><i class="dot"></i></div></div>
 
-    <div id="topbar">
-      <div class="team blue"><span id="score-blue">0</span><div class="bar"><i id="bar-blue"></i></div></div>
-      <div id="timer">10:00</div>
-      <div class="team red"><div class="bar"><i id="bar-red"></i></div><span id="score-red">0</span></div>
+    <div id="tl">
+      <div id="mm-wrap"><canvas id="minimap" width="440" height="440"></canvas><span class="mm-n">N</span></div>
+      <div id="scorebox">
+        <div class="srow friendly"><span class="sname">FRIENDLY</span><div class="sbar"><i id="bar-f"></i></div><b id="score-f">0</b></div>
+        <div class="srow enemy"><span class="sname">ENEMY</span><div class="sbar"><i id="bar-e"></i></div><b id="score-e">0</b></div>
+        <div class="smeta"><span id="timer">10:00</span><span class="dot">•</span><span>TDM</span><span class="dot">•</span><span id="limit">75</span></div>
+      </div>
     </div>
 
-    <canvas id="minimap" width="252" height="180"></canvas>
+    <div id="compass"><canvas id="compass-c" width="1040" height="64"></canvas><div id="bearing">000</div></div>
     <div id="killfeed"></div>
     <div id="fps"></div>
 
-    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
     <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
     <div id="dmg-ind"></div>
+    <div id="score-pop"></div>
+    <div id="medal"></div>
+    <div id="prompt"></div>
     <div id="center-msg"></div>
     <div id="countdown"></div>
     <div id="protect">SPAWN PROTECTION</div>
 
-    <div id="reload-wrap"><span>RELOADING</span><div><i id="reload-fill"></i></div></div>
+    <div id="health-wrap"><div id="health-bar"><i id="health-fill"></i></div></div>
 
-    <div id="health-wrap">
-      <div class="lbl">HP</div>
-      <div id="health-num">100</div>
-      <div id="health-bar"><i id="health-fill"></i></div>
-    </div>
-
-    <div id="ammo-wrap">
-      <div id="weapon-name">AR-7 Rifle</div>
-      <div class="ammo"><span id="ammo-mag">30</span><span class="sep">/</span><span id="ammo-res">150</span></div>
-      <div class="gren"><span class="lbl">FRAG</span> <span id="grenades">●●○</span></div>
+    <div id="ammo">
+      <div id="weapon-name">MK-4 CARBINE</div>
+      <div class="ammo-row">
+        <span id="ammo-mag">30</span>
+        <div class="ammo-side"><span id="ammo-res">150</span><span id="fire-mode">AUTO</span></div>
+      </div>
+      <div class="equip">
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a6 6 0 1 0 0.01 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3h4v4h-4zM14 4l4-2" stroke="currentColor" stroke-width="2" fill="none"/></svg><b id="grenades">1</b><span class="glyph" data-act="grenade"></span></span>
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l12-12M14 6l4-2 2 2-2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><span class="glyph" data-act="melee"></span></span>
+      </div>
     </div>
 
     <div id="death">
-      <div id="death-killer">Killed by</div>
-      <div id="death-weapon"></div>
+      <div class="d-label">KILLED BY</div>
+      <div id="death-killer"></div>
+      <div id="death-detail"></div>
       <div id="death-timer"></div>
     </div>
     <div id="scoreboard"></div>
+    <div id="toast"></div>
   </div>
 
-  <!-- Touch controls -->
+  <!-- ============ Touch controls ============ -->
   <div id="touch">
     <div id="stick"><div id="stick-knob"></div></div>
     <button data-btn="pause" class="tb small" id="tb-pause">❚❚</button>
     <button data-btn="score" class="tb small" id="tb-score">TAB</button>
     <button data-btn="fire" class="tb big" id="tb-fire">FIRE</button>
     <button data-btn="ads" class="tb" id="tb-ads">ADS</button>
-    <button data-btn="touchJump" class="tb" id="tb-jump">JUMP</button>
+    <button data-btn="jump" class="tb" id="tb-jump">JUMP</button>
     <button data-btn="crouch" class="tb" id="tb-crouch">CROUCH</button>
-    <button data-btn="touchReload" class="tb" id="tb-reload">RELOAD</button>
-    <button data-btn="touchSwap" class="tb" id="tb-swap">SWAP</button>
-    <button data-btn="touchGrenade" class="tb" id="tb-frag">FRAG</button>
+    <button data-btn="reload" class="tb" id="tb-reload">RELOAD</button>
+    <button data-btn="swap" class="tb" id="tb-swap">SWAP</button>
+    <button data-btn="grenade" class="tb" id="tb-frag">FRAG</button>
+    <button data-btn="melee" class="tb" id="tb-melee">MELEE</button>
     <button data-btn="sprint" class="tb" id="tb-sprint">SPRINT</button>
   </div>
 
-  <!-- Main menu -->
+  <!-- ============ Main menu ============ -->
   <div id="menu" class="screen on">
-    <div class="panel">
-      <div class="brand">
-        <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><path d="M32 2v18M32 44v18M2 32h18M44 32h18" stroke="#fff" stroke-width="4"/></svg>
-        <div>
-          <h1>BREACHPOINT</h1>
-          <p>Team Deathmatch · Browser FPS</p>
-        </div>
-      </div>
+    <div class="mw">
+      <header class="mw-head">
+        <div class="logo"><span class="mark"></span>BREACHPOINT</div>
+        <nav class="tabs" role="tablist">
+          <span class="glyph bumper" data-act="prevTab"></span>
+          <button class="tab on" data-tab="play" data-nav>PLAY</button>
+          <button class="tab" data-tab="loadout" data-nav>LOADOUT</button>
+          <button class="tab" data-tab="options" data-nav>OPTIONS</button>
+          <span class="glyph bumper" data-act="nextTab"></span>
+        </nav>
+      </header>
 
-      <div class="grid">
-        <label>Callsign<input id="opt-name" maxlength="16" autocomplete="off"></label>
-        <label>Primary weapon
-          <select id="opt-primary">
-            <option value="rifle">AR-7 Rifle — all-rounder</option>
-            <option value="smg">VX-9 SMG — fast, close range</option>
-            <option value="shotgun">M12 Shotgun — point blank</option>
-            <option value="sniper">LR-50 Sniper — one-shot headshots</option>
-          </select>
-        </label>
-        <label>Team size
-          <select id="opt-team">
-            <option value="2">2 v 2</option><option value="3">3 v 3</option><option value="4">4 v 4</option>
-            <option value="5">5 v 5</option><option value="6">6 v 6</option><option value="8">8 v 8</option>
-          </select>
-        </label>
-        <label>Bot difficulty
-          <select id="opt-diff"><option value="easy">Recruit</option><option value="normal">Regular</option><option value="hard">Veteran</option></select>
-        </label>
-        <label>Score limit
-          <select id="opt-score"><option>25</option><option>50</option><option>75</option><option>100</option><option>150</option></select>
-        </label>
-        <label>Time limit
-          <select id="opt-time"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
-        </label>
-      </div>
-
-      <details class="settings">
-        <summary>Settings</summary>
-        <div class="grid">
-          <label>Mouse sensitivity <output id="out-sens"></output><input type="range" id="opt-sens" min="0.2" max="3" step="0.05"></label>
-          <label>Field of view <output id="out-fov"></output><input type="range" id="opt-fov" min="65" max="110" step="1"></label>
-          <label>Volume <output id="out-vol"></output><input type="range" id="opt-vol" min="0" max="1" step="0.05"></label>
-          <div class="checks">
-            <label class="check"><input type="checkbox" id="opt-invert"> Invert Y</label>
-            <label class="check"><input type="checkbox" id="opt-ff"> Friendly fire</label>
-            <label class="check"><input type="checkbox" id="opt-fps"> Show FPS</label>
+      <div class="mw-body">
+        <section class="pane on" id="pane-play">
+          <h2 class="pane-title">TEAM DEATHMATCH</h2>
+          <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
+          <div class="rows">
+            <div class="row"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
+              <option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option>
+              <option value="5">5v5</option><option value="6">6v6</option><option value="8">8v8</option></select></div>
+            <div class="row"><label for="opt-diff">Bot difficulty</label><select id="opt-diff" data-nav>
+              <option value="easy">Recruit</option><option value="normal">Regular</option><option value="hard">Veteran</option></select></div>
+            <div class="row"><label for="opt-score">Score limit</label><select id="opt-score" data-nav>
+              <option>25</option><option>50</option><option>75</option><option>100</option><option>150</option></select></div>
+            <div class="row"><label for="opt-time">Time limit</label><select id="opt-time" data-nav>
+              <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
+            <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
-        </div>
-      </details>
+          <button id="play" class="cta" data-nav><span>DEPLOY</span><span class="glyph" data-act="accept"></span></button>
+        </section>
 
-      <button id="play" class="primary">DEPLOY</button>
+        <section class="pane" id="pane-loadout">
+          <h2 class="pane-title">LOADOUT</h2>
+          <div class="rows">
+            <div class="row"><label for="opt-name">Callsign</label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+          </div>
+          <div id="weapon-list" class="weapons"></div>
+        </section>
 
-      <div class="controls">
-        <div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>
-        <div><kbd>LMB</kbd> Fire</div><div><kbd>RMB</kbd> Aim down sights</div>
-        <div><kbd>Shift</kbd> Sprint</div><div><kbd>Space</kbd> Jump</div>
-        <div><kbd>C</kbd>/<kbd>Ctrl</kbd> Crouch</div><div><kbd>R</kbd> Reload</div>
-        <div><kbd>1</kbd><kbd>2</kbd><kbd>Q</kbd> Weapons</div><div><kbd>G</kbd> Frag grenade</div>
-        <div><kbd>Tab</kbd> Scoreboard</div><div><kbd>Esc</kbd> Pause</div>
+        <section class="pane" id="pane-options">
+          <h2 class="pane-title">OPTIONS</h2>
+          <div class="rows two">
+            <div class="group">GRAPHICS</div>
+            <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
+              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
+            <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
+            <div class="row"><label for="opt-fps">FPS counter</label><input type="checkbox" id="opt-fps" data-nav></div>
+            <div class="group">MOUSE &amp; KEYBOARD</div>
+            <div class="row"><label for="opt-sens">Mouse sensitivity <output id="out-sens"></output></label><input type="range" id="opt-sens" min="0.2" max="3" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-invert">Invert look</label><input type="checkbox" id="opt-invert" data-nav></div>
+            <div class="group">CONTROLLER</div>
+            <div class="row"><label for="opt-padsens">Stick sensitivity <output id="out-padsens"></output></label><input type="range" id="opt-padsens" min="0.3" max="2.5" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-deadzone">Stick deadzone <output id="out-deadzone"></output></label><input type="range" id="opt-deadzone" min="0.04" max="0.3" step="0.01" data-nav></div>
+            <div class="row"><label for="opt-aa">Aim assist</label><input type="checkbox" id="opt-aa" data-nav></div>
+            <div class="row"><label for="opt-vib">Vibration</label><input type="checkbox" id="opt-vib" data-nav></div>
+            <div class="group">AUDIO</div>
+            <div class="row"><label for="opt-vol">Master volume <output id="out-vol"></output></label><input type="range" id="opt-vol" min="0" max="1" step="0.05" data-nav></div>
+          </div>
+          <div class="controls-ref">
+            <table>
+              <thead><tr><th>Action</th><th>Keyboard &amp; mouse</th><th>Controller</th></tr></thead>
+              <tbody>
+                <tr><td>Move / look</td><td>WASD / mouse</td><td>Left stick / right stick</td></tr>
+                <tr><td>Fire / aim</td><td>LMB / RMB</td><td>RT / LT</td></tr>
+                <tr><td>Jump</td><td>Space</td><td>A</td></tr>
+                <tr><td>Crouch · slide while sprinting</td><td>C · Ctrl</td><td>B</td></tr>
+                <tr><td>Sprint · hold breath</td><td>Shift</td><td>L3</td></tr>
+                <tr><td>Reload</td><td>R</td><td>X</td></tr>
+                <tr><td>Swap weapon</td><td>Q / 1 / 2 / wheel</td><td>Y / D-pad up</td></tr>
+                <tr><td>Frag grenade</td><td>G</td><td>RB / LB</td></tr>
+                <tr><td>Melee</td><td>V</td><td>R3</td></tr>
+                <tr><td>Scoreboard</td><td>Tab</td><td>View</td></tr>
+                <tr><td>Pause</td><td>Esc</td><td>Menu</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="intel">
+          <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
+          <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
+          <div class="intel-k">MODE</div><div class="intel-v">TEAM DEATHMATCH</div>
+          <div class="intel-k">INPUT</div><div class="intel-v" id="intel-input">KEYBOARD &amp; MOUSE</div>
+        </aside>
       </div>
+
+      <footer class="mw-foot" id="menu-hints"></footer>
     </div>
   </div>
 
-  <!-- Pause -->
+  <!-- ============ Pause ============ -->
   <div id="pause" class="screen">
-    <div class="panel narrow">
-      <h2>PAUSED</h2>
-      <button id="resume" class="primary">RESUME</button>
-      <label>Mouse sensitivity <output id="out-sens2"></output><input type="range" id="opt-sens2" min="0.2" max="3" step="0.05"></label>
-      <label>Volume <output id="out-vol2"></output><input type="range" id="opt-vol2" min="0" max="1" step="0.05"></label>
-      <button id="restart">RESTART MATCH</button>
-      <button id="quit">QUIT TO MENU</button>
+    <div class="mw narrow">
+      <header class="mw-head"><div class="logo"><span class="mark"></span>PAUSED</div></header>
+      <div class="rows">
+        <button id="resume" class="cta" data-nav><span>RESUME</span></button>
+        <div class="row"><label for="opt-sens2">Mouse sensitivity <output id="out-sens2"></output></label><input type="range" id="opt-sens2" min="0.2" max="3" step="0.05" data-nav></div>
+        <div class="row"><label for="opt-padsens2">Stick sensitivity <output id="out-padsens2"></output></label><input type="range" id="opt-padsens2" min="0.3" max="2.5" step="0.05" data-nav></div>
+        <div class="row"><label for="opt-vol2">Volume <output id="out-vol2"></output></label><input type="range" id="opt-vol2" min="0" max="1" step="0.05" data-nav></div>
+        <button id="restart" class="menu-btn" data-nav>RESTART MATCH</button>
+        <button id="quit" class="menu-btn" data-nav>QUIT TO MENU</button>
+      </div>
+      <footer class="mw-foot" id="pause-hints"></footer>
     </div>
   </div>
 
-  <!-- End of match -->
+  <!-- ============ End of match ============ -->
   <div id="end" class="screen">
-    <div class="panel wide">
-      <h2 id="end-title">VICTORY</h2>
+    <div class="mw wide">
+      <div id="end-title">VICTORY</div>
       <div id="end-score"></div>
       <div id="end-mvp"></div>
       <div id="end-board"></div>
-      <div class="row">
-        <button id="again" class="primary">PLAY AGAIN</button>
-        <button id="menu-btn">MAIN MENU</button>
+      <div class="end-actions">
+        <button id="again" class="cta" data-nav><span>PLAY AGAIN</span></button>
+        <button id="menu-btn" class="menu-btn" data-nav>MAIN MENU</button>
       </div>
     </div>
   </div>
 
   <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
-  <div id="loading" class="screen on"><div class="spinner"></div><p>Loading…</p></div>
+  <div id="loading" class="screen on"><div class="load-logo">BREACHPOINT</div><div class="load-bar"><i></i></div><p id="load-text">Building Tarsa Market…</p></div>
   <noscript><p style="color:#fff;padding:2rem">Breachpoint requires JavaScript and WebGL.</p></noscript>
 
   <script type="module" src="js/main.js"></script>

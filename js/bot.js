@@ -280,6 +280,7 @@ export class BotBrain {
     }
 
     if (!engaging || this.reactT > 0) return;
+    if (dist < 1.7 && b.meleeCd <= 0 && Math.random() < 0.5) { b.melee(); return; }
     // pick the right tool for the range
     const primary = b.weapons[0], pistol = b.weapons[1];
     const pr = primary.def.botRange;
