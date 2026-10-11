@@ -158,7 +158,11 @@ export class PlayerController {
     this.prevShift = shift;
     if (sprintPress) this.padSprint = true;
     if (f < 0.35 || inp.ads || inp.fire) this.padSprint = false;
-    const sprintWant = canAct && (shift || this.padSprint) && f > 0.4 && !inp.ads && !inp.fire;
+    // touch auto-fire target (decided before movement so it can break a sprint, like pulling the trigger)
+    const at = g.aimTarget;
+    const autoOn = canAct && inp.isTouch && s.touchAutoFire !== false && !inp.fire && !!at && at.alive && !at.hidden
+      && at.pos.distanceTo(c.pos) < def.range * 0.9;
+    const sprintWant = canAct && (shift || this.padSprint || inp.touchSprint) && f > 0.4 && !inp.ads && !inp.fire && !autoOn;
     if (sprintWant && sprintPress && c.weapon.reloading) c.weapon.cancelReload();
     const sprint = sprintWant && !c.weapon.reloading;
 
@@ -196,9 +200,7 @@ export class PlayerController {
     c.adsT = clamp(c.adsT + Math.sign(adsWant - c.adsT) * dt / def.adsTime, 0, 1);
 
     // touch auto-fire: shoot while the crosshair is on an enemy in range (Call of Duty Mobile "simple mode")
-    const t = g.aimTarget;
-    const auto = canAct && inp.isTouch && s.touchAutoFire !== false && !inp.fire && t && t.alive && !t.hidden
-      && t.pos.distanceTo(c.pos) < def.range * 0.9 && c.sprinting === false;
+    const auto = autoOn && !c.sprinting;
     let fired = false;
     if (canAct && (inp.fire || auto) && this.cycleT <= 0) {
       if (def.auto || !this.triggerLatch || auto) {

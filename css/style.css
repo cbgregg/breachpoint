@@ -267,6 +267,8 @@ body.ingame #touch.on { display: block; }
 #tb-frag { right: 192px; bottom: 106px; }
 #tb-melee { right: 34px; bottom: 196px; }
 #tb-sprint { left: 22px; bottom: 112px; }
+#stick.sprint { border-color: rgba(232, 176, 74, 0.9); box-shadow: 0 0 0 2px rgba(232, 176, 74, 0.35); }
+#stick.sprint #stick-knob { background: rgba(232, 176, 74, 0.55); }
 /* while aiming: a bigger fire button, plus a second one on the left so the right thumb can hold ADS and aim */
 #tb-fire, #tb-fire2 { transition: width .12s, height .12s; }
 #tb-fire2 { left: 92px; bottom: 96px; width: 96px; height: 96px; display: none; }

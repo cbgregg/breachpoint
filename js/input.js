@@ -289,6 +289,9 @@ export class Input {
         if (t.identifier === stickId) {
           let dx = t.clientX - sx, dy = t.clientY - sy;
           const len = Math.hypot(dx, dy);
+          // push the stick all the way forward (to the ring and a little past) to sprint, like CoD Mobile
+          const sprint = len > R * 1.02 && -dy > Math.abs(dx) * 1.2;
+          if (sprint !== this.touchSprint) { this.touchSprint = sprint; stick.classList.toggle('sprint', sprint); }
           if (len > R) { dx *= R / len; dy *= R / len; }
           knob.style.transform = `translate(${dx}px, ${dy}px)`;
           this.touchMoveX = dx / R; this.touchMoveY = -dy / R;
@@ -303,6 +306,7 @@ export class Input {
       for (const t of e.changedTouches) {
         if (t.identifier === stickId) {
           stickId = null; this.touchMoveX = this.touchMoveY = 0;
+          this.touchSprint = false; stick.classList.remove('sprint');
           knob.style.transform = ''; stick.classList.remove('show');
         }
         if (t.identifier === lookId) lookId = null;

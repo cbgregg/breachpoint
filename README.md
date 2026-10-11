@@ -20,7 +20,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Controller | Xbox / standard gamepads: radial deadzone, response curve, separate sensitivity, aim assist (slowdown, rotational tracking, ADS snap), rumble, full menu navigation with D-pad/stick, bumpers switch tabs, glyphs swap automatically between keyboard and controller |
 | Music | Original score synthesized live (no recordings, so nothing to license): a slow D-minor menu theme and a 112 BPM action track whose layers build with recent fighting, the last minute and close finishes; end-of-match stings; separate music volume. Swap in your own tracks via `MUSIC_FILES` in `js/config.js` |
 | Audio | Synthesized: layered gunshots (crack, body, thump, tail) with distance filtering and street reverb, bolt/pump foley, bullet whiz on near misses, casing tinkles, footsteps, explosions, hit/headshot/kill confirms |
-| Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons; tap-to-aim and auto-fire on target by default, both in Options) |
+| Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons; push the stick all the way forward to sprint; tap-to-aim and auto-fire on target by default, both in Options) |
 | Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, FOV, mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
 
 ## Controls
