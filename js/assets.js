@@ -9,9 +9,17 @@ export const ASSETS = { soldier: null };
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();
   try {
-    const gltf = await loader.loadAsync('assets/models/soldier.glb', (e) => {
-      if (onProgress && e.total) onProgress(e.loaded / e.total);
-    });
+    let gltf;
+    try {
+      gltf = await loader.loadAsync('assets/models/soldier.glb', (e) => {
+        if (onProgress && e.total) onProgress(e.loaded / e.total);
+      });
+    } catch (e) {
+      // hosts that won't serve .glb can ship the model as a base64 JS module instead
+      const { SOLDIER_B64 } = await import('./soldier-data.js');
+      const bin = Uint8Array.from(atob(SOLDIER_B64), ch => ch.charCodeAt(0));
+      gltf = await loader.parseAsync(bin.buffer, '');
+    }
     const clips = {};
     for (const c of gltf.animations) clips[c.name] = c;
     gltf.scene.traverse((o) => {
