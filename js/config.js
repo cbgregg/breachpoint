@@ -52,21 +52,21 @@ export const WEAPONS = {
     id: 'rifle', name: 'MK-4 Carbine', short: 'MK-4', mode: 'AUTO', auto: true, rpm: 750, damage: 24, headMult: 1.6,
     mag: 30, reserve: 150, reload: 2.2, spread: 0.03, adsSpread: 0.004, moveSpread: 0.03,
     recoilPitch: 0.011, recoilYaw: 0.006, range: 150, falloffStart: 35, falloffEnd: 80, falloffMin: 0.7,
-    pellets: 1, adsFov: 52, adsTime: 0.22, botRange: [8, 40],
+    pellets: 1, adsFov: 50, adsTime: 0.22, botRange: [8, 40],
     model: { type: 'rifle', sight: 'holo' },
   },
   smg: {
     id: 'smg', name: 'VX-9 SMG', short: 'VX-9', mode: 'AUTO', auto: true, rpm: 880, damage: 19, headMult: 1.4,
     mag: 32, reserve: 160, reload: 1.9, spread: 0.04, adsSpread: 0.012, moveSpread: 0.015,
     recoilPitch: 0.009, recoilYaw: 0.008, range: 100, falloffStart: 14, falloffEnd: 40, falloffMin: 0.55,
-    pellets: 1, adsFov: 60, adsTime: 0.16, botRange: [4, 22],
+    pellets: 1, adsFov: 55, adsTime: 0.16, botRange: [4, 22],
     model: { type: 'smg', sight: 'reflex' },
   },
   shotgun: {
     id: 'shotgun', name: 'M12 Pump', short: 'M12', mode: 'PUMP', auto: false, rpm: 70, damage: 16, headMult: 1.3,
     mag: 7, reserve: 35, reload: 2.8, spread: 0.085, adsSpread: 0.065, moveSpread: 0.02,
     recoilPitch: 0.055, recoilYaw: 0.01, range: 45, falloffStart: 7, falloffEnd: 22, falloffMin: 0.25,
-    pellets: 9, adsFov: 64, adsTime: 0.2, botRange: [2, 12],
+    pellets: 9, adsFov: 58, adsTime: 0.2, botRange: [2, 12],
     model: { type: 'shotgun', sight: 'iron' },
   },
   sniper: {
@@ -80,7 +80,7 @@ export const WEAPONS = {
     id: 'pistol', name: 'P-45 Sidearm', short: 'P-45', mode: 'SEMI', auto: false, rpm: 400, damage: 30, headMult: 1.6,
     mag: 12, reserve: 60, reload: 1.5, spread: 0.022, adsSpread: 0.008, moveSpread: 0.015,
     recoilPitch: 0.018, recoilYaw: 0.006, range: 100, falloffStart: 18, falloffEnd: 45, falloffMin: 0.6,
-    pellets: 1, adsFov: 64, adsTime: 0.14, botRange: [3, 25],
+    pellets: 1, adsFov: 58, adsTime: 0.14, botRange: [3, 25],
     model: { type: 'pistol', sight: 'iron' },
   },
 };

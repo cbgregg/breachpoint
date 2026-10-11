@@ -71,9 +71,9 @@ export class HUD {
       let t = this.tags.get(c);
       if (!t) {
         const el = document.createElement('div');
-        el.className = 'tag';
-        el.innerHTML = '<span class="tn"></span><span class="tc"></span>';
-        el.firstChild.textContent = c.name.toUpperCase();
+        el.className = 'ntag';
+        el.innerHTML = '<span class="tc"></span><span class="tn"></span>';
+        el.lastChild.textContent = c.name.toUpperCase();
         this.tagBox.appendChild(el);
         t = { el, key: '' };
         this.tags.set(c, t);
@@ -83,7 +83,7 @@ export class HUD {
       const s = Math.max(0.7, Math.min(1.15, 9 / Math.max(1, dist) + 0.62));
       t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(2)})`;
       const key = (friend ? 'f' : 'e') + (friend && dist > 45 ? ' far' : '');
-      if (key !== t.key) { t.key = key; t.el.className = 'tag ' + key; }
+      if (key !== t.key) { t.key = key; t.el.className = 'ntag ' + key; }
     }
     for (const [c, t] of this.tags) if (!seen.has(c)) { t.el.remove(); this.tags.delete(c); }
   }

@@ -16,7 +16,10 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
 const POLE_R = new THREE.Vector3(1, -0.8, 0.2), POLE_L = new THREE.Vector3(-1, -0.9, 0);
-const EYE_RELIEF = -0.25;
+const EYE_RELIEF = -0.15; // close to the eye, like CoD: the optic frames the target
+// The FOV setting works like Call of Duty's: degrees across a 4:3 frame (80 = MW default). three.js
+// wants the vertical angle, which is what makes players and the gun look the right size.
+export const vfov = (h) => 2 * Math.atan(Math.tan((h * Math.PI) / 360) * 0.75) * 180 / Math.PI;
 
 function solveElbow(S, H, a, b, pole, out) {
   const d = _c.subVectors(H, S);
@@ -87,8 +90,8 @@ export class PlayerController {
       return {
         id: w.id, holder, gun,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
-        hip: touch ? (pistol ? new THREE.Vector3(0.12, -0.14, -0.34) : new THREE.Vector3(0.14, -0.17, -0.22))
-          : pistol ? new THREE.Vector3(0.11, -0.12, -0.34) : new THREE.Vector3(0.13, -0.15, -0.22),
+        hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
+          : pistol ? new THREE.Vector3(0.1, -0.12, -0.3) : new THREE.Vector3(0.105, -0.155, -0.19),
         ads: new THREE.Vector3(0, -gun.sightY, EYE_RELIEF - gun.sightZ),
       };
     });
@@ -126,7 +129,8 @@ export class PlayerController {
     const def = c.weapon.def;
 
     // ---- look ----
-    const zoom = lerp(1, def.adsFov / s.fov, c.adsT);
+    const baseFov = vfov(s.fov);
+    const zoom = lerp(1, def.adsFov / baseFov, c.adsT);
     const sens = 0.0022 * s.sensitivity * zoom;
     const inv = s.invertY ? -1 : 1;
     c.yaw -= inp.mouseDX * sens;
@@ -321,7 +325,7 @@ export class PlayerController {
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     cam.rotation.order = 'YXZ';
     cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
-    const fov = lerp(s.fov, c.weapon.def.adsFov, c.adsT) * (c.sprinting ? 1.06 : 1);
+    const fov = lerp(vfov(s.fov), c.weapon.def.adsFov, c.adsT) * (c.sprinting ? 1.06 : 1);
     if (Math.abs(fov - this.lastFov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
@@ -458,6 +462,7 @@ export class PlayerController {
     cam.position.lerp(_a, Math.min(1, dt * 3));
     if (k) k.eyePos(_b); else _b.copy(c.pos);
     cam.lookAt(_b);
-    if (Math.abs(cam.fov - this.game.settings.fov) > 0.01) { cam.fov = this.game.settings.fov; cam.updateProjectionMatrix(); this.lastFov = cam.fov; }
+    const df = vfov(this.game.settings.fov);
+    if (Math.abs(cam.fov - df) > 0.01) { cam.fov = df; cam.updateProjectionMatrix(); this.lastFov = cam.fov; }
   }
 }
