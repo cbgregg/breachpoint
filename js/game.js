@@ -15,6 +15,7 @@ import { Renderer, SUN_DIR } from './render.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(new THREE.Vector3(), 1.3);
 const ZERO = new THREE.Vector3();
 const GRAV = 20;
 
@@ -250,8 +251,15 @@ export class Game {
     }
 
     this.updateAimTarget();
+    this.camera.updateMatrixWorld();
+    _pm.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    _frustum.setFromProjectionMatrix(_pm);
     for (const c of this.characters) {
-      if (c.isBot) c.updateModel(dt, c.team === this.player.team || c === this.aimTarget);
+      if (!c.isBot) continue;
+      _sph.center.set(c.pos.x, c.pos.y + 0.9, c.pos.z);
+      const dist = _sph.center.distanceTo(this.camera.position);
+      const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 32 ? 2 : 1;
+      c.updateModel(dt, c.team === this.player.team || c === this.aimTarget, lod);
     }
     this.updateGrenades(dt);
     this.updatePickups(dt);

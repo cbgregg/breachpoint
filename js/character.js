@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
+import { cloneSoldier } from './assets.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -199,6 +200,13 @@ const SH_R = new THREE.Vector3(0.19, 0.03, 0), SH_L = new THREE.Vector3(-0.19, 0
 
 export function setOperatorWeapon(model, weaponId) {
   if (model.weaponId === weaponId) return;
+  if (model.soldier) {
+    model.gunHolder.clear();
+    model.gun = buildGun(weaponId);
+    model.weaponId = weaponId;
+    model.gunHolder.add(model.gun.group);
+    return;
+  }
   model.gunHolder.clear();
   const gun = buildGun(weaponId);
   model.gun = gun;
@@ -251,7 +259,7 @@ export class Character {
     this.stepAccum = 0; this.animPhase = 0;
     this.model = null;
     if (isBot) {
-      this.model = buildOperator(team, primary, name);
+      this.model = buildSoldierModel(team, primary, name) || buildOperator(team, primary, name);
       game.scene.add(this.model.root);
       this.model.root.visible = false;
     }
@@ -447,8 +455,22 @@ export class Character {
     if (this.pos.y < -15) this.takeDamage(999, null, 'fall', false, this.pos);
   }
 
-  updateModel(dt, showName) {
+  updateModel(dt, showName, lod = 1) {
     if (!this.model) return;
+    if (this.model.soldier) {
+      // level of detail: off-screen bots only move their root; distant ones animate at a lower rate
+      const m = this.model;
+      m.accDt = (m.accDt || 0) + dt;
+      if (lod === 0) {
+        m.root.position.copy(this.pos); m.root.rotation.set(0, this.yaw, 0);
+        if (!this.alive && this.game.time - this.deathT > 5) m.root.visible = false;
+        return;
+      }
+      if (lod === 2 && (m.skip = !m.skip)) return;
+      animateSoldier(this, m.accDt, showName);
+      m.accDt = 0;
+      return;
+    }
     const m = this.model;
     const r = m.root;
     if (!this.alive) {
@@ -523,4 +545,212 @@ export class Character {
   dispose() {
     if (this.model) this.game.scene.remove(this.model.root);
   }
+}
+
+// ---------- rigged soldier (Mixamo skeleton) ----------
+const _w1 = new THREE.Vector3(), _w2 = new THREE.Vector3(), _w3 = new THREE.Vector3(), _w4 = new THREE.Vector3();
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _qAim = new THREE.Quaternion();
+const _eu = new THREE.Euler(0, 0, 0, 'YXZ');
+const UP = new THREE.Vector3(0, 1, 0);
+
+// rotate a bone about a world-space axis, keeping the result in its parent's space
+function rotateBoneWorld(bone, axis, angle) {
+  if (!angle) return;
+  _qa.setFromAxisAngle(axis, angle);
+  bone.getWorldQuaternion(_qb);
+  _qb.premultiply(_qa);
+  bone.parent.getWorldQuaternion(_qc).invert();
+  bone.quaternion.copy(_qc.multiply(_qb));
+  bone.updateMatrixWorld(true);
+}
+// swing a bone so the direction to its child joint points at `dir` (world)
+function swingBone(bone, child, dir) {
+  bone.getWorldPosition(_w1);
+  child.getWorldPosition(_w2);
+  _w2.sub(_w1).normalize();
+  _qa.setFromUnitVectors(_w2, dir);
+  bone.getWorldQuaternion(_qb);
+  _qb.premultiply(_qa);
+  bone.parent.getWorldQuaternion(_qc).invert();
+  bone.quaternion.copy(_qc.multiply(_qb));
+  bone.updateMatrixWorld(true);
+}
+
+function buildSoldierModel(team, weaponId, name) {
+  const sol = cloneSoldier(team);
+  if (!sol) return null;
+  const root = new THREE.Group();
+  root.rotation.order = 'YXZ';
+  const body = new THREE.Group();
+  body.add(sol.root);
+  root.add(body);
+  const gunHolder = new THREE.Group();
+  root.add(gunHolder);
+  const nameTag = makeNameSprite(name, team === 0 ? FRIENDLY_CSS : ENEMY_CSS);
+  nameTag.position.y = 2.15;
+  root.add(nameTag);
+  const b = sol.bones;
+  root.updateMatrixWorld(true);
+  const len = (a, c) => b[a].getWorldPosition(_w1).distanceTo(b[c].getWorldPosition(_w2));
+  const model = {
+    soldier: true, root, body, gunHolder, nameTag, bones: b, mixer: sol.mixer, actions: sol.actions,
+    armLen: { upper: len('RightArm', 'RightForeArm'), fore: len('RightForeArm', 'RightHand') },
+    legLen: len('RightUpLeg', 'RightLeg'),
+    gun: null, weaponId: null, kick: 0, team, blend: { Idle: 1, Walk: 0, Run: 0 }, legYaw: 0,
+  };
+  setOperatorWeapon(model, weaponId);
+  return model;
+}
+
+function animateSoldier(c, dt, showName) {
+  const m = c.model, r = m.root, B = m.bones;
+  const alive = c.alive;
+  r.position.copy(c.pos);
+  r.rotation.set(0, c.yaw, 0);
+  const s = Math.sin(c.yaw), co = Math.cos(c.yaw);
+  const fwd = -(c.vel.x * s + c.vel.z * co);
+  const side = c.vel.x * co - c.vel.z * s;
+  const hs = alive ? Math.hypot(c.vel.x, c.vel.z) : 0;
+  const sliding = c.slideT > 0;
+
+  // locomotion blend
+  const moving = hs > 0.4 && c.onGround && !sliding;
+  const run = moving && c.sprinting;
+  const target = { Idle: moving ? 0 : 1, Walk: moving && !run ? 1 : 0, Run: run ? 1 : 0 };
+  const k = Math.min(1, dt * 8);
+  for (const n of ['Idle', 'Walk', 'Run']) {
+    m.blend[n] += (target[n] - m.blend[n]) * k;
+    m.actions[n].setEffectiveWeight(m.blend[n]);
+  }
+  const back = fwd < -0.3 && !run;
+  m.actions.Walk.setEffectiveTimeScale((back ? -1 : 1) * Math.max(0.6, hs / 1.7) * (c.crouchT > 0.5 ? 0.8 : 1));
+  m.actions.Run.setEffectiveTimeScale(Math.max(0.7, hs / 5.8));
+  m.mixer.update(alive ? dt : 0);
+  r.updateMatrixWorld(true);
+
+  // legs face the movement direction, upper body stays on the aim
+  let legYaw = 0;
+  if (moving) {
+    legYaw = back ? Math.atan2(-side, -fwd) : Math.atan2(side, Math.max(0.01, fwd));
+    legYaw = -Math.max(-1.1, Math.min(1.1, legYaw));
+  }
+  m.legYaw += (legYaw - m.legYaw) * Math.min(1, dt * 10);
+
+  const right = _w4.set(co, 0, -s);
+  const cr = alive ? c.crouchT : 0;
+  if (alive) {
+    rotateBoneWorld(B.Hips, UP, m.legYaw);
+    rotateBoneWorld(B.Spine, UP, -m.legYaw * 0.5);
+    rotateBoneWorld(B.Spine1, UP, -m.legYaw * 0.5);
+  }
+  // crouch / slide: bend knees and drop the body so the feet stay planted
+  let bend = cr * 1.05;
+  if (sliding) bend = 0.9;
+  m.body.position.y = -2 * m.legLen * (1 - Math.cos(bend)) * 0.95;
+  if (bend > 0.01) {
+    for (const sideName of ['Left', 'Right']) {
+      rotateBoneWorld(B[sideName + 'UpLeg'], right, bend);
+      rotateBoneWorld(B[sideName + 'Leg'], right, -2 * bend);
+      rotateBoneWorld(B[sideName + 'Foot'], right, bend);
+    }
+  }
+
+  if (!alive) {
+    // procedural collapse on top of the frozen pose
+    const t = c.game.time - c.deathT;
+    const k1 = Math.min(1, t / 0.3), k2 = Math.max(0, Math.min(1, (t - 0.12) / 0.55));
+    const e2 = k2 * k2 * (3 - 2 * k2);
+    for (const sideName of ['Left', 'Right']) {
+      rotateBoneWorld(B[sideName + 'UpLeg'], right, 0.9 * k1);
+      rotateBoneWorld(B[sideName + 'Leg'], right, -1.5 * k1);
+    }
+    rotateBoneWorld(B.Spine1, right, -0.4 * e2 * c.deathDir);
+    for (const sideName of ['Left', 'Right']) rotateBoneWorld(B[sideName + 'Arm'], right, 0.8 * k1);
+    m.body.position.y = -0.35 * k1;
+    r.rotation.x = -c.deathDir * e2 * Math.PI / 2.15;
+    r.rotation.z = e2 * 0.15 * c.deathDir;
+    // gun drops beside the body
+    m.gunHolder.position.set(0.35 * c.deathDir, 0.05, -0.2);
+    m.gunHolder.rotation.set(0, 1.2, Math.PI / 2);
+    m.nameTag.visible = false;
+    if (t > 5) r.visible = false;
+    return;
+  }
+  r.visible = true;
+
+  // aim: spine pitch, then place the gun in an aim frame in front of the chest
+  const pitch = c.pitch - (c.sprinting ? 0.5 : 0);
+  rotateBoneWorld(B.Spine1, right, -pitch * 0.3);
+  rotateBoneWorld(B.Spine2, right, -pitch * 0.3);
+  rotateBoneWorld(B.Head, right, -pitch * 0.25);
+  m.kick = Math.max(0, m.kick - dt * 12);
+  _eu.set(pitch, c.yaw + (c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
+  _qAim.setFromEuler(_eu);
+  if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) * 0.7));
+  const pistol = m.weaponId === 'pistol';
+  B.Spine2.getWorldPosition(_w3);
+  _w1.set(pistol ? 0.04 : 0.13, pistol ? 0.12 : 0.04, (pistol ? -0.42 : -0.26) + m.kick * 0.04).applyQuaternion(_qAim);
+  _w3.add(_w1); // grip, world
+  m.gunHolder.position.copy(_w3);
+  m.gunHolder.parent.worldToLocal(m.gunHolder.position);
+  r.getWorldQuaternion(_qb).invert();
+  m.gunHolder.quaternion.copy(_qb.multiply(_qAim));
+  m.gunHolder.updateMatrixWorld(true);
+
+  // arm IK onto grip and foregrip
+  const gun = m.gun;
+  gun.group.localToWorld(_w3.set(0.0, -0.035, 0.065));
+  const rt = _w3.clone();
+  (gun.pump || gun.foregrip).getWorldPosition(_w3);
+  _w3.add(_w1.set(-0.03, -0.03, 0.05).applyQuaternion(_qAim));
+  ikArms(m, rt, _w3.clone(), _qAim);
+
+  m.nameTag.visible = showName;
+  m.nameTag.position.y = c.height + 0.38;
+}
+
+function ikArms(m, rightTarget, leftTarget, aimQ) {
+  const B = m.bones;
+  const solveArm = (sideName, target, pole) => {
+    const upper = B[sideName + 'Arm'], fore = B[sideName + 'ForeArm'], hand = B[sideName + 'Hand'];
+    const S = upper.getWorldPosition(new THREE.Vector3());
+    const E = solveElbow(S, target, m.armLen.upper, m.armLen.fore, pole, new THREE.Vector3());
+    swingBone(upper, fore, E.clone().sub(S).normalize());
+    swingBone(fore, hand, target.clone().sub(E).normalize());
+  };
+  solveArm('Right', rightTarget, new THREE.Vector3(1, -1.2, 0.4).applyQuaternion(aimQ));
+  solveArm('Left', leftTarget, new THREE.Vector3(-1, -1.3, 0.1).applyQuaternion(aimQ));
+  swingBone(B.RightHand, B.RightHandMiddle1, new THREE.Vector3(-0.55, -0.45, -0.7).applyQuaternion(aimQ).normalize());
+  swingBone(B.LeftHand, B.LeftHandMiddle1, new THREE.Vector3(0.55, 0.35, -0.75).applyQuaternion(aimQ).normalize());
+}
+
+// First-person body: the same rig placed under the camera with the head collapsed, so only
+// real sleeves and gloved hands show. Returns null when the model isn't loaded.
+export function createFpBody(team) {
+  const sol = cloneSoldier(team);
+  if (!sol) return null;
+  const root = new THREE.Group();
+  root.add(sol.root);
+  sol.actions.Idle.setEffectiveWeight(1);
+  sol.mixer.update(0);
+  root.updateMatrixWorld(true);
+  const b = sol.bones;
+  const len = (a, c) => b[a].getWorldPosition(_w1).distanceTo(b[c].getWorldPosition(_w2));
+  const neck = b.Neck.getWorldPosition(new THREE.Vector3());
+  sol.root.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  return {
+    root, inner: sol.root, bones: b, mixer: sol.mixer, neck,
+    armLen: { upper: len('RightArm', 'RightForeArm'), fore: len('RightForeArm', 'RightHand') },
+  };
+}
+
+const _I = new THREE.Quaternion();
+export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gunQ = _I) {
+  fp.mixer.update(dt);
+  // neck sits just behind and below the camera; the head is collapsed so it never clips
+  fp.root.position.set(-fp.neck.x, -0.16 - fp.neck.y - shoulderDrop, 0.09 - fp.neck.z);
+  fp.bones.Head.scale.setScalar(0.001);
+  fp.bones.Neck.scale.setScalar(0.4);
+  fp.root.updateMatrixWorld(true);
+  ikArms(fp, rightTarget, leftTarget, gunQ);
 }

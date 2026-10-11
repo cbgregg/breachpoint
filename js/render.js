@@ -130,13 +130,14 @@ export class Renderer {
     sun.castShadow = true;
     const sc = sun.shadow.camera;
     sc.left = -52; sc.right = 52; sc.top = 52; sc.bottom = -52; sc.near = 10; sc.far = 200;
-    sun.shadow.bias = -0.0003;
-    sun.shadow.normalBias = 0.035;
+    sun.shadow.bias = -0.00015;
+    sun.shadow.normalBias = 0.025;
     scene.add(sun);
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0xbcd0e8, 0x5b4c3a, 0.35));
+    scene.add(new THREE.HemisphereLight(0xbcd0e8, 0x5b4c3a, 0.2));
+    scene.environmentIntensity = 0.85;
   }
 
   applyQuality(name) {
@@ -146,7 +147,7 @@ export class Renderer {
     this.renderer.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
     this.renderer.shadowMap.enabled = q.shadows > 0;
-    this.renderer.shadowMap.type = q.shadows >= 2048 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     if (q.shadows > 0 && this.sun.shadow.mapSize.x !== q.shadows) {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }

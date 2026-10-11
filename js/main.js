@@ -2,6 +2,7 @@
 import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, MAP_NAME } from './config.js';
 import { Game } from './game.js';
 import { glyph } from './hud.js';
+import { loadAssets } from './assets.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -21,6 +22,8 @@ const settings = loadSettings();
 // ---------- game bootstrap ----------
 let game;
 // let the loading screen paint before the (synchronous) world build
+await loadAssets((f) => { $('load-text').textContent = `Loading operators… ${Math.round(f * 100)}%`; });
+$('load-text').textContent = 'Building Tarsa Market…';
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
 try {
   game = new Game($('app'));

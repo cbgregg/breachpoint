@@ -1,6 +1,6 @@
 # Breachpoint
 
-A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step and no asset downloads — every texture, model and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
+A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from one rigged soldier model, every texture, gun, building and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
 
 **Play:** `https://<your-username>.github.io/breachpoint/` (after enabling Pages — see below)
 
@@ -8,10 +8,10 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 
 | Area | What's included |
 |---|---|
-| Look | Physical sky with image-based lighting, low warm sun, real-time soft shadows, ground-truth ambient occlusion (GTAO), bloom, filmic tone mapping, color grade, vignette, chromatic aberration, film grain, SMAA. Procedural PBR materials (albedo + normal + roughness) for asphalt, concrete, plaster, brick, corrugated metal, wood, sandbags, HESCO. Quality presets Low → Ultra |
+| Look | Physical sky with image-based lighting, low warm sun, real-time soft shadows, ground-truth ambient occlusion (GTAO), bloom, filmic tone mapping, color grade, vignette, chromatic aberration, film grain, SMAA. Rounded-edge geometry throughout, 4096 shadow maps on High. Procedural PBR materials (albedo + normal + roughness) for asphalt, concrete, plaster, brick, corrugated metal, wood, sandbags, HESCO. Quality presets Low → Ultra |
 | Map | *Tarsa Market*: perimeter of multi-storey buildings with shop shutters, signage, awnings, balconies, AC units, water tanks and dishes; central concrete building with rooftop access, compound walls, jersey barriers, shipping containers, wrecked cars, market stalls, sandbag positions, HESCO forward bases, palms, power cables, distant skyline. Symmetric layout for fair TDM |
-| Operators | Articulated soldiers (thighs, shins, IK arms that actually hold each weapon), plate carriers, pouches, helmets with NVG mounts vs. balaclavas and shemaghs. Walk/sprint/strafe/crouch/slide animation and a procedural death collapse |
-| Weapons | MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
+| Operators | Rigged, textured soldier model with motion-captured idle/walk/run animation, blended by speed; legs turn toward movement while the upper body stays on the aim; IK arms grip each weapon's pistol grip and foregrip; crouch, slide and death poses layered on top. The same rig provides the first-person arms and gloves. Falls back to procedural operators if the model can't load |
+| Weapons | Guns built from real side-profile silhouettes with rounded edges, lathed barrels, muzzle devices and scopes. MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
 | Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
 | Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
 | HUD | Compass with enemy gunfire pings, rotating minimap rendered from the actual map, friendly/enemy score widget, ammo cluster with fire mode and equipment, score pop-ups beside the crosshair, medals (multikills, streaks, payback), killfeed, hitmarkers, directional damage, red-out damage effect, death card with killer distance and HP, scoreboard with K/D, device-aware button prompts |
@@ -77,7 +77,8 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
 | `js/world.js` | Map layout (mirrored), dressing merged per material, minimap render |
 | `js/textures.js` | Procedural PBR texture sets |
-| `js/character.js` | Shared player/bot logic, operator model, IK arm posing, animation |
+| `js/assets.js` | Loads the rigged soldier (GLTF) and clones it per character |
+| `js/character.js` | Shared player/bot logic, soldier animation blending, IK arms, first-person body, procedural fallback |
 | `js/player.js` | Local player: input → movement/weapons, camera, viewmodel with IK arms, aim assist |
 | `js/weapons.js` | Weapon state, detailed gun models, spread cone |
 | `js/bot.js` | Bot AI |
@@ -104,6 +105,11 @@ npx serve .            # or: python3 -m http.server 8000
 - High uses GTAO + bloom + SMAA at 1.25× pixel ratio; drop to **Medium** on integrated GPUs and **Low** on phones (the default on touch devices).
 - Static map geometry is merged per material, so the whole district renders in a few dozen draw calls.
 
+## Credits
+
+- Soldier model and animations (`assets/models/soldier.glb`): the *Soldier* sample from the [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf), a Mixamo character. Mixamo assets are royalty-free for use in projects under Adobe's terms; check those terms before commercial use, or swap in your own rigged `.glb` with a Mixamo skeleton.
+- Everything else (code, textures, guns, map, audio) is generated in this repo.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Code: MIT — see [LICENSE](LICENSE).

@@ -125,7 +125,7 @@ export function makeTextureSets() {
   { // concrete
     const N = 512, { fbm, r } = makeNoise(23);
     const pores = new Float32Array(N * N);
-    for (let i = 0; i < 5000; i++) pores[(r() * N | 0) + (r() * N | 0) * N] = 0.5 + r() * 0.5;
+    for (let i = 0; i < 1800; i++) pores[(r() * N | 0) + (r() * N | 0) * N] = 0.3 + r() * 0.4;
     const cracks = crackMask(N, r, 4, 90);
     sets.concrete = bake(N, (u, v, o, x, y) => {
       const i = y * N + x;
@@ -135,7 +135,7 @@ export function makeTextureSets() {
       let g = 150 + (big - 0.5) * 40 + (mid - 0.5) * 18 + (fine - 0.5) * 10;
       g *= 1 - streak * 0.25 - pores[i] * 0.3 - seam * 0.25 - cracks[i] * 0.4;
       o[0] = g * 1.0; o[1] = g * 0.975; o[2] = g * 0.93;
-      o[3] = fine * 0.3 + mid * 0.2 - pores[i] * 0.8 - seam * 0.6 - cracks[i];
+      o[3] = fine * 0.3 + mid * 0.25 - pores[i] * 0.25 - seam * 0.6 - cracks[i] * 0.8;
       o[4] = 0.86 + (mid - 0.5) * 0.12 - streak * 0.05;
     }, 2.5);
   }

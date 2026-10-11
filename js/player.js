@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { TEAMS, MELEE } from './config.js';
 import { buildGun } from './weapons.js';
-import { Seg, teamMat } from './character.js';
+import { Seg, teamMat, createFpBody, poseFpBody } from './character.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -46,6 +46,11 @@ export class PlayerController {
     this.cycleT = 0; // bolt / pump cycle after a shot
     this.lastFov = 0;
     this.buildArms();
+    this.fp = createFpBody(char.team);
+    if (this.fp) {
+      this.vmRoot.add(this.fp.root);
+      for (const a of [this.armR, this.armL]) a.upper.visible = a.fore.visible = a.hand.visible = false;
+    }
     this.buildViewmodels();
   }
 
@@ -353,12 +358,12 @@ export class PlayerController {
       const p = 1 - this.cycleT / total;
       if (gun.bolt) {
         gun.bolt.rotation.z = -bump(0.1, 0.9, p) * 1.1;
-        gun.bolt.position.z = 0.04 + bump(0.25, 0.75, p) * 0.08;
+        gun.bolt.position.z = gun.boltHome + bump(0.25, 0.75, p) * 0.08;
       }
-      if (gun.pump) gun.pump.position.z = -0.33 + bump(0.1, 0.8, p) * 0.09;
+      if (gun.pump) gun.pump.position.z = gun.pumpHome + bump(0.1, 0.8, p) * 0.09;
     } else {
-      if (gun.bolt) { gun.bolt.rotation.z = 0; gun.bolt.position.z = 0.04; }
-      if (gun.pump) gun.pump.position.z = -0.33;
+      if (gun.bolt) { gun.bolt.rotation.z = 0; gun.bolt.position.z = gun.boltHome; }
+      if (gun.pump) gun.pump.position.z = gun.pumpHome;
     }
 
     // muzzle flash
@@ -375,7 +380,7 @@ export class PlayerController {
     } else this.vmFlashLight.intensity = 0;
 
     // arms (IK in camera space)
-    gun.group.localToWorld(_R.set(0, -0.045, 0.012));
+    gun.group.localToWorld(_R.set(0, -0.04, 0.03));
     if (leftMode === 'grip') {
       (gun.pump || gun.foregrip).getWorldPosition(_L);
       if (gun.pump) _L.y -= 0.0;
@@ -389,8 +394,15 @@ export class PlayerController {
       _L.set(-0.12, -0.42, -0.15);
     }
     if (c.grenadeCd > 0.4) _L.set(-0.1, -0.05 - gren * 0.1, -0.45 + gren * 0.1);
-    this.poseArm(this.armR, SHOULDER_R, _R, POLE_R, h);
-    this.poseArm(this.armL, SHOULDER_L, _L, POLE_L, h);
+    if (this.fp) {
+      // wrist sits slightly behind/below the grip point
+      _R.add(_a.set(0.004, -0.004, 0.045).applyQuaternion(h.quaternion));
+      _L.add(_a.set(-0.02, -0.025, 0.045).applyQuaternion(h.quaternion));
+      poseFpBody(this.fp, dt, _R, _L, this.sprintT * 0.05, h.quaternion);
+    } else {
+      this.poseArm(this.armR, SHOULDER_R, _R, POLE_R, h);
+      this.poseArm(this.armL, SHOULDER_L, _L, POLE_L, h);
+    }
   }
 
   poseArm(arm, S, H, pole, holder) {

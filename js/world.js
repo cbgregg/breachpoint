@@ -1,6 +1,7 @@
 // Map "Tarsa Market": collision layout + dressed geometry (merged per material), spawns, pickups, nav grid
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Box } from './physics.js';
 import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
@@ -113,14 +114,21 @@ class Batcher {
   }
 }
 
-function worldBox(w, h, d, scale) {
-  const g = new THREE.BoxGeometry(w, h, d);
-  if (!scale) return g;
-  const uv = g.attributes.uv;
-  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
-  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
-    const i = f * 4 + k;
-    uv.setXY(i, uv.getX(i) * dims[f][0] / scale, uv.getY(i) * dims[f][1] / scale);
+// Box with rounded edges and triplanar world-scale UVs (scale = metres per texture tile; 0 = one tile per face)
+function worldBox(w, h, d, scale, radius) {
+  const r = radius ?? Math.min(0.05, Math.min(w, h, d) * 0.14);
+  const small = Math.max(w, h, d) < 0.4;
+  const g = r > 0.002 ? new RoundedBoxGeometry(w, h, d, small ? 1 : 2, r) : new THREE.BoxGeometry(w, h, d);
+  const pos = g.attributes.position, nrm = g.attributes.normal, uv = g.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const ax = Math.abs(nrm.getX(i)), ay = Math.abs(nrm.getY(i)), az = Math.abs(nrm.getZ(i));
+    let u, v, su, sv;
+    if (ax >= ay && ax >= az) { u = z; v = y; su = d; sv = h; }
+    else if (ay >= az) { u = x; v = z; su = w; sv = d; }
+    else { u = x; v = y; su = w; sv = h; }
+    if (scale) uv.setXY(i, u / scale, v / scale);
+    else uv.setXY(i, u / su + 0.5, v / sv + 0.5);
   }
   return g;
 }
@@ -276,7 +284,7 @@ export function buildWorld(scene, physics) {
         shape.lineTo(-0.1, 1.07); shape.lineTo(-0.18, 0.3); shape.lineTo(-0.31, 0.08); shape.closePath();
         const n = Math.round(d / 2);
         for (let i = 0; i < n; i++) {
-          const g = new THREE.ExtrudeGeometry(shape, { depth: 1.96, bevelEnabled: false });
+          const g = new THREE.ExtrudeGeometry(shape, { depth: 1.9, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 3 });
           g.translate(0, 0, -0.98);
           const uv = g.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) / 3, uv.getY(k) / 3);
           put(g, M.concrete, cx, 0, z0 + (i + 0.5) * (d / n), (rnd() - 0.5) * 0.06, { grime: 0.35, tint: i % 2 ? 0xf0ece4 : 0xe0dbd0 });
