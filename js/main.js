@@ -182,6 +182,11 @@ $('again').addEventListener('click', () => {
 $('menu-btn').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
 // ---------- online (peer-to-peer, 6-digit codes) ----------
+// sandboxed previews can't open WebRTC/WebSocket connections; builds there set this flag
+if (window.BREACHPOINT_OFFLINE) {
+  document.querySelector('.online-row').style.display = 'none';
+  document.querySelector('#pane-play .pane-note').textContent = 'Online play (6-digit codes) works on the GitHub Pages version of the game.';
+}
 const lobby = new Lobby(game);
 window.__lobby = lobby;
 let joinCode = '';
