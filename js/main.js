@@ -43,11 +43,11 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'],
 ];
 const outputs = {
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
-  'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`],
+  'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
 function writeForm() {
   for (const [id, key, type] of bindings) {
@@ -138,6 +138,7 @@ const syncPause = () => {
   $('opt-sens2').value = settings.sensitivity; $('out-sens2').textContent = Number(settings.sensitivity).toFixed(2);
   $('opt-padsens2').value = settings.padSensitivity; $('out-padsens2').textContent = Number(settings.padSensitivity).toFixed(2);
   $('opt-vol2').value = settings.volume; $('out-vol2').textContent = `${Math.round(settings.volume * 100)}%`;
+  $('opt-music2').value = settings.musicVolume; $('out-music2').textContent = `${Math.round(settings.musicVolume * 100)}%`;
 };
 const pauseSlider = (id, key, out, fmt, after) => $(id).addEventListener('input', (e) => {
   settings[key] = parseFloat(e.target.value);
@@ -150,6 +151,15 @@ const pauseSlider = (id, key, out, fmt, after) => $(id).addEventListener('input'
 pauseSlider('opt-sens2', 'sensitivity', 'out-sens2', v => v.toFixed(2));
 pauseSlider('opt-padsens2', 'padSensitivity', 'out-padsens2', v => v.toFixed(2));
 pauseSlider('opt-vol2', 'volume', 'out-vol2', v => `${Math.round(v * 100)}%`, () => game.audio.setVolume(settings.volume));
+pauseSlider('opt-music2', 'musicVolume', 'out-music2', v => `${Math.round(v * 100)}%`, () => game.music.setVolume(settings.musicVolume));
+
+// menu music starts on the first click / key / tap (browsers block audio before that)
+const startMenuMusic = () => {
+  game.audio.init();
+  if (game.state === 'menu') game.music.play('menu');
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.removeEventListener(ev, startMenuMusic, true);
+};
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, startMenuMusic, true);
 
 game.onPause = (paused) => {
   syncOnlineFlags();

@@ -14,6 +14,7 @@ import { Input } from './input.js';
 import { applySpread } from './weapons.js';
 import { Renderer, SUN_DIR } from './render.js';
 import { HostSession, GuestSession } from './online.js';
+import { Music } from './music.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -50,6 +51,8 @@ export class Game {
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects = new Effects(this.scene, this.physics);
     this.audio = new GameAudio();
+    this.music = new Music(this.audio);
+    this.audio.onVolume = () => this.music.apply();
     this.effects.onCasing = (p) => this.audio.play('casing', p);
     this.input = new Input(this.renderer.renderer.domElement);
     this.hud = new HUD(this);
@@ -96,6 +99,7 @@ export class Game {
   applySettings(s) {
     if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); }
     this.audio.setVolume(s.volume);
+    this.music.setVolume(s.musicVolume ?? 0.5);
     this.input.deadzone = s.padDeadzone;
     if (this.input.adsMode !== (s.adsMode || 'hold')) { this.input.adsMode = s.adsMode || 'hold'; this.input.clearAds(); }
     this.input.vibration = s.vibration;
@@ -169,6 +173,14 @@ export class Game {
     this.input.enabled = true;
     if (this.input.lastDevice !== 'pad') this.input.lock();
     if (this.session) this.session.startAll();
+    this.startMusic();
+  }
+
+  startMusic() {
+    this.music.setDuck(false);
+    this.music.setIntensity(0.35);
+    this.music.intensity = 0.35;
+    this.music.play('action');
   }
 
   startGuest(start) {
@@ -205,6 +217,7 @@ export class Game {
       if (navigator.userActivation && navigator.userActivation.isActive) this.input.lock();
       else this.hud.message('CLICK TO JOIN THE FIGHT');
     }
+    this.startMusic();
   }
 
   addBot(team) {
@@ -232,6 +245,7 @@ export class Game {
     if (this.state !== 'playing') return;
     this.state = 'paused';
     this.input.clearAds();
+    this.music.setDuck(true);
     if (this.playerCtl) this.playerCtl.triggerLatch = false;
     this.input.reset();
     this.input.enabled = false;
@@ -242,6 +256,7 @@ export class Game {
   resume() {
     if (this.state !== 'paused') return;
     this.state = 'playing';
+    this.music.setDuck(false);
     this.input.reset();
     this.input.enabled = true;
     if (this.input.lastDevice !== 'pad') this.input.lock();
@@ -254,6 +269,8 @@ export class Game {
     this.session = null;
     this.mode = 'local';
     this.state = 'menu';
+    this.music.setDuck(false);
+    this.music.play('menu');
     this.input.enabled = false;
     this.input.unlock();
     this.hud.show(false);
@@ -277,6 +294,8 @@ export class Game {
     this.audio.play('horn', null, { ui: true });
     const winner = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;
     const sorted = [...this.characters].sort((a, b) => b.score - a.score);
+    this.music.setDuck(false);
+    this.music.sting(winner === this.player.team);
     const result = { winner, scores: [...this.scores], players: sorted, mvp: sorted[0], playerTeam: this.player.team, mode: this.mode };
     if (this.mode === 'host' && this.session) this.session.sendEnd(result);
     if (this.onEnd) this.onEnd(result);
@@ -367,6 +386,14 @@ export class Game {
     }
     this.updateGrenades(dt);
     this.updatePickups(dt);
+    // score intensity: recent fighting, the last minute, or a close finish
+    {
+      const p = this.player, t = this.time;
+      const fight = p.alive && (t - p.lastFireT < 4 || t - p.lastDamageT < 5) ? 0.4 : 0;
+      const lim = this.settings.scoreLimit || 75;
+      const finale = this.timeLeft < 60 || Math.max(...this.scores) >= lim - 5 ? 0.5 : 0;
+      this.music.setIntensity(0.35 + fight + finale);
+    }
     this.audio.setListener(this.camera.position, this.player.alive ? this.player.yaw : 0);
 
     // screen damage effect follows missing health

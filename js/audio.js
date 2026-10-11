@@ -55,6 +55,7 @@ export class GameAudio {
   setVolume(v) {
     this.volume = v;
     if (this.master) this.master.gain.value = v;
+    if (this.onVolume) this.onVolume();
   }
 
   setListener(pos, yaw) {

@@ -103,7 +103,11 @@ export const QUALITY = {
 
 const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
+// Optional: your own music files (paths in the repo, e.g. 'assets/music/menu.mp3'). null = the built-in score.
+export const MUSIC_FILES = { menu: null, action: null };
+
 export const DEFAULT_SETTINGS = {
+  musicVolume: 0.5,
   name: 'Operator',
   teamSize: 6,
   difficulty: 'normal',

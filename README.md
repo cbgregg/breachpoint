@@ -17,6 +17,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
 | HUD | Compass with enemy gunfire pings, rotating minimap rendered from the actual map, friendly/enemy score widget, ammo cluster with fire mode and equipment, score pop-ups beside the crosshair, medals (multikills, streaks, payback), killfeed, hitmarkers, directional damage, red-out damage effect, death card with killer distance and HP, scoreboard with K/D, device-aware button prompts |
 | Controller | Xbox / standard gamepads: radial deadzone, response curve, separate sensitivity, aim assist (slowdown, rotational tracking, ADS snap), rumble, full menu navigation with D-pad/stick, bumpers switch tabs, glyphs swap automatically between keyboard and controller |
+| Music | Original score synthesized live (no recordings, so nothing to license): a slow D-minor menu theme and a 112 BPM action track whose layers build with recent fighting, the last minute and close finishes; end-of-match stings; separate music volume. Swap in your own tracks via `MUSIC_FILES` in `js/config.js` |
 | Audio | Synthesized: layered gunshots (crack, body, thump, tail) with distance filtering and street reverb, bolt/pump foley, bullet whiz on near misses, casing tinkles, footsteps, explosions, hit/headshot/kill confirms |
 | Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons) |
 | Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, FOV, mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
@@ -121,6 +122,7 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/physics.js` | AABB collision, step-up movement, raycasts |
 | `js/effects.js` | Soft particles, tracers, casings, debris, decals, explosions |
 | `js/audio.js` | Synthesized positional audio with reverb |
+| `js/music.js` | Procedural menu and action music, intensity layering, optional file playback |
 | `js/hud.js` | Compass, minimap, score events, killfeed, scoreboard, button glyphs |
 | `js/input.js` | Keyboard, mouse, gamepad (mapping, curves, rumble, menu nav), touch |
 
