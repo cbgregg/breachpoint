@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS } from './config.js';
 const WEAPON_IDS = Object.keys(WEAPONS);
 import { Physics, rayBox } from './physics.js';
-import { buildWorld, renderMinimap, PICKUP_SPOTS } from './world.js';
+import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
 import { Character, setCharacterDetail } from './character.js';
 import { BotBrain } from './bot.js';
 import { PlayerController } from './player.js';
@@ -47,7 +47,7 @@ export class Game {
     this.vmScene.add(this.vmSun);
 
     this.physics = new Physics();
-    this.world = buildWorld(this.scene, this.physics);
+    this.world = buildWorld(this.scene, this.physics, 'tarsa');
     setCharacterDetail(this.world.textures.fabric);
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects = new Effects(this.scene, this.physics);
@@ -116,7 +116,10 @@ export class Game {
       this.settings.timeLimit = +cfg.timeLimit || 10;
       this.settings.scoreLimit = +cfg.scoreLimit || 75;
       this.settings.friendlyFire = !!cfg.friendlyFire;
+      this.settings.map = MAPS[cfg.map] ? cfg.map : 'tarsa';
     }
+    // 'random' (or an unknown id) picks one of the maps
+    if (!MAPS[this.settings.map]) this.settings.map = MAP_IDS[(Math.random() * MAP_IDS.length) | 0];
     this.applySettings(this.settings);
     if (this.session) this.session.dispose();
     this.session = null;
@@ -126,6 +129,7 @@ export class Game {
     if (this.playerCtl) this.vmScene.remove(this.playerCtl.vmRoot);
     for (const g of this.grenades) this.scene.remove(g.mesh);
     this.grenades = [];
+    this.loadMap(this.settings.map);
     this.pickups = this.pickups.filter(p => { if (p.dynamic) this.scene.remove(p.mesh); return !p.dynamic; });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; p.timer = 0; }
     this.effects.clear();
@@ -774,8 +778,28 @@ export class Game {
     return root;
   }
 
+  // swap the map: drop the old geometry, collision and nav grid, then build the new one
+  loadMap(id) {
+    if (!MAPS[id] || (this.world && this.world.id === id)) return;
+    if (this.world) {
+      this.scene.remove(this.world.group);
+      this.world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      for (const m of Object.values(this.world.materials)) m.dispose();
+      for (const set of Object.values(this.world.textures)) for (const t of Object.values(set)) if (t && t.isTexture) t.dispose();
+    }
+    this.physics.boxes.length = 0;
+    this.world = buildWorld(this.scene, this.physics, id);
+    setCharacterDetail(this.world.textures.fabric);
+    for (const p of this.pickups) this.scene.remove(p.mesh);
+    this.pickups = [];
+    this.buildPickups();
+    this.minimap = renderMinimap(this.renderer.renderer, this.scene);
+    this.effects.clear();
+    if (this.onMapChange) this.onMapChange(this.world);
+  }
+
   buildPickups() {
-    for (const spot of PICKUP_SPOTS) {
+    for (const spot of this.world.pickupSpots) {
       const mesh = this.makePickupMesh(spot.type);
       const pos = new THREE.Vector3(...spot.pos);
       mesh.position.copy(pos);

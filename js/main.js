@@ -1,5 +1,6 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, MAP_NAME, PUBLIC_MATCH } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH } from './config.js';
+import { MAPS } from './world.js';
 import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
@@ -39,7 +40,7 @@ game.applySettings(settings);
 
 // ---------- form binding ----------
 const bindings = [
-  ['opt-name', 'name', 'text'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
+  ['opt-name', 'name', 'text'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
@@ -297,7 +298,7 @@ function renderLobby() {
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
-      : `${settings.teamSize}v${settings.teamSize} · ${settings.scoreLimit} kills · ${settings.timeLimit} min${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
+      : `${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.teamSize}v${settings.teamSize} · ${settings.scoreLimit} kills · ${settings.timeLimit} min${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
     $('lobby-leave').textContent = inMatch ? 'END SESSION' : 'CLOSE LOBBY';
   } else {
     const slots = $('code-slots').querySelectorAll('i');
@@ -333,6 +334,7 @@ $('host-btn').addEventListener('click', () => {
   readAll();
   game.audio.init();
   lobby.host(settings.name, settings.primary);
+  setMapHint();
   openLobby();
 });
 // ---------- quick match ----------
@@ -401,6 +403,8 @@ function tryJoin() {
   joinError = '';
   lobby.join(joinCode, settings.name, settings.primary);
 }
+lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(id); };
+const setMapHint = () => { lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : ''); };
 $('lobby-start').addEventListener('click', () => {
   readAll();
   showScreen(null);
@@ -584,13 +588,22 @@ game.input.onPadChange = (connected, id) => {
 document.addEventListener('mousemove', () => { if (screen) focusEl(null); }, { passive: true });
 
 // ---------- menu intel map ----------
-(() => {
+function drawIntel() {
   const c = $('intel-map'), g = c.getContext('2d');
   g.drawImage(game.minimap.canvas, 0, 0, c.width, c.height);
   g.fillStyle = 'rgba(79,179,255,0.25)'; g.fillRect(0, 0, c.width * 0.13, c.height);
   g.fillStyle = 'rgba(255,77,77,0.25)'; g.fillRect(c.width * 0.87, 0, c.width * 0.13, c.height);
-  $('intel-mapname').textContent = MAP_NAME.toUpperCase();
-})();
+  $('intel-mapname').textContent = (settings.map === 'random' && game.state === 'menu' ? 'RANDOM' : game.world.name).toUpperCase();
+}
+game.onMapChange = () => drawIntel();
+// picking a map in the menu loads it behind the menu, so you can see it before deploying
+$('opt-map').addEventListener('change', () => {
+  if (MAPS[settings.map] && game.state === 'menu') game.loadMap(settings.map);
+  if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); }
+  drawIntel();
+});
+if (MAPS[settings.map] && settings.map !== game.world.id) game.loadMap(settings.map);
+drawIntel();
 
 writeForm();
 renderHints(game.input.lastDevice);

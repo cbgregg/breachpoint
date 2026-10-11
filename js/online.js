@@ -94,7 +94,7 @@ export class Lobby {
       p.lastPong ??= t;
       const ms = await Promise.race([this.net.ping(p.peerId), new Promise(r => setTimeout(() => r(0), 3000))]);
       if (ms) { p.ping = Math.round(ms); p.lastPong = now(); }
-      else if (now() - p.lastPong > 12 && this.players.has(p.peerId)) {
+      else if (now() - p.lastPong > 20 && this.players.has(p.peerId)) { // generous: a guest may be busy loading a map
         this.dropPlayer(p.peerId);
         this.toast(`${p.name.toUpperCase()} LOST CONNECTION`);
       }
@@ -166,7 +166,7 @@ export class Lobby {
   }
 
   broadcastLobby() {
-    const msg = { t: 'lobby', st: 'accepted', ps: this.lobbyList(), ig: this.game.mode === 'host' && this.game.live ? 1 : 0 };
+    const msg = { t: 'lobby', st: 'accepted', ps: this.lobbyList(), ig: this.game.mode === 'host' && this.game.live ? 1 : 0, map: this.mapHint || '' };
     for (const id of this.players.keys()) this.net.send(msg, id);
   }
 
@@ -322,6 +322,8 @@ export class Lobby {
           if (this.quickMode && !this.public) { this.public = true; this.board.close(); clearTimeout(this.quickTimer); }
           if (Array.isArray(m.ps)) this.roster = m.ps.slice(0, MAX_HUMANS).map(p => ({ n: cleanName(p && p.n), tm: p && p.tm === 1 ? 1 : 0, h: p && p.h ? 1 : 0 }));
           this.hostInGame = !!m.ig;
+          // load the host's map while waiting, so the match starts instantly
+          if (typeof m.map === 'string' && this.game.state === 'menu' && this.onMapHint) this.onMapHint(m.map);
         } else if (st === 'pending' && this.quickMode && !this.public) return this.fail(); // public lobbies don't make you wait
         else if (st === 'denied') return this.fail('The host declined your request.');
         else if (st === 'kicked') return this.close('You were removed from the match by the host.');
@@ -435,7 +437,7 @@ export class HostSession {
     r.started = true;
     this.net.send({
       t: 'start', v: PROTO, you: c.id,
-      cfg: { timeLimit: s.timeLimit, scoreLimit: s.scoreLimit, friendlyFire: !!s.friendlyFire, teamSize: s.teamSize },
+      cfg: { timeLimit: s.timeLimit, scoreLimit: s.scoreLimit, friendlyFire: !!s.friendlyFire, teamSize: s.teamSize, map: g.world.id },
       ro: g.characters.map(x => this.rosterEntry(x)),
       sp: [r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r3(c.yaw)],
       tm: r3(g.time), tl: r2(g.timeLeft), cd: r2(g.countdownT), sc: [...g.scores],

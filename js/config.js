@@ -108,7 +108,7 @@ const coarse = typeof window !== 'undefined' && window.matchMedia && window.matc
 export const TURN_ENDPOINT = 'https://breachpoint-turn.broad-mouse-d2f9.workers.dev';
 
 // Quick match (public) rules: the same for every public lobby
-export const PUBLIC_MATCH = { teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false };
+export const PUBLIC_MATCH = { teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false, map: 'random' };
 
 // Optional: your own music files (paths in the repo, e.g. 'assets/music/menu.mp3'). null = the built-in score.
 export const MUSIC_FILES = { menu: null, action: null };
@@ -121,6 +121,7 @@ export const DEFAULT_SETTINGS = {
   name: 'Operator',
   teamSize: 6,
   difficulty: 'normal',
+  map: 'tarsa',
   scoreLimit: 75,
   timeLimit: 10,
   primary: 'rifle',

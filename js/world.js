@@ -1,4 +1,4 @@
-// Map "Tarsa Market": collision layout + dressed geometry (merged per material), spawns, pickups, nav grid
+// Maps (Tarsa Market, Shuran Yard): collision layout + dressed geometry (merged per material), spawns, pickups, nav grid
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -10,10 +10,10 @@ export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
 
 // Collision layout. [cx, cz, w(x), d(z), h, y0, kind, extra]
 // HALF items are mirrored through the center (x,z) -> (-x,-z) so both teams get the same map.
-const CENTER = [
+const TARSA_CENTER = [
   [0, 0, 8, 8, 3, 0, 'building'],
 ];
-const HALF = [
+const TARSA_HALF = [
   [3.75, 2, 0.5, 4, 1.0, 3, 'parapet'],
   [0, 3.75, 8, 0.5, 1.0, 3, 'parapet'],
   [14, 12, 12, 1, 3.2, 0, 'wall', 0],
@@ -55,11 +55,11 @@ const HALF = [
   [0, 30.5, 86, 1, 8, 0, 'boundary'],
   [42.5, 0, 1, 62, 8, 0, 'boundary'],
 ];
-for (let k = 1; k <= 6; k++) HALF.push([4 + (6.5 - k) * 0.9, -2.5, 0.9, 3, k * 0.5, 0, 'stairs', k]);
+for (let k = 1; k <= 6; k++) TARSA_HALF.push([4 + (6.5 - k) * 0.9, -2.5, 0.9, 3, k * 0.5, 0, 'stairs', k]);
 
-const SPAWNS_RED = [[38, -24], [38, -16], [38, -8], [38, 8], [38, 16], [38, 22], [34, -14], [34, 14]];
+const TARSA_SPAWNS = [[38, -24], [38, -16], [38, -8], [38, 8], [38, 16], [38, 22], [34, -14], [34, 14]];
 
-export const PICKUP_SPOTS = [
+const TARSA_PICKUPS = [
   { type: 'health', pos: [0, 3, 0] },
   { type: 'health', pos: [18, 0, -24] },
   { type: 'health', pos: [-18, 0, 24] },
@@ -68,6 +68,86 @@ export const PICKUP_SPOTS = [
   { type: 'ammo', pos: [24, 0, 0] },
   { type: 'ammo', pos: [-24, 0, 0] },
 ];
+
+
+// Map "Shuran Yard": classic three-lane layout. North lane (market street), mid lane (open yard with a
+// container in the middle), south lane (container stacks and long sightlines). Lanes are separated by
+// building blocks and container walls with one connector gap per divider half.
+const SHURAN_CENTER = [
+  [0, 9, 6, 6, 6, 0, 'building'],
+  [0, -9, 6, 6, 6, 0, 'building'],
+  [0, 0, 1.6, 1.6, 1.6, 0, 'crate'],
+  [0.15, 0.1, 1.4, 1.4, 1.4, 1.6, 'crate'],
+];
+const SHURAN_HALF = [
+  // north divider (z 6..12): block, connector gap at x 12..16, container wall
+  [7.5, 9, 9, 6, 6, 0, 'building'],
+  [19.5, 7.7, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [19.5, 10.3, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
+  [19.5, 9, 7, 2.6, 2.6, 2.6, 'container', 0x6b7a3a],
+  [26.5, 7.7, 7, 2.6, 2.6, 0, 'container', 0x6e7f86],
+  [26.5, 10.3, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  // south divider (z -12..-6): container wall, connector gap at x 10..14, block
+  [6.5, -7.7, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
+  [6.5, -10.3, 7, 2.6, 2.6, 0, 'container', 0x7a6a3a],
+  [6.5, -9, 7, 2.6, 2.6, 2.6, 'container', 0x8a3d2c],
+  [19, -9, 10, 6, 5, 0, 'building'],
+  [26.5, -9, 0.8, 5, 1.1, 0, 'sand'],
+  // mid lane (z -6..6)
+  [6, 3.6, 2, 2, 1.2, 0, 'pallet'],
+  [9.5, -2.2, 0.62, 4, 1.07, 0, 'jersey'],
+  [14, 2.4, 3, 0.8, 1.1, 0, 'sand'],
+  [17.5, -3.3, 7, 2.6, 2.6, 0, 'container', 0x4d6b54],
+  [23, 2.6, 1.5, 1.5, 1.5, 0, 'crate'],
+  [28, -0.5, 0.8, 3, 1.1, 0, 'sand'],
+  // north lane (z 12..27): market street
+  [6, 18, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [3.5, 23.5, 4, 0.6, 1.2, 0, 'wall', 3],
+  [12, 22.5, 1, 1, 4, 0, 'column'],
+  [15, 15.4, 3, 0.8, 1.1, 0, 'sand'],
+  [20, 21, 2, 2, 1.2, 0, 'pallet'],
+  [25, 15.2, 1.5, 1.5, 1.5, 0, 'crate'],
+  [9.5, 27.4, 2.4, 0.9, 0.9, 0, 'stall', 0],
+  [22, 27.4, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [17.4, 25.6, 0.62, 0.62, 0.9, 0, 'barrel'],
+  [18.2, 25.3, 0.62, 0.62, 0.9, 0, 'barrel', 1],
+  // south lane (z -27..-12): container yard
+  [8, -20, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [8, -20, 7, 2.6, 2.6, 2.6, 'container', 0x3e5d74],
+  [17, -15.6, 0.62, 4, 1.07, 0, 'jersey'],
+  [21, -23, 7, 2.6, 2.6, 0, 'container', 0x6e7f86],
+  [26, -16.5, 1.6, 1.6, 1.6, 0, 'crate'],
+  [27.8, -16.5, 1.6, 1.6, 1.6, 0, 'crate'],
+  [13, -26, 2, 2, 2, 0, 'pallet'],
+  [3, -24, 0.8, 3, 1.1, 0, 'sand'],
+  // spawn (x 31..41)
+  [31.5, 19, 1, 4, 3.5, 0, 'hesco'],
+  [31.5, 0, 1, 4, 3.5, 0, 'hesco'],
+  [31.5, -19, 1, 4, 3.5, 0, 'hesco'],
+  [37, 9, 2, 2, 1.2, 0, 'ammo'],
+  [40, 27.4, 0.5, 0.5, 6, 0, 'palm'],
+  [40, -27.4, 0.5, 0.5, 6, 0, 'palm'],
+  // perimeter
+  [0, 30.5, 86, 1, 8, 0, 'boundary'],
+  [42.5, 0, 1, 62, 8, 0, 'boundary'],
+];
+const SHURAN_SPAWNS = [[38, -24], [38, -15], [38, -5], [38, 5], [38, 15], [38, 24], [35, -11], [35, 11]];
+const SHURAN_PICKUPS = [
+  { type: 'health', pos: [0, 0, 20] },
+  { type: 'health', pos: [0, 0, -20] },
+  { type: 'health', pos: [0, 0, 3.4] },
+  { type: 'health', pos: [0, 0, -3.4] },
+  { type: 'ammo', pos: [14, 0, 9] },
+  { type: 'ammo', pos: [-14, 0, -9] },
+  { type: 'ammo', pos: [12, 0, -9] },
+  { type: 'ammo', pos: [-12, 0, 9] },
+];
+
+export const MAPS = {
+  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Open district with a central building and rooftop', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS },
+  shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, open yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS },
+};
+export const MAP_IDS = Object.keys(MAPS);
 
 // ---------- helpers ----------
 function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -133,7 +213,8 @@ function worldBox(w, h, d, scale, radius) {
   return g;
 }
 
-export function buildWorld(scene, physics) {
+export function buildWorld(scene, physics, mapId = 'tarsa') {
+  const LAYOUT = MAPS[mapId] || MAPS.tarsa;
   const tex = makeTextureSets();
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   const pbr = (set, extra = {}) => std({ map: set.map, normalMap: set.normalMap, roughnessMap: set.roughnessMap, roughness: 1, ...extra });
@@ -313,15 +394,15 @@ export function buildWorld(scene, physics) {
         const tint = extra;
         // corrugated walls: map the texture so ribs run vertically along the length
         const body = worldBox(L - 0.1, h - 0.1, W - 0.08, 2.4);
-        put(body, M.metal, cx, h / 2, cz, ry, { tint, grime: 0.35 });
+        put(body, M.metal, cx, y0 + h / 2, cz, ry, { tint, grime: y0 > 0 ? 0.1 : 0.35, base: y0 });
         const ax = along ? 1 : 0, az = along ? 0 : 1;
         // frame
-        for (const s of [-1, 1]) for (const t of [-1, 1]) put(worldBox(0.16, h, 0.16, 0), M.dark, cx + ax * s * (L / 2 - 0.08) + az * t * (W / 2 - 0.08), h / 2, cz + az * s * (L / 2 - 0.08) + ax * t * (W / 2 - 0.08), ry, { tint, grime: 0.3 });
-        for (const yy of [0.08, h - 0.08]) for (const t of [-1, 1]) put(worldBox(L, 0.16, 0.12, 0), M.dark, cx + az * t * (W / 2 - 0.04), yy, cz + ax * t * (W / 2 - 0.04), ry, { tint, grime: 0.3 });
+        for (const s of [-1, 1]) for (const t of [-1, 1]) put(worldBox(0.16, h, 0.16, 0), M.dark, cx + ax * s * (L / 2 - 0.08) + az * t * (W / 2 - 0.08), y0 + h / 2, cz + az * s * (L / 2 - 0.08) + ax * t * (W / 2 - 0.08), ry, { tint, grime: 0.3, base: y0 });
+        for (const yy of [0.08, h - 0.08]) for (const t of [-1, 1]) put(worldBox(L, 0.16, 0.12, 0), M.dark, cx + az * t * (W / 2 - 0.04), y0 + yy, cz + ax * t * (W / 2 - 0.04), ry, { tint, grime: 0.3, base: y0 });
         // door locking bars on one end
         for (let i = 0; i < 4; i++) {
           const t = -W / 2 + 0.35 + i * (W - 0.7) / 3;
-          put(new THREE.CylinderGeometry(0.022, 0.022, h - 0.3, 6), M.dark, cx + ax * (L / 2 + 0.02) + az * t, h / 2, cz + az * (L / 2 + 0.02) + ax * t, 0, { grime: 0.2 });
+          put(new THREE.CylinderGeometry(0.022, 0.022, h - 0.3, 6), M.dark, cx + ax * (L / 2 + 0.02) + az * t, y0 + h / 2, cz + az * (L / 2 + 0.02) + ax * t, 0, { grime: 0.2, base: y0 });
         }
         break;
       }
@@ -416,8 +497,8 @@ export function buildWorld(scene, physics) {
     solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
   };
-  for (const it of CENTER) add(...it.slice(0, 7), it[7], 0);
-  for (const [cx, cz, w, d, h, y0, kind, extra] of HALF) {
+  for (const it of LAYOUT.center) add(...it.slice(0, 7), it[7], 0);
+  for (const [cx, cz, w, d, h, y0, kind, extra] of LAYOUT.half) {
     add(cx, cz, w, d, h, y0, kind, extra, 1);
     add(-cx, -cz, w, d, h, y0, kind, extra, 0);
   }
@@ -524,8 +605,8 @@ export function buildWorld(scene, physics) {
 
   batch.build(group);
 
-  const world = { group, spawns: [[], []], materials: M, textures: tex };
-  for (const [x, z] of SPAWNS_RED) {
+  const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
+  for (const [x, z] of LAYOUT.spawns) {
     world.spawns[1].push(new THREE.Vector3(x, 0, z));
     world.spawns[0].push(new THREE.Vector3(-x, 0, -z));
   }
