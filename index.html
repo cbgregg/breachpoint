@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Breachpoint — Team Deathmatch</title>
+  <meta name="description" content="Breachpoint: a browser-based first-person shooter with team deathmatch and AI bots. Built with Three.js.">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff4a4a' stroke-width='5'/%3E%3Cpath d='M32 2v18M32 44v18M2 32h18M44 32h18' stroke='%23fff' stroke-width='5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- In-game HUD -->
+  <div id="hud">
+    <div id="vignette"></div>
+    <div id="hurt-flash"></div>
+    <div id="scope"><div class="lens"></div></div>
+
+    <div id="topbar">
+      <div class="team blue"><span id="score-blue">0</span><div class="bar"><i id="bar-blue"></i></div></div>
+      <div id="timer">10:00</div>
+      <div class="team red"><div class="bar"><i id="bar-red"></i></div><span id="score-red">0</span></div>
+    </div>
+
+    <canvas id="minimap" width="252" height="180"></canvas>
+    <div id="killfeed"></div>
+    <div id="fps"></div>
+
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="dmg-ind"></div>
+    <div id="center-msg"></div>
+    <div id="countdown"></div>
+    <div id="protect">SPAWN PROTECTION</div>
+
+    <div id="reload-wrap"><span>RELOADING</span><div><i id="reload-fill"></i></div></div>
+
+    <div id="health-wrap">
+      <div class="lbl">HP</div>
+      <div id="health-num">100</div>
+      <div id="health-bar"><i id="health-fill"></i></div>
+    </div>
+
+    <div id="ammo-wrap">
+      <div id="weapon-name">AR-7 Rifle</div>
+      <div class="ammo"><span id="ammo-mag">30</span><span class="sep">/</span><span id="ammo-res">150</span></div>
+      <div class="gren"><span class="lbl">FRAG</span> <span id="grenades">●●○</span></div>
+    </div>
+
+    <div id="death">
+      <div id="death-killer">Killed by</div>
+      <div id="death-weapon"></div>
+      <div id="death-timer"></div>
+    </div>
+    <div id="scoreboard"></div>
+  </div>
+
+  <!-- Touch controls -->
+  <div id="touch">
+    <div id="stick"><div id="stick-knob"></div></div>
+    <button data-btn="pause" class="tb small" id="tb-pause">❚❚</button>
+    <button data-btn="score" class="tb small" id="tb-score">TAB</button>
+    <button data-btn="fire" class="tb big" id="tb-fire">FIRE</button>
+    <button data-btn="ads" class="tb" id="tb-ads">ADS</button>
+    <button data-btn="touchJump" class="tb" id="tb-jump">JUMP</button>
+    <button data-btn="crouch" class="tb" id="tb-crouch">CROUCH</button>
+    <button data-btn="touchReload" class="tb" id="tb-reload">RELOAD</button>
+    <button data-btn="touchSwap" class="tb" id="tb-swap">SWAP</button>
+    <button data-btn="touchGrenade" class="tb" id="tb-frag">FRAG</button>
+    <button data-btn="sprint" class="tb" id="tb-sprint">SPRINT</button>
+  </div>
+
+  <!-- Main menu -->
+  <div id="menu" class="screen on">
+    <div class="panel">
+      <div class="brand">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="4"/><path d="M32 2v18M32 44v18M2 32h18M44 32h18" stroke="#fff" stroke-width="4"/></svg>
+        <div>
+          <h1>BREACHPOINT</h1>
+          <p>Team Deathmatch · Browser FPS</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <label>Callsign<input id="opt-name" maxlength="16" autocomplete="off"></label>
+        <label>Primary weapon
+          <select id="opt-primary">
+            <option value="rifle">AR-7 Rifle — all-rounder</option>
+            <option value="smg">VX-9 SMG — fast, close range</option>
+            <option value="shotgun">M12 Shotgun — point blank</option>
+            <option value="sniper">LR-50 Sniper — one-shot headshots</option>
+          </select>
+        </label>
+        <label>Team size
+          <select id="opt-team">
+            <option value="2">2 v 2</option><option value="3">3 v 3</option><option value="4">4 v 4</option>
+            <option value="5">5 v 5</option><option value="6">6 v 6</option><option value="8">8 v 8</option>
+          </select>
+        </label>
+        <label>Bot difficulty
+          <select id="opt-diff"><option value="easy">Recruit</option><option value="normal">Regular</option><option value="hard">Veteran</option></select>
+        </label>
+        <label>Score limit
+          <select id="opt-score"><option>25</option><option>50</option><option>75</option><option>100</option><option>150</option></select>
+        </label>
+        <label>Time limit
+          <select id="opt-time"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
+        </label>
+      </div>
+
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="grid">
+          <label>Mouse sensitivity <output id="out-sens"></output><input type="range" id="opt-sens" min="0.2" max="3" step="0.05"></label>
+          <label>Field of view <output id="out-fov"></output><input type="range" id="opt-fov" min="65" max="110" step="1"></label>
+          <label>Volume <output id="out-vol"></output><input type="range" id="opt-vol" min="0" max="1" step="0.05"></label>
+          <div class="checks">
+            <label class="check"><input type="checkbox" id="opt-invert"> Invert Y</label>
+            <label class="check"><input type="checkbox" id="opt-ff"> Friendly fire</label>
+            <label class="check"><input type="checkbox" id="opt-fps"> Show FPS</label>
+          </div>
+        </div>
+      </details>
+
+      <button id="play" class="primary">DEPLOY</button>
+
+      <div class="controls">
+        <div><kbd>WASD</kbd> Move</div><div><kbd>Mouse</kbd> Aim</div>
+        <div><kbd>LMB</kbd> Fire</div><div><kbd>RMB</kbd> Aim down sights</div>
+        <div><kbd>Shift</kbd> Sprint</div><div><kbd>Space</kbd> Jump</div>
+        <div><kbd>C</kbd>/<kbd>Ctrl</kbd> Crouch</div><div><kbd>R</kbd> Reload</div>
+        <div><kbd>1</kbd><kbd>2</kbd><kbd>Q</kbd> Weapons</div><div><kbd>G</kbd> Frag grenade</div>
+        <div><kbd>Tab</kbd> Scoreboard</div><div><kbd>Esc</kbd> Pause</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen">
+    <div class="panel narrow">
+      <h2>PAUSED</h2>
+      <button id="resume" class="primary">RESUME</button>
+      <label>Mouse sensitivity <output id="out-sens2"></output><input type="range" id="opt-sens2" min="0.2" max="3" step="0.05"></label>
+      <label>Volume <output id="out-vol2"></output><input type="range" id="opt-vol2" min="0" max="1" step="0.05"></label>
+      <button id="restart">RESTART MATCH</button>
+      <button id="quit">QUIT TO MENU</button>
+    </div>
+  </div>
+
+  <!-- End of match -->
+  <div id="end" class="screen">
+    <div class="panel wide">
+      <h2 id="end-title">VICTORY</h2>
+      <div id="end-score"></div>
+      <div id="end-mvp"></div>
+      <div id="end-board"></div>
+      <div class="row">
+        <button id="again" class="primary">PLAY AGAIN</button>
+        <button id="menu-btn">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
+  <div id="loading" class="screen on"><div class="spinner"></div><p>Loading…</p></div>
+  <noscript><p style="color:#fff;padding:2rem">Breachpoint requires JavaScript and WebGL.</p></noscript>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
