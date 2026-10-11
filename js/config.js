@@ -103,6 +103,10 @@ export const QUALITY = {
 
 const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
+// TURN relay (hides players' IP addresses). URL of the Cloudflare Worker in cloudflare/turn-worker.js,
+// e.g. 'https://breachpoint-turn.<you>.workers.dev'. Empty = direct peer-to-peer only.
+export const TURN_ENDPOINT = '';
+
 // Quick match (public) rules: the same for every public lobby
 export const PUBLIC_MATCH = { teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false };
 
@@ -111,6 +115,7 @@ export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
   musicVolume: 0.5,
+  privateRelay: false, // route private matches through the TURN relay too (hides your IP)
   name: 'Operator',
   teamSize: 6,
   difficulty: 'normal',

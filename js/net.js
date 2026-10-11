@@ -2,6 +2,30 @@
 // Signaling payloads are encrypted with a key derived from the match code, and WebRTC itself is
 // DTLS-encrypted end to end, so relays never see game traffic.
 import { joinRoom, selfId } from '../lib/trystero.js';
+import { TURN_ENDPOINT } from './config.js';
+
+// short-lived TURN credentials from the Worker, reused until they near expiry
+let turnCache = null;
+const turnUrl = () => new URLSearchParams(location.search).get('turn') || TURN_ENDPOINT; // ?turn= for testing
+export const turnAvailable = () => !!turnUrl();
+export async function turnServers() {
+  if (!turnUrl()) return null;
+  if (turnCache && Date.now() < turnCache.until) return turnCache.servers;
+  try {
+    const res = await Promise.race([
+      fetch(turnUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+    ]);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.iceServers) || !data.iceServers.length) throw new Error('no servers');
+    turnCache = { servers: data.iceServers, until: Date.now() + (data.ttl || 3600) * 800 };
+    return turnCache.servers;
+  } catch (e) {
+    console.warn('TURN relay unavailable, connecting directly', e);
+    return null;
+  }
+}
 
 const APP_ID = 'breachpoint-p2p-v1';
 const MAX_MSG = 64 * 1024;
@@ -26,13 +50,22 @@ export class Net {
     return p ? p.split(',').filter(Boolean) : undefined;
   }
 
-  open(code) {
+  // relayOnly: only offer TURN relay addresses, so no peer ever learns this player's IP
+  async open(code, { relayOnly = false } = {}) {
     this.close();
+    const gen = (this.gen = (this.gen || 0) + 1);
     const cfg = { appId: APP_ID, password: `breachpoint:${code}:v1` };
     const urls = this.relayUrls();
     if (urls) cfg.relayConfig = { urls };
-    // ?stun=0 skips public STUN servers (LAN / local testing)
-    if (new URLSearchParams(location.search).get('stun') === '0') cfg.rtcConfig = { iceServers: [] };
+    const noStun = new URLSearchParams(location.search).get('stun') === '0';
+    const turn = await turnServers();
+    if (gen !== this.gen) return; // closed or reopened while fetching credentials
+    this.relayed = !!(turn && relayOnly);
+    if (turn) {
+      // TURN servers (plus Cloudflare's STUN) replace the defaults; relay-only hides our address
+      cfg.rtcConfig = { iceServers: noStun ? turn.filter(s => [].concat(s.urls).some(u => /^turns?:/.test(u))) : turn };
+      if (relayOnly) cfg.rtcConfig.iceTransportPolicy = 'relay';
+    } else if (noStun) cfg.rtcConfig = { iceServers: [] }; // ?stun=0 skips public STUN servers (LAN / local testing)
     this.room = joinRoom(cfg, `match-${code}`, {
       onJoinError: (e) => this.emit('error', e && e.error ? e.error : 'Could not connect', e && e.peerId),
     });
@@ -62,6 +95,7 @@ export class Net {
   }
 
   close() {
+    this.gen = (this.gen || 0) + 1;
     if (this.room) { this.room.leave().catch(() => {}); this.room = null; this.action = null; }
     this.peers.clear();
   }

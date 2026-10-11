@@ -73,7 +73,7 @@ export class Lobby {
   toast(s) { if (this.onToast) this.onToast(s); }
 
   // ---------- host ----------
-  host(name, primary) {
+  host(name, primary, relayOnly = this.wantRelay(false)) {
     this.reset();
     this.role = 'host';
     this.code = newCode();
@@ -81,7 +81,7 @@ export class Lobby {
     this.hostPrimary = primary;
     this.hostTeam = 0;
     this.status = 'open';
-    this.net.open(this.code);
+    this.net.open(this.code, { relayOnly });
     clearInterval(this.pingTimer);
     this.pingTimer = setInterval(() => this.pingAll(), 2000);
     this.changed();
@@ -194,8 +194,11 @@ export class Lobby {
     this.hostPublic();
   }
 
+  // public matches always relay when the TURN Worker is set up; private ones when the player opts in
+  wantRelay(pub) { return pub || !!(this.game.settings || {}).privateRelay || !!this.privateRelay; }
+
   hostPublic() {
-    this.host(this.quickName, this.quickPrimary);
+    this.host(this.quickName, this.quickPrimary, true);
     this.public = true;
     this.approval = false;
     clearInterval(this.adTimer);
@@ -223,7 +226,7 @@ export class Lobby {
     this.myPrimary = primary;
     this.status = 'searching';
     this.lastError = '';
-    this.net.open(code);
+    this.net.open(code, { relayOnly: this.wantRelay(quick) });
     clearTimeout(this.findTimer);
     this.findTimer = setTimeout(() => {
       if (this.role === 'guest' && !this.hostId) {
@@ -287,7 +290,7 @@ export class Lobby {
       }
       case 'lobby':
         // another host is using this code; move to a fresh one
-        if (!this.players.size && !this.inMatch) { this.host(this.hostName, this.hostPrimary); this.toast('CODE CHANGED'); }
+        if (!this.players.size && !this.inMatch) { this.host(this.hostName, this.hostPrimary, this.net.relayed || this.public); this.toast('CODE CHANGED'); }
         break;
       case 'in':
         if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.input(id, m);

@@ -4,6 +4,7 @@ import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS } from './online.js';
+import { turnAvailable } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -43,7 +44,7 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'],
 ];
 const outputs = {
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
@@ -230,6 +231,10 @@ function leaveOnline() {
 }
 
 let quickIntro = false;
+document.body.classList.toggle('has-relay', turnAvailable());
+if (turnAvailable()) {
+  document.getElementById('quick-ipnote').innerHTML = 'Quick match puts you in a game with strangers. Your connection goes through <b>Cloudflare\'s relay, so other players can\'t see your IP address</b>. Whoever hosts runs the match.';
+}
 function openLobby() {
   readAll();
   joinError = '';
@@ -240,6 +245,7 @@ function openLobby() {
 function readAll() {
   for (const [id, key, type] of bindings) readField(id, key, type);
   saveSettings(settings);
+  lobby.privateRelay = !!settings.privateRelay;
 }
 
 function playerRow(p, actions) {
