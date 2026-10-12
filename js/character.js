@@ -266,6 +266,7 @@ export class Character {
     this.lastDamageT = -99; this.lastFireT = -99;
     this.damagers = new Map();
     this.bloom = 0; this.adsT = 0; this.sprinting = false;
+    this.tacSprinting = false; this.tacFuel = PLAYER.tacTime; this.tacIdle = 9;
     this.lastAttacker = null; this.lastAttackerT = -99;
     this.killer = null; this.deathT = 0; this.deathDir = 1;
     this.stepAccum = 0; this.animPhase = 0;
@@ -303,6 +304,7 @@ export class Character {
 
   spawn(p, yaw) {
     this.spawnT = this.game.time;
+    this.tacFuel = PLAYER.tacTime; this.tacSprinting = false; this.tacIdle = 9;
     if (this.pendingLoadout) { const l = this.pendingLoadout; this.pendingLoadout = null; if (l !== this.loadout) this.setLoadout(l); }
     this.pos.copy(p);
     this.vel.set(0, 0, 0);
@@ -365,7 +367,7 @@ export class Character {
     w.cooldown = 60 / w.def.rpm;
     this.lastFireT = this.game.time;
     this.spawnProtect = 0;
-    this.sprinting = false;
+    this.sprinting = false; this.tacSprinting = false;
     this.game.shoot(this, w.def, origin, dir, this.currentSpread());
     this.bloom = Math.min(0.06, this.bloom + w.def.recoilPitch * 0.35);
     if (this.model) this.model.kick = 1;
@@ -432,7 +434,7 @@ export class Character {
   }
 
   // slideReq: crouch was just pressed this frame (starts a slide when sprinting)
-  updateMovement(dt, wish, sprint, jump, slideReq = false) {
+  updateMovement(dt, wish, sprint, jump, slideReq = false, tac = false) {
     const phys = this.game.physics;
     const hs0 = Math.hypot(this.vel.x, this.vel.z);
     if (slideReq && this.sprinting && this.onGround && hs0 > PLAYER.walk && this.slideT <= 0) {
@@ -443,6 +445,10 @@ export class Character {
       this.game.audio.play('slide', this.spos);
     }
     const sliding = this.slideT > 0;
+    // tactical sprint charge: drains while in use, refills a second after you stop
+    if (this.tacSprinting) { this.tacFuel = Math.max(0, this.tacFuel - dt); this.tacIdle = 0; }
+    else { this.tacIdle = (this.tacIdle || 0) + dt; if (this.tacIdle > 1) this.tacFuel = Math.min(PLAYER.tacTime, this.tacFuel + dt * PLAYER.tacTime / PLAYER.tacRecharge); }
+    if (sliding) this.tacSprinting = false;
     let target = (this.wantCrouch || sliding) ? 1 : 0;
     if (target === 0 && this.crouchT > 0 && phys.overlap(this.pos.x, this.pos.y + 0.05, this.pos.z, this.radius * 0.95, PLAYER.height - 0.05)) target = 1;
     this.crouchT += Math.sign(target - this.crouchT) * Math.min(Math.abs(target - this.crouchT), dt * (sliding ? 10 : 7));
@@ -458,7 +464,8 @@ export class Character {
       if (jump && this.onGround) { this.slideT = 0; }
     } else {
       this.sprinting = sprint && this.crouchT < 0.3;
-      let speed = this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.sprinting ? PLAYER.sprint : PLAYER.walk;
+      this.tacSprinting = !!tac && this.sprinting && this.tacFuel > 0.05;
+      let speed = this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.tacSprinting ? PLAYER.tacSprint : this.sprinting ? PLAYER.sprint : PLAYER.walk;
       speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
       const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
       const tx = wish.x * speed, tz = wish.z * speed;
@@ -734,12 +741,13 @@ function animateSoldier(c, dt, showName) {
   r.visible = true;
 
   // aim: spine pitch, then place the gun in an aim frame in front of the chest
-  const pitch = c.pitch - (c.sprinting ? 0.5 : 0);
+  const tac = c.tacSprinting && c.sprinting;
+  const pitch = tac ? c.pitch * 0.3 + 0.95 : c.pitch - (c.sprinting ? 0.5 : 0);
   rotateBoneWorld(B.Spine1, right, -pitch * 0.3);
   rotateBoneWorld(B.Spine2, right, -pitch * 0.3);
   rotateBoneWorld(B.Head, right, -pitch * 0.25);
   m.kick = Math.max(0, m.kick - dt * 12);
-  _eu.set(pitch, c.yaw + (c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
+  _eu.set(pitch, c.yaw + (tac ? 0.3 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
   _qAim.setFromEuler(_eu);
   if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) * 0.7));
   const pistol = m.weaponId === 'pistol';

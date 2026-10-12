@@ -25,6 +25,9 @@ export const PLAYER = {
   crouchEye: 1.05,
   walk: 5.2,
   sprint: 7.8,
+  tacSprint: 9.8,   // tactical sprint (double-tap sprint): faster, gun up, limited
+  tacTime: 4,       // seconds of tactical sprint on a full charge
+  tacRecharge: 3.5, // seconds to fully recharge (starts 1 s after you stop)
   crouchSpeed: 2.7,
   adsSpeedMult: 0.6,
   jump: 7.0,

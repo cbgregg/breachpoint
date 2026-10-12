@@ -1,6 +1,6 @@
 // Bot AI: perception, goal selection, pathing, aiming, shooting, grenades
 import * as THREE from 'three';
-import { DIFFICULTY } from './config.js';
+import { DIFFICULTY, PLAYER } from './config.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -212,7 +212,11 @@ export class BotBrain {
       this.stuckT = 1;
     }
     b.wantCrouch = this.crouch;
-    b.updateMovement(dt, wish, sprint && !this.visible, jump);
+    // long runs with nobody in sight: tactical sprint while the charge is high
+    const run = sprint && !this.visible;
+    if (!run) this.tac = false;
+    else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
+    b.updateMovement(dt, wish, run, jump, false, run && this.tac);
   }
 
   aim(dt) {

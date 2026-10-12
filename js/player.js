@@ -195,6 +195,21 @@ export class PlayerController {
     const sprintWant = canAct && (shift || this.padSprint || inp.touchSprint) && f > 0.4 && !inp.ads && !inp.fire && !autoOn;
     if (sprintWant && sprintPress && c.weapon.reloading) c.weapon.cancelReload();
     const sprint = sprintWant && !c.weapon.reloading;
+    // tactical sprint: double-tap Shift, click L3 again while sprinting, or push the touch stick to
+    // sprint twice in quick succession. Lasts until you stop sprinting or the charge runs out.
+    const touchEdge = inp.touchSprint && !this.prevTouchSprint;
+    this.prevTouchSprint = inp.touchSprint;
+    const shiftEdge = shift && !this.prevShiftTac;
+    const now = g.time;
+    if (!shift && this.prevShiftTac) this.lastShiftUpT = now; // quick release + press again = double tap
+    this.prevShiftTac = shift;
+    if ((shiftEdge && now - (this.lastShiftUpT ?? -9) < 0.3) || (inp.lastDevice === 'pad' && sprintPress && c.sprinting && !shiftEdge) || (touchEdge && now - (this.lastTouchSprintT ?? -9) < 0.45)) {
+      if (c.tacFuel > 0.3) this.tacOn = true;
+    }
+    if (inp.touchSprint === false && this.prevTouchUp !== false) this.lastTouchSprintT = now;
+    this.prevTouchUp = inp.touchSprint;
+    if (!sprint || c.tacFuel <= 0.05) this.tacOn = false;
+    const tac = sprint && !!this.tacOn;
 
     let slideReq = false;
     const crouchPress = inp.action('crouch'), slidePress = inp.action('slide');
@@ -204,10 +219,10 @@ export class PlayerController {
     c.wantCrouch = this.crouchToggle || inp.down('ControlLeft');
     const jump = canAct && (inp.down('Space') || inp.action('jump'));
     if (jump) this.crouchToggle = false;
-    c.updateMovement(dt, _wish, sprint, jump, slideReq && canAct);
+    c.updateMovement(dt, _wish, sprint, jump, slideReq && canAct, tac);
     // the exact command that produced this frame's movement (sent to the host when playing online)
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
-    this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, cr: c.wantCrouch ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
+    this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, tac: tac ? 1 : 0, cr: c.wantCrouch ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
     if (!this.wasGround && c.onGround) this.landDip = 1;
     this.wasGround = c.onGround;
 
@@ -377,7 +392,8 @@ export class PlayerController {
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     cam.rotation.order = 'YXZ';
     cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
-    const fov = lerp(vfov(s.fov), this.adsFov(c.weapon.def), c.adsT) * (c.sprinting ? 1.06 : 1);
+    this.tacK = lerp(this.tacK || 0, c.tacSprinting ? 1 : 0, Math.min(1, dt * 8));
+    const fov = lerp(vfov(s.fov), this.adsFov(c.weapon.def), c.adsT) * (c.sprinting ? 1.06 + 0.05 * this.tacK : 1);
     if (Math.abs(fov - this.lastFov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
@@ -442,6 +458,17 @@ export class PlayerController {
       this.sprintT * 0.75 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
       tilt * 0.32 + this.sprintT * 0.45 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
+    // tactical sprint: gun swung up beside the face, muzzle high (MW style)
+    const tk = this.tacK || 0;
+    if (tk > 0.01) {
+      // undo most of the normal sprint pose, then swing the muzzle up, held off to the right
+      h.position.x += (0.07 + this.sprintT * 0.03) * tk;
+      h.position.y += (-0.07 + this.sprintT * 0.05) * tk + by * 0.8;
+      h.position.z += -0.12 * tk;
+      h.rotation.x += (0.85 + this.sprintT * 0.3) * tk;
+      h.rotation.y += (-0.35 - this.sprintT * 0.75) * tk;
+      h.rotation.z += (0.15 - this.sprintT * 0.45) * tk + bx * 4;
+    }
     if (s1 + s2 > 0) {
       const w2 = Math.sin(ip * Math.PI * 3) * 0.04; // a little life in the hands
       h.position.x += -0.05 * s1 - 0.035 * s2;
