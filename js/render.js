@@ -60,6 +60,52 @@ const GradeShader = {
 
 export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 24), THREE.MathUtils.degToRad(215));
 
+// Height fog: distance haze plus a dense layer that hugs the ground and thins with altitude,
+// glowing warm when looking towards the sun. Patched into three's fog chunks so every lit
+// material, particle and sprite gets it for free.
+const fv = (v) => v.toFixed(4);
+const _sd = SUN_DIR.clone().normalize();
+THREE.ShaderChunk.fog_pars_vertex = `#ifdef USE_FOG
+  varying float vFogDepth;
+  varying vec3 vFogWorld;
+#endif`;
+THREE.ShaderChunk.fog_vertex = `#ifdef USE_FOG
+  vFogDepth = - mvPosition.z;
+  vFogWorld = transpose(mat3(viewMatrix)) * (mvPosition.xyz - viewMatrix[3].xyz);
+#endif`;
+THREE.ShaderChunk.fog_pars_fragment = `#ifdef USE_FOG
+  uniform vec3 fogColor;
+  varying float vFogDepth;
+  varying vec3 vFogWorld;
+  #ifdef FOG_EXP2
+    uniform float fogDensity;
+  #else
+    uniform float fogNear;
+    uniform float fogFar;
+  #endif
+#endif`;
+THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
+  {
+    vec3 fRay = vFogWorld - cameraPosition;
+    float fDist = length(fRay);
+    vec3 fDir = fRay / max(fDist, 1e-4);
+    #ifdef FOG_EXP2
+      float fHaze = 1.0 - exp(-fogDensity * fogDensity * fDist * fDist);
+    #else
+      float fHaze = smoothstep(fogNear, fogFar, vFogDepth);
+    #endif
+    const float FB = 0.32;      // ground layer falloff per metre of height
+    const float FG = 0.0085;    // ground layer density at y = 0
+    float h0 = max(cameraPosition.y, 0.0), dy = fRay.y;
+    float integ = abs(dy) > 0.02 ? (exp(-FB * h0) - exp(-FB * (h0 + dy))) / (FB * dy) : exp(-FB * h0);
+    float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
+    float fogFactor = clamp(fHaze + fGround * (1.0 - fHaze), 0.0, 0.92);
+    float fSun = pow(max(dot(fDir, vec3(${fv(_sd.x)}, ${fv(_sd.y)}, ${fv(_sd.z)})), 0.0), 5.0);
+    vec3 fCol = mix(fogColor, fogColor * vec3(1.35, 1.12, 0.82), fSun);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fCol, fogFactor);
+  }
+#endif`;
+
 export class Renderer {
   constructor(container, scene, camera, vmScene, vmCamera) {
     this.scene = scene; this.camera = camera; this.vmScene = vmScene; this.vmCamera = vmCamera;
@@ -123,7 +169,7 @@ export class Renderer {
     scene.environmentIntensity = 1;
     pmrem.dispose();
 
-    scene.fog = new THREE.FogExp2(0xb8b0a0, 0.0075);
+    scene.fog = new THREE.FogExp2(0xc2b49c, 0.0062);
 
     const sun = new THREE.DirectionalLight(0xffe2bd, 3.4);
     sun.position.copy(SUN_DIR).multiplyScalar(80);

@@ -5,6 +5,7 @@ const WEAPON_IDS = Object.keys(WEAPONS);
 import { Physics, rayBox } from './physics.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
 import { Character, setCharacterDetail } from './character.js';
+import { hitPower } from './motion.js';
 import { BotBrain } from './bot.js';
 import { PlayerController } from './player.js';
 import { Effects } from './effects.js';
@@ -98,7 +99,7 @@ export class Game {
   get live() { return this.state === 'playing' || (this.state === 'paused' && this.mode !== 'local'); }
 
   applySettings(s) {
-    if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); }
+    if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); this.effects?.setQuality(s.quality); }
     this.audio.setVolume(s.volume);
     this.music.setVolume(s.musicVolume ?? 0.5);
     this.input.deadzone = s.padDeadzone;
@@ -506,6 +507,7 @@ export class Game {
         if (al > 2 && al < best && _b.lengthSq() - al * al < 2.2) { whizzed = true; this.audio.play('whiz', null, { ui: true }); }
       }
       let kind;
+      if (hitC) hitC.hitReact(_end, _d, hitPower(def), head);
       if (hitC && cosmetic) {
         kind = 0; // wait for the host's hitmarker
       } else if (hitC) {
@@ -553,6 +555,7 @@ export class Game {
     if (!best) return;
     const lunge = _a.subVectors(best.pos, attacker.pos).setY(0).normalize();
     attacker.vel.x += lunge.x * 4; attacker.vel.z += lunge.z * 4;
+    best.hitReact(best.chestPos(_b), lunge, 2.2, false);
     this.effects.impact(best.chestPos(_b), lunge.negate(), 'blood');
     this.audio.play('meleehit', best.pos);
     const wasAlive = best.alive;
@@ -637,6 +640,7 @@ export class Game {
       if (d > GRENADE.radius) continue;
       if (this.physics.blocked(src, cp) && this.physics.blocked(src, c.headPos(_b))) continue;
       const dmg = GRENADE.damage * Math.pow(1 - d / GRENADE.radius, 1.3) + 5;
+      c.hitReact(cp, _b.subVectors(cp, pos).setY(Math.max(0.2, cp.y - pos.y)), 1.5 + 2.5 * (1 - d / GRENADE.radius), false, 3 * (1 - d / GRENADE.radius));
       const wasAlive = c.alive;
       const before = c.health;
       c.takeDamage(dmg, g.owner, 'grenade', false, pos);

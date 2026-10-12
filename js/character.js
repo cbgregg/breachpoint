@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
 import { cloneSoldier } from './assets.js';
+import { createMotion, driveGait, sense, applyDynamics, hitImpulse, startRagdoll, stepRagdoll, poseRagdoll } from './motion.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -369,6 +370,12 @@ export class Character {
     return true;
   }
 
+  // visual reaction to being hit (runs on every machine): dir = travel direction of the shot
+  hitReact(point, dir, power = 1, head = false, up = 0) {
+    this.lastHit = { t: this.game.time, point: point.clone(), dir: dir.clone().normalize(), power, head, up };
+    if (this.alive && this.model && this.model.motion) hitImpulse(this.model.motion, this.yaw, this.lastHit.dir, power, head);
+  }
+
   takeDamage(amount, attacker, weaponId, headshot, fromPos) {
     if (!this.alive || this.spawnProtect > 0 || !this.game.live || this.game.mode === 'guest') return;
     if (attacker && attacker !== this && attacker.team === this.team && !this.game.settings.friendlyFire) return;
@@ -467,13 +474,13 @@ export class Character {
       // level of detail: off-screen bots only move their root; distant ones animate at a lower rate
       const m = this.model;
       m.accDt = (m.accDt || 0) + dt;
-      if (lod === 0) {
+      if (lod === 0 && this.alive) {
         m.root.position.copy(this.pos); m.root.rotation.set(0, this.yaw, 0);
         if (!this.alive && this.game.time - this.deathT > 5) m.root.visible = false;
         return;
       }
       // distant: the body still moves every frame, only the skeleton pose updates at ~30 Hz
-      if (lod === 2 && m.accDt < 1 / 30) {
+      if (lod === 2 && m.accDt < 1 / 30 && this.alive) {
         if (this.alive) { m.root.position.copy(this.pos); m.root.rotation.set(0, this.yaw, 0); }
         return;
       }
@@ -608,7 +615,19 @@ function buildSoldierModel(team, weaponId, name) {
     gun: null, weaponId: null, kick: 0, team, blend: { Idle: 1, Walk: 0, Run: 0 }, legYaw: 0,
   };
   setOperatorWeapon(model, weaponId);
+  model.motion = createMotion(model);
   return model;
+}
+
+// the killing blow: the last recorded hit if it was just now, otherwise a push away from the killer
+function deathImpulse(c) {
+  const h = c.lastHit;
+  if (h && c.game.time - h.t < 0.6) return { point: h.point.clone(), dir: h.dir.clone(), power: h.power * (h.head ? 1.2 : 1), up: h.up || 0 };
+  const k = c.killer;
+  if (!k || k === c) return null;
+  const dir = new THREE.Vector3(c.pos.x - k.pos.x, 0, c.pos.z - k.pos.z);
+  if (dir.lengthSq() < 1e-4) return null;
+  return { point: c.chestPos(new THREE.Vector3()), dir: dir.normalize(), power: 1 };
 }
 
 function animateSoldier(c, dt, showName) {
@@ -632,8 +651,22 @@ function animateSoldier(c, dt, showName) {
     m.actions[n].setEffectiveWeight(m.blend[n]);
   }
   const back = fwd < -0.3 && !run;
-  m.actions.Walk.setEffectiveTimeScale((back ? -1 : 1) * Math.max(0.6, hs / 1.7) * (c.crouchT > 0.5 ? 0.8 : 1));
-  m.actions.Run.setEffectiveTimeScale(Math.max(0.7, hs / 5.8));
+  const mo = m.motion;
+  if (alive) {
+    if (mo.rag) { mo.rag = null; mo.lastPos = null; }
+    sense(mo, c.pos, c.yaw, dt);
+    const ph0 = mo.phase;
+    driveGait(mo, m, hs * (c.crouchT > 0.5 ? 1.25 : 1), back, dt);
+    // sprinting feet and slides kick up dust (works for every view: local, host and interpolated)
+    if (c.onGround !== false && !c.local) {
+      const crossed = (x) => (ph0 < x && mo.phase >= x) || (ph0 > mo.phase && (x > ph0 || x <= mo.phase) && !back);
+      if (m.blend.Run > 0.5) {
+        if (crossed(0.47)) c.game.effects.kickDust(B.LeftFoot.getWorldPosition(_w1), hs);
+        if (crossed(0.95)) c.game.effects.kickDust(B.RightFoot.getWorldPosition(_w1), hs);
+      }
+      if (sliding && (mo.slideDust = (mo.slideDust || 0) + dt) > 0.05) { mo.slideDust = 0; c.game.effects.kickDust(c.pos, 8, true); }
+    }
+  }
   m.mixer.update(alive ? dt : 0);
   r.updateMatrixWorld(true);
 
@@ -652,10 +685,11 @@ function animateSoldier(c, dt, showName) {
     rotateBoneWorld(B.Spine, UP, -m.legYaw * 0.5);
     rotateBoneWorld(B.Spine1, UP, -m.legYaw * 0.5);
   }
+  const dyn = alive ? applyDynamics(mo, c, B, rotateBoneWorld, dt) : { knee: 0, drop: 0 };
   // crouch / slide: bend knees and drop the body so the feet stay planted
-  let bend = cr * 1.05;
+  let bend = cr * 1.05 + dyn.knee * (1 - cr);
   if (sliding) bend = 0.9;
-  m.body.position.y = -2 * m.legLen * (1 - Math.cos(bend)) * 0.95;
+  m.body.position.y = -2 * m.legLen * (1 - Math.cos(bend)) * 0.95 - dyn.drop;
   if (bend > 0.01) {
     for (const sideName of ['Left', 'Right']) {
       rotateBoneWorld(B[sideName + 'UpLeg'], right, bend);
@@ -665,22 +699,10 @@ function animateSoldier(c, dt, showName) {
   }
 
   if (!alive) {
-    // procedural collapse on top of the frozen pose
     const t = c.game.time - c.deathT;
-    const k1 = Math.min(1, t / 0.3), k2 = Math.max(0, Math.min(1, (t - 0.12) / 0.55));
-    const e2 = k2 * k2 * (3 - 2 * k2);
-    for (const sideName of ['Left', 'Right']) {
-      rotateBoneWorld(B[sideName + 'UpLeg'], right, 0.9 * k1);
-      rotateBoneWorld(B[sideName + 'Leg'], right, -1.5 * k1);
-    }
-    rotateBoneWorld(B.Spine1, right, -0.4 * e2 * c.deathDir);
-    for (const sideName of ['Left', 'Right']) rotateBoneWorld(B[sideName + 'Arm'], right, 0.8 * k1);
-    m.body.position.y = -0.35 * k1;
-    r.rotation.x = -c.deathDir * e2 * Math.PI / 2.15;
-    r.rotation.z = e2 * 0.15 * c.deathDir;
-    // gun drops beside the body
-    m.gunHolder.position.set(0.35 * c.deathDir, 0.05, -0.2);
-    m.gunHolder.rotation.set(0, 1.2, Math.PI / 2);
+    if (!mo.rag) mo.rag = startRagdoll(m, c.game.physics, mo.vel, deathImpulse(c));
+    stepRagdoll(mo.rag, dt);
+    poseRagdoll(mo.rag, m, swingBone);
     m.nameTag.visible = false;
     if (t > 5) r.visible = false;
     return;

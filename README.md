@@ -1,6 +1,6 @@
 # Breachpoint
 
-A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** or **online with friends using a 6-digit code** (peer-to-peer, no server), on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from one rigged soldier model, every texture, gun, building and sound is generated at runtime, so it deploys to GitHub Pages as plain static files.
+A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** or **online with friends using a 6-digit code** (peer-to-peer, no server), on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from one rigged soldier model, every gun, building and sound is generated at runtime (surface textures are CC0 photo scans), so it deploys to GitHub Pages as plain static files.
 
 **Play:** `https://<your-username>.github.io/breachpoint/` (after enabling Pages — see below)
 
@@ -8,10 +8,10 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 
 | Area | What's included |
 |---|---|
-| Look | Physical sky with image-based lighting, low warm sun, real-time soft shadows, ground-truth ambient occlusion (GTAO), bloom, filmic tone mapping, color grade, vignette, chromatic aberration, film grain, SMAA. Rounded-edge geometry throughout, 4096 shadow maps on High. Procedural PBR materials (albedo + normal + roughness) for asphalt, concrete, plaster, brick, corrugated metal, wood, sandbags, HESCO. Quality presets Low → Ultra |
+| Look | Physical sky with image-based lighting, low warm sun, real-time soft shadows, ground-truth ambient occlusion (GTAO), bloom, filmic tone mapping, color grade, vignette, chromatic aberration, film grain, SMAA. Rounded-edge geometry throughout, 4096 shadow maps on High. Photo-scanned PBR materials (albedo + normal + roughness, CC0) for asphalt, concrete, plaster, brick, corrugated steel, painted metal, wood, weathered planks, dirt, cobblestone, sandbags, cloth, HESCO and rubber, with procedural fallbacks. Height fog that hugs the ground and glows toward the sun, drifting dust motes, dust kicked up by sprinting feet and slides. Quality presets Low → Ultra |
 | Maps | **Shuran Yard** (new): a three-lane map. North lane is a market street, mid lane an open yard with a container and crates at the center, south lane a container yard with stacked containers and long sightlines; lanes are split by building blocks and container walls with one connector per side, and each team spawns behind HESCO cover. Pick it (or Random) on the Play tab; online, guests load the host's map, and quick matches rotate randomly. |
 | Map | *Tarsa Market*: perimeter of multi-storey buildings with shop shutters, signage, awnings, balconies, AC units, water tanks and dishes; central concrete building with rooftop access, compound walls, jersey barriers, shipping containers, wrecked cars, market stalls, sandbag positions, HESCO forward bases, palms, power cables, distant skyline. Symmetric layout for fair TDM |
-| Operators | Rigged, textured soldier model with motion-captured idle/walk/run animation, blended by speed; legs turn toward movement while the upper body stays on the aim; IK arms grip each weapon's pistol grip and foregrip; crouch, slide and death poses layered on top. The same rig provides the first-person arms and gloves. Falls back to procedural operators if the model can't load |
+| Operators | Rigged, textured soldier model with motion-captured idle/walk/run animation, blended by speed; legs turn toward movement while the upper body stays on the aim; IK arms grip each weapon's pistol grip and foregrip. Procedural motion on top of the clips: one shared gait phase so walk/run blend without double-stepping and stride matches ground speed, spring-driven lean into acceleration and turns, landing compression and airborne tuck, hit flinches in the direction of each shot (head snaps on headshots), and **ragdoll deaths** (verlet skeleton seeded with the body's momentum and the killing shot's impulse, colliding with the ground and nearby cover; the gun tumbles free). The same rig provides the first-person arms and gloves. Falls back to procedural operators if the model can't load |
 | Weapons | Guns built from real side-profile silhouettes with rounded edges, lathed barrels, muzzle devices and scopes. MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
 | Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
 | Online | Host a match and share a 6-digit code (or invite link); friends type it in and join. Peer-to-peer over WebRTC, so it runs on GitHub Pages with no game server. Host-authoritative with input validation, lag compensation, client-side prediction and wallhack-resistant culling (see below). Up to 8 humans, bots fill the rest, players can drop in mid-match |
@@ -122,9 +122,11 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
 | `js/world.js` | Map layout (mirrored), dressing merged per material, minimap render |
-| `js/textures.js` | Procedural PBR texture sets |
+| `js/textures.js` | Procedural PBR texture sets (overridden by `assets/textures/` when present) |
+| `assets/textures/` | Photo PBR sets: `<name>/color.jpg`, `normal.jpg`, `rough.jpg` |
 | `js/assets.js` | Loads the rigged soldier (GLTF) and clones it per character |
 | `js/character.js` | Shared player/bot logic, soldier animation blending, IK arms, first-person body, procedural fallback |
+| `js/motion.js` | Gait phase, spring body dynamics, hit reactions, ragdoll |
 | `js/player.js` | Local player: input → movement/weapons, camera, viewmodel with IK arms, aim assist |
 | `js/weapons.js` | Weapon state, detailed gun models, spread cone |
 | `js/bot.js` | Bot AI |
@@ -156,7 +158,8 @@ npx serve .            # or: python3 -m http.server 8000
 
 - Soldier model and animations (`assets/models/soldier.glb`): the *Soldier* sample from the [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf), a Mixamo character. Mixamo assets are royalty-free for use in projects under Adobe's terms; check those terms before commercial use, or swap in your own rigged `.glb` with a Mixamo skeleton.
 - Peer-to-peer matchmaking: [Trystero](https://github.com/dmotz/trystero) by Dan Motzenbecker (MIT), vendored in `lib/`.
-- Everything else (code, textures, guns, map, audio) is generated in this repo.
+- Surface textures (`assets/textures/`): CC0 sets from [ambientCG](https://ambientcg.com) (Asphalt014, Concrete047A, Plaster003, CorrugatedSteel009, Ground037, Fabric049/061/066, Rubber001) and [Poly Haven](https://polyhaven.com) (red_brick_03, green_metal_rust, wood_planks, weathered_brown_planks, cobblestone_floor_08), resized and recolored for the maps.
+- Everything else (code, guns, map, audio) is generated in this repo.
 
 ## License
 

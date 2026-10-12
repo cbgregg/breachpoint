@@ -103,6 +103,48 @@ class Points {
   }
 }
 
+// Floating dust: a box of slow, drifting motes that follows the camera and wraps around it.
+// Bright where they catch the sun, nearly invisible otherwise, so they add depth without noise.
+class Motes {
+  constructor(scene, map) {
+    this.pts = new Points(scene, 320, true, map);
+    this.n = 0; this.box = 22; this.t = 0;
+    this.seed = [];
+  }
+  setCount(n) {
+    this.n = Math.min(n, this.pts.max);
+    this.seed.length = 0;
+    for (let i = 0; i < this.n; i++) this.seed.push({ x: Math.random(), y: Math.random(), z: Math.random(), ph: Math.random() * 6.28, s: rand(0.012, 0.03), a: rand(0.25, 0.7) });
+  }
+  update(dt, cam) {
+    const P = this.pts;
+    if (!this.n || !cam) { P.geo.setDrawRange(0, 0); return; }
+    this.t += dt;
+    const B = this.box, t = this.t;
+    const wx = 0.35 * t, wz = 0.12 * t; // light breeze
+    let n = 0;
+    for (const m of this.seed) {
+      // position in a camera-centred wrapping box
+      const fx = (((m.x * B + wx + Math.sin(t * 0.3 + m.ph) * 0.6 - cam.x) % B) + B) % B;
+      const fz = (((m.z * B + wz + Math.cos(t * 0.27 + m.ph) * 0.6 - cam.z) % B) + B) % B;
+      const fy = (((m.y * 7 + Math.sin(t * 0.21 + m.ph * 2) * 0.4 - cam.y + 2) % 7) + 7) % 7;
+      const x = cam.x + fx - B / 2, z = cam.z + fz - B / 2, y = cam.y + fy - 2;
+      if (y < 0.05) continue;
+      // fade at the edges of the box so wrapping never pops
+      const ex = Math.min(fx, B - fx) / (B * 0.2), ez = Math.min(fz, B - fz) / (B * 0.2);
+      const edge = Math.min(1, ex, ez, fy / 1.2, (7 - fy) / 1.2);
+      P.pos[n * 3] = x; P.pos[n * 3 + 1] = y; P.pos[n * 3 + 2] = z;
+      P.col[n * 3] = 1.0; P.col[n * 3 + 1] = 0.86; P.col[n * 3 + 2] = 0.62;
+      P.alpha[n] = m.a * 0.35 * Math.max(0, edge) * (0.65 + 0.35 * Math.sin(t * 1.3 + m.ph * 3));
+      P.size[n] = m.s;
+      P.rot[n] = 0;
+      n++;
+    }
+    P.geo.setDrawRange(0, n);
+    for (const k of ['position', 'color', 'alpha', 'size']) P.geo.attributes[k].needsUpdate = true;
+  }
+}
+
 export class Effects {
   constructor(scene, physics) {
     this.scene = scene;
@@ -112,6 +154,9 @@ export class Effects {
     this.glow = new Points(scene, 900, true, dot);
     this.smoke = new Points(scene, 700, false, puffTexture());
     this.flashes = new Points(scene, 32, true, this.starTex);
+    this.motes = new Motes(scene, dot);
+    this.motes.setCount(200);
+    this.camPos = null;
 
     // lit debris chips
     this.debris = [];
@@ -189,6 +234,20 @@ export class Effects {
     this.glow.mat.uniforms.scale.value = s;
     this.smoke.mat.uniforms.scale.value = s;
     this.flashes.mat.uniforms.scale.value = s;
+    this.motes.pts.mat.uniforms.scale.value = s;
+    this.camPos = camera.getWorldPosition(this.camPos || new THREE.Vector3());
+  }
+
+  setQuality(name) { this.motes.setCount({ low: 0, medium: 140, high: 220, ultra: 300 }[name] ?? 200); }
+
+  // footfalls / slides kick up a little dust
+  kickDust(pos, speed, slide = false) {
+    const n = slide ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      this.smoke.spawn(_p.set(pos.x + rand(-0.15, 0.15), pos.y + 0.05, pos.z + rand(-0.15, 0.15)),
+        _v.set(rand(-0.4, 0.4), rand(0.2, 0.6), rand(-0.4, 0.4)), 0xa89a80, rand(0.12, 0.2) * (slide ? 1.6 : 1), rand(0.7, 1.2),
+        { grow: slide ? 1.4 : 0.7, alpha: (slide ? 0.32 : 0.16) * Math.min(1, speed / 6), drag: 2.5, gravity: -0.1 });
+    }
   }
 
   flashLight(pos, intensity, life, color = 0xffb060) {
@@ -285,6 +344,7 @@ export class Effects {
   }
 
   update(dt) {
+    this.motes.update(dt, this.camPos);
     this.glow.update(dt);
     this.smoke.update(dt);
     this.flashes.update(dt);

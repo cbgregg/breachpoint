@@ -16,6 +16,7 @@ import { Board } from './quickplay.js';
 import { safeName } from './names.js';
 import { PRIMARIES, PLAYER, MELEE, WEAPONS } from './config.js';
 import { Character } from './character.js';
+import { hitPower } from './motion.js';
 
 export const MAX_HUMANS = 8;
 const PROTO = 1;
@@ -866,7 +867,17 @@ export class GuestSession {
           const end = new THREE.Vector3(e[0], e[1], e[2]);
           g.effects.tracer(muzzle, end);
           const k = e[3];
-          if (k === 'b') g.effects.impact(end, dir.clone().negate(), 'blood');
+          if (k === 'b') {
+            g.effects.impact(end, dir.clone().negate(), 'blood');
+            // body reaction: whoever is standing where the blood is
+            let hit = null, bd = 1.44;
+            for (const o of g.characters) {
+              if (o === c || !o.alive || o === g.player) continue;
+              const d2 = Math.min(o.chestPos(_v3).distanceToSquared(end), o.headPos(_v3).distanceToSquared(end));
+              if (d2 < bd) { bd = d2; hit = o; }
+            }
+            if (hit) hit.hitReact(end, dir, hitPower(WEAPONS[wid]), hit.headPos(_v3).distanceToSquared(end) < 0.05);
+          }
           else if (Array.isArray(k) && [k[1], k[2], k[3]].every(fin)) {
             g.effects.impact(end, new THREE.Vector3(k[1], k[2], k[3]), String(k[0]).slice(0, 12));
             if (first) g.audio.play('impact', end);
