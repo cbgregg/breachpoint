@@ -219,7 +219,7 @@ export class HUD {
     }
     // enemy pings (recent gunfire)
     for (const c of g.characters) {
-      if (!c.alive || c.team === p.team || g.time - c.lastFireT > 1.5) continue;
+      if (!c.alive || c.team === p.team || g.time - c.lastFireT > 1.5 || c.weapon.def.quiet) continue;
       const b = this.heading(Math.atan2(-(c.pos.x - p.pos.x), -(c.pos.z - p.pos.z)));
       let delta = b - hd; if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
       if (Math.abs(delta) > span / 2) continue;
@@ -258,7 +258,7 @@ export class HUD {
       if (!c.alive || c === p) continue;
       const friend = c.team === p.team;
       const since = g.time - c.lastFireT;
-      if (!friend && since > 2) continue;
+      if (!friend && (since > 2 || c.weapon.def.quiet)) continue;
       ctx.globalAlpha = friend ? 1 : Math.max(0.2, 1 - since / 2);
       ctx.fillStyle = friend ? FRIENDLY_CSS : ENEMY_CSS;
       ctx.save();

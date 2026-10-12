@@ -13,10 +13,12 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Map | *Tarsa Market*: perimeter of multi-storey buildings with shop shutters, signage, awnings, balconies, AC units, water tanks and dishes; central concrete building with rooftop access, compound walls, jersey barriers, shipping containers, wrecked cars, market stalls, sandbag positions, HESCO forward bases, palms, power cables, distant skyline. Symmetric layout for fair TDM |
 | Operators | Rigged, textured soldier model with motion-captured idle/walk/run animation, blended by speed; legs turn toward movement while the upper body stays on the aim; IK arms grip each weapon's pistol grip and foregrip. Procedural motion on top of the clips: one shared gait phase so walk/run blend without double-stepping and stride matches ground speed, spring-driven lean into acceleration and turns, landing compression and airborne tuck, hit flinches in the direction of each shot (head snaps on headshots), and **ragdoll deaths** (verlet skeleton seeded with the body's momentum and the killing shot's impulse, colliding with the ground and nearby cover; the gun tumbles free). The same rig provides the first-person arms and gloves. Falls back to procedural operators if the model can't load |
 | Weapons | Guns built from real side-profile silhouettes with rounded edges, lathed barrels, muzzle devices and scopes. MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
+| Gunsmith | Five attachment slots with real trade-offs, modeled on the gun in first and third person and previewed in 3D on the Loadout tab. **Optics:** iron sights, reflex, holographic, 4× prism scope (eyecup-framed magnified view with a chevron), 8× sniper scope. **Muzzle:** compensator, suppressor (off the compass and minimap, quieter, no muzzle flash, bots hear it less, −15% range), full choke for the shotgun. **Underbarrel:** vertical grip (recoil) or angled grip (aim speed). **Magazine:** extended (+50%, slower reload) or fast mag. **Tac laser:** tighter hip fire and faster aim, but a visible beam. Stat bars show gains and losses against stock. Bots roll random builds; online, loadouts sync to everyone |
 | Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
 | Online | Host a match and share a 6-digit code (or invite link); friends type it in and join. Peer-to-peer over WebRTC, so it runs on GitHub Pages with no game server. Host-authoritative with input validation, lag compensation, client-side prediction and wallhack-resistant culling (see below). Up to 8 humans, bots fill the rest, players can drop in mid-match |
 | Readability | Black Ops 2-style: friendly names with a blue marker above teammates (visible through walls), enemy names in red when your crosshair is on them, a soft rim light on every soldier, distinct kits (tan vs. cool slate) and a brighter, more saturated grade |
 | Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
+| Pause menu | Live match panel (score, time, your stats, current build, scoreboard), Change Loadout (applies on next spawn, also online), full Options, host controls online, confirm-to-quit/restart. Compact layout on phones |
 | HUD | Compass with enemy gunfire pings, rotating minimap rendered from the actual map, friendly/enemy score widget, ammo cluster with fire mode and equipment, score pop-ups beside the crosshair, medals (multikills, streaks, payback), killfeed, hitmarkers, directional damage, red-out damage effect, death card with killer distance and HP, scoreboard with K/D, device-aware button prompts |
 | Controller | Xbox / standard gamepads: radial deadzone, response curve, separate sensitivity, aim assist (slowdown, rotational tracking, ADS snap), rumble, full menu navigation with D-pad/stick, bumpers switch tabs, glyphs swap automatically between keyboard and controller |
 | Music | Original score synthesized live (no recordings, so nothing to license): a slow D-minor menu theme and a 112 BPM action track whose layers build with recent fighting, the last minute and close finishes; end-of-match stings; separate music volume. Swap in your own tracks via `MUSIC_FILES` in `js/config.js` |
@@ -128,7 +130,9 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/character.js` | Shared player/bot logic, soldier animation blending, IK arms, first-person body, procedural fallback |
 | `js/motion.js` | Gait phase, spring body dynamics, hit reactions, ragdoll |
 | `js/player.js` | Local player: input → movement/weapons, camera, viewmodel with IK arms, aim assist |
-| `js/weapons.js` | Weapon state, detailed gun models, spread cone |
+| `js/weapons.js` | Weapon state, detailed gun models and attachment parts, spread cone |
+| `js/attachments.js` | Gunsmith slots, attachment stats, loadout strings sent over the network |
+| `js/gunsmith.js` | 3D weapon preview on the Loadout tab |
 | `js/bot.js` | Bot AI |
 | `js/nav.js` | Navigation grid, A*, path smoothing |
 | `js/physics.js` | AABB collision, step-up movement, raycasts |
@@ -143,6 +147,7 @@ npx serve .            # or: python3 -m http.server 8000
 | Want to… | Edit |
 |---|---|
 | Change weapon damage / fire rate / recoil / mag size | `WEAPONS.<id>` in `js/config.js` |
+| Tune or add attachments | `ATTACHMENTS` / `GUNSMITH` in `js/attachments.js` |
 | Make bots harder or easier | `DIFFICULTY.<level>` |
 | Change movement / slide feel | `PLAYER` |
 | Change graphics presets | `QUALITY` |

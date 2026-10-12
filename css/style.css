@@ -368,3 +368,92 @@ body.online #restart { display: none; }
   .code-big { font-size: 48px; }
   .code-slots i { width: 38px; height: 50px; font-size: 32px; }
 }
+
+/* ---------- gunsmith ---------- */
+.weapons { grid-template-columns: 1fr 1fr; }
+.wcard { grid-template-columns: 1fr auto; align-content: start; }
+.wcard .wa { grid-column: 1 / -1; font-size: 11px; letter-spacing: 0.12em; color: var(--ink-dim); text-transform: uppercase; min-height: 1.3em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcard.on .wa { color: var(--amber); }
+.gs { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.gs-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.gs-name { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: 0.1em; }
+.gs-sub { font-size: 11px; letter-spacing: 0.24em; color: var(--amber); }
+.gs-view { background: radial-gradient(ellipse at 50% 60%, rgba(236, 233, 225, 0.09), rgba(0, 0, 0, 0) 70%), var(--panel); border: 1px solid var(--line); }
+.gs-view canvas { display: block; width: 100%; height: auto; aspect-ratio: 8 / 3; }
+.row.slot label { flex-direction: column; align-items: flex-start; gap: 2px; }
+.row.slot label small { font-size: 11px; letter-spacing: 0.04em; text-transform: none; color: var(--ink-faint); }
+.row.slot select { min-width: 46%; }
+.gs-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; padding: 10px 12px; background: var(--panel); }
+.gs-stats .stat { display: flex; flex-direction: column; gap: 3px; font-size: 11px; letter-spacing: 0.14em; color: var(--ink-dim); }
+.gs-stats .stat i { position: relative; display: block; height: 4px; background: rgba(236, 233, 225, 0.12); }
+.gs-stats .stat b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+.gs-stats .stat em { position: absolute; top: 0; bottom: 0; }
+.gs-stats .stat em.up { background: #6fd36f; }
+.gs-stats .stat em.down { background: var(--enemy); }
+.gs-facts { grid-column: 1 / -1; font-size: 12px; letter-spacing: 0.14em; color: var(--ink-dim); margin-top: 4px; }
+.in-match-only { display: none; }
+#psec-loadout .in-match-only { display: block; }
+@media (max-width: 520px) { .weapons { grid-template-columns: 1fr; } .gs-stats { grid-template-columns: 1fr; } .row.slot { flex-wrap: wrap; } .row.slot select { width: 100%; } }
+
+/* ---------- pause menu ---------- */
+.mw.pause-wrap { width: min(1180px, 100%); height: 100%; max-height: 100%; background: transparent; }
+.pause-meta { font-size: 13px; letter-spacing: 0.2em; color: var(--ink-dim); }
+.pause-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 28px; align-items: start; }
+.pause-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
+.pause-nav .cta { margin: 0 0 6px; }
+.menu-btn.psec.on { border-left: 3px solid var(--amber); background: rgba(232, 176, 74, 0.1); }
+.menu-btn.danger { color: #ffb4a8; }
+.menu-btn.armed { background: rgba(255, 77, 77, 0.22); border-color: var(--enemy); color: #fff; }
+.pause-panel { min-width: 0; max-height: 100%; overflow-y: auto; padding-right: 4px; }
+.psec-pane { display: none; flex-direction: column; gap: 12px; }
+.psec-pane.on { display: flex; }
+.psec-pane .pane { display: flex; }
+.psec-pane .pane-title { font-size: 34px; }
+.pm-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; background: var(--panel); border: 1px solid var(--line); padding: 14px 18px; }
+.pm-team { display: flex; align-items: baseline; gap: 14px; font-family: var(--display); font-weight: 700; letter-spacing: 0.16em; font-size: 16px; }
+.pm-team b { font-size: 52px; line-height: 1; letter-spacing: 0.04em; }
+.pm-team.f { color: var(--friendly); }
+.pm-team.e { color: var(--enemy); justify-content: flex-end; }
+.pm-mid { display: flex; flex-direction: column; align-items: center; font-family: var(--display); }
+.pm-mid span { font-size: 30px; font-weight: 700; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+.pm-mid small { font-size: 11px; letter-spacing: 0.2em; color: var(--ink-faint); }
+.pm-me { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.pm-me div { background: var(--panel); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.pm-me small { font-size: 10px; letter-spacing: 0.2em; color: var(--ink-faint); }
+.pm-me b { font-family: var(--display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pm-build { grid-column: 1 / -1; margin: 0; font-size: 12px; letter-spacing: 0.14em; color: var(--amber); }
+.pm-board { display: flex; gap: 12px; }
+@media (max-width: 860px) {
+  .pause-body { grid-template-columns: 210px minmax(0, 1fr); gap: 16px; }
+  .pm-me { grid-template-columns: repeat(3, 1fr); }
+  .pm-board { flex-direction: column; }
+  .pm-team b { font-size: 40px; }
+}
+@media (max-width: 520px) { .pm-score { padding: 10px; gap: 8px; } .pm-team { font-size: 12px; gap: 8px; } .pm-team span { display: none; } }
+.pm-board { flex-wrap: wrap; }
+.pm-board .sb-team { min-width: min(100%, 300px); }
+.pm-board .sb-team table { width: 100%; font-size: 13px; }
+.pm-board .sb-team td:first-child { max-width: 110px; }
+.psec-pane .rows.two { grid-template-columns: 1fr; }
+.psec-pane .controls-ref { display: none; }
+.psec-pane .pane { grid-column: auto; }
+@media (max-width: 600px) {
+  .pause-body { grid-template-columns: 1fr; }
+  .pause-nav { position: static; }
+}
+/* phones in landscape: compact pause menu so the panel stays beside it */
+@media (max-height: 520px) {
+  .mw.pause-wrap { padding: 10px 16px; gap: 8px; }
+  .pause-wrap .logo { font-size: 22px; }
+  .pause-nav { gap: 4px; }
+  .pause-nav .cta { font-size: 18px; padding: 8px 14px; margin-bottom: 2px; }
+  .pause-nav .menu-btn { font-size: 14px; padding: 8px 12px; }
+  .pause-nav .pane-note { display: none; }
+  .psec-pane .pane-title { display: none; }
+  .pm-score { padding: 8px 12px; }
+  .pm-team b { font-size: 32px; }
+  .pm-mid span { font-size: 22px; }
+  .pm-me div { padding: 5px 8px; }
+  .pm-me b { font-size: 20px; }
+  #pause-hints { display: none; }
+}

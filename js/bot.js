@@ -60,7 +60,7 @@ export class BotBrain {
       const ang = Math.acos(clamp(_c.dot(fwd), -1, 1));
       const aware = ang < d.fov || dist < 5 || e === this.target ||
         (b.lastAttacker === e && g.time - b.lastAttackerT < 2.5) ||
-        (g.time - e.lastFireT < 0.6 && dist < 30);
+        (g.time - e.lastFireT < 0.6 && dist < (e.weapon.def.quiet ? 10 : 30));
       if (!aware) continue;
       if (g.physics.blocked(eye, e.headPos(_d)) && g.physics.blocked(eye, e.chestPos(_d))) continue;
       const score = dist - (e === this.target ? 8 : 0);

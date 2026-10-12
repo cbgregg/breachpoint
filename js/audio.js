@@ -147,12 +147,15 @@ export class GameAudio {
     switch (name) {
       case 'shot': {
         const s = SHOTS[opts.weapon] || SHOTS.rifle;
+        const q = !!opts.quiet; // suppressed: no supersonic-sounding crack, muffled body, short tail, carries less
+        if (q && pos && sp.dist > 35) break;
         const near = sp.dist < 25;
-        const o = dry(0.9);
-        if (near) this.noiseBurst(o, t, { type: 'highpass', freq: s.crack, decay: 0.03, gain: s.gain * 0.9, attack: 0.0008 });
-        this.noiseBurst(o, t, { type: 'bandpass', freq: s.body, q: 0.9, decay: s.decay, gain: s.gain });
-        this.tone(o, t, { freq: s.thump, end: 30, type: 'sine', decay: s.decay * 1.4, gain: s.gain * 1.1 });
-        this.noiseBurst(o, t + 0.01, { freq: 700, decay: s.tail, gain: s.gain * 0.35, attack: 0.02 });
+        const o = dry(q ? 0.3 : 0.9);
+        if (near && !q) this.noiseBurst(o, t, { type: 'highpass', freq: s.crack, decay: 0.03, gain: s.gain * 0.9, attack: 0.0008 });
+        if (q) this.noiseBurst(o, t, { type: 'bandpass', freq: 2200, q: 1.4, decay: 0.035, gain: s.gain * 0.22, attack: 0.001 });
+        this.noiseBurst(o, t, { type: 'bandpass', freq: s.body * (q ? 0.55 : 1), q: 0.9, decay: s.decay * (q ? 0.6 : 1), gain: s.gain * (q ? 0.3 : 1) });
+        this.tone(o, t, { freq: s.thump, end: 30, type: 'sine', decay: s.decay * (q ? 0.8 : 1.4), gain: s.gain * (q ? 0.35 : 1.1) });
+        if (!q) this.noiseBurst(o, t + 0.01, { freq: 700, decay: s.tail, gain: s.gain * 0.35, attack: 0.02 });
         if (!pos) {
           if (opts.weapon === 'sniper') { this.click(o, t + 0.45, 2200, 0.25); this.click(o, t + 0.75, 1800, 0.25); }
           if (opts.weapon === 'shotgun') { this.click(o, t + 0.35, 1500, 0.3); this.click(o, t + 0.55, 1200, 0.3); }

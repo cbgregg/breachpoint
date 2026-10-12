@@ -135,10 +135,20 @@
 
         <section class="pane" id="pane-loadout">
           <h2 class="pane-title">LOADOUT</h2>
+          <p class="notice in-match-only">Changes apply the next time you spawn.</p>
           <div class="rows">
             <div class="row"><label for="opt-name">Callsign</label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
           </div>
+          <div class="group">PRIMARY</div>
           <div id="weapon-list" class="weapons"></div>
+          <div class="gs" id="gunsmith">
+            <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
+            <div class="gs-view"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
+            <div class="rows" id="gs-slots"></div>
+            <div class="gs-stats" id="gs-stats"></div>
+          </div>
+          <div class="group">SECONDARY · P-45 SIDEARM</div>
+          <div class="rows" id="gs-pistol"></div>
         </section>
 
         <section class="pane" id="pane-options">
@@ -204,20 +214,37 @@
 
   <!-- ============ Pause ============ -->
   <div id="pause" class="screen">
-    <div class="mw narrow">
-      <header class="mw-head"><div class="logo"><span class="mark"></span>PAUSED</div></header>
-      <div class="rows">
-        <button id="resume" class="cta" data-nav><span>RESUME</span></button>
-        <div class="row"><label for="opt-sens2">Mouse sensitivity <output id="out-sens2"></output></label><input type="range" id="opt-sens2" min="0.2" max="3" step="0.05" data-nav></div>
-        <div class="row"><label for="opt-padsens2">Stick sensitivity <output id="out-padsens2"></output></label><input type="range" id="opt-padsens2" min="0.3" max="2.5" step="0.05" data-nav></div>
-        <div class="row"><label for="opt-vol2">Volume <output id="out-vol2"></output></label><input type="range" id="opt-vol2" min="0" max="1" step="0.05" data-nav></div>
-        <div class="row"><label for="opt-music2">Music <output id="out-music2"></output></label><input type="range" id="opt-music2" min="0" max="1" step="0.05" data-nav></div>
-        <button id="restart" class="menu-btn" data-nav>RESTART MATCH</button>
-        <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
-        <button id="pause-end" class="menu-btn online-only host-only" data-nav>END MATCH FOR EVERYONE</button>
-        <button id="quit" class="menu-btn" data-nav>QUIT TO MENU</button>
-        <p class="pane-note online-only">The match keeps running while this menu is open.</p>
-        <p class="pane-note online-only" id="pause-conn"></p>
+    <div class="mw pause-wrap">
+      <header class="mw-head">
+        <div class="logo"><span class="mark"></span>PAUSED</div>
+        <div class="pause-meta" id="pause-meta"></div>
+      </header>
+      <div class="pause-body">
+        <nav class="pause-nav">
+          <button id="resume" class="cta" data-nav><span>RESUME</span><span class="glyph" data-act="pause"></span></button>
+          <button class="menu-btn psec on" data-sec="match" data-nav>MATCH</button>
+          <button class="menu-btn psec" data-sec="loadout" data-nav>CHANGE LOADOUT</button>
+          <button class="menu-btn psec" data-sec="options" data-nav>OPTIONS</button>
+          <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
+          <button id="pause-end" class="menu-btn online-only host-only danger" data-nav>END MATCH FOR EVERYONE</button>
+          <button id="restart" class="menu-btn" data-nav>RESTART MATCH</button>
+          <button id="quit" class="menu-btn danger" data-nav>QUIT TO MENU</button>
+          <p class="pane-note online-only">The match keeps running while this menu is open.</p>
+          <p class="pane-note online-only" id="pause-conn"></p>
+        </nav>
+        <section class="pause-panel">
+          <div class="psec-pane on" id="psec-match">
+            <div class="pm-score">
+              <div class="pm-team f"><span>FRIENDLY</span><b id="pm-f">0</b></div>
+              <div class="pm-mid"><span id="pm-time">10:00</span><small id="pm-limit">FIRST TO 75</small></div>
+              <div class="pm-team e"><b id="pm-e">0</b><span>ENEMY</span></div>
+            </div>
+            <div class="pm-me" id="pm-me"></div>
+            <div class="pm-board" id="pause-board"></div>
+          </div>
+          <div class="psec-pane" id="psec-loadout"></div>
+          <div class="psec-pane" id="psec-options"></div>
+        </section>
       </div>
       <footer class="mw-foot" id="pause-hints"></footer>
     </div>

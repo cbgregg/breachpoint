@@ -155,6 +155,18 @@ export class Effects {
     this.smoke = new Points(scene, 700, false, puffTexture());
     this.flashes = new Points(scene, 32, true, this.starTex);
     this.motes = new Motes(scene, dot);
+    // laser beams + dots
+    this.laserMax = 24; this.laserN = 0;
+    this.laserPos = new Float32Array(this.laserMax * 6); this.laserCol = new Float32Array(this.laserMax * 6);
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.BufferAttribute(this.laserPos, 3).setUsage(THREE.DynamicDrawUsage));
+    lg.setAttribute('color', new THREE.BufferAttribute(this.laserCol, 3).setUsage(THREE.DynamicDrawUsage));
+    lg.setDrawRange(0, 0);
+    this.laserGeo = lg;
+    const ll = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    ll.frustumCulled = false;
+    scene.add(ll);
+    this.laserDots = new Points(scene, this.laserMax, true, dot);
     this.motes.setCount(200);
     this.camPos = null;
 
@@ -235,7 +247,37 @@ export class Effects {
     this.smoke.mat.uniforms.scale.value = s;
     this.flashes.mat.uniforms.scale.value = s;
     this.motes.pts.mat.uniforms.scale.value = s;
+    this.laserDots.mat.uniforms.scale.value = s;
     this.camPos = camera.getWorldPosition(this.camPos || new THREE.Vector3());
+  }
+
+  beginLasers() { this.laserN = 0; }
+  laser(from, dir, physics, own) {
+    if (this.laserN >= this.laserMax) return;
+    const hit = physics.raycast(from, dir, 80);
+    const len = hit ? hit.t : 80;
+    const i = this.laserN++;
+    const P = this.laserPos, C = this.laserCol;
+    P[i * 6] = from.x; P[i * 6 + 1] = from.y; P[i * 6 + 2] = from.z;
+    P[i * 6 + 3] = from.x + dir.x * len; P[i * 6 + 4] = from.y + dir.y * len; P[i * 6 + 5] = from.z + dir.z * len;
+    const a = own ? 0.35 : 0.6, b = own ? 0.05 : 0.12;
+    C[i * 6] = 1.6 * a; C[i * 6 + 1] = 0.04 * a; C[i * 6 + 2] = 0.03 * a;
+    C[i * 6 + 3] = 1.6 * b; C[i * 6 + 4] = 0.04 * b; C[i * 6 + 5] = 0.03 * b;
+    if (hit) {
+      const D = this.laserDots, k = i;
+      D.pos[k * 3] = hit.point.x + hit.normal.x * 0.01; D.pos[k * 3 + 1] = hit.point.y + hit.normal.y * 0.01; D.pos[k * 3 + 2] = hit.point.z + hit.normal.z * 0.01;
+      D.col[k * 3] = 2.4; D.col[k * 3 + 1] = 0.12; D.col[k * 3 + 2] = 0.08;
+      D.alpha[k] = 0.95; D.size[k] = 0.02 + len * 0.0006; D.rot[k] = 0;
+    } else this.laserDots.alpha[i] = 0;
+  }
+  endLasers() {
+    const n = this.laserN;
+    this.laserGeo.setDrawRange(0, n * 2);
+    this.laserGeo.attributes.position.needsUpdate = true;
+    this.laserGeo.attributes.color.needsUpdate = true;
+    const D = this.laserDots;
+    D.geo.setDrawRange(0, n);
+    for (const k of ['position', 'color', 'alpha', 'size', 'rot']) D.geo.attributes[k].needsUpdate = true;
   }
 
   setQuality(name) { this.motes.setCount({ low: 0, medium: 140, high: 220, ultra: 300 }[name] ?? 200); }
@@ -266,7 +308,11 @@ export class Effects {
     this.tracers.push({ from: from.clone(), dir: d.clone().divideScalar(dist), dist, t: 0 });
   }
 
-  muzzle(pos, dir, big = false) {
+  muzzle(pos, dir, big = false, quiet = false) {
+    if (quiet) {
+      this.smoke.spawn(pos, _v.copy(dir).multiplyScalar(0.8).add({ x: 0, y: 0.3, z: 0 }), 0xb8b2a6, 0.08, 0.5, { grow: 0.35, alpha: 0.12, drag: 2 });
+      return;
+    }
     this.flashLight(pos, big ? 60 : 30, 0.05);
     this.flashes.spawn(pos, _v.set(0, 0, 0), 0xffd090, big ? 0.7 : 0.45, 0.05, { alpha: 1 });
     this.smoke.spawn(pos, _v.copy(dir).multiplyScalar(1.2).add({ x: 0, y: 0.4, z: 0 }), 0xb8b2a6, 0.15, 0.6, { grow: 0.6, alpha: 0.18, drag: 2 });

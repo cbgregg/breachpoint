@@ -16,6 +16,7 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
 const POLE_R = new THREE.Vector3(1, -0.8, 0.2), POLE_L = new THREE.Vector3(-1, -0.9, 0);
+const _lq = new THREE.Quaternion();
 const EYE_RELIEF = -0.15; // close to the eye, like CoD: the optic frames the target
 // The FOV setting works like Call of Duty's: degrees across a 4:3 frame (80 = MW default). three.js
 // wants the vertical angle, which is what makes players and the gun look the right size.
@@ -81,7 +82,7 @@ export class PlayerController {
     this.guns.forEach(g => this.vmRoot.remove(g.holder));
     this.guns = this.c.weapons.map(w => {
       const holder = new THREE.Group();
-      const gun = buildGun(w.id, { forViewmodel: true });
+      const gun = buildGun(w.id, { forViewmodel: true, att: w.def.att });
       holder.add(gun.group);
       holder.visible = false;
       this.vmRoot.add(holder);
@@ -92,7 +93,7 @@ export class PlayerController {
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
           : pistol ? new THREE.Vector3(0.1, -0.12, -0.3) : new THREE.Vector3(0.105, -0.155, -0.19),
-        ads: new THREE.Vector3(0, -gun.sightY, EYE_RELIEF - gun.sightZ),
+        ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
       };
     });
     if (!this.flash) {
@@ -110,6 +111,16 @@ export class PlayerController {
     g.holder.updateMatrixWorld(true);
     g.gun.muzzle.getWorldPosition(out);
     return this.camera.localToWorld(out);
+  }
+  // laser emitter of the current gun in world space (null if it has none)
+  laserWorld(out, dirOut) {
+    const g = this.guns[this.c.cur];
+    if (!g || !g.gun.laser || !this.vmRoot.visible) return null;
+    g.gun.laser.getWorldPosition(out);
+    this.camera.localToWorld(out);
+    g.gun.group.getWorldQuaternion(_lq);
+    dirOut.set(0, 0, -1).applyQuaternion(_lq).applyQuaternion(this.camera.quaternion);
+    return out;
   }
   ejectWorld(out) {
     const g = this.guns[this.c.cur];
@@ -403,7 +414,7 @@ export class PlayerController {
 
     // muzzle flash
     this.flashT -= dt;
-    this.flash.visible = this.flashT > 0;
+    this.flash.visible = this.flashT > 0 && !w.def.quiet;
     h.updateMatrixWorld(true);
     if (this.flash.visible) {
       gun.muzzle.getWorldPosition(this.flash.position);

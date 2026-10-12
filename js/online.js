@@ -17,6 +17,7 @@ import { safeName } from './names.js';
 import { PRIMARIES, PLAYER, MELEE, WEAPONS } from './config.js';
 import { Character } from './character.js';
 import { hitPower } from './motion.js';
+import { parseLoadout } from './attachments.js';
 
 export const MAX_HUMANS = 8;
 const PROTO = 1;
@@ -288,7 +289,7 @@ export class Lobby {
         if (this.players.has(id) || this.pending.has(id)) return;
         if (m.v !== PROTO) { this.net.send({ t: 'lobby', st: 'version' }, id); return; }
         if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, id); return; }
-        const p = { peerId: id, name: cleanName(m.name), primary: PRIMARIES.includes(m.primary) ? m.primary : 'rifle' };
+        const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str };
         this.pending.set(id, p);
         if (this.approval) {
           this.net.send({ t: 'lobby', st: 'pending' }, id);
@@ -303,6 +304,13 @@ export class Lobby {
         break;
       case 'in':
         if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.input(id, m);
+        break;
+      case 'lo': // a guest changed loadout; it takes effect on their next spawn
+        if (this.players.has(id) && typeof m.l === 'string') {
+          const l = parseLoadout(m.l).str;
+          this.players.get(id).primary = l;
+          if (this.game.mode === 'host' && this.game.session) this.game.session.setLoadout(id, l);
+        }
         break;
       case 'bye':
         if (this.players.has(id)) { const p = this.players.get(id); this.dropPlayer(id); this.toast(`${p.name.toUpperCase()} LEFT`); }
@@ -431,7 +439,12 @@ export class HostSession {
     if (b) this.rosterAdd.push(b);
   }
 
-  rosterEntry(c) { return [c.id, c.name, c.team, c.primaryId, c.isBot ? 1 : 0, c.remote ? 1 : 0]; }
+  setLoadout(peerId, l) {
+    const r = this.remotes.get(peerId);
+    if (r && r.c) r.c.pendingLoadout = l;
+  }
+
+  rosterEntry(c) { return [c.id, c.name, c.team, c.loadout, c.isBot ? 1 : 0, c.remote ? 1 : 0]; }
 
   sendStart(r) {
     const g = this.game, s = g.settings, c = r.c;
@@ -676,6 +689,10 @@ export class GuestSession {
   }
 
   get hostId() { return this.lobby.hostId; }
+  sendLoadout(l) { if (this.hostId) this.net.send({ t: 'lo', l }, this.hostId); }
+
+
+  get hostId() { return this.lobby.hostId; }
   hostNow() { return now() + (this.offset ?? 0); }
   viewTime() { return this.hostNow() - INTERP; }
 
@@ -727,7 +744,7 @@ export class GuestSession {
     const g = this.game;
     if (!Array.isArray(e) || !Number.isInteger(e[0]) || g.charById(e[0])) return null;
     const [id, name, team, primary, bot] = e;
-    const c = new Character(g, { id, name: cleanName(name), team: team === 1 ? 1 : 0, isBot: !!bot, primary: PRIMARIES.includes(primary) ? primary : 'rifle', puppet: true });
+    const c = new Character(g, { id, name: cleanName(name), team: team === 1 ? 1 : 0, isBot: !!bot, primary: typeof primary === 'string' ? primary : 'rifle', puppet: true });
     c.hidden = true;
     c.alive = false;
     c.netSeen = -9;
@@ -857,8 +874,9 @@ export class GuestSession {
         if (c.model) c.model.kick = 1;
         const dir = _v2.set(dx, dy, dz).normalize();
         const muzzle = c.hidden ? _v1.set(ox, oy, oz) : c.muzzleWorld(_v1);
-        g.audio.play('shot', c.pos, { weapon: wid });
-        g.effects.muzzle(muzzle, dir, wid === 'shotgun' || wid === 'sniper');
+        const wdef = (c.weapons.find(w => w.id === wid) || {}).def || WEAPONS[wid];
+        g.audio.play('shot', c.pos, { weapon: wid, quiet: wdef.quiet });
+        g.effects.muzzle(muzzle, dir, wid === 'shotgun' || wid === 'sniper', wdef.quiet);
         if (!c.hidden && wid !== 'sniper' && wid !== 'shotgun') g.effects.casing(c.ejectWorld(_v3), dir, new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)));
         if (!Array.isArray(ends)) return;
         let whiz = false, first = true;
@@ -904,6 +922,12 @@ export class GuestSession {
         const [, id, ox, oy, oz, vx, vy, vz, owner] = ev;
         if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
         g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner));
+        break;
+      }
+      case 'lo': {
+        const [, id, l] = ev;
+        const c = g.charById(id);
+        if (c && typeof l === 'string') c.setLoadout(l);
         break;
       }
       case 'boom': {

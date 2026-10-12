@@ -6,6 +6,8 @@ import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
+import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
+import { GunPreview } from './gunsmith.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -84,30 +86,71 @@ for (const [id, key, type] of bindings) {
   });
 }
 
-// weapon cards with stat bars
-function stat(def) {
-  return {
-    DAMAGE: Math.min(1, (def.damage * def.pellets) / 110),
-    'FIRE RATE': Math.min(1, def.rpm / 900),
-    RANGE: Math.min(1, def.falloffEnd / 120),
-    MOBILITY: Math.max(0.1, 1 - def.adsTime / 0.34),
-  };
+// ---------- loadout + gunsmith ----------
+const preview = new GunPreview($('gs-view'));
+if (!settings.attachments || typeof settings.attachments !== 'object') settings.attachments = {};
+const inMatch = () => game.state === 'playing' || game.state === 'paused';
+function statsOf(d) {
+  const clamp01 = (v) => Math.max(0.04, Math.min(1, v));
+  return [
+    ['DAMAGE', clamp01((d.damage * d.pellets) / 110)],
+    ['FIRE RATE', clamp01(d.rpm / 900)],
+    ['RANGE', clamp01(d.falloffEnd / 120)],
+    ['HIP ACCURACY', clamp01(1 - d.spread / 0.1)],
+    ['CONTROL', clamp01(1 - (d.recoilPitch + d.recoilYaw * 0.6) / 0.075)],
+    ['AIM SPEED', clamp01(1 - d.adsTime / 0.42)],
+  ];
+}
+function attFor(id) { return cleanAtt(id, settings.attachments[id]); }
+function loadoutChanged() {
+  saveSettings(settings);
+  if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
+}
+function slotRows(id, host, prefix) {
+  const g = GUNSMITH[id], a = attFor(id);
+  host.innerHTML = SLOTS.filter(sl => g[sl]).map(sl => {
+    const cur = ATTACHMENTS[sl][a[sl]];
+    return `<div class="row slot"><label for="${prefix}-${sl}">${SLOT_NAMES[sl]}<small>${cur.desc}</small></label>
+      <select id="${prefix}-${sl}" data-slot="${sl}" data-nav>${g[sl].map(k => `<option value="${k}"${k === a[sl] ? ' selected' : ''}>${ATTACHMENTS[sl][k].name}</option>`).join('')}</select></div>`;
+  }).join('');
+  host.querySelectorAll('select').forEach(el => el.addEventListener('change', () => {
+    settings.attachments[id] = { ...attFor(id), [el.dataset.slot]: el.value };
+    el.closest('.row').querySelector('small').textContent = ATTACHMENTS[el.dataset.slot][el.value].desc;
+    loadoutChanged();
+    renderGunsmith(false);
+  }));
+}
+function renderGunsmith(rebuildRows = true) {
+  const id = settings.primary, d = weaponDef(id, attFor(id)), base = WEAPONS[id];
+  $('gs-name').textContent = d.name.toUpperCase();
+  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows('pistol', $('gs-pistol'), 'gp'); }
+  const now = statsOf(d), was = statsOf(weaponDef(id, null));
+  $('gs-stats').innerHTML = now.map(([k, v], i) => {
+    const w = was[i][1], lo = Math.min(v, w), diff = v - w;
+    return `<span class="stat">${k}<i><b style="width:${Math.round(lo * 100)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${Math.round(lo * 100)}%;width:${Math.round(Math.abs(diff) * 100)}%"></em>` : ''}</i></span>`;
+  }).join('') + `<span class="gs-facts">${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}${d.mag !== base.mag ? '' : ''}</span>`;
+  preview.show(id, attFor(id));
+  // cards show the build summary
+  $('weapon-list').querySelectorAll('.wcard').forEach(b => {
+    const s2 = attSummary(b.dataset.weapon, attFor(b.dataset.weapon));
+    b.querySelector('.wa').textContent = s2.length ? s2.join(' · ') : 'STOCK';
+  });
 }
 function renderWeapons() {
   const list = $('weapon-list');
   list.innerHTML = PRIMARIES.map(id => {
     const d = WEAPONS[id];
-    const st = stat(d);
     return `<button class="wcard ${settings.primary === id ? 'on' : ''}" data-weapon="${id}" data-nav>
-      <span class="wn">${d.name.toUpperCase()}</span><span class="wt">${d.mode} · ${d.mag} RDS</span>
-      <span class="stats">${Object.entries(st).map(([k, v]) => `<span class="stat">${k}<i><b style="width:${Math.round(v * 100)}%"></b></i></span>`).join('')}</span>
+      <span class="wn">${d.name.toUpperCase()}</span><span class="wt">${d.mode}</span><span class="wa"></span>
     </button>`;
-  }).join('') + `<div class="row"><label>Secondary</label><span class="wn" style="font-family:var(--display);font-weight:600;letter-spacing:.08em">${WEAPONS.pistol.name.toUpperCase()}</span></div>`;
+  }).join('');
   list.querySelectorAll('.wcard').forEach(b => b.addEventListener('click', () => {
     settings.primary = b.dataset.weapon;
-    saveSettings(settings);
     list.querySelectorAll('.wcard').forEach(x => x.classList.toggle('on', x === b));
+    loadoutChanged();
+    renderGunsmith();
   }));
+  renderGunsmith();
 }
 
 // ---------- tabs ----------
@@ -116,14 +159,17 @@ let tab = 'play';
 function setTab(t) {
   tab = t;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === `pane-${t}`));
+  document.querySelectorAll('#menu .pane').forEach(p => p.classList.toggle('on', p.id === `pane-${t}`));
   game.audio.play('ui', null, { ui: true });
+  if (t === 'loadout') renderGunsmith(false);
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
 // ---------- screens ----------
 let screen = 'menu';
 function showScreen(id) {
+  if (id !== 'pause' && id !== 'lobby' && $('pane-loadout').closest('#pause')) restorePanes();
+  if (id !== 'pause') clearInterval(pauseTimer);
   screen = id;
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
   document.body.classList.toggle('ingame', id === null);
@@ -139,25 +185,52 @@ function deploy() {
 $('play').addEventListener('click', deploy);
 $('opt-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') deploy(); });
 
-// pause
-const syncPause = () => {
-  $('opt-sens2').value = settings.sensitivity; $('out-sens2').textContent = Number(settings.sensitivity).toFixed(2);
-  $('opt-padsens2').value = settings.padSensitivity; $('out-padsens2').textContent = Number(settings.padSensitivity).toFixed(2);
-  $('opt-vol2').value = settings.volume; $('out-vol2').textContent = `${Math.round(settings.volume * 100)}%`;
-  $('opt-music2').value = settings.musicVolume; $('out-music2').textContent = `${Math.round(settings.musicVolume * 100)}%`;
-};
-const pauseSlider = (id, key, out, fmt, after) => $(id).addEventListener('input', (e) => {
-  settings[key] = parseFloat(e.target.value);
-  if (game.settings) game.settings[key] = settings[key];
-  $(out).textContent = fmt(settings[key]);
-  if (after) after();
-  saveSettings(settings);
-  writeForm();
-});
-pauseSlider('opt-sens2', 'sensitivity', 'out-sens2', v => v.toFixed(2));
-pauseSlider('opt-padsens2', 'padSensitivity', 'out-padsens2', v => v.toFixed(2));
-pauseSlider('opt-vol2', 'volume', 'out-vol2', v => `${Math.round(v * 100)}%`, () => game.audio.setVolume(settings.volume));
-pauseSlider('opt-music2', 'musicVolume', 'out-music2', v => `${Math.round(v * 100)}%`, () => game.music.setVolume(settings.musicVolume));
+// ---------- pause menu ----------
+// Loadout and Options are the same panes as the main menu, moved into the pause panel while it's open.
+let pauseSec = 'match', pauseTimer = 0;
+const menuBody = document.querySelector('#menu .mw-body');
+function restorePanes() {
+  const aside = menuBody.querySelector('.intel');
+  menuBody.insertBefore($('pane-options'), aside);
+  menuBody.insertBefore($('pane-loadout'), $('pane-options'));
+  document.querySelectorAll('#menu .pane').forEach(p => p.classList.toggle('on', p.id === `pane-${tab}`));
+}
+function setPauseSec(sec) {
+  pauseSec = sec;
+  document.querySelectorAll('.psec').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
+  document.querySelectorAll('.psec-pane').forEach(p => p.classList.toggle('on', p.id === `psec-${sec}`));
+  if (sec === 'loadout') { $('psec-loadout').appendChild($('pane-loadout')); $('pane-loadout').classList.add('on'); renderGunsmith(false); }
+  if (sec === 'options') { $('psec-options').appendChild($('pane-options')); $('pane-options').classList.add('on'); writeForm(); }
+  if (sec === 'match') renderPauseMatch();
+}
+const mmss = (t) => `${Math.floor(Math.max(0, t) / 60)}:${String(Math.floor(Math.max(0, t) % 60)).padStart(2, '0')}`;
+function renderPauseMatch() {
+  const g = game, p = g.player;
+  if (!p) return;
+  $('pause-meta').textContent = `TEAM DEATHMATCH · ${(MAPS[g.world.id]?.name || '').toUpperCase()}${g.mode === 'local' ? ' · VS BOTS' : ' · ONLINE'}`;
+  $('pm-f').textContent = g.scores[p.team];
+  $('pm-e').textContent = g.scores[1 - p.team];
+  $('pm-time').textContent = mmss(g.timeLeft);
+  $('pm-limit').textContent = `FIRST TO ${g.settings.scoreLimit}`;
+  const kd = p.deaths ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
+  const lo = parseLoadout(p.loadout);
+  const build = [WEAPONS[lo.primary].name.toUpperCase(), ...attSummary(lo.primary, lo.att)].join(' · ');
+  $('pm-me').innerHTML = [['SCORE', p.score], ['KILLS', p.kills], ['DEATHS', p.deaths], ['ASSISTS', p.assists], ['K/D', kd], ['STREAK', p.streak]]
+    .map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('') + `<p class="pm-build">${esc(build)}</p>`;
+  g.hud.renderScoreboard($('pause-board'));
+}
+document.querySelectorAll('.psec').forEach(b => b.addEventListener('click', () => { setPauseSec(b.dataset.sec); game.audio.play('ui', null, { ui: true }); }));
+// destructive buttons need a second press
+function confirmBtn(el, fn) {
+  const label = el.textContent;
+  let armed = 0, t = 0;
+  const disarm = () => { armed = 0; el.classList.remove('armed'); el.textContent = label; };
+  el.addEventListener('click', () => {
+    if (armed) { clearTimeout(t); disarm(); fn(); return; }
+    armed = 1; el.classList.add('armed'); el.textContent = 'PRESS AGAIN TO CONFIRM';
+    t = setTimeout(disarm, 3500);
+  });
+}
 
 // menu music starts on the first click / key / tap (browsers block audio before that)
 const startMenuMusic = () => {
@@ -170,12 +243,17 @@ for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListen
 game.onPause = (paused) => {
   syncOnlineFlags();
   $('pause-conn').textContent = !lobby.active ? '' : lobby.net.relayed ? 'Connection: Cloudflare relay (your IP is hidden)' : `Connection: direct peer-to-peer${turnAvailable() && !turnStatus.ok ? ` (relay unavailable: ${turnStatus.detail})` : ''}`;
-  if (paused) { syncPause(); showScreen('pause'); }
-  else showScreen(null);
+  clearInterval(pauseTimer);
+  if (paused) {
+    $('quit').textContent = lobby.active ? 'LEAVE MATCH' : 'QUIT TO MENU';
+    setPauseSec('match');
+    showScreen('pause');
+    pauseTimer = setInterval(() => { if (screen === 'pause' && pauseSec === 'match') renderPauseMatch(); }, 1000);
+  } else { restorePanes(); showScreen(null); }
 };
 $('resume').addEventListener('click', () => game.resume());
-$('restart').addEventListener('click', () => { showScreen(null); game.startMatch(settings); });
-$('quit').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
+confirmBtn($('restart'), () => { restorePanes(); showScreen(null); game.startMatch(settings); });
+confirmBtn($('quit'), () => { clearInterval(pauseTimer); restorePanes(); leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
 // end of match
 game.onEnd = (r) => {
@@ -290,7 +368,7 @@ function renderLobby() {
     const pend = [...lobby.pending.values()];
     $('pending-wrap').style.display = pend.length || lobby.approval ? '' : 'none';
     setHTML('pending-list', pend.length
-      ? pend.map(p => `<div class="prow req"><span class="pn">${esc(p.name)}</span><span class="pt">${esc((p.primary || '').toUpperCase())}</span>
+      ? pend.map(p => `<div class="prow req"><span class="pn">${esc(p.name)}</span><span class="pt">${esc(WEAPONS[parseLoadout(p.primary).primary].short)}</span>
           <button class="ok" data-accept="${esc(p.peerId)}" data-nav>ACCEPT</button><button data-deny="${esc(p.peerId)}" data-nav>DENY</button></div>`).join('')
       : '<div class="empty">No one is waiting. Share the code above.</div>');
     const swap = (id) => (inMatch ? '' : `<button data-swap="${esc(id)}" data-nav title="Switch team">⇄</button>`);
@@ -337,7 +415,7 @@ lobby.onToast = (s) => game.hud.toast(s);
 $('host-btn').addEventListener('click', () => {
   readAll();
   game.audio.init();
-  lobby.host(settings.name, settings.primary);
+  lobby.host(settings.name, loadoutFromSettings(settings));
   setMapHint();
   openLobby();
 });
@@ -349,7 +427,7 @@ function startQuick() {
   game.audio.init();
   quickIntro = false;
   joinError = '';
-  lobby.quick(settings.name, settings.primary);
+  lobby.quick(settings.name, loadoutFromSettings(settings));
   showScreen('lobby');
   renderLobby();
 }
@@ -405,7 +483,7 @@ function tryJoin() {
   readAll();
   game.audio.init();
   joinError = '';
-  lobby.join(joinCode, settings.name, settings.primary);
+  lobby.join(joinCode, settings.name, loadoutFromSettings(settings));
 }
 lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(id); };
 const setMapHint = () => { lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : ''); };
@@ -427,7 +505,7 @@ $('lobby-leave').addEventListener('click', () => {
   showScreen('menu');
 });
 $('pause-lobby').addEventListener('click', () => openLobby());
-$('pause-end').addEventListener('click', () => game.endMatch());
+confirmBtn($('pause-end'), () => game.endMatch());
 
 lobby.onStart = (m) => {
   try {
@@ -443,7 +521,7 @@ lobby.onClosed = (reason, wasPublic) => {
   if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
   // a public host went away: find another match automatically
   if (wasPublic && /host closed|Lost connection/.test(reason)) {
-    lobby.quick(settings.name, settings.primary);
+    lobby.quick(settings.name, loadoutFromSettings(settings));
     game.hud.toast('HOST LEFT — FINDING ANOTHER MATCH');
     showScreen('lobby');
     renderLobby();
@@ -535,7 +613,8 @@ game.input.onNav = (dir) => {
       else el.click();
       break;
     case 'back':
-      if (screen === 'pause') game.resume();
+      if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
+      else if (screen === 'pause') game.resume();
       else if (screen === 'menu' && tab !== 'play') { setTab('play'); focusFirst(); }
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');

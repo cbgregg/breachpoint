@@ -2,10 +2,12 @@
 import * as THREE from 'three';
 import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS } from './config.js';
 const WEAPON_IDS = Object.keys(WEAPONS);
+const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
 import { Character, setCharacterDetail } from './character.js';
 import { hitPower } from './motion.js';
+import { loadoutFromSettings, randomLoadout } from './attachments.js';
 import { BotBrain } from './bot.js';
 import { PlayerController } from './player.js';
 import { Effects } from './effects.js';
@@ -142,7 +144,7 @@ export class Game {
 
     const N = Math.max(1, Math.min(8, settings.teamSize | 0));
     const myTeam = this.mode === 'host' ? online.lobby.hostTeam : 0;
-    this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: settings.primary });
+    this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: loadoutFromSettings(settings) });
     this.characters = [this.player];
     if (this.mode === 'host') {
       this.session = new HostSession(this, online.lobby);
@@ -196,7 +198,7 @@ export class Game {
     for (const e of Array.isArray(start.ro) ? start.ro : []) {
       if (e[0] === start.you) {
         const [id, name, team, primary] = e;
-        this.player = new Character(this, { id, name: String(name).slice(0, 16), team: team === 1 ? 1 : 0, isBot: false, primary: WEAPON_IDS.includes(primary) ? primary : 'rifle' });
+        this.player = new Character(this, { id, name: String(name).slice(0, 16), team: team === 1 ? 1 : 0, isBot: false, primary: typeof primary === 'string' ? primary : 'rifle' });
         this.characters.push(this.player);
       } else this.session.addPuppet(e);
     }
@@ -229,7 +231,7 @@ export class Game {
 
   addBot(team) {
     if (!this.botNames || !this.botNames.length) this.botNames = shuffle([...BOT_NAMES]);
-    const b = new Character(this, { name: this.botNames.pop(), team, isBot: true, primary: pickBotWeapon() });
+    const b = new Character(this, { name: this.botNames.pop(), team, isBot: true, primary: randomLoadout(pickBotWeapon()) });
     this.characters.push(b);
     const brain = new BotBrain(b, this);
     this.brains.set(b, brain);
@@ -391,6 +393,7 @@ export class Game {
       const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 32 ? 2 : 1;
       c.updateModel(dt, c.team === this.player.team || c === this.aimTarget, lod);
     }
+    this.updateLasers();
     this.updateGrenades(dt);
     this.updatePickups(dt);
     // score intensity: recent fighting, the last minute, or a close finish
@@ -465,6 +468,30 @@ export class Game {
     }
   }
 
+  // tactical lasers: everyone's beam is visible (the trade-off for tighter hip fire)
+  updateLasers() {
+    const fx = this.effects;
+    fx.beginLasers();
+    const p = this.player;
+    if (p && p.alive && p.weapon.def.laser && this.playerCtl.laserWorld(_la, _lb)) fx.laser(_la.addScaledVector(_lb, 0.35), _lb, this.physics, true);
+    for (const c of this.characters) {
+      if (c === p || !c.alive || c.hidden || !c.model || !c.model.root.visible || !c.weapon.def.laser) continue;
+      const gun = c.model.gun;
+      if (!gun || !gun.laser || c.sprinting) continue;
+      gun.laser.getWorldPosition(_la);
+      gun.group.getWorldQuaternion(_lq);
+      fx.laser(_la, _lb.set(0, 0, -1).applyQuaternion(_lq), this.physics, false);
+    }
+    fx.endLasers();
+  }
+
+  // change class: applies at the next spawn (guests ask the host)
+  requestLoadout(l) {
+    if (!this.player) return;
+    if (this.mode === 'guest') { this.session?.sendLoadout(l); return; }
+    this.player.pendingLoadout = l;
+  }
+
   charById(id) { return this.characters.find(c => c.id === id) || null; }
 
   // ---------- combat ----------
@@ -472,13 +499,13 @@ export class Game {
     const ff = this.settings.friendlyFire;
     const isPlayer = shooter === this.player;
     const muzzle = isPlayer ? this.playerCtl.muzzleWorld(_m) : shooter.muzzleWorld(_m);
-    this.audio.play('shot', isPlayer ? null : shooter.pos, { weapon: def.id });
-    this.effects.muzzle(muzzle, dir, def.id === 'shotgun' || def.id === 'sniper');
+    this.audio.play('shot', isPlayer ? null : shooter.pos, { weapon: def.id, quiet: def.quiet });
+    this.effects.muzzle(muzzle, dir, def.id === 'shotgun' || def.id === 'sniper', def.quiet);
     const ej = isPlayer ? this.playerCtl.ejectWorld(_a) : shooter.ejectWorld(_a);
     _r.set(Math.cos(shooter.yaw), 0, -Math.sin(shooter.yaw));
     if (def.id !== 'sniper' && def.id !== 'shotgun') this.effects.casing(ej, dir, _r);
     const cosmetic = this.mode === 'guest'; // guests draw their own shot instantly; the host decides what it hit
-    if (!cosmetic) this.reportIntel(1 - shooter.team, shooter.pos);
+    if (!cosmetic && !def.quiet) this.reportIntel(1 - shooter.team, shooter.pos);
     const rewound = this.session && shooter.remote ? this.session.rewind(shooter) : null;
     const hits = new Map();
     const ends = [];
@@ -714,7 +741,10 @@ export class Game {
 
   respawn(c) {
     const p = this.chooseSpawn(c.team);
+    if (c.isBot && Math.random() < 0.3) c.pendingLoadout = randomLoadout(c.primaryId);
+    const before = c.loadout;
     c.spawn(p, this.world.spawnYaw[c.team]);
+    if (c.loadout !== before) this.emit(['lo', c.id, c.loadout]);
     if (c.isBot) this.brains.get(c).reset();
     if (!c.isBot) this.notify(c, 'spawn', +c.pos.x.toFixed(2), +c.pos.y.toFixed(2), +c.pos.z.toFixed(2), +c.yaw.toFixed(3));
   }

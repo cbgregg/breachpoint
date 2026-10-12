@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
+import { parseLoadout } from './attachments.js';
 import { cloneSoldier } from './assets.js';
 import { createMotion, driveGait, sense, applyDynamics, hitImpulse, startRagdoll, stepRagdoll, poseRagdoll } from './motion.js';
 
@@ -199,17 +200,21 @@ export function buildOperator(team, weaponId, name) {
 const POLE_R = new THREE.Vector3(0.7, -1, 0.4), POLE_L = new THREE.Vector3(-0.8, -1, 0.1);
 const SH_R = new THREE.Vector3(0.19, 0.03, 0), SH_L = new THREE.Vector3(-0.19, 0.03, 0);
 
-export function setOperatorWeapon(model, weaponId) {
-  if (model.weaponId === weaponId) return;
+export function setOperatorWeapon(model, wdef) {
+  const weaponId = typeof wdef === 'string' ? wdef : wdef.id;
+  const key = typeof wdef === 'string' ? wdef : wdef.attKey;
+  if (model.weaponKey === key) return;
+  model.weaponKey = key;
+  const att = typeof wdef === 'string' ? null : wdef.att;
   if (model.soldier) {
     model.gunHolder.clear();
-    model.gun = buildGun(weaponId);
+    model.gun = buildGun(weaponId, { att });
     model.weaponId = weaponId;
     model.gunHolder.add(model.gun.group);
     return;
   }
   model.gunHolder.clear();
-  const gun = buildGun(weaponId);
+  const gun = buildGun(weaponId, { att });
   model.gun = gun;
   model.weaponId = weaponId;
   model.gunHolder.add(gun.group);
@@ -247,8 +252,11 @@ export class Character {
     this.onGround = false;
     this.health = PLAYER.maxHealth;
     this.alive = false;
-    this.primaryId = primary;
-    this.weapons = [new WeaponState(primary), new WeaponState('pistol')];
+    const lo = parseLoadout(primary);
+    this.loadout = lo.str;
+    this.primaryId = lo.primary;
+    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState('pistol', lo.pistolAtt)];
+    this.pendingLoadout = null;
     this.cur = 0; this.prev = 1; this.switchT = 0;
     this.grenades = GRENADE.start; this.grenadeCd = 0;
     this.meleeCd = 0; this.meleeT = 0;
@@ -263,7 +271,7 @@ export class Character {
     this.stepAccum = 0; this.animPhase = 0;
     this.model = null;
     if (isBot || remote || puppet) {
-      this.model = buildSoldierModel(team, primary, name) || buildOperator(team, primary, name);
+      this.model = buildSoldierModel(team, this.weapons[0].def, name) || buildOperator(team, this.weapons[0].def, name);
       game.scene.add(this.model.root);
       this.model.root.visible = false;
     }
@@ -282,7 +290,19 @@ export class Character {
     return out.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
   }
 
+  // swap weapons/attachments (applied at spawn, like changing class in CoD)
+  setLoadout(str) {
+    const lo = parseLoadout(str);
+    this.loadout = lo.str;
+    this.primaryId = lo.primary;
+    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState('pistol', lo.pistolAtt)];
+    this.cur = 0; this.prev = 1;
+    if (this.model) setOperatorWeapon(this.model, this.weapon.def);
+    if (this === this.game.player && this.game.playerCtl) this.game.playerCtl.buildViewmodels();
+  }
+
   spawn(p, yaw) {
+    if (this.pendingLoadout) { const l = this.pendingLoadout; this.pendingLoadout = null; if (l !== this.loadout) this.setLoadout(l); }
     this.pos.copy(p);
     this.vel.set(0, 0, 0);
     this.yaw = yaw; this.pitch = 0;
@@ -292,7 +312,7 @@ export class Character {
     this.slideT = 0; this.meleeT = 0; this.meleeCd = 0;
     this.weapons.forEach(w => w.refill());
     this.cur = 0; this.prev = 1; this.switchT = 0.4;
-    if (this.model) setOperatorWeapon(this.model, this.weapon.id);
+    if (this.model) setOperatorWeapon(this.model, this.weapon.def);
     this.grenades = GRENADE.start;
     this.spawnProtect = PLAYER.spawnProtect;
     this.damagers.clear();
@@ -313,7 +333,7 @@ export class Character {
     this.prev = this.cur;
     this.cur = i;
     this.switchT = 0.4;
-    if (this.model) setOperatorWeapon(this.model, this.weapon.id);
+    if (this.model) setOperatorWeapon(this.model, this.weapon.def);
     this.game.audio.play('switch', this.spos);
   }
 
