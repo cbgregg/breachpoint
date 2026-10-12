@@ -28,7 +28,8 @@ export const MODES = {
 export const MODE_IDS = Object.keys(MODES);
 
 // bomb sites on team 1's side (+x); team 0's are point-mirrored, like the maps themselves
-const SITES = { tarsa: [[25, -17], [25, 16]], shuran: [[24, -16], [24, 17]] };
+// (about 30 m from the defenders' spawn and 45 m from the attackers': both teams reach them at nearly the same time)
+const SITES = { tarsa: [[9, -17], [9, 16]], shuran: [[9, -16], [9, 17]] };
 const BOMB = { carried: 0, dropped: 1, planted: 2, defused: 3, exploded: 4 };
 const PHASE = ['pre', 'live', 'post'];
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -72,9 +73,12 @@ class RoundMode {
       const ij = nav.nearestOpen(nav.ci(x), nav.cj(z));
       return ij ? new THREE.Vector3(nav.cx(ij[0]), 0, nav.cz(ij[1])) : new THREE.Vector3(x, 0, z);
     };
-    const base = SITES[w.id] || [[24, -16], [24, 16]];
-    // sites[t] = the sites team t defends
-    this.sites = [base.map(([x, z]) => near(-x, -z)), base.map(([x, z]) => near(x, z))];
+    // sites[t] = the sites team t defends. Maps can list their own; mirrored maps use SITES.
+    if (w.sites) this.sites = w.sites.map(list => list.map(([x, z]) => near(x, z)));
+    else {
+      const base = SITES[w.id] || [[9, -16], [9, 16]];
+      this.sites = [base.map(([x, z]) => near(-x, -z)), base.map(([x, z]) => near(x, z))];
+    }
     // overtime flag: the open-sky spot nearest the middle (not inside a building)
     const ph = this.g.physics, up = new THREE.Vector3(0, 1, 0);
     let best = null, bd = Infinity;
@@ -87,7 +91,7 @@ class RoundMode {
       if (!nav.isOpenAt(x + 1.5, z) || !nav.isOpenAt(x - 1.5, z) || !nav.isOpenAt(x, z + 1.5) || !nav.isOpenAt(x, z - 1.5)) continue;
       best = [x, z]; bd = d;
     }
-    this.flag.pos.copy(best ? new THREE.Vector3(best[0], 0, best[1]) : near(0, 0));
+    this.flag.pos.copy(w.flagPos ? near(w.flagPos[0], w.flagPos[1]) : best ? new THREE.Vector3(best[0], 0, best[1]) : near(0, 0));
   }
 
   buildVisuals() {
@@ -227,7 +231,7 @@ class RoundMode {
   update(dt) {
     const g = this.g, cfg = this.cfg;
     if (this.phase === 'pre') {
-      if (g.countdownT <= 0) this.phase = 'live';
+      if (g.countdownT <= 0) { this.phase = 'live'; this.liveT = g.time; }
       return;
     }
     if (this.phase === 'post') {
@@ -428,7 +432,14 @@ class RoundMode {
         if (near === b) return { pos: bm.pos, kind: 'bomb' };
       }
       if (bm.state === BOMB.planted) return { pos: this.offset(brain, bm.pos, 7), kind: 'guard' };
-      return { pos: this.offset(brain, sites[this.botSite], 6), kind: 'push' };
+      // don't all rush in one pack: each attacker waits a moment, and some take the other site / a wider route
+      if (brain.gmRound !== this.round) {
+        brain.gmRound = this.round;
+        brain.gmDelay = Math.random() * 6;
+        brain.gmSite = Math.random() < 0.65 ? this.botSite : 1 - this.botSite;
+      }
+      if (g.time - (this.liveT ?? 0) < brain.gmDelay) return { pos: b.pos, kind: 'guard' };
+      return { pos: this.offset(brain, sites[brain.gmSite], 9), kind: 'push' };
     }
     // defenders
     if (bm.state === BOMB.planted) {

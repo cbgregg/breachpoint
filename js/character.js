@@ -771,6 +771,17 @@ function animateSoldier(c, dt, showName) {
   m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
 }
 
+// two-bone arm IK for props (the smoking soldier on the supermarket map): reach `target` with the
+// hand, elbow towards `pole` (world space)
+export function armIK(B, side, target, pole) {
+  const upper = B[side + 'Arm'], fore = B[side + 'ForeArm'], hand = B[side + 'Hand'];
+  const S = upper.getWorldPosition(new THREE.Vector3());
+  const E0 = fore.getWorldPosition(new THREE.Vector3()), H0 = hand.getWorldPosition(new THREE.Vector3());
+  const E = solveElbow(S, target, S.distanceTo(E0), E0.distanceTo(H0), pole, new THREE.Vector3());
+  swingBone(upper, fore, E.clone().sub(S).normalize());
+  swingBone(fore, hand, target.clone().sub(E).normalize());
+}
+
 function ikArms(m, rightTarget, leftTarget, aimQ, leftDir = null, leftFree = false) {
   const B = m.bones;
   const solveArm = (sideName, target, pole) => {

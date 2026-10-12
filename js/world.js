@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Box } from './physics.js';
 import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
+import { MART } from './supermarket.js';
 
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
 
@@ -175,6 +176,7 @@ const SHURAN_PICKUPS = [
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Tight market streets, enterable houses and a central rooftop', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS },
+  mart: MART,
 };
 export const MAP_IDS = Object.keys(MAPS);
 
@@ -328,9 +330,11 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const g = new THREE.PlaneGeometry(w, d);
     const sc = scaleOf(mat);
     const uv = g.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / sc, uv.getY(i) * d / sc);
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / (sc || 3), uv.getY(i) * d / (sc || 3));
     put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false });
   };
+  const street = !LAYOUT.build; // custom-built maps (the supermarket) lay their own ground
+  if (street) {
   plane(M.dirt, 300, 300, 0, 0, -0.01);
   plane(M.asphalt, 62, 60, 0, 0, 0.0);
   plane(M.tile, 26, 18, 0, 0, 0.012);
@@ -353,6 +357,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     m.rotation.x = -Math.PI / 2;
     m.position.set((rnd() - 0.5) * 50, 0.025, (rnd() - 0.5) * 40);
     group.add(m);
+  }
   }
 
   // A proper window on a solid facade: recessed dark glass, painted frame with mullions, stone sill and
@@ -802,8 +807,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
   };
-  for (const it of LAYOUT.center) add(...it.slice(0, 7), it[7], 0);
-  for (const [cx, cz, w, d, h, y0, kind, extra] of LAYOUT.half) {
+  if (street) for (const it of LAYOUT.center) add(...it.slice(0, 7), it[7], 0);
+  if (street) for (const [cx, cz, w, d, h, y0, kind, extra] of LAYOUT.half) {
     add(cx, cz, w, d, h, y0, kind, extra, 1);
     const mx = kind === 'house' ? mirrorSpec(extra) : kind === 'lights' ? [-extra[0], -extra[1], -extra[2], -extra[3]] : extra;
     add(-cx, -cz, w, d, h, y0, kind, mx, 0);
@@ -871,13 +876,18 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       s += bw;
     }
   };
-  facade(-43, 30, 1, 0, 0, -1, 86, 8);    // north row faces -z
-  facade(43, -30, -1, 0, 0, 1, 86, 8);    // south row faces +z
-  facade(42, 31, 0, -1, -1, 0, 62, 8);    // east row faces -x
-  facade(-42, -31, 0, 1, 1, 0, 62, 8);    // west row faces +x
+  if (street) {
+    facade(-43, 30, 1, 0, 0, -1, 86, 8);    // north row faces -z
+    facade(43, -30, -1, 0, 0, 1, 86, 8);    // south row faces +z
+    facade(42, 31, 0, -1, -1, 0, 62, 8);    // east row faces -x
+    facade(-42, -31, 0, 1, 1, 0, 62, 8);    // west row faces +x
+  }
+  // custom maps build themselves with the same helpers
+  let custom = null;
+  if (!street) custom = LAYOUT.build({ THREE, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
 
   // street lamps and power poles inside the map edge
-  for (const sz of [-1, 1]) for (let x = -24; x <= 24; x += 16) {
+  if (street) for (const sz of [-1, 1]) for (let x = -24; x <= 24; x += 16) {
     const z = sz * 28.2;
     put(new THREE.CylinderGeometry(0.06, 0.09, 6, 8), M.dark, x, 3, z, 0, { grime: 0.2 });
     put(worldBox(0.08, 0.08, 1.2, 0), M.dark, x, 5.9, z - sz * 0.6, 0, { grime: 0 });
@@ -904,7 +914,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   // base flags
-  for (const team of [0, 1]) {
+  if (street) for (const team of [0, 1]) {
     const sx = team === 1 ? 1 : -1;
     put(new THREE.CylinderGeometry(0.05, 0.06, 7, 8), M.dark, sx * 40.5, 3.5, 0, 0, { grime: 0.2 });
     const g = new THREE.PlaneGeometry(1.8, 1.1, 10, 4);
@@ -927,10 +937,14 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   group.add(buildMountain());
 
   const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
-  for (const [x, z] of LAYOUT.spawns) {
+  if (LAYOUT.spawns2) {
+    // asymmetric maps list each team's spawns
+    LAYOUT.spawns2.forEach((list, t) => { for (const [x, z] of list) world.spawns[t].push(new THREE.Vector3(x, 0, z)); });
+  } else for (const [x, z] of LAYOUT.spawns) {
     world.spawns[1].push(new THREE.Vector3(x, 0, z));
     world.spawns[0].push(new THREE.Vector3(-x, 0, -z));
   }
+  if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
   return world;
@@ -1012,11 +1026,15 @@ export function renderMinimap(renderer, scene) {
   const rt = new THREE.WebGLRenderTarget(W, H, { colorSpace: THREE.SRGBColorSpace });
   const fog = scene.fog;
   scene.fog = null;
+  // roofs (indoor maps) come off for the top-down view
+  const hidden = [];
+  scene.traverse(o => { if (o.userData.noMinimap && o.visible) { o.visible = false; hidden.push(o); } });
   const prevShadow = renderer.shadowMap.enabled;
   renderer.setRenderTarget(rt);
   renderer.render(scene, cam);
   renderer.setRenderTarget(null);
   scene.fog = fog;
+  for (const o of hidden) o.visible = true;
   renderer.shadowMap.enabled = prevShadow;
   const px = new Uint8Array(W * H * 4);
   renderer.readRenderTargetPixels(rt, 0, 0, W, H, px);

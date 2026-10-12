@@ -334,6 +334,11 @@ export class Game {
     this.input.poll(dt);
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
+    if (this.world.update) this.world.update(dt, performance.now() / 1000);
+    // in-world music (the supermarket's speakers): only during a match, loud inside, faint outside
+    const amb = this.world.ambient && (this.state === 'playing' || this.state === 'paused') ? this.world.ambient : null;
+    this.music.ambient(amb ? amb.music : null);
+    if (amb) this.music.ambientLevel(amb.inside(this.camera.position.x, this.camera.position.z) ? 0.85 : 0.18);
     if (this.state !== 'paused' || this.mode !== 'local') this.effects.update(dt);
     this.effects.setScale(this.camera, window.innerHeight * this.renderer.renderer.getPixelRatio());
     // keep the viewmodel lit from the sun's direction as the camera turns
@@ -347,6 +352,12 @@ export class Game {
   menuCamera(dt) {
     this.menuT += dt * 0.035;
     const t = this.menuT;
+    if (this.world.menuCam) {
+      this.world.menuCam(t, this.camera);
+      if (this.camera.fov !== 62) { this.camera.fov = 62; this.camera.updateProjectionMatrix(); }
+      for (const c of this.characters) c.updateModel(dt, false);
+      return;
+    }
     this.camera.position.set(Math.cos(t) * 22 + 6, 7 + Math.sin(t * 0.7) * 1.5, Math.sin(t) * 16);
     this.camera.lookAt(Math.cos(t + 0.9) * 6, 2.2, Math.sin(t + 0.9) * 6);
     if (this.camera.fov !== 62) { this.camera.fov = 62; this.camera.updateProjectionMatrix(); }

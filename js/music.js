@@ -45,7 +45,7 @@ export class Music {
     return true;
   }
 
-  level() { return this.volume * (this.audio.volume ?? 0.7) * this.duck; }
+  level() { return this.volume * (this.audio.volume ?? 0.7) * this.duck * (this.ambDuck ?? 1); }
   apply() { if (this.out) this.out.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.15); }
   setVolume(v) { this.volume = v; this.apply(); }
   setDuck(on) { this.duck = on ? 0.45 : 1; this.apply(); }
@@ -65,6 +65,20 @@ export class Music {
     this.track = null;
     this.name = null;
   }
+
+  // in-world music (the supermarket's ceiling speakers): plays alongside the score, its level follows
+  // where you are (full inside the store, faint outside), and the score drops back while it plays
+  ambient(name) {
+    if (name === this.ambName) return;
+    if (this.amb) { this.amb.stop(1.5); this.amb = null; }
+    this.ambName = name;
+    this.ambDuck = name ? 0.4 : 1;
+    this.apply();
+    if (!name || !this.ensure()) return;
+    this.amb = new MuzakTrack(this);
+    this.amb.start();
+  }
+  ambientLevel(v) { if (this.amb) this.amb.level(v); }
 
   // short end-of-match cue, then the menu theme
   sting(win) {
@@ -312,6 +326,61 @@ class ActionTrack extends Track {
     }
     // riser into the next phrase
     if (I > 0.55 && bar % 8 === 7 && s === 0) noise(ctx, nb, this.bus, t, { type: 'bandpass', freq: 400, q: 2, attack: dt * 15, decay: 0.05, gain: 0.12, sweep: 6000 });
+  }
+}
+
+// Supermarket music: easy-listening bossa nova in F, through small ceiling speakers (band-passed, roomy).
+// Electric piano comping, walking bass, brushed kit, a vibraphone tune. Original, synthesized live.
+const MZ = { Fmaj7: [53, 57, 60, 64], Dm7: [50, 53, 57, 60], Gm7: [55, 58, 62, 65], C7: [48, 52, 55, 58], Am7: [57, 60, 64, 67], Bbmaj7: [58, 62, 65, 69], Em7b5: [52, 55, 58, 62], A7: [57, 61, 64, 67] };
+class MuzakTrack extends Track {
+  constructor(m) {
+    super(m, 116);
+    // re-route: speaker EQ instead of the concert hall
+    this.bus.disconnect();
+    const ctx = this.ctx;
+    this.spk = ctx.createBiquadFilter(); this.spk.type = 'bandpass'; this.spk.frequency.value = 1300; this.spk.Q.value = 0.45;
+    this.lvl = ctx.createGain(); this.lvl.gain.value = 0.0001;
+    this.bus.connect(this.spk).connect(this.lvl).connect(m.out);
+    this.lvl.connect(this.send);
+    this.prog = ['Fmaj7', 'Fmaj7', 'Dm7', 'Dm7', 'Gm7', 'C7', 'Fmaj7', 'A7', 'Bbmaj7', 'Bbmaj7', 'Em7b5', 'A7', 'Dm7', 'Gm7', 'C7', 'C7'];
+    this.tune = [[0, 0, 72, 6], [0, 6, 69, 2], [0, 8, 72, 4], [0, 12, 74, 4], [1, 0, 76, 10], [2, 0, 74, 6], [2, 6, 72, 2], [2, 8, 69, 8], [3, 0, 67, 12],
+      [4, 0, 70, 6], [4, 6, 69, 2], [4, 8, 67, 4], [4, 12, 65, 4], [5, 0, 64, 12], [6, 0, 65, 6], [6, 6, 69, 2], [6, 8, 72, 8], [7, 0, 73, 12],
+      [8, 0, 74, 6], [8, 6, 72, 2], [8, 8, 70, 8], [9, 0, 69, 12], [10, 0, 67, 6], [10, 8, 70, 8], [11, 0, 69, 12],
+      [12, 0, 65, 6], [12, 6, 67, 2], [12, 8, 69, 8], [13, 0, 70, 8], [13, 8, 72, 8], [14, 0, 67, 16], [15, 0, 65, 12]];
+  }
+  level(v) { this.target = v; if (this.started) this.lvl.gain.setTargetAtTime(Math.max(0.0001, v), this.ctx.currentTime, 0.4); }
+  start() { super.start(); this.started = true; this.level(this.target ?? 0.6); }
+  stop(fade) {
+    const t = this.ctx.currentTime;
+    this.lvl.gain.cancelScheduledValues(t);
+    this.lvl.gain.setTargetAtTime(0.0001, t, fade / 3);
+    super.stop(fade);
+  }
+  play(step, t) {
+    const ctx = this.ctx, dt = this.dt, nb = this.m.audio.noise;
+    const bar = Math.floor(step / 16), s = step % 16;
+    const ch = MZ[this.prog[bar % 16]];
+    // bossa bass: root on 1, fifth on the "and" of 2, root on 3, approach note
+    const root = ch[0] - 24;
+    const bass = { 0: root, 6: root + 7, 8: root, 14: root + 7 };
+    if (bass[s] !== undefined) voice(ctx, this.bus, t, { freq: mtof(bass[s]), type: 'triangle', attack: 0.01, hold: dt * 2.5, release: 0.25, gain: 0.16, cutoff: 700 });
+    // electric piano comping: the bossa rhythm (1, a2, &3, 4...)
+    if ([0, 3, 6, 10, 12].includes(s) && !(s === 12 && bar % 2)) {
+      for (const n of ch) {
+        voice(ctx, this.bus, t, { freq: mtof(n), type: 'sine', attack: 0.004, hold: dt * 1.2, release: 0.5, gain: 0.035, cutoff: 3000 });
+        voice(ctx, this.bus, t, { freq: mtof(n) * 2.0, type: 'sine', attack: 0.002, hold: 0.01, release: 0.18, gain: 0.008, cutoff: 6000 });
+      }
+    }
+    // brushes + rim click
+    if (s % 2 === 0) noise(ctx, nb, this.bus, t, { type: 'bandpass', freq: 5200, q: 0.5, decay: s % 4 === 0 ? 0.09 : 0.05, gain: s % 4 === 0 ? 0.05 : 0.03 });
+    if (s === 3 || s === 10) noise(ctx, nb, this.bus, t, { type: 'bandpass', freq: 1800, q: 4, decay: 0.03, gain: 0.08 });
+    // vibraphone tune (every other pass, so it breathes)
+    if (Math.floor(bar / 16) % 2 === 0) {
+      for (const [b, st, n, len] of this.tune) if (b === bar % 16 && st === s) {
+        voice(ctx, this.bus, t, { freq: mtof(n), type: 'sine', attack: 0.003, hold: 0.04, release: len * dt * 1.6, gain: 0.07, cutoff: 5000 });
+        voice(ctx, this.bus, t, { freq: mtof(n) * 4, type: 'sine', attack: 0.002, hold: 0.01, release: 0.25, gain: 0.006, cutoff: 8000 });
+      }
+    }
   }
 }
 
