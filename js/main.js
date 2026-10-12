@@ -687,6 +687,7 @@ function focusFirst() {
   const pref = sideOpen ? (account.signedIn ? ($('sd-req').querySelector('[data-nav]') || $('sd-friends').querySelector('[data-nav]') || $('sd-add-in')) : $('sd-email'))
     : screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
     : screen === 'signin' ? document.querySelector('#signin .si-step.on input')
+    : screen === 'feedback' ? document.querySelector('[data-fb].on')
     : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
     : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
@@ -763,7 +764,7 @@ game.input.onNav = (dir) => {
       if (!el) { focusFirst(); break; }
       if (el.type === 'checkbox') { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
       else if (el.tagName === 'SELECT') openDropdown(el);
-      else if (el.tagName === 'INPUT' && el.type !== 'range') { el.focus(); break; }
+      else if ((el.tagName === 'INPUT' && el.type !== 'range') || el.tagName === 'TEXTAREA') { el.focus(); break; }
       else if (el.tagName === 'INPUT') break;
       else el.click();
       game.audio.play('ui', null, { ui: true });
@@ -775,6 +776,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'menu') openMode();
       else if (screen === 'mode') { showScreen('title'); }
       else if (screen === 'signin') $('si-back').click();
+      else if (screen === 'feedback') closeFeedback();
       else if (screen === 'end') $('menu-btn').click();
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
@@ -808,7 +810,8 @@ game.input.onNav = (dir) => {
 };
 window.addEventListener('keydown', (e) => {
   if (!screen || game.input.enabled) return;
-  const typing = document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
+  const ae = document.activeElement;
+  const typing = ae && (ae.tagName === 'TEXTAREA' || (ae.tagName === 'INPUT' && ae.type !== 'range' && ae.type !== 'checkbox'));
   if (e.key === 'Escape') { e.preventDefault(); game.input.onNav('back'); }
   else if (!typing && (e.key === 'f' || e.key === 'F') && !e.repeat && !e.ctrlKey && !e.metaKey && screen !== 'title') { e.preventDefault(); toggleSide(); }
   else if (!typing && screen !== 'title' && ARROWS[e.key]) { e.preventDefault(); if (!document.querySelector('.pad-focus') && document.activeElement && document.activeElement.matches('[data-nav]')) focusEl(document.activeElement); game.input.onNav(ARROWS[e.key]); }
@@ -1025,7 +1028,52 @@ const toggleSide = () => (sideOpen ? closeSide() : openSide());
 $('side-btn').addEventListener('click', openSide);
 // about / support
 const openLink = (url) => { try { window.open(url, '_blank', 'noopener'); } catch (_) { location.href = url; } };
-$('feedback-btn').addEventListener('click', () => openLink('https://github.com/cbgregg/breachpoint/issues/new'));
+$('feedback-btn').addEventListener('click', () => openFeedback());
+
+// ---------- feedback form ----------
+let fbFrom = 'menu', fbKind = 'feature', fbBusy = false;
+function fbStatus(html, cls) { const el = $('fb-status'); el.className = 'join-status' + (cls ? ' ' + cls : ''); el.innerHTML = html; }
+function setFbKind(k) {
+  fbKind = k;
+  document.querySelectorAll('[data-fb]').forEach(b => { const on = b.dataset.fb === k; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+}
+function openFeedback(kind) {
+  if (sideOpen) closeSide();
+  fbFrom = screen || 'menu';
+  if (kind) setFbKind(kind);
+  fbStatus('');
+  $('fb-send').disabled = false;
+  showScreen('feedback');
+  if (game.input.lastDevice !== 'touch' && game.input.lastDevice !== 'pad') setTimeout(() => $('fb-text').focus({ preventScroll: true }), 30);
+}
+function closeFeedback() {
+  const to = fbFrom === 'feedback' ? 'menu' : fbFrom;
+  showScreen(to);
+  if (to === 'pause') setPauseSec('options');      // the options panel was put back while the form was open
+  else if (to === 'menu') setTab('options');
+}
+document.querySelectorAll('[data-fb]').forEach(b => b.addEventListener('click', () => { setFbKind(b.dataset.fb); game.audio.play('ui', null, { ui: true }); }));
+$('fb-text').addEventListener('input', () => { $('fb-count').textContent = `${$('fb-text').value.length} / 2000`; });
+$('fb-back').addEventListener('click', closeFeedback);
+$('fb-send').addEventListener('click', async () => {
+  if (fbBusy) return;
+  const text = $('fb-text').value.trim();
+  if (text.length < 10) { fbStatus('Write a little more (at least 10 characters).', 'bad'); return; }
+  fbBusy = true; $('fb-send').disabled = true;
+  fbStatus('<span class="spin"></span>Sending…');
+  try {
+    await account.sendFeedback({
+      kind: fbKind, text, contact: $('fb-contact').value.trim(),
+      device: game.input.lastDevice || '', mode: (game.settings && game.state !== 'menu' ? game.settings.mode : settings.mode) || '',
+      map: game.world ? game.world.id : '', screen: fbFrom, ua: navigator.userAgent,
+    });
+    $('fb-text').value = ''; $('fb-contact').value = ''; $('fb-count').textContent = '0 / 2000';
+    fbStatus('Thanks! Your message was sent.', 'good');
+    game.hud.toast('FEEDBACK SENT · THANK YOU');
+    setTimeout(() => { if (screen === 'feedback') closeFeedback(); }, 1600);
+  } catch (e) { fbStatus(esc(e.message), 'bad'); $('fb-send').disabled = false; }
+  fbBusy = false;
+});
 $('coffee-btn').addEventListener('click', () => openLink('https://buymeacoffee.com/breachpoint'));
 $('side-scrim').addEventListener('click', closeSide);
 $('sd-close').addEventListener('click', closeSide);

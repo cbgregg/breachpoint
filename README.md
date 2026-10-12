@@ -4,7 +4,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 
 **Play:** [breach-point.net](https://breach-point.net) · **Status:** pre-alpha
 
-Developed by cbgregg. Artificial intelligence was used to assist with development of this project. Keep the servers running: it's a one-man team, so if you enjoy it, [buy me a coffee](https://buymeacoffee.com/breachpoint). Feature requests and feedback: [open an issue](https://github.com/cbgregg/breachpoint/issues/new).
+Developed by cbgregg. Artificial intelligence was used to assist with development of this project. Keep the servers running: it's a one-man team, so if you enjoy it, [buy me a coffee](https://buymeacoffee.com/breachpoint). Feature requests and feedback: *Options → About → Send feedback* in the game.
 
 ## Features
 
@@ -96,7 +96,7 @@ The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers K
 2. **Cloudflare → Storage & Databases → KV → Create** a namespace, e.g. `breachpoint-accounts`.
 3. **Workers & Pages → Create → Worker**, name it `breachpoint-auth` → *Edit code* → paste `cloudflare/auth-worker.js` → *Deploy*.
 4. Worker → **Settings → Bindings → Add → KV namespace**: variable name `ACCOUNTS`, the namespace from step 2.
-5. Worker → **Settings → Variables and Secrets**: `RESEND_API_KEY` (Secret), `MAIL_FROM` = `Breachpoint <login@breach-point.net>` (Text), `APP_URL` = `https://breach-point.net` (Text).
+5. Worker → **Settings → Variables and Secrets**: `RESEND_API_KEY` (Secret), `MAIL_FROM` = `Breachpoint <login@breach-point.net>` (Text), `APP_URL` = `https://breach-point.net` (Text), and optionally `FEEDBACK_TO` (Secret): the address that receives the in-game feedback form. Every message is also stored in the KV namespace under `fb:` for a year, so you can read them there even without it.
 6. Open `https://breachpoint-auth.<you>.workers.dev/pubkey`: it should show a JSON key. Put the Worker URL in `AUTH_ENDPOINT` in `js/config.js` and push.
 
 Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a day; sessions last 60 days so returning players don't count), Resend 100 emails a day. The $5/month Workers plan lifts the KV limit.

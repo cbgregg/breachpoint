@@ -180,6 +180,12 @@ export class Account {
     } catch (_) { /* ignore */ }
   }
 
+  // in-game feedback form (signed in or not; the server attaches only your Name Tag)
+  async sendFeedback(data) {
+    if (!this.enabled) throw new Error('Feedback isn\'t switched on for this server yet.');
+    return this.call('/feedback', data, !!this.session);
+  }
+
   // ---------- match passes ----------
   // a pass for one match code, cached until shortly before it expires
   async ticket(room) {

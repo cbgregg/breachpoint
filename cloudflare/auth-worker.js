@@ -26,6 +26,9 @@
 //               APP_URL          e.g.  https://breach-point.net   (where sign-in links point)
 //               ALLOWED_ORIGINS  optional, comma-separated list of sites allowed to call this Worker;
 //                                default breach-point.net, www.breach-point.net
+//               FEEDBACK_TO      optional, address that receives the in-game feedback form (Secret, so it
+//                                never appears in the repo). Every message is also kept in KV under fb:
+//                                for a year, so nothing is lost if this isn't set.
 // The ticket signing key is generated on first use and kept in KV.
 
 const LOGIN_TTL = 15 * 60;              // sign-in links
@@ -76,6 +79,7 @@ export default {
         case '/friends/decline': return await withUser(ctx, (u) => friendDrop(ctx, u, 'decline'));
         case '/friends/cancel': return await withUser(ctx, (u) => friendDrop(ctx, u, 'cancel'));
         case '/friends/remove': return await withUser(ctx, (u) => friendDrop(ctx, u, 'remove'));
+        case '/feedback': return await feedback(ctx);
         case '/logout': return await logout(ctx);
         case '/delete': return await withUser(ctx, (u, s) => deleteAccount(ctx, u, s));
         default: return json({ error: 'not found' }, 404, cors);
@@ -281,6 +285,35 @@ async function friendDrop({ env, body, cors }, user, kind) {
   else if (kind === 'cancel') { delete me.o[them]; delete other.i[user.id]; }
   else { delete me.f[them]; delete other.f[user.id]; }
   await frPut(env, user.id, me); await frPut(env, them, other);
+  return json({ ok: true }, 200, cors);
+}
+
+// ---------- feedback form (no sign-in needed) ----------
+const FB_KINDS = { feature: 'Feature request', bug: 'Bug report', feedback: 'Feedback' };
+async function feedback({ env, body, request, cors }) {
+  const kind = FB_KINDS[body.kind] ? body.kind : 'feedback';
+  const text = String(body.text || '').replace(/\r/g, '').trim();
+  if (text.length < 10) return json({ error: 'Write a little more (at least 10 characters).' }, 400, cors);
+  if (text.length > 2000) return json({ error: 'Keep it under 2000 characters.' }, 400, cors);
+  const contact = String(body.contact || '').trim().slice(0, 120);
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  if (!await allow(env, `rl:fb:${await sha(ip)}`, 6, 3600)) return json({ error: 'Thanks! You\'ve sent a lot already. Try again in an hour.' }, 429, cors);
+  // signed in? attach the Name Tag (never the email)
+  let who = '';
+  const m = (request.headers.get('Authorization') || '').match(/^Bearer ([A-Za-z0-9_-]{20,80})$/);
+  if (m) { const se = await getJSON(env, `sess:${await sha(m[1])}`); const u = se && await getUser(env, se.uid); if (u) who = `${u.tag || 'no Name Tag'} (${u.id})`; }
+  const meta = {};
+  for (const k of ['device', 'mode', 'map', 'screen', 'ua']) if (typeof body[k] === 'string') meta[k] = body[k].slice(0, k === 'ua' ? 200 : 40);
+  const rec = { kind, text, contact, who, meta, at: new Date().toISOString(), country: (request.cf && request.cf.country) || '' };
+  await env.ACCOUNTS.put(`fb:${rec.at}:${rand(4)}`, JSON.stringify(rec), { expirationTtl: 365 * 86400 });
+  if (env.FEEDBACK_TO && env.RESEND_API_KEY && env.MAIL_FROM) {
+    const lines = [`${FB_KINDS[kind]}`, '', text, '', `Contact: ${contact || '(none)'}`, `Player: ${who || '(not signed in)'}`, `Where: ${Object.entries(meta).map(([k, v]) => `${k}=${v}`).join(' · ')}`, `Country: ${rec.country}`, `Time: ${rec.at}`];
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.MAIL_FROM, to: [env.FEEDBACK_TO], subject: `[Breachpoint] ${FB_KINDS[kind]}: ${text.slice(0, 60).replace(/\s+/g, ' ')}`, text: lines.join('\n'), ...(/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(contact) ? { reply_to: contact } : {}) }),
+    }).catch(() => {});
+  }
   return json({ ok: true }, 200, cors);
 }
 

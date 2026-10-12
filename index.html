@@ -161,6 +161,25 @@
     </div>
   </div>
 
+  <!-- ============ Feedback form ============ -->
+  <div id="feedback" class="screen">
+    <div class="mw narrow signin fbw">
+      <header class="mw-head"><div class="bo-title"><b>FEEDBACK</b><small>FEATURE REQUESTS · BUGS · IDEAS</small></div></header>
+      <div class="fb-kinds" role="radiogroup" aria-label="Type">
+        <button class="mp on" data-fb="feature" data-nav><b>FEATURE</b><small>Something to add</small></button>
+        <button class="mp" data-fb="bug" data-nav><b>BUG</b><small>Something broken</small></button>
+        <button class="mp" data-fb="feedback" data-nav><b>FEEDBACK</b><small>Anything else</small></button>
+      </div>
+      <textarea id="fb-text" maxlength="2000" rows="6" placeholder="What would make Breachpoint better? For bugs: what happened, and what you expected." data-nav></textarea>
+      <div class="fb-count" id="fb-count">0 / 2000</div>
+      <input id="fb-contact" maxlength="120" autocomplete="off" spellcheck="false" placeholder="How to reach you (optional)" data-nav>
+      <p class="pane-note si-fine">Only the developer reads this. Your device type and current map are included to help with bugs. Leave the contact box empty to stay anonymous.</p>
+      <button id="fb-send" class="cta" data-nav><span>SEND</span><span class="glyph" data-act="accept"></span></button>
+      <div class="join-status" id="fb-status"></div>
+      <button id="fb-back" class="menu-btn" data-nav>BACK</button>
+    </div>
+  </div>
+
   <!-- ============ Main menu ============ -->
   <div id="menu" class="screen">
     <div class="mw">
@@ -272,7 +291,7 @@
             <div class="row"><label for="opt-music">Music volume <output id="out-music"></output></label><input type="range" id="opt-music" min="0" max="1" step="0.05" data-nav></div>
             <div class="group">ABOUT</div>
             <div class="row about-row"><label><span>Developed by cbgregg · <span class="pa-chip">PRE-ALPHA</span></span><small>Artificial intelligence was used to assist with development of this project.</small></label></div>
-            <div class="row"><label>Feature request or feedback<small>Opens a new issue on the game's GitHub page</small></label><button id="feedback-btn" class="menu-btn small" data-nav>SEND FEEDBACK</button></div>
+            <div class="row"><label>Feature request or feedback<small>Goes straight to the developer</small></label><button id="feedback-btn" class="menu-btn small" data-nav>SEND FEEDBACK</button></div>
             <div class="row"><label>Keep the servers running<small>I'm a one-man team</small></label><button id="coffee-btn" class="menu-btn small" data-nav>☕ BUY ME A COFFEE</button></div>
           </div>
           <div class="controls-ref">
