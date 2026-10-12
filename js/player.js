@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { TEAMS, MELEE, GRENADE, PLAYER } from './config.js';
 import { buildGun } from './weapons.js';
-import { Seg, teamMat, createFpBody, poseFpBody } from './character.js';
+import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose } from './vmarms.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -14,11 +14,23 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const _E = new THREE.Vector3(), _R = new THREE.Vector3(), _L = new THREE.Vector3(), _D = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
-const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
-const POLE_R = new THREE.Vector3(1, -0.8, 0.2), POLE_L = new THREE.Vector3(-1, -0.9, 0);
+const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Vector3(-0.32, -0.38, 0.05);
+const POLE_R = new THREE.Vector3(0.7, -1.4, 0.2), POLE_L = new THREE.Vector3(-1, -0.65, 0.05);
+// where the hands go, in the gun's frame (origin = top of the pistol grip, barrel toward -z)
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const RH_LONG = V3(0.031, -0.052, 0.018), RH_PISTOL = V3(0.031, -0.045, 0.012);
+const GRIP_F = V3(0, -0.25, -0.97), PALM_L = V3(-1, 0, 0), PALM_R = V3(1, 0, 0), PALM_UP = V3(0, 1, 0);
+const LH_PISTOL = V3(-0.033, -0.06, 0.004);
+const VG_OFF = V3(-0.03, -0.015, 0.036), VG_F = V3(0, -0.12, -1);
+const SUP_OFF = V3(-0.022, -0.012, 0.01), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
+const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
+const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
+const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
+const COOK_F = V3(0.25, 0.1, -1);
+const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
 const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
-const _lq = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
+const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
 const EYE_RELIEF = -0.15;
 const INSPECT = 3.0; // seconds
 const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multiplier at full ADS // close to the eye, like CoD: the optic frames the target
@@ -58,31 +70,10 @@ export class PlayerController {
     this.cookT = null; this.gLatch = false; this.cookBlend = 0; this.nextTick = 0; // frag cooking
     this.inspectT = 0; // weapon inspect animation (seconds left)
     this.prevDeadFire = true; this.wasDead = false;
-    this.buildArms();
-    this.fp = createFpBody(char.team);
-    if (this.fp) {
-      this.vmRoot.add(this.fp.root);
-      for (const a of [this.armR, this.armL]) a.upper.visible = a.fore.visible = a.hand.visible = false;
-    }
+    this.arms = createVmArms(char.team);
+    this.vmRoot.add(this.arms.root);
+    this.lPose = clonePose(POSES.support); this.rPose = clonePose(POSES.trigger);
     this.buildViewmodels();
-  }
-
-  buildArms() {
-    const k = TEAMS[this.c.team].kit;
-    const mat = teamMat(this.c.team);
-    const mk = () => {
-      const upper = new THREE.Group(), fore = new THREE.Group(), hand = new THREE.Group();
-      new Seg().cap(k.shirt, 0.052, 0.24, 0, -0.17, 0).build(upper, mat);
-      new Seg().cap(k.shirt, 0.045, 0.26, 0, -0.16, 0).box(0x22201c, 0.1, 0.06, 0.1, 0, -0.3, 0).build(fore, mat);
-      new Seg().box(k.glove, 0.085, 0.1, 0.035, 0, -0.04, 0)
-        .box(k.glove, 0.08, 0.045, 0.055, 0, -0.1, -0.02, 0.6)
-        .box(k.glove, 0.03, 0.06, 0.03, 0.04, -0.06, -0.03, 0.3, 0, -0.5)
-        .build(hand, mat);
-      this.vmRoot.add(upper, fore, hand);
-      return { upper, fore, hand };
-    };
-    this.armR = mk();
-    this.armL = mk();
   }
 
   buildViewmodels() {
@@ -95,11 +86,21 @@ export class PlayerController {
       this.vmRoot.add(holder);
       const pistol = w.id === 'pistol';
       const touch = this.game.input.isTouch;
+      // where the left hand holds the magazine (gun frame): pistols palm it from below, the rest wrap it
+      const type = w.def.model.type;
+      let magHold = null;
+      if (type !== 'shotgun') {
+        holder.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(gun.mag).applyMatrix4(gun.group.matrixWorld.clone().invert());
+        magHold = type === 'pistol'
+          ? { pos: V3((box.min.x + box.max.x) / 2 - 0.004, box.min.y - 0.016, (box.min.z + box.max.z) / 2 + 0.006), f: V3(0.55, 0, -0.85), p: PALM_UP, pose: POSES.cup }
+          : { pos: V3(box.min.x - 0.016, box.max.y + (box.min.y - box.max.y) * 0.6, Math.max(box.min.z + 0.046, (box.min.z + box.max.z) / 2)), f: V3(0, -0.1, -1), p: PALM_R, pose: POSES.wrap };
+      }
       return {
-        id: w.id, holder, gun,
+        id: w.id, holder, gun, type, magHold,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.1, -0.12, -0.3) : new THREE.Vector3(0.105, -0.155, -0.19),
+          : pistol ? new THREE.Vector3(0.1, -0.12, -0.3) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
       };
     });
@@ -495,14 +496,6 @@ export class PlayerController {
     const mag = gun.mag;
     mag.position.copy(gun.magHome);
     mag.visible = true;
-    let leftMode = 'grip', leftFree = false, leftGrip = 1;
-    _ld.set(0, 0, 0);
-    if (s2 > 0.6 && w.id !== 'shotgun') leftMode = 'mag';
-    const magReload = w.reloading && w.id !== 'shotgun';
-    if (magReload) leftMode = 'magReload';
-    else if (w.reloading && w.id === 'shotgun') {
-      leftMode = Math.sin(rp * Math.PI * 10) > 0 ? 'pouch' : 'port';
-    }
     // bolt / pump cycling after a shot
     if (this.cycleT > 0) {
       this.cycleT -= dt;
@@ -531,55 +524,69 @@ export class PlayerController {
       this.vmFlashLight.intensity = 3;
     } else this.vmFlashLight.intensity = 0;
 
-    // arms (IK in camera space)
-    gun.group.localToWorld(_R.set(0, -0.04, 0.03));
-    if (leftMode === 'grip') {
-      (gun.pump || gun.foregrip).getWorldPosition(_L);
-    } else if (leftMode === 'mag') {
-      mag.getWorldPosition(_L);
-      _L.y -= 0.06;
-    } else if (leftMode === 'port') {
-      gun.eject.getWorldPosition(_L);
-      _L.y -= 0.05;
-      _ld.set(0.3, 0.4, -0.85).applyQuaternion(h.quaternion);
-    } else if (leftMode === 'pouch') {
-      gun.mag.getWorldPosition(_L); _L.add(_a.set(-0.05, -0.4, 0.05)); leftGrip = 0.8; leftFree = true;
-    } else if (leftMode === 'magReload') {
-      const bottom = MAG_BOTTOM[w.def.model.type] ?? -0.18;
-      _gl.copy(gun.magHome).add(_a.set(0, bottom * 0.62, -0.01));          // where the fingers wrap the mag
-      gun.group.localToWorld(_m0.copy(_gl));                                 // M0: mag seated
-      (gun.pump || gun.foregrip).getWorldPosition(_fg);                      // F: foregrip
-      _m1.copy(_m0).add(_a.set(0.01, -0.15, 0.05));                         // M1: mag pulled clear
-      _pp.copy(_m0).add(_a.set(-0.06, -0.42, 0.06));                         // P: straight down, out of view
+    // ---------- hands + arms (camera space) ----------
+    const type = G.type, A = gun.att || {};
+    gun.group.getWorldQuaternion(_gq);
+    // right hand on the pistol grip, trigger finger in the guard
+    handFrame(_R, _rq, gun.group, _gq, type === 'pistol' ? RH_PISTOL : RH_LONG, GRIP_F, PALM_L);
+    // left hand where it rests on the gun: support hand on a pistol, vertical grip, or palm up under the handguard / pump
+    let lPose;
+    if (type === 'pistol') { handFrame(_L, _lq, gun.group, _gq, LH_PISTOL, GRIP_F, PALM_R); lPose = POSES.wrap; }
+    else if (A.under === 'vgrip') { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF), VG_F, PALM_R); lPose = POSES.wrap; }
+    else { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF), SUP_F, PALM_SUP); lPose = POSES.support; }
+    let tPose = lPose, lk = 0, leftFree = false;
+    const toward = (pos, q, pose, k) => { _L.lerp(pos, k); _lq.slerp(q, k); tPose = pose; lk = k; };
+    const MH = G.magHold;
+    if (s2 > 0.05 && MH) {
+      // inspect: left hand drops to the magazine
+      handFrame(_tp, _tq, gun.group, _gq, MH.pos, MH.f, MH.p);
+      toward(_tp, _tq, MH.pose, smooth(0.3, 0.9, s2));
+    }
+    if (w.reloading && MH) {
+      // magazine change: grab the mag, pull it, take it down out of view, bring a fresh one up, seat it,
+      // slap it home, back to the gun. The mag rides in the hand the whole time.
+      handFrame(_m0, _mq, gun.group, _gq, MH.pos, MH.f, MH.p);                 // M0: holding the seated mag
+      _m1.copy(_m0).add(_a.set(0.01, -0.15, 0.05));                           // M1: pulled clear
+      _pp.copy(_m0).add(_a.set(-0.06, -0.42, 0.06));                          // P: down, out of view
       const seg = (a, b) => smooth(a, b, rp);
-      let attach = true;
-      if (rp < 0.1) { _L.lerpVectors(_fg, _m0, seg(0, 0.1)); attach = false; }
+      _gl.copy(_L); _lq2.copy(_lq);                                            // the resting grip
+      let attach = true, k = 1;
+      if (rp < 0.1) { k = seg(0, 0.1); _L.lerpVectors(_gl, _m0, k); attach = false; }
       else if (rp < 0.24) _L.lerpVectors(_m0, _m1, seg(0.1, 0.24));
       else if (rp < 0.4) _L.lerpVectors(_m1, _pp, seg(0.24, 0.4));
       else if (rp < 0.56) _L.lerpVectors(_pp, _m1, seg(0.4, 0.56));
       else if (rp < 0.7) _L.lerpVectors(_m1, _m0, seg(0.56, 0.7));
       else if (rp < 0.78) { _L.copy(_m0); _L.y += 0.025 * bump(0.7, 0.78, rp); attach = rp < 0.72; }
-      else { _L.lerpVectors(_m0, _fg, seg(0.78, 0.92)); attach = false; }
+      else { k = 1 - seg(0.78, 0.92); _L.lerpVectors(_gl, _m0, k); attach = false; }
+      _lq.copy(_lq2).slerp(_mq, k);
+      tPose = MH.pose; lk = k;
       if (attach) {
-        // the magazine rides in the hand
         gun.group.worldToLocal(_a.copy(_L));
-        mag.position.copy(gun.magHome).add(_a.sub(_gl));
+        mag.position.copy(gun.magHome).add(_a.sub(MH.pos));
       }
-      // palm wraps the front of the mag, fingers forward and a little up
-      _ld.set(0.35, 0.3, -0.9).applyQuaternion(h.quaternion);
-      leftGrip = attach ? 1 : 0.85;
-      leftFree = rp > 0.06 && rp < 0.86; // elbow tucked down while the hand works the mag
+      leftFree = rp > 0.12 && rp < 0.84;
+    } else if (w.reloading) {
+      // shotgun: shells from the belt into the loading port, one at a time
+      const k = smooth(-0.4, 0.4, Math.sin(rp * Math.PI * 10)) * smooth(0, 0.08, rp) * (1 - smooth(0.9, 1, rp));
+      handFrame(_tp, _tq, gun.group, _gq, _v1.copy(gun.eject.position).add(PORT_OFF), PORT_F, PALM_L);
+      _m1.copy(_tp).add(_a.set(-0.08, -0.38, 0.08));
+      _tp.lerp(_m1, 1 - k);
+      toward(_tp, _tq, POSES.cup, smooth(0, 0.08, rp) * (1 - smooth(0.9, 1, rp)));
+      leftFree = true;
     }
-    // tactical sprint: the left hand lets go and the arm drops, pumping below the frame like a running arm
+    // tactical sprint: the left hand lets go and pumps below the frame like a running arm
     const tkL = this.tacK || 0;
     if (tkL > 0.35 && !w.reloading) {
-      const sw = Math.sin(this.bobT), k = smooth(0.35, 0.8, tkL);
-      _a.set(-0.2, -0.78 + 0.05 * Math.abs(sw), -0.12 + 0.1 * sw);
-      _L.lerp(_a, k);
-      leftGrip = 0.6; leftFree = k > 0.3;
+      const swg = Math.sin(this.bobT), k = smooth(0.35, 0.8, tkL);
+      handFrame(_tp, _tq, null, null, _a.set(-0.2, -0.62 + 0.05 * Math.abs(swg), -0.2 + 0.1 * swg), SPRINT_F, SPRINT_P);
+      toward(_tp, _tq, POSES.fist, k);
+      leftFree = k > 0.3;
     }
-    if (c.grenadeCd > 0.4) _L.set(-0.1, -0.05 - gren0 * 0.1, -0.45 + gren0 * 0.1);
-    // cooking: frag in the left hand, held up beside the lowered gun
+    if (c.grenadeCd > 0.4) {
+      handFrame(_tp, _tq, null, null, _a.set(-0.1, -0.05 - gren0 * 0.1, -0.45 + gren0 * 0.1), THROW_F, THROW_P);
+      toward(_tp, _tq, POSES.open, 1);
+    }
+    // cooking: the frag sits in the left hand, held up beside the lowered gun
     if (!this.vmNade) {
       this.vmNade = new THREE.Mesh(this.game.grenadeGeo, this.game.grenadeMat);
       this.vmNade.scale.setScalar(0.55);
@@ -588,29 +595,14 @@ export class PlayerController {
     this.vmNade.visible = this.cookBlend > 0.3;
     if (this.vmNade.visible) {
       const shake = this.cookT !== null && this.cookT > GRENADE.fuse - 1.2 ? (Math.random() - 0.5) * 0.006 : 0;
-      _L.set(-0.17 + shake, -0.15 - (1 - this.cookBlend) * 0.2, -0.36);
-      this.vmNade.position.copy(_L).add(_a.set(0.03, 0.045, -0.035));
+      handFrame(_tp, _tq, null, null, _a.set(-0.17 + shake, -0.17 - (1 - this.cookBlend) * 0.2, -0.36), COOK_F, PALM_UP);
+      toward(_tp, _tq, POSES.cup, smooth(0.3, 0.8, this.cookBlend));
+      this.vmNade.position.copy(_tp).add(_a.set(0, 0.045, -0.012));
       this.vmNade.rotation.set(0.4, 0.3, 0);
     }
-    if (this.fp) {
-      // wrist sits slightly behind/below the grip point
-      _R.add(_a.set(0.004, -0.004, 0.045).applyQuaternion(h.quaternion));
-      _L.add(_a.set(-0.02, -0.025, 0.045).applyQuaternion(h.quaternion));
-      poseFpBody(this.fp, dt, _R, _L, this.sprintT * 0.05, h.quaternion, 1, _ld.lengthSq() > 0 ? _ld : null, leftFree, leftGrip);
-    } else {
-      this.poseArm(this.armR, SHOULDER_R, _R, POLE_R, h);
-      this.poseArm(this.armL, SHOULDER_L, _L, POLE_L, h);
-    }
-  }
-
-  poseArm(arm, S, H, pole, holder) {
-    solveElbow(S, H, 0.34, 0.36, pole, _E);
-    arm.upper.position.copy(S);
-    arm.upper.quaternion.setFromUnitVectors(DOWN, _a.subVectors(_E, S).normalize());
-    arm.fore.position.copy(_E);
-    arm.fore.quaternion.setFromUnitVectors(DOWN, _a.subVectors(H, _E).normalize());
-    arm.hand.position.copy(H);
-    arm.hand.quaternion.copy(holder.quaternion);
+    blendPose(this.lPose, lPose, tPose, lk);
+    poseArm(this.arms.R, SHOULDER_R, _R, _rq, this.rPose, POLE_R);
+    poseArm(this.arms.L, SHOULDER_L, _L, _lq, this.lPose, leftFree ? _a.set(-0.4, -1, 0.1) : POLE_L);
   }
 
   // Round modes: over-the-shoulder view of a living teammate. Returns false when there's nobody to watch.
