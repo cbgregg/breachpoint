@@ -718,7 +718,7 @@ function syncAccount() {
   document.body.classList.toggle('has-account', !!u);
   $('acct-email').textContent = u ? u.email : '';
   $('title-acct').textContent = u && u.name ? `Signed in as ${u.name}` : '';
-  $('mode-online-d').textContent = !account.enabled
+  $('mode-online-d').textContent = window.BREACHPOINT_OFFLINE ? 'Online play works on the full game at breach-point.net.' : !account.enabled
     ? 'Quick match with anyone, or a private 6-digit code for friends.'
     : u && u.name ? `Quick match with anyone, or a private 6-digit code for friends. Playing as ${u.name}.`
       : 'Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.';
