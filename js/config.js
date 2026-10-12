@@ -113,7 +113,7 @@ export const TURN_ENDPOINT = 'https://breachpoint-turn.broad-mouse-d2f9.workers.
 
 // Online accounts (passwordless email sign-in). URL of the Cloudflare Worker in cloudflare/auth-worker.js,
 // e.g. 'https://breachpoint-auth.<you>.workers.dev'. Empty = accounts off: online play needs no sign-in.
-export const AUTH_ENDPOINT = '';
+export const AUTH_ENDPOINT = 'https://breachpoint-auth.broad-mouse-d2f9.workers.dev';
 
 // Quick match (public) rules: the same for every public lobby
 export const PUBLIC_MATCH = { mode: 'tdm', teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false, map: 'random' };

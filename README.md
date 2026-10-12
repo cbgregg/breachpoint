@@ -89,6 +89,8 @@ Why it's safe:
 - In online matches each player carries a **signed match pass** for that match only. The host checks it before letting anyone in, so nobody can join without an account or under someone else's account, and a kicked or declined account can't rejoin from a new tab.
 - Presence (online / where you are / your match code) is only shown to accepted friends, and expires two minutes after you close the game.
 
+**Auto-deploy:** both Workers deploy from this repo with Cloudflare Workers Builds. `cloudflare/wrangler-auth.toml` and `cloudflare/wrangler-turn.toml` hold the non-secret settings (`keep_vars` keeps anything set in the dashboard, and secrets are never in the repo). Each Worker → *Settings → Build*: repository `cbgregg/breachpoint`, branch `main`, root directory `cloudflare`, deploy command `npx wrangler deploy -c wrangler-auth.toml` (or `-c wrangler-turn.toml`), watch paths limited to that Worker's two files.
+
 The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers KV, email sent through Resend). With `AUTH_ENDPOINT` empty in `js/config.js`, accounts are off and Online works without signing in.
 
 **Setup** (about 15 minutes, free tiers):
