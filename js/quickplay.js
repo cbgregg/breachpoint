@@ -50,17 +50,17 @@ export class Board {
     if (!ad || typeof ad.code !== 'string' || !/^\d{6}$/.test(ad.code)) return;
     const clean = {
       code: ad.code, v: ad.v | 0, n: Math.max(0, Math.min(16, ad.n | 0)), max: Math.max(1, Math.min(16, ad.max | 0)),
-      ig: !!ad.ig, open: ad.open !== 0, seen: Date.now(),
+      ig: !!ad.ig, open: ad.open !== 0, m: ['tdm', 'gunfight', 'snd'].includes(ad.m) ? ad.m : 'tdm', seen: Date.now(),
     };
     this.ads.set(clean.code, clean);
     if (this.onAd) this.onAd(clean);
   }
 
   // open lobbies, fullest first so players end up together
-  candidates(proto, exclude) {
+  candidates(proto, exclude, mode = 'tdm') {
     const t = Date.now();
     return [...this.ads.values()]
-      .filter(a => a.v === proto && a.open && a.n < a.max && t - a.seen < STALE && !exclude.has(a.code))
+      .filter(a => a.v === proto && a.open && a.m === mode && a.n < a.max && t - a.seen < STALE && !exclude.has(a.code))
       .sort((a, b) => b.n - a.n || Math.random() - 0.5);
   }
 

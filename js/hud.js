@@ -14,7 +14,7 @@ const PAD_GLYPH = {
 };
 const KEY_GLYPH = {
   accept: 'Enter', back: 'Esc', jump: 'Space', crouch: 'C', reload: 'R', swap: 'Q', grenade: 'G', melee: 'V', sprint: 'Shift',
-  prevTab: 'Q', nextTab: 'E', pause: 'Esc', scoreboard: 'Tab', alt: 'Y',
+  prevTab: 'Q', nextTab: 'E', pause: 'Esc', scoreboard: 'Tab', alt: 'F',
 };
 export function glyph(act, device) {
   if (device === 'pad') { const [t, c] = PAD_GLYPH[act] || ['?', '']; return `<i class="pg ${c}">${t}</i>`; }
@@ -410,8 +410,9 @@ export class HUD {
 
   hideDeath() { $('death').classList.remove('on'); }
 
-  countdown(n) {
+  countdown(n, intro = false) {
     const el = $('countdown');
+    this.cls('count-label', 'on', n > 0 && intro);
     if (n <= 0) { el.classList.remove('on'); return; }
     if (el.textContent !== String(n)) {
       el.textContent = n;

@@ -396,6 +396,7 @@ export class PlayerController {
     const bobAmt = Math.min(1, hs / 6) * (1 - 0.85 * c.adsT);
     this.landDip = Math.max(0, this.landDip - dt * 4);
     c.eyePos(cam.position);
+    if (c.stepOff) cam.position.y += c.stepOff; // stairs: ease the eye over each step
     if (this.correction) { cam.position.add(this.correction); this.correction.multiplyScalar(Math.max(0, 1 - dt * 12)); }
     cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.03 * bobAmt - Math.sin(this.landDip * Math.PI) * 0.07;
     this.shake = Math.max(0, this.shake - dt * 4);
@@ -404,7 +405,11 @@ export class PlayerController {
     cam.rotation.order = 'YXZ';
     cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
     this.tacK = lerp(this.tacK || 0, c.tacSprinting ? 1 : 0, Math.min(1, dt * 8));
-    const fov = lerp(vfov(s.fov), this.adsFov(c.weapon.def), c.adsT) * (c.sprinting ? 1.06 + 0.05 * this.tacK : 1);
+    // sprint widens the view a little, eased in and out over about half a second (never a snap)
+    const sprintGoal = c.sprinting ? 1 : 0;
+    this.sprintK = (this.sprintK || 0) + (sprintGoal - (this.sprintK || 0)) * Math.min(1, dt * (sprintGoal ? 3.2 : 4.5));
+    const sk = this.sprintK * this.sprintK * (3 - 2 * this.sprintK);
+    const fov = lerp(vfov(s.fov), this.adsFov(c.weapon.def), c.adsT) * (1 + sk * (0.035 + 0.025 * this.tacK));
     if (Math.abs(fov - this.lastFov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();

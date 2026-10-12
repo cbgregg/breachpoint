@@ -180,9 +180,10 @@ export class Lobby {
   // ---------- guest ----------
   // ---------- quick match ----------
   // read public lobby notices for a few seconds, join the fullest open one, or host if there are none
-  quick(name, primary) {
+  quick(name, primary, mode = 'tdm') {
     this.close();
     this.quickMode = true;
+    this.quickGm = ['tdm', 'gunfight', 'snd'].includes(mode) ? mode : 'tdm';
     this.quickTried = new Set();
     this.quickName = name; this.quickPrimary = primary;
     this.status = 'matching';
@@ -196,7 +197,7 @@ export class Lobby {
     if (!this.quickMode) return;
     this.net.close();
     this.role = null;
-    const c = this.board.candidates(PROTO, this.quickTried)[0];
+    const c = this.board.candidates(PROTO, this.quickTried, this.quickGm)[0];
     if (c) { this.quickTried.add(c.code); this.join(c.code, this.quickName, this.quickPrimary, true); return; }
     this.hostPublic();
   }
@@ -219,7 +220,7 @@ export class Lobby {
     clearInterval(this.adTimer);
     const advertise = () => {
       if (!this.public || this.role !== 'host') return;
-      this.board.publish({ v: PROTO, code: this.code, n: this.players.size + 1, max: MAX_HUMANS, ig: this.inMatch ? 1 : 0, open: 1 }).catch(() => {});
+      this.board.publish({ v: PROTO, code: this.code, n: this.players.size + 1, max: MAX_HUMANS, ig: this.inMatch ? 1 : 0, open: 1, m: this.quickGm || 'tdm' }).catch(() => {});
     };
     advertise();
     this.adTimer = setInterval(advertise, 4000);
@@ -297,7 +298,9 @@ export class Lobby {
 
   admit(id, p) {
     this.pending.set(id, p);
-    if (this.approval) {
+    // friends (by signed account, never by name) skip the approval step
+    const friend = !!(p.uid && this.account && this.account.isFriend(p.uid));
+    if (this.approval && !friend) {
       this.net.send({ t: 'lobby', st: 'pending' }, id);
       this.toast(`${p.name.toUpperCase()} WANTS TO JOIN`);
       this.changed();
@@ -313,7 +316,7 @@ export class Lobby {
         if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, id); return; }
         const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str };
         if (this.account && this.account.enabled) {
-          // accounts are on: only players with a valid pass for this code get in, under their account callsign
+          // accounts are on: only players with a valid pass for this code get in, under their account Name Tag
           if (this.checking.has(id)) return;
           this.checking.add(id);
           const code = this.code;
@@ -460,7 +463,7 @@ export class HostSession {
     if (bot) this.rosterRm.push(bot.id), g.removeCharacter(bot);
     const c = this.createRemote(p);
     g.characters.push(c);
-    c.spawn(g.chooseSpawn(c.team), g.world.spawnYaw[c.team]);
+    c.spawn(g.chooseSpawn(c.team), g.spawnYawOut);
     if (g.gm) g.gm.onJoin(c);
     this.rosterAdd.push(c);
     this.sendStart(this.remotes.get(p.peerId));
@@ -871,6 +874,7 @@ export class GuestSession {
     const oldX = c.pos.x, oldY = c.pos.y, oldZ = c.pos.z;
     const keepAds = c.adsT, keepCrouch = c.wantCrouch, keepSprint = c.sprinting;
     const keepFuel = c.tacFuel, keepIdle = c.tacIdle, keepTac = c.tacSprinting; // our own charge is predicted locally
+    const keepStep = c.stepOff || 0; // the replay mustn't stack stair-camera easing
     c.pos.set(x, y, z);
     c.vel.set(vx, vy, vz);
     c.onGround = !!(fl & 1);
@@ -889,7 +893,7 @@ export class GuestSession {
       c.adsT = p.adsT;
       c.updateMovement(cmd.dt, _wish, !!cmd.sp, !!cmd.j, !!cmd.sl, !!cmd.tac);
     }
-    c.tacFuel = keepFuel; c.tacIdle = keepIdle; c.tacSprinting = keepTac;
+    c.tacFuel = keepFuel; c.tacIdle = keepIdle; c.tacSprinting = keepTac; c.stepOff = keepStep;
     g.audio.muted = false;
     c.adsT = keepAds; c.wantCrouch = keepCrouch;
     if (!this.pending.length) c.sprinting = keepSprint && c.sprinting;

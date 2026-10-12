@@ -1,5 +1,5 @@
-// Callsign filter for public play. Names that contain slurs or strong profanity (including common
-// letter swaps like 4→a, 1→i, $→s, and padding like "f.u.c.k") are replaced with a neutral callsign.
+// Name Tag filter for public play. Names that contain slurs or strong profanity (including common
+// letter swaps like 4→a, 1→i, $→s, and padding like "f.u.c.k") are replaced with a neutral Name Tag.
 const LEET = { 0: 'o', 1: 'i', 2: 'z', 3: 'e', 4: 'a', 5: 's', 6: 'g', 7: 't', 8: 'b', 9: 'g', '@': 'a', '$': 's', '!': 'i', '|': 'i', '+': 't' };
 // matched anywhere in the squashed name (long, unambiguous stems)
 const STRONG = [

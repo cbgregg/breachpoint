@@ -80,6 +80,62 @@ export class Music {
   }
   ambientLevel(v) { if (this.amb) this.amb.level(v); }
 
+  // pre-match countdown: a drum build-up that lands its biggest hit when the match starts (in `secs`)
+  hype(secs = 10) {
+    if (!this.ensure()) return;
+    this.stop();
+    this.cancelHype();
+    const ctx = this.ctx, nb = this.audio.noise;
+    const t0 = ctx.currentTime + 0.05, end = t0 + secs;
+    const bus = ctx.createGain();
+    bus.gain.value = 0.95;
+    bus.connect(this.out);
+    const send = ctx.createGain(); send.gain.value = 0.45; bus.connect(send).connect(this.hall);
+    this.hypeBus = bus;
+    const beat = 0.5; // 120 BPM, counted back from the start so the last hit is exactly on 0
+    for (let k = Math.floor(secs / beat); k >= 1; k--) {
+      const t = end - k * beat, left = end - t;   // seconds to go
+      if (t < t0) continue;
+      const bar = Math.floor((secs - left) / 2);  // 0..4
+      const b = Math.round((secs - left) / beat) % 4;
+      if (left > 6) { if (b === 0 || b === 2) drum(ctx, bus, nb, t, 'taiko', 0.75); }
+      else if (left > 2) {
+        drum(ctx, bus, nb, t, 'taiko', 0.85);
+        drum(ctx, bus, nb, t + beat / 2, 'tom', 0.9 + (b % 2) * 0.25);
+        if (b === 3) drum(ctx, bus, nb, t + beat * 0.75, 'snare', 0.5);
+      } else {
+        drum(ctx, bus, nb, t, 'taiko', 1);
+        for (let i = 0; i < 4; i++) drum(ctx, bus, nb, t + i * beat / 4, i % 2 ? 'tom' : 'snare', 0.45 + (2 - left) * 0.3 + i * 0.05);
+      }
+      if (bar >= 1 && b === 0 && left > 2) drum(ctx, bus, nb, t, 'kick', 0.8);
+    }
+    // a low drone and a rising noise sweep under the last seconds
+    const o = ctx.createOscillator(), og = ctx.createGain(), of = ctx.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.value = mtof(26); of.type = 'lowpass'; of.Q.value = 4;
+    of.frequency.setValueAtTime(120, t0); of.frequency.exponentialRampToValueAtTime(900, end);
+    og.gain.setValueAtTime(0.0001, t0); og.gain.exponentialRampToValueAtTime(0.08, t0 + 2); og.gain.setValueAtTime(0.08, end - 0.6); og.gain.exponentialRampToValueAtTime(0.16, end); og.gain.exponentialRampToValueAtTime(0.0001, end + 0.4);
+    o.connect(of).connect(og).connect(bus); o.start(t0); o.stop(end + 0.5);
+    const rs = Math.max(t0, end - 3);
+    {
+      const src = ctx.createBufferSource(); src.buffer = nb; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.Q.value = 1.2;
+      f.frequency.setValueAtTime(400, rs); f.frequency.exponentialRampToValueAtTime(6500, end);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, rs); g.gain.exponentialRampToValueAtTime(0.16, end); g.gain.exponentialRampToValueAtTime(0.0001, end + 0.15);
+      src.connect(f).connect(g).connect(bus); src.start(rs); src.stop(end + 0.2);
+    }
+    // the hit
+    drum(ctx, bus, nb, end, 'taiko', 1.3); drum(ctx, bus, nb, end + 0.012, 'taiko', 1.1);
+    drum(ctx, bus, nb, end, 'kick', 1); drum(ctx, bus, nb, end + 0.01, 'crash', 0.9);
+    for (const m of [38, 50, 57, 62, 65]) for (const det of [-8, 8]) voice(ctx, bus, end, { freq: mtof(m), det, type: 'sawtooth', attack: 0.02, hold: 0.5, release: 1.4, gain: 0.045, cutoff: 1800, env: 2.5 });
+  }
+  cancelHype() {
+    if (!this.hypeBus) return;
+    const g = this.hypeBus.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t); g.setTargetAtTime(0.0001, t, 0.08);
+    const b = this.hypeBus; setTimeout(() => { try { b.disconnect(); } catch (_) { /* gone */ } }, 600);
+    this.hypeBus = null;
+  }
+
   // short end-of-match cue, then the menu theme
   sting(win) {
     if (!this.ensure()) return;

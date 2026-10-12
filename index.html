@@ -50,6 +50,7 @@
     <div id="medal"></div>
     <div id="prompt"></div>
     <div id="center-msg"></div>
+    <div id="count-label"><b>MATCH BEGINS IN</b><span id="count-sub"></span></div>
     <div id="countdown"></div>
     <div id="protect">SPAWN PROTECTION</div>
 
@@ -105,6 +106,7 @@
     <div class="title-wrap">
       <div class="title-logo"><span class="mark"></span>BREACHPOINT</div>
       <div class="title-sub">TEAM DEATHMATCH · GUNFIGHT · SEARCH &amp; DESTROY</div>
+      <div class="title-pa"><span class="pa-chip">PRE-ALPHA</span></div>
       <div class="title-press" id="title-press">PRESS ENTER TO START</div>
     </div>
     <div class="title-foot"><span id="title-acct"></span></div>
@@ -130,28 +132,30 @@
     </div>
   </div>
 
-  <!-- ============ Sign in (email link or code, no passwords) ============ -->
+  <!-- ============ Sign in (email link only, no passwords) ============ -->
   <div id="signin" class="screen">
     <div class="mw narrow signin">
       <header class="mw-head"><div class="bo-title"><b id="si-title">SIGN IN</b><small>MULTIPLAYER ACCOUNT · NO PASSWORD</small></div></header>
       <div class="si-step" id="si-email">
-        <p class="si-lead">Enter your email. We'll send a sign-in link and a 6-digit code. There's no password to remember or leak.</p>
+        <p class="si-lead">Enter your email and we'll send you a sign-in link. There's no password to remember or leak.</p>
         <input id="si-email-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
+        <label class="si-remember"><input type="checkbox" id="si-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
+        <p class="si-warn" id="si-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link, and sign out on shared or public computers.</p>
         <button id="si-send" class="cta" data-nav><span>EMAIL ME A SIGN-IN LINK</span><span class="glyph" data-act="accept"></span></button>
       </div>
-      <div class="si-step" id="si-code">
-        <p class="si-lead">Sent to <b id="si-to"></b>. Open the link on this device, or type the code from the email here (handy on a console or TV).</p>
-        <input id="si-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" data-nav>
-        <button id="si-verify" class="cta" data-nav><span>SIGN IN</span><span class="glyph" data-act="accept"></span></button>
+      <div class="si-step" id="si-sent">
+        <div class="si-mail" aria-hidden="true"></div>
+        <p class="si-lead">We sent a sign-in link to <b id="si-to"></b>. Open it <b>on this device</b> and you'll be signed in here. It works once, for 15 minutes.</p>
+        <p class="si-lead dim">Nothing yet? Check your spam folder, or send it again.</p>
         <div class="si-row"><button id="si-resend" class="menu-btn small" data-nav>SEND AGAIN</button><button id="si-other" class="menu-btn small" data-nav>USE A DIFFERENT EMAIL</button></div>
       </div>
       <div class="si-step" id="si-name">
-        <p class="si-lead">Pick your callsign. It's yours: no one else online can use it. You can change it later in Loadout.</p>
-        <input id="si-name-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Callsign" data-nav>
+        <p class="si-lead">Choose your <b>Name Tag</b>. It's what everyone sees in matches. You can change it once a day, and friends can see your previous Name Tags.</p>
+        <input id="si-name-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav>
         <button id="si-name-save" class="cta" data-nav><span>CONTINUE</span><span class="glyph" data-act="accept"></span></button>
       </div>
       <div class="join-status" id="si-status"></div>
-      <p class="pane-note si-fine">Your email is only used to sign you in. It's never shown to other players.</p>
+      <p class="pane-note si-fine">Your email is only used to sign you in. Nobody else can ever see it, not even your friends.</p>
       <div class="cf-badge" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
       <button id="si-back" class="menu-btn" data-nav>BACK</button>
     </div>
@@ -213,7 +217,7 @@
           <div class="lo-grid">
             <div class="lo-left">
               <div class="rows">
-                <div class="row"><label for="opt-name">Callsign</label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+                <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
               </div>
               <div class="group">PRIMARY</div>
               <div id="weapon-list" class="weapons"></div>
@@ -244,6 +248,8 @@
             <div class="row"><label for="opt-adszoom">ADS zoom <output id="out-adszoom"></output></label><input type="range" id="opt-adszoom" min="0.5" max="1.6" step="0.05" data-nav></div>
             <div class="row"><label for="opt-sightsize">Sight size when aiming</label><select id="opt-sightsize" data-nav>
               <option value="normal">Normal</option><option value="large">Large</option><option value="huge">Huge</option></select></div>
+            <div class="row touch-only"><label for="opt-touchsize">Touch: button size</label><select id="opt-touchsize" data-nav>
+              <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
             <div class="row touch-only"><label for="opt-touchads">Touch: aim down sights</label><select id="opt-touchads" data-nav>
               <option value="toggle">Tap</option><option value="hold">Hold</option></select></div>
             <div class="row touch-only"><label for="opt-autofire">Touch: auto-fire on target</label><input type="checkbox" id="opt-autofire" data-nav></div>
@@ -260,10 +266,14 @@
             <div class="row relay-only"><label>Cloudflare relay <output id="relay-status"></output></label><button id="relay-test" class="menu-btn small" data-nav>TEST</button></div>
             <div class="group acct-only">ACCOUNT</div>
             <div class="row acct-only"><label>Signed in <output id="acct-email"></output></label><button id="acct-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
-            <div class="row acct-only"><label>Delete account and callsign</label><button id="acct-del" class="menu-btn small danger" data-nav>DELETE</button></div>
+            <div class="row acct-only"><label>Delete account, Name Tag and friends</label><button id="acct-del" class="menu-btn small danger" data-nav>DELETE</button></div>
             <div class="group">AUDIO</div>
             <div class="row"><label for="opt-vol">Master volume <output id="out-vol"></output></label><input type="range" id="opt-vol" min="0" max="1" step="0.05" data-nav></div>
             <div class="row"><label for="opt-music">Music volume <output id="out-music"></output></label><input type="range" id="opt-music" min="0" max="1" step="0.05" data-nav></div>
+            <div class="group">ABOUT</div>
+            <div class="row about-row"><label><span>Developed by cbgregg · <span class="pa-chip">PRE-ALPHA</span></span><small>Artificial intelligence was used to assist with development of this project.</small></label></div>
+            <div class="row"><label>Feature request or feedback<small>Opens a new issue on the game's GitHub page</small></label><button id="feedback-btn" class="menu-btn small" data-nav>SEND FEEDBACK</button></div>
+            <div class="row"><label>Keep the servers running<small>I'm a one-man team</small></label><button id="coffee-btn" class="menu-btn small" data-nav>☕ BUY ME A COFFEE</button></div>
           </div>
           <div class="controls-ref">
             <table>
@@ -371,7 +381,7 @@
       <div id="lobby-quickintro" class="lobby-view">
         <div class="code-label">PUBLIC MATCH</div>
         <p class="notice" id="quick-ipnote">Quick match puts you in a game with strangers. Like any peer-to-peer game, <b>the other players in your match can see your IP address</b>, and whoever hosts runs the match.</p>
-        <p class="notice dim">There's no chat. Offensive callsigns are replaced automatically. Use <b>Host online match</b> for a private game with friends.</p>
+        <p class="notice dim">There's no chat. Offensive Name Tags are replaced automatically. Use <b>Host online match</b> for a private game with friends.</p>
         <button id="quick-go" class="cta" data-nav><span>FIND A MATCH</span></button>
       </div>
 
@@ -414,6 +424,69 @@
   </div>
 
   <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
+  <!-- ============ Pre-alpha + support (all menus) ============ -->
+  <div id="support" class="support">
+    <span class="pa-chip">PRE-ALPHA</span>
+    <span class="sp-msg">Keep the servers running: I'm a one-man team.</span>
+    <a class="sp-coffee" href="https://buymeacoffee.com/breachpoint" target="_blank" rel="noopener">☕ BUY ME A COFFEE</a>
+  </div>
+
+  <!-- ============ Social sidebar (Y / F): sign in, Name Tag, friend code, friends ============ -->
+  <button id="side-btn" class="side-btn" title="Friends and account (Y on a controller, F on a keyboard)"><span class="glyph" data-act="alt"></span><span class="sb-t">FRIENDS</span><span class="sb-on" id="sb-on"></span><span class="sb-req" id="sb-req"></span></button>
+  <div id="side-scrim"></div>
+  <aside id="side" aria-label="Friends and account" aria-hidden="true">
+    <header class="sd-head">
+      <div class="bo-title"><b>SOCIAL</b><small id="sd-sub">FRIENDS · ACCOUNT</small></div>
+      <button id="sd-close" class="sd-x" data-nav title="Close"><span class="glyph" data-act="back"></span><span>CLOSE</span></button>
+    </header>
+    <div class="sd-body">
+      <!-- accounts not switched on for this server -->
+      <section class="sd-sec" id="sd-off">
+        <p class="sd-note">Online accounts aren't switched on for this server yet, so friends and sign-in are unavailable. Your Name Tag is saved on this device (Create a Class).</p>
+      </section>
+
+      <!-- signed out -->
+      <section class="sd-sec" id="sd-in">
+        <div class="sd-k">SIGN IN</div>
+        <p class="sd-note">Sign in with an email link to get a Name Tag, a friend code, and to join friends' matches. No password.</p>
+        <input id="sd-email" class="sd-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
+        <label class="si-remember"><input type="checkbox" id="sd-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
+        <p class="si-warn" id="sd-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link.</p>
+        <button id="sd-send" class="menu-btn sd-cta" data-nav>EMAIL ME A SIGN-IN LINK</button>
+        <div class="join-status" id="sd-in-status"></div>
+      </section>
+
+      <!-- signed in -->
+      <section class="sd-sec" id="sd-me">
+        <div class="sd-card">
+          <span class="pc-emb" id="sd-emb"></span>
+          <div class="sd-who"><b id="sd-tag"></b><small id="sd-acct"></small></div>
+        </div>
+
+        <div class="sd-k">NAME TAG <small>everyone sees this</small></div>
+        <div class="sd-line"><input id="sd-tag-in" class="sd-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav><button id="sd-tag-save" class="menu-btn small" data-nav>CHANGE</button></div>
+        <p class="sd-note" id="sd-tag-note"></p>
+
+        <div class="sd-k">DISPLAY NAME <small>only friends see this</small></div>
+        <div class="sd-line"><input id="sd-disp-in" class="sd-in" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. your first name" data-nav><button id="sd-disp-save" class="menu-btn small" data-nav>SAVE</button></div>
+
+        <div class="sd-k">YOUR FRIEND CODE</div>
+        <div class="sd-line"><div class="sd-code" id="sd-code"></div><button id="sd-code-copy" class="menu-btn small" data-nav>COPY</button></div>
+        <p class="sd-note">Give this code to friends so they can add you.</p>
+
+        <div class="sd-k">ADD A FRIEND</div>
+        <div class="sd-line"><input id="sd-add-in" class="sd-in code" maxlength="9" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" data-nav><button id="sd-add" class="menu-btn small" data-nav>SEND</button></div>
+        <div class="join-status" id="sd-add-status"></div>
+
+        <div id="sd-req-wrap"><div class="sd-k">FRIEND REQUESTS</div><div id="sd-req" class="sd-list"></div></div>
+        <div class="sd-k">FRIENDS <small id="sd-fcount"></small></div>
+        <div id="sd-friends" class="sd-list"></div>
+
+        <div class="sd-foot"><button id="sd-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
+      </section>
+    </div>
+  </aside>
+
   <div id="loading" class="screen on">
     <div class="ld-top"><div class="load-logo">BREACHPOINT</div></div>
     <div class="ld-map"><canvas id="ld-mapc" width="336" height="240"></canvas></div>

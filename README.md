@@ -2,7 +2,9 @@
 
 A browser first-person shooter in the style of modern military shooters: **Team Deathmatch** against **AI bots** or **online with friends using a 6-digit code** (peer-to-peer, no server), on a dusty market district, with full **Xbox controller** support. Built with [Three.js](https://threejs.org/). No build step — apart from the rigged soldier and first-person hand models, every gun, building and sound is generated at runtime (surface textures are CC0 photo scans), so it deploys to GitHub Pages as plain static files.
 
-**Play:** `https://<your-username>.github.io/breachpoint/` (after enabling Pages — see below)
+**Play:** [breach-point.net](https://breach-point.net) · **Status:** pre-alpha
+
+Developed by cbgregg. Artificial intelligence was used to assist with development of this project. Keep the servers running: it's a one-man team, so if you enjoy it, [buy me a coffee](https://buymeacoffee.com/breachpoint). Feature requests and feedback: [open an issue](https://github.com/cbgregg/breachpoint/issues/new).
 
 ## Features
 
@@ -25,7 +27,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Music | Original score synthesized live (no recordings, so nothing to license): a slow D-minor menu theme and a 112 BPM action track whose layers build with recent fighting, the last minute and close finishes; end-of-match stings; separate music volume. Swap in your own tracks via `MUSIC_FILES` in `js/config.js` |
 | Audio | Synthesized: layered gunshots (crack, body, thump, tail) with distance filtering and street reverb, bolt/pump foley, bullet whiz on near misses, casing tinkles, footsteps, explosions, hit/headshot/kill confirms |
 | Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons; push the stick all the way forward to sprint; tap-to-aim and auto-fire on target by default, both in Options) |
-| Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, ADS zoom (scales every optic's magnification), sight size when aiming (Normal / Large / Huge: how much of the screen the optic fills), FOV (Call of Duty-style: degrees across a 4:3 frame, 80 = MW default), mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
+| Settings | Saved to `localStorage`: Name Tag (offline), loadout, match size, difficulty, limits, friendly fire, quality, ADS zoom (scales every optic's magnification), sight size when aiming (Normal / Large / Huge: how much of the screen the optic fills), FOV (Call of Duty-style: degrees across a 4:3 frame, 80 = MW default), mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
 
 ## Controls
 
@@ -71,14 +73,21 @@ The game opens on a title screen (**press Enter / A / tap to start**), then **Of
 
 ### Accounts (passwordless email sign-in)
 
-There are no passwords. You enter your email and get a message with a **sign-in link** and a **6-digit code**: open the link on the same device, or type the code (handy on a console or TV while the email is on your phone). Then you pick a **callsign**, which is unique to your account. Sessions last 60 days on that device. *Options → Account* has Sign out and Delete account.
+There are no passwords. You enter your email and get a **sign-in link** (links only, no codes). Open it on the same device and you're in. Tick **Remember me** to stay signed in on that device for 60 days; the game warns you to use it only on your own device. Without it the session ends when the browser closes (and after a day at most on the server).
+
+- **Name Tag**: what everyone sees in matches. Name Tags aren't unique (anyone can pick any tag that passes the filter), and you can change yours **once a day**. Friends can see your previous Name Tags.
+- **Display name**: optional, and only your friends see it.
+- **Friend code** (`ABCD-2345`): every account gets one. Give it to friends; they enter it to send you a request.
+- **Social sidebar**: press **Y** on a controller, **F** on a keyboard, or tap **FRIENDS** in any menu. Sign in, change your Name Tag and display name, copy your friend code, add friends by code, accept / decline / cancel requests, see who's online and where (menus, lobby or match, mode and map), and **Join** a friend's lobby or match. Friends skip the host's approval step.
+- *Options → Account* has Sign out and Delete account (which also removes you from friends' lists).
 
 Why it's safe:
-- Links and codes expire quickly and work once, and wrong codes are limited. Only hashes of links, codes and sessions are stored, so a leaked database can't sign anyone in.
+- Sign-in links expire after 15 minutes and work once. Only hashes of links and sessions are stored, so a leaked database can't sign anyone in.
 - The link token sits in the URL fragment (`#login=…`), which browsers never send to a server, and the game wipes it from the address bar immediately. The page sends no referrer.
-- Sign-in emails are rate-limited, and the server gives the same answer whether or not an email has an account.
-- In online matches each player carries a **signed match pass** for that match only. The host checks it before letting anyone in, so nobody can join without an account or under someone else's callsign, and a kicked or declined account can't rejoin from a new tab.
-- Other players never see your email.
+- Sign-in emails and friend requests are rate-limited, and the server gives the same answer whether or not an email has an account.
+- **Nobody can see anyone's email.** The server never returns an email to other players or friends; you see your own only masked (`c•••••@example.com`).
+- In online matches each player carries a **signed match pass** for that match only. The host checks it before letting anyone in, so nobody can join without an account or under someone else's account, and a kicked or declined account can't rejoin from a new tab.
+- Presence (online / where you are / your match code) is only shown to accepted friends, and expires two minutes after you close the game.
 
 The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers KV, email sent through Resend). With `AUTH_ENDPOINT` empty in `js/config.js`, accounts are off and Online works without signing in.
 
@@ -107,7 +116,7 @@ The match keeps running while the pause menu is open in online play. The host sh
 
 ### Security and privacy
 
-There is no game server: the host's browser runs the match and checks everything guests send, so a modified client can't move faster, heal, refill ammo or report its own hits, and players are only sent what they could plausibly see. Signaling is encrypted with a key derived from the match code and game traffic is encrypted WebRTC. Callsigns are filtered, hosts can approve, kick and ban players, and with accounts on, every guest's identity is checked with a signed pass.
+There is no game server: the host's browser runs the match and checks everything guests send, so a modified client can't move faster, heal, refill ammo or report its own hits, and players are only sent what they could plausibly see. Signaling is encrypted with a key derived from the match code and game traffic is encrypted WebRTC. Name Tags are filtered, hosts can approve, kick and ban players, and with accounts on, every guest's identity is checked with a signed pass.
 
 - **IP addresses:** quick matches go through a Cloudflare relay, so other players can't see your IP. Private matches connect directly unless *Options → Hide my IP in private matches* is on.
 - Online play needs HTTPS (or `localhost`). Some strict networks block WebRTC; if a player can't connect, try another network or let someone else host.
@@ -155,8 +164,8 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/net.js` | Peer-to-peer transport: 6-digit codes, Nostr signaling, WebRTC data channels |
 | `js/online.js` | Lobby (approval, kick, teams), host session (input validation, lag compensation, culled snapshots), guest session (prediction, reconciliation, interpolation) |
 | `js/quickplay.js` | Quick match: public lobby notices over Nostr, choosing a lobby |
-| `js/names.js` | Callsign filter |
-| `js/account.js` | Online accounts: email sign-in (link or code), sessions, callsigns, signed match passes |
+| `js/names.js` | Name Tag filter |
+| `js/account.js` | Online accounts: email-link sign-in, remember me, Name Tags, display names, friends, presence, signed match passes |
 | `cloudflare/auth-worker.js` | Account server (Cloudflare Worker): sign-in emails via Resend, KV storage, pass signing |
 | `cloudflare/turn-worker.js` | TURN relay credentials (Cloudflare Worker) |
 | `lib/trystero.js` | Vendored [Trystero](https://github.com/dmotz/trystero) 0.25 (Nostr strategy), MIT |
@@ -200,6 +209,7 @@ npx serve .            # or: python3 -m http.server 8000
 
 ## Credits
 
+- Developed by cbgregg. Artificial intelligence was used to assist with development of this project.
 - Soldier model and animations (`assets/models/soldier.glb`): the *Soldier* sample from the [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf), a Mixamo character. Mixamo assets are royalty-free for use in projects under Adobe's terms; check those terms before commercial use, or swap in your own rigged `.glb` with a Mixamo skeleton.
 - Peer-to-peer matchmaking: [Trystero](https://github.com/dmotz/trystero) by Dan Motzenbecker (MIT), vendored in `lib/`.
 - First-person hands (`assets/models/hands.glb`, `assets/textures/hands/`): a rigged, textured hand model ("Rigged Hand", 2015) supplied by the project owner, converted to glTF with only the right hand kept (the left is the same mesh mirrored) and driven by the game's own grip poses and arm IK. Check the original model's license before commercial use.

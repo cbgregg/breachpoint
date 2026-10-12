@@ -284,7 +284,8 @@ export class Input {
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
           stickId = t.identifier; sx = t.clientX; sy = t.clientY;
-          stick.style.left = `${sx - 60}px`; stick.style.top = `${sy - 60}px`;
+          const z = parseFloat(getComputedStyle(ui).zoom) || 1; // the touch layer can be scaled down (Options)
+          stick.style.left = `${sx / z - 60}px`; stick.style.top = `${sy / z - 60}px`;
           stick.classList.add('show');
         } else if (lookId === null) {
           lookStart(t);

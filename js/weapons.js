@@ -509,9 +509,12 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     p.lathe(M.metal, [[0.0145, 0.425], [0.0165, 0.428], [0.0165, 0.452], [0.0145, 0.455]], 0.096, 0, 20);
     p.lathe(M.metal, [[0.0145, 0.455], [0.0145, 0.425]], 0.096, 0, 20);
     p.rbox(M.metal, 0.002, 0.012, 0.004, 0, 0.09, -0.44, 0.0008);
-    // rear drum sight
-    p.add(M.metal, new THREE.CylinderGeometry(0.012, 0.012, 0.022, 16), 0, 0.085, 0.005, 0, 0, Math.PI / 2);
-    p.rbox(M.metal, 0.02, 0.012, 0.012, 0, 0.077, 0.005, 0.002);
+    // rear drum sight: the drum sits low and carries a ring aperture centred on the sight line, so
+    // aiming looks through the ring at the front post (nothing solid crosses the line of sight)
+    p.add(M.metal, new THREE.CylinderGeometry(0.0085, 0.0085, 0.022, 16), 0, 0.0805, 0.005, 0, 0, Math.PI / 2);
+    p.rbox(M.metal, 0.02, 0.01, 0.012, 0, 0.076, 0.005, 0.002);
+    p.lathe(M.metal, [[0.0068, -0.009], [0.0086, -0.009], [0.0086, -0.001], [0.0068, -0.001], [0.0068, -0.009]], 0.096, 0, 24); // thin ghost ring
+    for (const xs of [-1, 1]) p.rbox(M.metal, 0.003, 0.01, 0.008, xs * 0.0078, 0.0855, 0.005, 0.001); // ring posts
     // slim polymer handguard
     p.profile(M.poly, [[0.24, 0.06], [0.39, 0.056, 0.014], [0.404, 0.032, 0.014], [0.396, -0.006, 0.014], [0.27, -0.01, 0.01], [0.24, 0.004]], 0.044, { bevel: 0.006, r: 0.012 });
     for (let i = 0; i < 5; i++) p.rbox(M.recess, 0.046, 0.0025, 0.006, 0, 0.002, -0.27 - i * 0.026, 0.001);
@@ -527,7 +530,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     } else if (A.under === 'agrip') {
       p.profile(M.poly, [[0.285, -0.008], [0.375, -0.008], [0.36, -0.022, 0.006], [0.32, -0.036, 0.008], [0.3, -0.032, 0.006]], 0.03, { r: 0.006, bevel: 0.003 });
       foregrip.position.set(0, -0.024, -0.335);
-    } else foregrip.position.set(0, 0.005, -0.32);
+    } else foregrip.position.set(0, -0.012, -0.31); // low on the handguard so the fingers stay out of the sight picture
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.032, 0.03, 0.34);
     // magwell + trigger housing
     p.profile(M.metal, [[0.122, 0.0], [0.162, 0.0], [0.162, -0.03, 0.004], [0.122, -0.03, 0.004]], 0.03, { r: 0.004, bevel: 0.0015 });

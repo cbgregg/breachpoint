@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { PLAYER } from './config.js';
 
+const STEP_DOWN = 0.36; // largest drop that counts as a stair step when walking down
+
 export class Box {
   constructor(minx, miny, minz, maxx, maxy, maxz) {
     this.minx = minx; this.miny = miny; this.minz = minz;
@@ -85,6 +87,7 @@ export class Physics {
   }
 
   moveEntity(e, dt) {
+    // e.stepOff: how far the eye lags behind the feet after a step (decays to 0); e.noSnap: skip stair snapping (jumps)
     const p = e.pos, r = e.radius, h = e.height;
     const wasGround = e.onGround;
 
@@ -99,6 +102,7 @@ export class Physics {
         if (!b) break;
         const step = b.maxy - p.y;
         if (wasGround && step > 0 && step <= PLAYER.stepHeight && !this.overlap(p.x, b.maxy + 0.001, p.z, r, h)) {
+          e.stepOff = (e.stepOff || 0) - step; // the camera eases up the step instead of snapping
           p.y = b.maxy;
           continue;
         }
@@ -126,6 +130,22 @@ export class Physics {
     }
     // ground probe so we stay grounded while standing still
     if (!e.onGround && e.vel.y <= 0 && this.overlap(p.x, p.y - 0.03, p.z, r * 0.95, 0.03)) e.onGround = true;
+    // walking down stairs: stick to the next step down instead of falling onto it (no hopping)
+    if (!e.onGround && wasGround && e.vel.y <= 0 && !e.noSnap) {
+      let top = -Infinity;
+      const rr = r * 0.95, lim = p.y - STEP_DOWN;
+      for (const b of this.boxes) {
+        if (b.maxy > p.y + 1e-3 || b.maxy < lim || b.maxy <= top) continue;
+        if (p.x - rr < b.maxx && p.x + rr > b.minx && p.z - rr < b.maxz && p.z + rr > b.minz) top = b.maxy;
+      }
+      if (top > -Infinity && !this.overlap(p.x, top + 0.001, p.z, r, h)) {
+        e.stepOff = (e.stepOff || 0) + (p.y - top);
+        p.y = top;
+        e.vel.y = 0;
+        e.onGround = true;
+      }
+    }
+    if (e.stepOff) e.stepOff = Math.abs(e.stepOff) < 0.002 ? 0 : Math.max(-1, Math.min(1, e.stepOff * Math.exp(-dt * 7.5)));
   }
 
   // Small sphere (as cube) with bounce; returns true when it bounced this step

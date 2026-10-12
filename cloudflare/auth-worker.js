@@ -1,15 +1,23 @@
-// Breachpoint account Worker: passwordless sign-in by email (Cloudflare Workers + Workers KV + Resend).
+// Breachpoint account Worker: passwordless sign-in by email link, Name Tags, friend codes, friends and
+// presence (Cloudflare Workers + Workers KV + Resend).
 //
-// How sign-in works
-//   1. The game posts an email address to /start. The Worker emails a one-time sign-in link and a
-//      6-digit code (for consoles/TVs, where the email is read on a phone). The response is the same
-//      whether or not the address has an account, so it can't be used to find out who plays.
-//   2. Opening the link (or typing the code into the game) calls /verify, which creates the account
-//      on first use and returns a session token. Links and codes expire after 15 minutes, work once,
-//      and a code allows 5 guesses. Only SHA-256 hashes of links, codes and sessions are stored.
-//   3. For online matches the game asks /ticket for a short-lived signed pass naming the player and
-//      the match code. Hosts check the signature with the public key from /pubkey, so nobody can join
-//      under someone else's callsign or without an account.
+// Sign-in
+//   1. The game posts an email address to /start. The Worker emails a one-time sign-in link. The
+//      response is the same whether or not the address has an account, so it can't be used to find out
+//      who plays.
+//   2. Opening the link calls /verify, which creates the account on first use and returns a session.
+//      Links expire after 15 minutes and work once. "Remember me" keeps the session for 60 days; without
+//      it the session lasts a day (and the game keeps it only until the browser closes). Only SHA-256
+//      hashes of links and sessions are stored.
+//   3. For online matches the game asks /ticket for a short-lived signed pass naming the player and the
+//      match code. Hosts check the signature with the public key from /pubkey.
+//
+// Players
+//   Name Tag      shown to everyone in matches. Not unique. Can be changed once every 24 hours; friends
+//                 can see previous Name Tags.
+//   Display name  optional, only friends see it.
+//   Friend code   unique code (XXXX-XXXX) you give to friends; entering it sends a friend request.
+//   Email         never returned to anyone (your own shows masked in your profile).
 //
 // Setup (Cloudflare dashboard, Workers & Pages → Create → Worker, paste this file):
 //   Bindings:   KV namespace bound as  ACCOUNTS
@@ -20,12 +28,17 @@
 //                                default breach-point.net, www.breach-point.net
 // The ticket signing key is generated on first use and kept in KV.
 
-const LOGIN_TTL = 15 * 60;              // sign-in links and codes
-const SESSION_TTL = 60 * 24 * 3600;     // stay signed in for 60 days (renewed while you play)
+const LOGIN_TTL = 15 * 60;              // sign-in links
+const SESSION_LONG = 60 * 24 * 3600;    // "remember me": 60 days, renewed while you play
+const SESSION_SHORT = 24 * 3600;        // otherwise a day
 const TICKET_TTL = 3 * 3600;            // match passes
-const CODE_TRIES = 5;
+const TAG_EVERY = 24 * 3600;            // Name Tag changes
+const HIST_KEEP = 10;                   // previous Name Tags kept for friends
+const PRESENCE_TTL = 120;               // seconds a heartbeat keeps you "online"
+const MAX_FRIENDS = 200, MAX_PENDING = 50, MAX_REQ_PER_DAY = 40;
 const MAX_STARTS_PER_EMAIL = 4;         // per 15 minutes
 const MAX_STARTS_PER_IP = 12;           // per hour
+const CODE_ABC = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // friend codes: no 0/O, 1/I
 const enc = new TextEncoder();
 
 export default {
@@ -52,9 +65,17 @@ export default {
       switch (path) {
         case '/start': return await start(ctx);
         case '/verify': return await verify(ctx);
-        case '/me': return await withUser(ctx, (u) => json({ user: pub(u) }, 200, cors));
-        case '/name': return await withUser(ctx, (u, s) => setName(ctx, u, s));
+        case '/me': return await withUser(ctx, async (u) => json({ user: await self(env, u) }, 200, cors));
+        case '/name': return await withUser(ctx, (u) => setTag(ctx, u));
+        case '/display': return await withUser(ctx, (u) => setDisplay(ctx, u));
         case '/ticket': return await withUser(ctx, (u) => ticket(ctx, u));
+        case '/presence': return await withUser(ctx, (u) => presence(ctx, u));
+        case '/friends': return await withUser(ctx, (u) => friends(ctx, u));
+        case '/friends/add': return await withUser(ctx, (u) => friendAdd(ctx, u));
+        case '/friends/accept': return await withUser(ctx, (u) => friendAccept(ctx, u));
+        case '/friends/decline': return await withUser(ctx, (u) => friendDrop(ctx, u, 'decline'));
+        case '/friends/cancel': return await withUser(ctx, (u) => friendDrop(ctx, u, 'cancel'));
+        case '/friends/remove': return await withUser(ctx, (u) => friendDrop(ctx, u, 'remove'));
         case '/logout': return await logout(ctx);
         case '/delete': return await withUser(ctx, (u, s) => deleteAccount(ctx, u, s));
         default: return json({ error: 'not found' }, 404, cors);
@@ -65,7 +86,7 @@ export default {
   },
 };
 
-// ---------- sign-in ----------
+// ---------- sign-in (email link only) ----------
 async function start({ env, body, request, cors }) {
   const email = normEmail(body.email);
   if (!email) return json({ error: 'That doesn\'t look like an email address.' }, 400, cors);
@@ -74,38 +95,22 @@ async function start({ env, body, request, cors }) {
   if (!await allow(env, `rl:e:${eh}`, MAX_STARTS_PER_EMAIL, LOGIN_TTL)) return json({ error: 'Too many sign-in emails. Wait a few minutes and check your inbox (and spam folder).' }, 429, cors);
   if (!await allow(env, `rl:ip:${await sha(ip)}`, MAX_STARTS_PER_IP, 3600)) return json({ error: 'Too many sign-in attempts from this network. Try again later.' }, 429, cors);
 
-  const token = rand(32), code = String(100000 + (randInt() % 900000)), rid = rand(16);
-  const rec = { email, th: await sha(token), ch: await sha(`${rid}:${code}`), tries: 0, exp: now() + LOGIN_TTL };
-  await env.ACCOUNTS.put(`req:${rid}`, JSON.stringify(rec), { expirationTtl: LOGIN_TTL });
-  await env.ACCOUNTS.put(`tok:${rec.th}`, rid, { expirationTtl: LOGIN_TTL });
-
+  const token = rand(32);
+  await env.ACCOUNTS.put(`tok:${await sha(token)}`, JSON.stringify({ email, exp: now() + LOGIN_TTL }), { expirationTtl: LOGIN_TTL });
   const app = (env.APP_URL || 'https://breach-point.net').replace(/\/+$/, '');
   // the token goes in the URL fragment, which browsers never send to any server
   const link = `${app}/#login=${token}`;
-  const sent = await sendMail(env, email, link, code);
+  const sent = await sendMail(env, email, link);
   if (!sent.ok) return json({ error: sent.error }, 502, cors);
-  return json({ ok: true, rid }, 200, cors);
+  return json({ ok: true }, 200, cors);
 }
 
 async function verify({ env, body, cors }) {
-  let rid, rec;
-  if (typeof body.token === 'string' && /^[A-Za-z0-9_-]{20,80}$/.test(body.token)) {
-    rid = await env.ACCOUNTS.get(`tok:${await sha(body.token)}`);
-    rec = rid && await getJSON(env, `req:${rid}`);
-    if (!rec || rec.th !== await sha(body.token)) return json({ error: 'This sign-in link has expired or was already used. Request a new one.' }, 400, cors);
-  } else if (typeof body.rid === 'string' && /^[A-Za-z0-9_-]{10,40}$/.test(body.rid) && /^\d{6}$/.test(String(body.code || ''))) {
-    rid = body.rid;
-    rec = await getJSON(env, `req:${rid}`);
-    if (!rec) return json({ error: 'That code has expired. Request a new one.' }, 400, cors);
-    if (rec.ch !== await sha(`${rid}:${body.code}`)) {
-      rec.tries++;
-      if (rec.tries >= CODE_TRIES) { await burn(env, rid, rec); return json({ error: 'Too many wrong codes. Request a new one.', expired: true }, 400, cors); }
-      await env.ACCOUNTS.put(`req:${rid}`, JSON.stringify(rec), { expirationTtl: Math.max(60, rec.exp - now()) });
-      return json({ error: `Wrong code. ${CODE_TRIES - rec.tries} ${CODE_TRIES - rec.tries === 1 ? 'try' : 'tries'} left.` }, 400, cors);
-    }
-  } else return json({ error: 'Missing sign-in link or code.' }, 400, cors);
-  if (rec.exp < now()) { await burn(env, rid, rec); return json({ error: 'That sign-in has expired. Request a new one.' }, 400, cors); }
-  await burn(env, rid, rec); // one use only
+  if (typeof body.token !== 'string' || !/^[A-Za-z0-9_-]{20,80}$/.test(body.token)) return json({ error: 'Missing sign-in link.' }, 400, cors);
+  const tk = `tok:${await sha(body.token)}`;
+  const rec = await getJSON(env, tk);
+  await env.ACCOUNTS.delete(tk); // one use only
+  if (!rec || rec.exp < now()) return json({ error: 'This sign-in link has expired or was already used. Request a new one.' }, 400, cors);
 
   // find or create the account
   const eh = await sha(rec.email);
@@ -113,18 +118,14 @@ async function verify({ env, body, cors }) {
   let user = uid && await getJSON(env, `user:${uid}`);
   if (!user) {
     uid = rand(12);
-    user = { id: uid, email: rec.email, name: null, created: now() };
-    await env.ACCOUNTS.put(`user:${uid}`, JSON.stringify(user));
+    user = { id: uid, email: rec.email, tag: null, created: now() };
     await env.ACCOUNTS.put(`email:${eh}`, uid);
   }
-  const session = rand(32);
-  await env.ACCOUNTS.put(`sess:${await sha(session)}`, JSON.stringify({ uid, at: now() }), { expirationTtl: SESSION_TTL });
-  return json({ session, user: pub(user) }, 200, cors);
-}
-
-async function burn(env, rid, rec) {
-  await env.ACCOUNTS.delete(`req:${rid}`);
-  if (rec && rec.th) await env.ACCOUNTS.delete(`tok:${rec.th}`);
+  await ensureCode(env, user);
+  await env.ACCOUNTS.put(`user:${uid}`, JSON.stringify(user));
+  const session = rand(32), ttl = body.remember ? SESSION_LONG : SESSION_SHORT;
+  await env.ACCOUNTS.put(`sess:${await sha(session)}`, JSON.stringify({ uid, at: now(), ttl }), { expirationTtl: ttl });
+  return json({ session, remember: !!body.remember, user: await self(env, user) }, 200, cors);
 }
 
 // ---------- signed-in requests ----------
@@ -134,36 +135,153 @@ async function withUser(ctx, fn) {
   if (!m) return json({ error: 'Not signed in.', signedOut: true }, 401, cors);
   const sk = `sess:${await sha(m[1])}`;
   const s = await getJSON(env, sk);
-  const user = s && await getJSON(env, `user:${s.uid}`);
+  const user = s && await getUser(env, s.uid);
   if (!user) return json({ error: 'Your sign-in has expired. Sign in again.', signedOut: true }, 401, cors);
-  // keep active players signed in (refresh at most daily to save writes)
-  if (now() - (s.at || 0) > 86400) await env.ACCOUNTS.put(sk, JSON.stringify({ uid: s.uid, at: now() }), { expirationTtl: SESSION_TTL });
+  // keep active players signed in (refresh at most every few hours to save writes)
+  const ttl = s.ttl || SESSION_LONG;
+  if (now() - (s.at || 0) > Math.min(86400, ttl / 4)) await env.ACCOUNTS.put(sk, JSON.stringify({ uid: s.uid, at: now(), ttl }), { expirationTtl: ttl });
   return fn(user, sk);
 }
 
-async function setName({ env, body, cors }, user) {
-  const name = String(body.name || '').replace(/\s+/g, ' ').trim();
-  if (!/^[\p{L}\p{N} _\-.]{3,16}$/u.test(name)) return json({ error: 'Callsigns are 3–16 letters, numbers, spaces, - _ or .' }, 400, cors);
-  if (/^operator(-\d+)?$/i.test(name) || /^bot\b/i.test(name)) return json({ error: 'That callsign is reserved.' }, 400, cors);
-  if (isOffensive(name)) return json({ error: 'Pick a different callsign.' }, 400, cors);
-  const key = `name:${name.toLowerCase()}`;
-  const owner = await env.ACCOUNTS.get(key);
-  if (owner && owner !== user.id) return json({ error: 'That callsign is taken.', taken: true }, 409, cors);
-  if (user.name && user.name.toLowerCase() !== name.toLowerCase()) await env.ACCOUNTS.delete(`name:${user.name.toLowerCase()}`);
-  await env.ACCOUNTS.put(key, user.id);
-  user.name = name;
-  await env.ACCOUNTS.put(`user:${user.id}`, JSON.stringify(user));
-  return json({ user: pub(user) }, 200, cors);
+async function getUser(env, uid) {
+  const u = await getJSON(env, `user:${uid}`);
+  if (u && u.name !== undefined && u.tag === undefined) { u.tag = u.name; delete u.name; } // older records
+  return u;
+}
+const saveUser = (env, u) => env.ACCOUNTS.put(`user:${u.id}`, JSON.stringify(u));
+
+// what you see about yourself (your email only masked)
+async function self(env, u) {
+  if (await ensureCode(env, u)) await saveUser(env, u);
+  return {
+    id: u.id, tag: u.tag || null, disp: u.disp || '', code: fmtCode(u.code), email: maskEmail(u.email),
+    hist: (u.hist || []).map(h => h.t), nextTagAt: u.tag && u.tagAt ? u.tagAt + TAG_EVERY : 0,
+  };
+}
+
+async function ensureCode(env, u) {
+  if (u.code) return false;
+  for (let i = 0; i < 8; i++) {
+    let c = '';
+    for (let k = 0; k < 8; k++) c += CODE_ABC[randInt() % CODE_ABC.length];
+    if (await env.ACCOUNTS.get(`fcode:${c}`)) continue;
+    await env.ACCOUNTS.put(`fcode:${c}`, u.id);
+    u.code = c;
+    return true;
+  }
+  throw new Error('code space');
+}
+
+async function setTag({ env, body, cors }, user) {
+  const tag = String(body.name || '').replace(/\s+/g, ' ').trim();
+  if (!/^[\p{L}\p{N} _\-.]{3,16}$/u.test(tag)) return json({ error: 'Name Tags are 3–16 letters, numbers, spaces, - _ or .' }, 400, cors);
+  if (/^operator(-\d+)?$/i.test(tag) || /^bot\b/i.test(tag)) return json({ error: 'That Name Tag is reserved.' }, 400, cors);
+  if (isOffensive(tag)) return json({ error: 'Pick a different Name Tag.' }, 400, cors);
+  if (user.tag === tag) return json({ user: await self(env, user) }, 200, cors);
+  if (user.tag && user.tagAt && now() - user.tagAt < TAG_EVERY) {
+    return json({ error: 'You can change your Name Tag once a day.', nextTagAt: user.tagAt + TAG_EVERY }, 429, cors);
+  }
+  if (user.tag) user.hist = [{ t: user.tag, until: now() }, ...(user.hist || [])].slice(0, HIST_KEEP);
+  user.tag = tag;
+  user.tagAt = now();
+  await saveUser(env, user);
+  return json({ user: await self(env, user) }, 200, cors);
+}
+
+async function setDisplay({ env, body, cors }, user) {
+  const d = String(body.name || '').replace(/\s+/g, ' ').trim();
+  if (d && !/^[\p{L}\p{N} _\-.'’]{1,24}$/u.test(d)) return json({ error: 'Display names are up to 24 letters, numbers, spaces and - _ . \'' }, 400, cors);
+  if (d && isOffensive(d)) return json({ error: 'Pick a different display name.' }, 400, cors);
+  user.disp = d;
+  await saveUser(env, user);
+  return json({ user: await self(env, user) }, 200, cors);
 }
 
 async function ticket({ env, body, cors }, user) {
-  if (!user.name) return json({ error: 'Choose a callsign first.' }, 400, cors);
+  if (!user.tag) return json({ error: 'Choose a Name Tag first.' }, 400, cors);
   const room = String(body.room || '');
   if (!/^[A-Za-z0-9:_-]{1,40}$/.test(room)) return json({ error: 'bad match code' }, 400, cors);
   const key = await signingKey(env);
-  const payload = b64u(enc.encode(JSON.stringify({ u: user.id, n: user.name, r: room, e: now() + TICKET_TTL })));
+  const payload = b64u(enc.encode(JSON.stringify({ u: user.id, n: user.tag, r: room, e: now() + TICKET_TTL })));
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key.priv, enc.encode(payload));
   return json({ ticket: `${payload}.${b64u(new Uint8Array(sig))}`, exp: now() + TICKET_TTL }, 200, cors);
+}
+
+// ---------- presence: friends see where you are and can join your match ----------
+async function presence({ env, body, cors }, user) {
+  const st = ['menu', 'lobby', 'match'].includes(body.state) ? body.state : 'menu';
+  const p = { s: st, at: now() };
+  if (typeof body.mode === 'string' && /^[a-z]{2,10}$/.test(body.mode)) p.m = body.mode;
+  if (typeof body.map === 'string' && /^[a-z]{2,12}$/.test(body.map)) p.map = body.map;
+  if (typeof body.join === 'string' && /^\d{6}$/.test(body.join)) p.j = body.join;
+  if (body.pub) p.pub = 1;
+  if (body.off) await env.ACCOUNTS.delete(`pres:${user.id}`);
+  else await env.ACCOUNTS.put(`pres:${user.id}`, JSON.stringify(p), { expirationTtl: PRESENCE_TTL });
+  return json({ ok: true }, 200, cors);
+}
+
+// ---------- friends ----------
+const frKey = (id) => `fr:${id}`;
+async function frGet(env, id) { const d = await getJSON(env, frKey(id)); return { f: {}, i: {}, o: {}, ...(d || {}) }; }
+const frPut = (env, id, d) => env.ACCOUNTS.put(frKey(id), JSON.stringify(d));
+
+async function friends({ env, cors }, user) {
+  const d = await frGet(env, user.id);
+  const ids = [...new Set([...Object.keys(d.f), ...Object.keys(d.i), ...Object.keys(d.o)])].slice(0, MAX_FRIENDS + 2 * MAX_PENDING);
+  const users = new Map();
+  await Promise.all(ids.map(async (id) => { const u = await getUser(env, id); if (u) users.set(id, u); }));
+  const pres = new Map();
+  await Promise.all(Object.keys(d.f).map(async (id) => { const p = await getJSON(env, `pres:${id}`); if (p && now() - p.at < PRESENCE_TTL + 30) pres.set(id, p); }));
+  const friendsList = Object.entries(d.f).filter(([id]) => users.has(id)).map(([id, since]) => {
+    const u = users.get(id), p = pres.get(id);
+    return {
+      id, tag: u.tag || 'Operator', disp: u.disp || '', hist: (u.hist || []).map(h => h.t).slice(0, 5), since,
+      online: !!p, state: p ? p.s : 'offline', mode: p && p.m || '', map: p && p.map || '', join: p && p.j || '', pub: !!(p && p.pub),
+    };
+  }).sort((a, b) => (b.online - a.online) || a.tag.localeCompare(b.tag));
+  const pend = (box) => Object.entries(box).filter(([id]) => users.has(id)).map(([id, at]) => ({ id, tag: users.get(id).tag || 'New player', at }));
+  return json({ friends: friendsList, incoming: pend(d.i), outgoing: pend(d.o) }, 200, cors);
+}
+
+async function friendAdd({ env, body, cors }, user) {
+  const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z0-9]{8}$/.test(code)) return json({ error: 'Friend codes look like ABCD-2345.' }, 400, cors);
+  if (!await allow(env, `rl:fr:${user.id}`, MAX_REQ_PER_DAY, 86400)) return json({ error: 'Too many friend requests today. Try again tomorrow.' }, 429, cors);
+  const them = await env.ACCOUNTS.get(`fcode:${code}`);
+  if (!them) return json({ error: 'No player has that friend code.' }, 404, cors);
+  if (them === user.id) return json({ error: 'That\'s your own friend code.' }, 400, cors);
+  const me = await frGet(env, user.id), other = await frGet(env, them);
+  if (me.f[them]) return json({ error: 'You\'re already friends.' }, 400, cors);
+  if (me.i[them]) return friendAccept({ env, body: { id: them }, cors }, user); // they asked first: accept
+  if (me.o[them]) return json({ ok: true, pending: true }, 200, cors);
+  if (Object.keys(me.f).length >= MAX_FRIENDS) return json({ error: 'Your friends list is full.' }, 400, cors);
+  if (Object.keys(me.o).length >= MAX_PENDING || Object.keys(other.i).length >= MAX_PENDING) return json({ error: 'Too many pending requests. Try again later.' }, 400, cors);
+  me.o[them] = now(); other.i[user.id] = now();
+  await frPut(env, user.id, me); await frPut(env, them, other);
+  return json({ ok: true, pending: true }, 200, cors);
+}
+
+async function friendAccept({ env, body, cors }, user) {
+  const them = String(body.id || '');
+  const me = await frGet(env, user.id);
+  if (!me.i[them]) return json({ error: 'That request is gone.' }, 404, cors);
+  const other = await frGet(env, them);
+  if (Object.keys(me.f).length >= MAX_FRIENDS || Object.keys(other.f).length >= MAX_FRIENDS) return json({ error: 'A friends list is full.' }, 400, cors);
+  delete me.i[them]; delete me.o[them]; delete other.o[user.id]; delete other.i[user.id];
+  me.f[them] = now(); other.f[user.id] = now();
+  await frPut(env, user.id, me); await frPut(env, them, other);
+  return json({ ok: true, friends: true }, 200, cors);
+}
+
+async function friendDrop({ env, body, cors }, user, kind) {
+  const them = String(body.id || '');
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(them)) return json({ error: 'bad id' }, 400, cors);
+  const me = await frGet(env, user.id), other = await frGet(env, them);
+  if (kind === 'decline') { delete me.i[them]; delete other.o[user.id]; }
+  else if (kind === 'cancel') { delete me.o[them]; delete other.i[user.id]; }
+  else { delete me.f[them]; delete other.f[user.id]; }
+  await frPut(env, user.id, me); await frPut(env, them, other);
+  return json({ ok: true }, 200, cors);
 }
 
 async function logout({ env, request, cors }) {
@@ -173,7 +291,15 @@ async function logout({ env, request, cors }) {
 }
 
 async function deleteAccount({ env, cors }, user, sk) {
-  if (user.name) await env.ACCOUNTS.delete(`name:${user.name.toLowerCase()}`);
+  const d = await frGet(env, user.id);
+  for (const id of new Set([...Object.keys(d.f), ...Object.keys(d.i), ...Object.keys(d.o)])) {
+    const o = await frGet(env, id);
+    delete o.f[user.id]; delete o.i[user.id]; delete o.o[user.id];
+    await frPut(env, id, o);
+  }
+  await env.ACCOUNTS.delete(frKey(user.id));
+  await env.ACCOUNTS.delete(`pres:${user.id}`);
+  if (user.code) await env.ACCOUNTS.delete(`fcode:${user.code}`);
   await env.ACCOUNTS.delete(`email:${await sha(user.email)}`);
   await env.ACCOUNTS.delete(`user:${user.id}`);
   await env.ACCOUNTS.delete(sk); // other devices' sessions stop working because the user record is gone
@@ -181,21 +307,20 @@ async function deleteAccount({ env, cors }, user, sk) {
 }
 
 // ---------- email ----------
-async function sendMail(env, to, link, code) {
+async function sendMail(env, to, link) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) return { ok: false, error: 'Sign-in email isn\'t set up on the server yet.' };
-  const text = `Your Breachpoint sign-in code is ${code}\n\nOr open this link to sign in:\n${link}\n\nThe link and code expire in 15 minutes and work once. If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share this code.`;
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;background:#0b0d0e;color:#ece9e1;padding:32px">
+  const text = `Open this link to sign in to Breachpoint:\n${link}\n\nThe link expires in 15 minutes and works once. If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share this link.`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;background:#070a0d;color:#eef2f4;padding:32px">
   <div style="max-width:440px;margin:0 auto">
-    <div style="font-weight:700;letter-spacing:6px;font-size:22px;margin-bottom:24px"><span style="display:inline-block;width:10px;height:10px;background:#ff4d4d;margin-right:10px"></span>BREACHPOINT</div>
-    <p style="color:#a7a49b;margin:0 0 8px">Your sign-in code</p>
-    <div style="font-size:38px;font-weight:700;letter-spacing:10px;margin:0 0 24px">${code.slice(0, 3)} ${code.slice(3)}</div>
-    <a href="${link}" style="display:inline-block;background:#ece9e1;color:#121313;text-decoration:none;font-weight:700;letter-spacing:3px;padding:14px 22px">SIGN IN ON THIS DEVICE</a>
-    <p style="color:#a7a49b;font-size:13px;line-height:1.5;margin:28px 0 0">The link and code expire in 15 minutes and work once. If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share this code.</p>
+    <div style="font-weight:700;letter-spacing:6px;font-size:22px;margin-bottom:24px"><span style="display:inline-block;width:10px;height:10px;background:#f7941d;margin-right:10px"></span>BREACHPOINT</div>
+    <p style="color:#9fabb4;margin:0 0 18px">Tap the button to sign in. It works once, for 15 minutes.</p>
+    <a href="${link}" style="display:inline-block;background:#f7941d;color:#0e1114;text-decoration:none;font-weight:700;letter-spacing:3px;padding:14px 22px">SIGN IN TO BREACHPOINT</a>
+    <p style="color:#9fabb4;font-size:13px;line-height:1.5;margin:28px 0 0">If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share or forward this link.</p>
   </div></div>`;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: `Breachpoint sign-in code: ${code}`, text, html }),
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: 'Your Breachpoint sign-in link', text, html }),
   });
   if (!res.ok) return { ok: false, error: 'Couldn\'t send the email. Try again in a moment.' };
   return { ok: true };
@@ -223,7 +348,12 @@ async function allow(env, key, max, ttl) {
   return true;
 }
 
-const pub = (u) => ({ id: u.id, name: u.name, email: u.email });
+const fmtCode = (c) => (c ? `${c.slice(0, 4)}-${c.slice(4)}` : '');
+function maskEmail(e) {
+  const [u, d] = String(e || '').split('@');
+  if (!d) return '';
+  return `${u.slice(0, 1)}${'•'.repeat(Math.max(2, Math.min(6, u.length - 1)))}@${d}`;
+}
 const now = () => Math.floor(Date.now() / 1000);
 const getJSON = async (env, k) => { const v = await env.ACCOUNTS.get(k); try { return v ? JSON.parse(v) : null; } catch (_) { return null; } };
 function normEmail(e) {
@@ -238,7 +368,7 @@ function json(body, status, headers) {
   return new Response(JSON.stringify(body), { status, headers: { 'Cache-Control': 'no-store', ...headers, 'Content-Type': 'application/json' } });
 }
 
-// ---------- callsign filter (same rules as js/names.js in the game) ----------
+// ---------- name filter (same rules as js/names.js in the game) ----------
 const LEET = { 0: 'o', 1: 'i', 2: 'z', 3: 'e', 4: 'a', 5: 's', 6: 'g', 7: 't', 8: 'b', 9: 'g', '@': 'a', '$': 's', '!': 'i', '|': 'i', '+': 't' };
 const STRONG = [
   'fuck', 'shit', 'cunt', 'bitch', 'whore', 'slut', 'pussy', 'porn', 'rapist', 'nigg', 'fagg', 'faggot', 'tranny', 'retard',

@@ -31,6 +31,7 @@ export class BotBrain {
     this.aimErrT = 0; this.aimHead = false; this.aimOff = 1;
     this.burstT = rand(...this.diff.burst); this.pauseT = 0; this.semiT = 0;
     this.stuckT = 1; this.lastPos.copy(this.bot.pos);
+    this.unstickT = 0; this.stuckN = 0; if (!this.unstickDir) this.unstickDir = new THREE.Vector3();
     this.grenadeT = rand(4, 10);
     this.crouch = false;
     if (this.spot) this.spot.clear();
@@ -258,18 +259,27 @@ export class BotBrain {
     }
     if (wish.lengthSq() > 1) wish.normalize();
 
-    // stuck detection
+    // unsticking: walk toward open space for a moment instead of pushing into the obstacle
+    if (this.unstickT > 0) {
+      this.unstickT -= dt;
+      wish.copy(this.unstickDir);
+      sprint = false;
+    } else if (wish.lengthSq() > 0.04) this.steer(wish);
+
+    // stuck detection: barely moved for a second while trying to
     this.stuckT -= dt;
     if (this.stuckT <= 0) {
       const moved = Math.hypot(b.pos.x - this.lastPos.x, b.pos.z - this.lastPos.z);
-      if (wish.lengthSq() > 0.2 && moved < 0.4) {
-        jump = true;
+      if (wish.lengthSq() > 0.2 && moved < 0.35) {
+        this.stuckN = (this.stuckN || 0) + 1;
+        jump = this.stuckN % 2 === 1;
         this.repathT = 0;
         this.strafeDir *= -1;
-        if (this.goalKind !== 'engage') this.goalT = 0;
-      }
+        this.startUnstick();
+        if (this.goalKind !== 'engage' && this.stuckN >= 2) { this.goalT = 0; this.goal = null; } // pick somewhere else
+      } else if (moved > 1) this.stuckN = 0;
       this.lastPos.copy(b.pos);
-      this.stuckT = 1;
+      this.stuckT = 0.8;
     }
     b.wantCrouch = this.crouch;
     // long runs with nobody in sight: tactical sprint while the charge is high
@@ -277,6 +287,46 @@ export class BotBrain {
     if (!run) this.tac = false;
     else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
     b.updateMovement(dt, wish, run, jump, false, run && this.tac);
+  }
+
+  // is the body blocked a little way along this direction? (ignores low steps)
+  blockedDir(x, z, dist = 0.55) {
+    const b = this.bot, ph = this.game.physics;
+    return !!ph.overlap(b.pos.x + x * dist, b.pos.y + PLAYER.stepHeight + 0.02, b.pos.z + z * dist, b.radius * 0.95, Math.max(0.4, b.height - PLAYER.stepHeight - 0.05));
+  }
+
+  // bend the wanted direction around corners and props the grid doesn't see
+  steer(wish) {
+    const len = Math.hypot(wish.x, wish.z);
+    if (len < 1e-4) return;
+    const x = wish.x / len, z = wish.z / len;
+    if (!this.blockedDir(x, z)) return;
+    const pref = this.strafeDir || 1;
+    for (const a of [0.45, 0.9, 1.35, 1.8]) {
+      for (const sgn of [pref, -pref]) {
+        const c = Math.cos(a * sgn), sn = Math.sin(a * sgn);
+        const nx = x * c - z * sn, nz = x * sn + z * c;
+        if (!this.blockedDir(nx, nz)) { wish.set(nx * len, 0, nz * len); return; }
+      }
+    }
+  }
+
+  // head for the nearest clear direction (or the centre of the nearest open nav cell) for a moment
+  startUnstick() {
+    const b = this.bot, nav = this.game.world.nav;
+    const cell = nav.nearestOpen(nav.ci(b.pos.x), nav.cj(b.pos.z));
+    let best = null, bestS = -Infinity;
+    const base = Math.random() * Math.PI * 2;
+    for (let k = 0; k < 12; k++) {
+      const a = base + k * Math.PI / 6, x = Math.cos(a), z = Math.sin(a);
+      if (this.blockedDir(x, z, 0.7)) continue;
+      let sc = Math.random() * 0.3;
+      if (cell) { const tx = nav.cx(cell[0]) - b.pos.x, tz = nav.cz(cell[1]) - b.pos.z, tl = Math.hypot(tx, tz); if (tl > 0.2) sc += (x * tx + z * tz) / tl; }
+      if (sc > bestS) { bestS = sc; best = [x, z]; }
+    }
+    if (!best) { const a = base; best = [Math.cos(a), Math.sin(a)]; }
+    this.unstickDir.set(best[0], 0, best[1]);
+    this.unstickT = rand(0.5, 0.9);
   }
 
   aim(dt) {

@@ -102,13 +102,16 @@ export class NavGrid {
     return new THREE.Vector3(this.cx(k % this.cols), 0, this.cz((k / this.cols) | 0));
   }
 
+  // straight walk from a to b stays on open cells, with some width so shortcuts don't clip corners
   lineClear(ax, az, bx, bz) {
     const dx = bx - ax, dz = bz - az;
     const len = Math.hypot(dx, dz);
-    const steps = Math.ceil(len / 0.3);
+    if (len < 1e-4) return true;
+    const steps = Math.ceil(len / 0.25);
+    const px = -dz / len * 0.35, pz = dx / len * 0.35;
     for (let s = 1; s <= steps; s++) {
-      const t = s / steps;
-      if (!this.isOpenAt(ax + dx * t, az + dz * t)) return false;
+      const t = s / steps, x = ax + dx * t, z = az + dz * t;
+      if (!this.isOpenAt(x, z) || !this.isOpenAt(x + px, z + pz) || !this.isOpenAt(x - px, z - pz)) return false;
     }
     return true;
   }

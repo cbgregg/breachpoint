@@ -28,9 +28,13 @@ const settings = loadSettings();
 const account = new Account();
 const loginToken = takeLoginToken(); // sign-in link opened: read and wipe it before anything else runs
 let playMode = 'offline';            // chosen on the Offline / Online screen
-// online with accounts on, your callsign is your account's; offline it's the local one
-const onlineName = () => playMode === 'online' && account.enabled && account.user && account.user.name;
+// online with accounts on, your Name Tag is your account's; offline it's the local one
+const onlineName = () => playMode === 'online' && account.enabled && account.tag;
 const myName = () => onlineName() || settings.name;
+// social sidebar state (see the sidebar section below)
+let sideOpen = false, sideFocusBack = null;
+const SIDE_SCREENS = ['mode', 'menu', 'pause', 'lobby', 'end'];
+const sideAllowed = () => SIDE_SCREENS.includes(screen) && !window.BREACHPOINT_OFFLINE;
 
 const TIPS = [
   'Press sprint again while sprinting for a short tactical sprint.',
@@ -78,7 +82,7 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
@@ -122,7 +126,7 @@ function syncModeRows() {
   document.body.dataset.gmode = m.id;
   document.querySelectorAll('.mode-pick .mp').forEach(b => { const on = b.dataset.mode === m.id; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
   $('intel-mode').textContent = m.name.toUpperCase();
-  if (!(typeof playMode !== 'undefined' && playMode === 'online')) $('play-title').textContent = m.name.toUpperCase();
+  $('play-title').textContent = typeof playMode !== 'undefined' && playMode === 'online' ? `ONLINE · ${m.name.toUpperCase()}` : m.name.toUpperCase();
   document.querySelector('#pane-play .pane-sub').textContent = m.blurb;
 }
 $('opt-mode').addEventListener('change', () => { syncModeRows(); if (lobby && lobby.role === 'host') lobby.broadcastLobby(); });
@@ -217,10 +221,14 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 // ---------- screens ----------
 let screen = 'menu';
 function showScreen(id) {
+  closeDropdown();
   if (id !== 'pause' && id !== 'lobby' && $('pane-loadout').closest('#pause')) restorePanes();
   if (id !== 'pause') clearInterval(pauseTimer);
   screen = id;
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
+  document.body.classList.toggle('side-ok', sideAllowed());
+  document.body.classList.toggle('in-menus', !!id && id !== 'loading');
+  if (sideOpen && !sideAllowed()) closeSide();
   document.body.classList.toggle('ingame', id === null);
   if (id && game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
@@ -514,7 +522,7 @@ function startQuick() {
   game.audio.init();
   quickIntro = false;
   joinError = '';
-  lobby.quick(myName(), loadoutFromSettings(settings));
+  lobby.quick(myName(), loadoutFromSettings(settings), settings.mode);
   showScreen('lobby');
   renderLobby();
 }
@@ -525,7 +533,8 @@ $('quick-btn').addEventListener('click', () => {
   renderLobby();
 });
 $('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, '1'); } catch (_) { /* ignore */ } startQuick(); });
-const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH });
+// public matches use fixed rules, but in the game mode you picked (players are matched by mode)
+const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || settings.mode || 'tdm' });
 lobby.onQuickHost = () => {
   launch(publicSettings(), { mode: 'host', lobby }).then(() => {
     syncOnlineFlags();
@@ -601,7 +610,7 @@ lobby.onClosed = (reason, wasPublic) => {
   if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
   // a public host went away: find another match automatically
   if (wasPublic && /host closed|Lost connection/.test(reason)) {
-    lobby.quick(myName(), loadoutFromSettings(settings));
+    lobby.quick(myName(), loadoutFromSettings(settings), settings.mode);
     game.hud.toast('HOST LEFT — FINDING ANOTHER MATCH');
     showScreen('lobby');
     renderLobby();
@@ -615,13 +624,13 @@ lobby.onClosed = (reason, wasPublic) => {
 
 // digits typed on the join screen
 window.addEventListener('keydown', (e) => {
-  if (screen !== 'lobby' || lobby.role === 'host' || game.input.enabled) return;
+  if (screen !== 'lobby' || lobby.role === 'host' || game.input.enabled || sideOpen) return;
   if (/^\d$/.test(e.key)) keypad(e.key);
   else if (e.key === 'Backspace') keypad('del');
   else if (e.key === 'Enter') { e.preventDefault(); tryJoin(); }
 });
 window.addEventListener('paste', (e) => {
-  if (screen !== 'lobby' || lobby.role) return;
+  if (screen !== 'lobby' || lobby.role || sideOpen) return;
   const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
   if (digits) { joinCode = digits; joinError = ''; renderLobby(); }
 });
@@ -633,8 +642,34 @@ $('app').addEventListener('click', () => {
 });
 
 // ---------- controller / keyboard menu navigation ----------
+// controller / keyboard dropdown for <select> (mouse and touch get the browser's own list)
+let dd = null;
+function openDropdown(sel) {
+  closeDropdown();
+  const r = sel.getBoundingClientRect();
+  dd = document.createElement('div');
+  dd.className = 'dd';
+  dd.sel = sel;
+  dd.innerHTML = [...sel.options].map((o, i) => `<button data-i="${i}" class="${i === sel.selectedIndex ? 'on' : ''}">${esc(o.textContent)}</button>`).join('');
+  document.body.appendChild(dd);
+  const h = dd.offsetHeight;
+  dd.style.left = `${Math.max(8, Math.min(r.left, innerWidth - dd.offsetWidth - 8))}px`;
+  dd.style.minWidth = `${r.width}px`;
+  dd.style.top = `${r.bottom + h + 8 < innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4)}px`;
+  dd.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pickDropdown(+b.dataset.i); });
+  focusEl(dd.children[sel.selectedIndex] || dd.children[0]);
+}
+function pickDropdown(i) {
+  const sel = dd.sel;
+  closeDropdown();
+  if (sel.selectedIndex !== i) { sel.selectedIndex = i; sel.dispatchEvent(new Event('change')); }
+  focusEl(sel);
+}
+function closeDropdown() { if (dd) { dd.remove(); dd = null; } }
+document.addEventListener('pointerdown', (e) => { if (dd && !dd.contains(e.target)) closeDropdown(); });
+
 function navItems() {
-  const scr = screen ? $(screen) : null;
+  const scr = sideOpen ? $('side') : screen ? $(screen) : null;
   if (!scr) return [];
   return [...scr.querySelectorAll('[data-nav]')].filter(el => el.offsetParent !== null && !el.closest('.tabs'));
 }
@@ -649,7 +684,8 @@ function focusEl(el) {
 }
 function focusFirst() {
   const items = navItems();
-  const pref = screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
+  const pref = sideOpen ? (account.signedIn ? ($('sd-req').querySelector('[data-nav]') || $('sd-friends').querySelector('[data-nav]') || $('sd-add-in')) : $('sd-email'))
+    : screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
     : screen === 'signin' ? document.querySelector('#signin .si-step.on input')
     : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
     : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
@@ -693,6 +729,16 @@ game.input.onNav = (dir) => {
   if (!screen) return;
   if (screen === 'title') { if (dir === 'accept' || dir === 'start') titleGo(); return; }
   if (screen === 'loading') return;
+  if (dd) {
+    const items = [...dd.children], cur = items.indexOf(document.querySelector('.dd .pad-focus'));
+    if (dir === 'up' || dir === 'down') { const n = items[Math.max(0, Math.min(items.length - 1, cur + (dir === 'down' ? 1 : -1)))]; if (n) { focusEl(n); game.audio.play('ui', null, { ui: true, freq: 2600 }); } }
+    else if (dir === 'accept') { pickDropdown(Math.max(0, cur)); game.audio.play('ui', null, { ui: true }); }
+    else if (dir === 'back' || dir === 'left' || dir === 'right') { const sel = dd.sel; closeDropdown(); focusEl(sel); }
+    return;
+  }
+  if (dir === 'alt') { toggleSide(); return; }
+  if (sideOpen && dir === 'back') { closeSide(); return; }
+  if (sideOpen && (dir === 'start' || dir === 'prevTab' || dir === 'nextTab')) return;
   const items = navItems();
   const el = document.activeElement && items.includes(document.activeElement) ? document.activeElement : (document.querySelector('.pad-focus') && items.includes(document.querySelector('.pad-focus')) ? document.querySelector('.pad-focus') : null);
   const tick = () => game.audio.play('ui', null, { ui: true, freq: 2600 });
@@ -716,7 +762,7 @@ game.input.onNav = (dir) => {
     case 'accept':
       if (!el) { focusFirst(); break; }
       if (el.type === 'checkbox') { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
-      else if (el.tagName === 'SELECT') cycleSelect(el, el.selectedIndex === el.options.length - 1 ? -el.selectedIndex : 1);
+      else if (el.tagName === 'SELECT') openDropdown(el);
       else if (el.tagName === 'INPUT' && el.type !== 'range') { el.focus(); break; }
       else if (el.tagName === 'INPUT') break;
       else el.click();
@@ -764,6 +810,7 @@ window.addEventListener('keydown', (e) => {
   if (!screen || game.input.enabled) return;
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
   if (e.key === 'Escape') { e.preventDefault(); game.input.onNav('back'); }
+  else if (!typing && (e.key === 'f' || e.key === 'F') && !e.repeat && !e.ctrlKey && !e.metaKey && screen !== 'title') { e.preventDefault(); toggleSide(); }
   else if (!typing && screen !== 'title' && ARROWS[e.key]) { e.preventDefault(); if (!document.querySelector('.pad-focus') && document.activeElement && document.activeElement.matches('[data-nav]')) focusEl(document.activeElement); game.input.onNav(ARROWS[e.key]); }
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'q' || e.key === 'Q')) game.input.onNav('prevTab');
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
@@ -823,105 +870,118 @@ function syncAccount() {
   const u = account.signedIn ? account.user : null;
   document.body.classList.toggle('has-account', !!u);
   $('acct-email').textContent = u ? u.email : '';
-  $('title-acct').textContent = u && u.name ? `Signed in as ${u.name}` : '';
+  $('title-acct').textContent = u && u.tag ? `Signed in as ${u.tag}` : '';
   $('mode-online-d').textContent = window.BREACHPOINT_OFFLINE ? 'Online play works on the full game at breach-point.net.' : !account.enabled
     ? 'Quick match with anyone, or a private 6-digit code for friends.'
-    : u && u.name ? `Quick match with anyone, or a private 6-digit code for friends. Playing as ${u.name}.`
+    : u && u.tag ? `Quick match with anyone, or a private 6-digit code for friends. Playing as ${u.tag}.`
       : 'Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.';
-  $('mode-acct').innerHTML = u ? `<span>Signed in as <b>${esc(u.name || u.email)}</b></span><button id="mode-out" class="menu-btn small" data-nav>SIGN OUT</button>` : '';
+  $('mode-acct').innerHTML = u ? `<span>Signed in as <b>${esc(u.tag || 'new player')}</b></span><button id="mode-out" class="menu-btn small" data-nav>SIGN OUT</button>` : '';
   if (u) $('mode-out').addEventListener('click', () => { account.signOut(); });
   if (screen === 'menu' || screen === 'pause') setPlayMode(playMode);
+  syncNameNote();
+  renderSide();
 }
 account.onChange = () => {
   syncAccount();
   // signed out while in the online menu: back to the mode screen
   if (!account.ready && playMode === 'online' && account.enabled && screen === 'menu') openMode();
-  // the email link was opened in another tab while this one waits for the code
-  if (screen === 'signin' && account.signedIn && siCur === 'code') signedIn();
+  // the email link was opened in another tab while this one waits
+  if (screen === 'signin' && account.signedIn && siCur === 'sent') signedIn();
+  heartbeat();
 };
 $('acct-out').addEventListener('click', () => account.signOut());
 confirmBtn($('acct-del'), async () => {
   try { await account.deleteAccount(); game.hud.toast('ACCOUNT DELETED'); } catch (e) { game.hud.toast(e.message.toUpperCase()); }
 });
 
-// online callsign changes are claimed on the account server (unique names)
+// online Name Tag changes go to the account server (once a day)
+const untilText = (t) => {
+  const mins = Math.max(1, Math.ceil((t - Date.now() / 1000) / 60)), h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
+};
+function syncNameNote() {
+  const u = account.signedIn ? account.user : null;
+  const wait = u && u.nextTagAt && u.nextTagAt > Date.now() / 1000;
+  $('opt-name-note').textContent = playMode === 'online' && account.enabled && u ? (wait ? `You can change it again in ${untilText(u.nextTagAt)}` : 'Everyone sees this. Changes once a day.') : '';
+}
+async function changeTag(want, el) {
+  want = want.trim();
+  if (!want || want === account.tag) { if (el) el.value = account.tag; return false; }
+  try {
+    await account.setTag(want);
+    game.hud.toast(`NAME TAG IS NOW ${account.tag.toUpperCase()}`);
+    return true;
+  } catch (e) {
+    game.hud.toast((e.nextTagAt ? `NAME TAG CAN CHANGE AGAIN IN ${untilText(e.nextTagAt)}` : e.message).toUpperCase());
+    if (el) el.value = account.tag;
+    return false;
+  } finally { syncNameNote(); }
+}
 $('opt-name').addEventListener('change', async () => {
   if (!onlineName()) return;
-  const el = $('opt-name'), want = el.value.trim();
-  if (!want || want === account.user.name) { el.value = account.user.name; return; }
-  try { await account.setName(want); game.hud.toast(`CALLSIGN IS NOW ${account.user.name.toUpperCase()}`); }
-  catch (e) { game.hud.toast(e.message.toUpperCase()); }
+  const el = $('opt-name');
+  await changeTag(el.value, el);
   el.value = myName();
   setPlayMode(playMode);
 });
 
-// ---------- sign in ----------
+// ---------- sign in (email link only) ----------
 let siCur = 'email', afterSignin = null;
 function siStep(st) {
   siCur = st;
   document.querySelectorAll('.si-step').forEach(el => el.classList.toggle('on', el.id === `si-${st}`));
-  $('si-title').textContent = st === 'name' ? 'YOUR CALLSIGN' : 'SIGN IN';
+  $('si-title').textContent = st === 'name' ? 'YOUR NAME TAG' : st === 'sent' ? 'CHECK YOUR EMAIL' : 'SIGN IN';
   $('si-back').textContent = st === 'name' ? 'SIGN OUT' : 'BACK';
   siStatus('');
   const inp = document.querySelector(`#si-${st} input`);
-  if (st === 'name') inp.value = account.user && account.user.name || (settings.name !== 'Operator' ? settings.name : '');
-  if (game.input.lastDevice !== 'touch') setTimeout(() => inp.focus({ preventScroll: true }), 30);
+  if (st === 'name') inp.value = account.tag || (settings.name !== 'Operator' ? settings.name : '');
+  if (inp && game.input.lastDevice !== 'touch' && game.input.lastDevice !== 'pad') setTimeout(() => inp.focus({ preventScroll: true }), 30);
+  if (game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
 function siStatus(html, cls) { const el = $('si-status'); el.className = 'join-status' + (cls ? ' ' + cls : ''); el.innerHTML = html; }
 let siBusyNow = false;
-function siBusy(b) { siBusyNow = b; document.querySelectorAll('#signin .cta, #signin input').forEach(x => { x.disabled = b; }); }
+function siBusy(b) { siBusyNow = b; document.querySelectorAll('#signin .cta, #signin input, #signin .menu-btn.small').forEach(x => { x.disabled = b; }); }
 function openSignin() {
+  if (sideOpen) closeSide();
   showScreen('signin');
-  siStep(account.signedIn && !account.user.name ? 'name' : 'email');
+  siStep(account.signedIn && !account.tag ? 'name' : 'email');
 }
 function signedIn() {
-  if (!account.user.name) { siStep('name'); return; }
-  game.hud.toast(`SIGNED IN AS ${account.user.name.toUpperCase()}`);
+  if (!account.tag) { if (screen !== 'signin') showScreen('signin'); siStep('name'); return; }
+  game.hud.toast(`SIGNED IN AS ${account.tag.toUpperCase()}`);
   const next = afterSignin;
   afterSignin = null;
   enterMenu('online');
   if (next) next();
 }
+// shared by the sign-in screen and the sidebar
+async function sendLink(email, remember, status) {
+  email = email.trim();
+  if (!email) { status('Enter your email address.', 'bad'); return false; }
+  status('<span class="spin"></span>Sending…');
+  try {
+    const r = await account.start(email, remember);
+    if (r.devToken) console.info('[dev] sign-in link', `${location.origin}${location.pathname}#login=${r.devToken}`);
+    return true;
+  } catch (e) { status(esc(e.message), 'bad'); return false; }
+}
 async function siSend() {
   if (siBusyNow) return;
-  const email = $('si-email-in').value.trim();
-  if (!email) { siStatus('Enter your email address.', 'bad'); return; }
   siBusy(true);
-  siStatus('<span class="spin"></span>Sending…');
-  try {
-    const r = await account.start(email);
-    siStep('code');
-    $('si-to').textContent = email;
-    if (r.dev) { console.info('[dev] sign-in link', r.dev.link, 'code', r.dev.code); window.__devLogin = r.dev; }
-    siStatus('Check your inbox (and spam folder). The link and code work for 15 minutes.', 'good');
-  } catch (e) { siStatus(esc(e.message), 'bad'); }
+  const email = $('si-email-in').value;
+  const ok = await sendLink(email, $('si-remember').checked, siStatus);
   siBusy(false);
-}
-async function siVerify() {
-  const code = $('si-code-in').value.replace(/\D/g, '');
-  if (code.length !== 6) { siStatus('The code is 6 digits.', 'bad'); return; }
-  if (siBusyNow) return;
-  siBusy(true);
-  siStatus('<span class="spin"></span>Checking…');
-  try { await account.verifyCode(code); siBusy(false); signedIn(); }
-  catch (e) {
-    siBusy(false);
-    $('si-code-in').value = '';
-    $('si-code-in').focus({ preventScroll: true });
-    siStatus(esc(e.message), 'bad');
-    if (e.expired) setTimeout(() => siStep('email'), 1800);
-  }
+  if (ok) { siStep('sent'); $('si-to').textContent = email.trim(); }
 }
 async function siName() {
   if (siBusyNow) return;
   const name = $('si-name-in').value.trim();
   siBusy(true);
   siStatus('<span class="spin"></span>Saving…');
-  try { await account.setName(name); siBusy(false); signedIn(); }
+  try { await account.setTag(name); siBusy(false); signedIn(); }
   catch (e) { siBusy(false); siStatus(esc(e.message), 'bad'); }
 }
 $('si-send').addEventListener('click', siSend);
-$('si-verify').addEventListener('click', siVerify);
 $('si-name-save').addEventListener('click', siName);
 $('si-resend').addEventListener('click', () => { $('si-email-in').value = account.email; siSend(); });
 $('si-other').addEventListener('click', () => siStep('email'));
@@ -930,13 +990,214 @@ $('si-back').addEventListener('click', () => {
   afterSignin = null;
   openMode();
 });
-$('si-code-in').addEventListener('input', (e) => {
-  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
-  if (e.target.value.length === 6) siVerify();
-});
-for (const [inp, fn] of [['si-email-in', siSend], ['si-code-in', siVerify], ['si-name-in', siName]]) {
+for (const [inp, fn] of [['si-email-in', siSend], ['si-name-in', siName]]) {
   $(inp).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fn(); } });
 }
+// the safety warning shows while "Remember me" is ticked
+for (const [cb, warn] of [['si-remember', 'si-warn'], ['sd-remember', 'sd-warn']]) {
+  const sync = () => $(warn).classList.toggle('on', $(cb).checked);
+  $(cb).addEventListener('change', sync);
+  sync();
+}
+
+// ---------- social sidebar (Y on a controller, F on a keyboard): account, Name Tag, friends ----------
+function openSide() {
+  if (sideOpen || !sideAllowed()) return;
+  sideOpen = true;
+  sideFocusBack = document.querySelector('.pad-focus');
+  document.body.classList.add('side-open');
+  $('side').setAttribute('aria-hidden', 'false');
+  game.audio.play('ui', null, { ui: true });
+  renderSide();
+  if (account.signedIn) account.loadFriends().catch(() => {});
+  if (game.input.lastDevice === 'pad') focusFirst();
+}
+function closeSide() {
+  if (!sideOpen) return;
+  sideOpen = false;
+  document.body.classList.remove('side-open');
+  $('side').setAttribute('aria-hidden', 'true');
+  if (document.activeElement && $('side').contains(document.activeElement)) document.activeElement.blur();
+  if (game.input.lastDevice === 'pad') { if (sideFocusBack && sideFocusBack.offsetParent) focusEl(sideFocusBack); else focusFirst(); }
+  else focusEl(null);
+}
+const toggleSide = () => (sideOpen ? closeSide() : openSide());
+$('side-btn').addEventListener('click', openSide);
+// about / support
+const openLink = (url) => { try { window.open(url, '_blank', 'noopener'); } catch (_) { location.href = url; } };
+$('feedback-btn').addEventListener('click', () => openLink('https://github.com/cbgregg/breachpoint/issues/new'));
+$('coffee-btn').addEventListener('click', () => openLink('https://buymeacoffee.com/breachpoint'));
+$('side-scrim').addEventListener('click', closeSide);
+$('sd-close').addEventListener('click', closeSide);
+
+const MODE_SHORT = { tdm: 'TDM', gunfight: 'Gunfight', snd: 'Search & Destroy' };
+function friendStatus(f) {
+  if (!f.online) return 'Offline';
+  const where = [MODE_SHORT[f.mode] || '', MAPS[f.map] ? MAPS[f.map].name : ''].filter(Boolean).join(' · ');
+  if (f.state === 'match') return `In a ${f.pub ? 'public' : 'private'} match${where ? ' · ' + where : ''}`;
+  if (f.state === 'lobby') return `In a ${f.pub ? 'public' : 'private'} lobby${where ? ' · ' + where : ''}`;
+  return 'Online · in the menus';
+}
+function renderSide() {
+  const on = account.enabled && !window.BREACHPOINT_OFFLINE;
+  const u = account.signedIn ? account.user : null;
+  $('sd-off').style.display = on ? 'none' : '';
+  $('sd-in').style.display = on && !u ? '' : 'none';
+  $('sd-me').style.display = on && u ? '' : 'none';
+  const d = account.friends;
+  const online = d.friends.filter(f => f.online).length;
+  $('sb-on').textContent = u && d.friends.length ? `${online} ONLINE` : u ? '' : on ? 'SIGN IN' : '';
+  $('sb-req').textContent = d.incoming.length ? String(d.incoming.length) : '';
+  $('sd-sub').textContent = u ? `${online} OF ${d.friends.length} FRIENDS ONLINE` : 'FRIENDS · ACCOUNT';
+  if (!u) return;
+  $('sd-emb').textContent = (u.tag || '?').slice(0, 1).toUpperCase();
+  $('sd-tag').textContent = (u.tag || 'Choose a Name Tag').toUpperCase();
+  $('sd-acct').textContent = `${u.email} · ${account.remember ? 'remembered on this device' : 'signed in until you close the browser'}`;
+  if (document.activeElement !== $('sd-tag-in')) $('sd-tag-in').value = u.tag || '';
+  if (document.activeElement !== $('sd-disp-in')) $('sd-disp-in').value = u.disp || '';
+  const wait = u.tag && u.nextTagAt && u.nextTagAt > Date.now() / 1000;
+  $('sd-tag-note').textContent = (wait ? `You can change it again in ${untilText(u.nextTagAt)}.` : 'You can change it once a day.')
+    + (u.hist && u.hist.length ? ` Friends can see your previous Name Tags: ${u.hist.slice(0, 3).join(', ')}.` : ' Friends can see your previous Name Tags.');
+  $('sd-tag-save').textContent = u.tag ? 'CHANGE' : 'SAVE';
+  $('sd-code').textContent = u.code || '––––-––––';
+  // requests
+  const req = d.incoming.map(r => `<div class="sd-row req"><span class="sd-dot"></span><span class="sd-n"><b>${esc(r.tag)}</b><small>wants to be friends</small></span>
+      <button class="menu-btn small ok" data-fr="accept" data-id="${esc(r.id)}" data-nav>ACCEPT</button><button class="menu-btn small" data-fr="decline" data-id="${esc(r.id)}" data-nav>DECLINE</button></div>`)
+    .concat(d.outgoing.map(r => `<div class="sd-row out"><span class="sd-dot"></span><span class="sd-n"><b>${esc(r.tag)}</b><small>request sent</small></span>
+      <button class="menu-btn small" data-fr="cancel" data-id="${esc(r.id)}" data-nav>CANCEL</button></div>`));
+  $('sd-req-wrap').style.display = req.length ? '' : 'none';
+  setHTML('sd-req', req.join(''));
+  // friends
+  $('sd-fcount').textContent = d.friends.length ? `${online}/${d.friends.length} online` : '';
+  const myJoin = lobby.active ? lobby.code : '';
+  setHTML('sd-friends', d.friends.length ? d.friends.map(f => {
+    const canJoin = f.online && f.join && f.join !== myJoin && (f.state === 'lobby' || f.state === 'match');
+    return `<div class="sd-row ${f.online ? 'on' : 'off'}"><span class="sd-dot"></span>
+      <span class="sd-n"><b>${esc(f.tag)}</b>${f.disp ? `<i>${esc(f.disp)}</i>` : ''}<small>${esc(friendStatus(f))}</small>${f.hist.length ? `<small class="sd-hist">Previously ${esc(f.hist.join(', '))}</small>` : ''}</span>
+      ${canJoin ? `<button class="menu-btn small ok" data-join="${esc(f.join)}" data-nav>JOIN</button>` : ''}
+      <button class="menu-btn small warn" data-fr="remove" data-id="${esc(f.id)}" data-nav title="Remove friend">✕</button></div>`;
+  }).join('') : '<div class="sd-empty">No friends yet. Share your friend code, or enter a friend\'s code above.</div>');
+}
+account.onFriends = (d, fresh) => {
+  renderSide();
+  for (const r of fresh) game.hud.toast(`FRIEND REQUEST FROM ${String(r.tag).toUpperCase()}`);
+};
+
+// signed out: send the link from the sidebar
+let sdBusy = false;
+function sdStatus(html, cls) { const el = $('sd-in-status'); el.className = 'join-status' + (cls ? ' ' + cls : ''); el.innerHTML = html; }
+async function sdSend() {
+  if (sdBusy) return;
+  sdBusy = true;
+  const email = $('sd-email').value;
+  if (await sendLink(email, $('sd-remember').checked, sdStatus)) sdStatus(`Sign-in link sent to <b>${esc(email.trim())}</b>. Open it on this device. It works once, for 15 minutes.`, 'good');
+  sdBusy = false;
+}
+$('sd-send').addEventListener('click', sdSend);
+$('sd-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sdSend(); } });
+
+// signed in
+$('sd-tag-save').addEventListener('click', async () => {
+  if (!account.tag) { try { await account.setTag($('sd-tag-in').value.trim()); game.hud.toast(`NAME TAG IS NOW ${account.tag.toUpperCase()}`); } catch (e) { game.hud.toast(e.message.toUpperCase()); } return; }
+  if (await changeTag($('sd-tag-in').value, $('sd-tag-in'))) setPlayMode(playMode);
+});
+$('sd-disp-save').addEventListener('click', async () => {
+  try { await account.setDisplay($('sd-disp-in').value.trim()); game.hud.toast(account.user.disp ? 'DISPLAY NAME SAVED · ONLY FRIENDS SEE IT' : 'DISPLAY NAME REMOVED'); }
+  catch (e) { game.hud.toast(e.message.toUpperCase()); }
+});
+$('sd-code-copy').addEventListener('click', () => account.user && copyText(account.user.code, 'FRIEND CODE COPIED'));
+function addStatus(html, cls) { const el = $('sd-add-status'); el.className = 'join-status' + (cls ? ' ' + cls : ''); el.innerHTML = html; }
+$('sd-add-in').addEventListener('input', (e) => {
+  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  e.target.value = v.length > 4 ? `${v.slice(0, 4)}-${v.slice(4)}` : v;
+});
+async function sdAdd() {
+  const code = $('sd-add-in').value;
+  if (code.replace(/[^A-Z0-9]/gi, '').length !== 8) { addStatus('Friend codes have 8 letters and numbers, like ABCD-2345.', 'bad'); return; }
+  addStatus('<span class="spin"></span>Sending…');
+  try {
+    const r = await account.addFriend(code);
+    $('sd-add-in').value = '';
+    addStatus(r.friends ? 'You\'re now friends.' : 'Friend request sent.', 'good');
+  } catch (e) { addStatus(esc(e.message), 'bad'); }
+}
+$('sd-add').addEventListener('click', sdAdd);
+$('sd-add-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sdAdd(); } });
+for (const id of ['sd-tag-in', 'sd-disp-in']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $(id.replace('-in', '-save')).click(); } });
+$('sd-out').addEventListener('click', () => { account.signOut(); game.hud.toast('SIGNED OUT'); });
+$('side').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.join) { joinFriend(b.dataset.join); return; }
+  if (!b.dataset.fr) return;
+  if (b.dataset.fr === 'remove' && !b.classList.contains('confirm')) {
+    // remove asks twice
+    b.classList.add('confirm'); b.textContent = 'REMOVE?';
+    setTimeout(() => { if (b.isConnected) { b.classList.remove('confirm'); b.textContent = '✕'; } }, 2500);
+    return;
+  }
+  const focusIdx = [...$('side').querySelectorAll('[data-nav]')].indexOf(b);
+  try { await account.friendAction(b.dataset.fr, b.dataset.id); }
+  catch (err) { game.hud.toast(err.message.toUpperCase()); }
+  if (game.input.lastDevice === 'pad' && sideOpen) {
+    const items = navItems();
+    focusEl(items[Math.min(focusIdx, items.length - 1)] || items[0]);
+  }
+});
+
+// join a friend's match by its code (friends skip the host's approval)
+function joinFriend(code) {
+  if (!/^\d{6}$/.test(code)) return;
+  closeSide();
+  if (lobby.active && lobby.code === code) { openLobby(); return; }
+  if (game.state !== 'menu') game.quitToMenu();
+  leaveOnline();
+  setPlayMode('online');
+  writeForm();
+  joinCode = code;
+  readAll();
+  game.audio.init();
+  joinError = '';
+  openLobby();
+  tryJoin();
+}
+
+// presence: friends see you online and which match to join; a heartbeat every 45 s
+let hbTimer = 0, hbLast = '';
+function presenceNow() {
+  const inMatch = game.state !== 'menu' && lobby.active;
+  const st = inMatch ? 'match' : lobby.active && lobby.code ? 'lobby' : 'menu';
+  const p = { state: st };
+  if (st !== 'menu') {
+    p.join = lobby.code;
+    if (lobby.public) p.pub = 1;
+    const cfg = lobby.public ? publicSettings() : settings;
+    p.mode = (game.state !== 'menu' && game.settings && game.settings.mode) || cfg.mode;
+    const mid = game.state !== 'menu' ? game.world.id : cfg.map;
+    if (MAPS[mid]) p.map = mid;
+  }
+  return p;
+}
+function heartbeat(force = false) {
+  clearTimeout(hbTimer);
+  if (!account.enabled || !account.signedIn || window.BREACHPOINT_OFFLINE) return;
+  hbTimer = setTimeout(() => heartbeat(true), 45000);
+  if (document.hidden) return;
+  const p = presenceNow(), k = JSON.stringify(p);
+  if (!force && k === hbLast) return;
+  hbLast = k;
+  account.presence(p);
+  // friends list: keep the online count and requests fresh (more often while the sidebar is open)
+  account.loadFriends().catch(() => {});
+}
+setInterval(() => {
+  if (!account.signedIn) return;
+  if (sideOpen) account.loadFriends().catch(() => {});
+  const k = JSON.stringify(presenceNow());
+  if (k !== hbLast) heartbeat(true); // joined or left a lobby or match: tell friends right away
+}, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(true); });
+window.addEventListener('pagehide', () => account.presenceOff());
 
 // ---------- device-aware hints ----------
 function renderHints(device) {
@@ -966,17 +1227,32 @@ game.input.onPadChange = (connected, id) => {
 document.addEventListener('mousemove', () => { if (screen) focusEl(null); }, { passive: true });
 
 // ---------- menu intel map ----------
+// Picking a map doesn't build it (that waits for the match); the preview shows the map's overhead
+// view once it has been loaded at least once this session.
+const mapShots = {};
 function drawIntel() {
   const c = $('intel-map'), g = c.getContext('2d');
-  g.drawImage(game.minimap.canvas, 0, 0, c.width, c.height);
-  g.fillStyle = 'rgba(79,179,255,0.25)'; g.fillRect(0, 0, c.width * 0.13, c.height);
-  g.fillStyle = 'rgba(255,77,77,0.25)'; g.fillRect(c.width * 0.87, 0, c.width * 0.13, c.height);
-  $('intel-mapname').textContent = (settings.map === 'random' && game.state === 'menu' ? 'RANDOM' : game.world.name).toUpperCase();
+  if (game.world && game.minimap) {
+    const k = document.createElement('canvas'); k.width = c.width; k.height = c.height;
+    k.getContext('2d').drawImage(game.minimap.canvas, 0, 0, c.width, c.height);
+    mapShots[game.world.id] = k;
+  }
+  const want = game.state === 'menu' ? settings.map : game.world.id;
+  const shot = mapShots[want];
+  g.clearRect(0, 0, c.width, c.height);
+  if (shot) {
+    g.drawImage(shot, 0, 0);
+    g.fillStyle = 'rgba(79,179,255,0.25)'; g.fillRect(0, 0, c.width * 0.13, c.height);
+    g.fillStyle = 'rgba(255,77,77,0.25)'; g.fillRect(c.width * 0.87, 0, c.width * 0.13, c.height);
+  } else {
+    g.fillStyle = 'rgba(255,255,255,0.04)'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = 'rgba(236,233,225,0.45)'; g.font = '600 18px Barlow Condensed, Arial Narrow, sans-serif'; g.textAlign = 'center';
+    g.fillText(want === 'random' ? '? RANDOM MAP ?' : 'PREVIEW AFTER FIRST MATCH', c.width / 2, c.height / 2 + 6);
+  }
+  $('intel-mapname').textContent = (want === 'random' ? 'RANDOM' : MAPS[want] ? MAPS[want].name : game.world.name).toUpperCase();
 }
 game.onMapChange = () => drawIntel();
-// picking a map in the menu loads it behind the menu, so you can see it before deploying
 $('opt-map').addEventListener('change', () => {
-  if (MAPS[settings.map] && game.state === 'menu') game.loadMap(settings.map);
   if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); }
   drawIntel();
 });
@@ -1001,5 +1277,5 @@ syncAccount();
     if (account.ready) openLobby();
     else { afterSignin = () => openLobby(); openSignin(); }
   } else showScreen('title');
-  account.refresh();
+  account.refresh().then(() => heartbeat(true));
 }

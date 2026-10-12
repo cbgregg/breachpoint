@@ -35,6 +35,8 @@ function pickBotWeapon() {
   return r < 0.45 ? 'rifle' : r < 0.72 ? 'smg' : r < 0.88 ? 'sniper' : 'shotgun';
 }
 
+const INTRO_SECS = 10.6; // 10 on screen once the loading screen fades
+
 export class Game {
   constructor(container) {
     this.container = container;
@@ -105,6 +107,7 @@ export class Game {
     if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); this.effects?.setQuality(s.quality); }
     const dyn = s.dynamicRes !== false;
     if (this.renderer.dynamic !== dyn) { this.renderer.dynamic = dyn; if (!dyn) { this.renderer.drs.scale = 1; this.renderer.applyPR(); this.renderer.setSize(); } }
+    document.documentElement.style.setProperty('--tb-zoom', String({ small: 0.7, medium: 0.85, large: 1 }[s.touchSize] || 0.7));
     this.audio.setVolume(s.volume);
     this.music.setVolume(s.musicVolume ?? 0.5);
     this.input.deadzone = s.padDeadzone;
@@ -189,6 +192,11 @@ export class Game {
     this.characters.forEach(c => { c.spawnT = this.time; });
     if (this.playerCtl) this.playerCtl.inspectT = 3.4; // check your weapon while the countdown runs
     if (this.gm) this.gm.start(); // round modes place everyone and run their own freeze time
+    // the match opens on a 10-second countdown with a drum build-up (round modes: the first round's freeze)
+    this.intro = true;
+    this.countdownT = INTRO_SECS;
+    this.lastBeep = Math.ceil(INTRO_SECS) + 1;
+    this.setIntroLabel();
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -197,7 +205,13 @@ export class Game {
     this.input.enabled = true;
     if (this.input.lastDevice !== 'pad') this.input.lock();
     if (this.session) this.session.startAll();
-    this.startMusic();
+    this.music.hype(INTRO_SECS);
+  }
+
+  setIntroLabel() {
+    const m = MODES[this.settings.mode] || MODES.tdm, w = MAPS[this.world.id];
+    const el = document.getElementById('count-sub');
+    if (el) el.textContent = `${m.name} · ${w ? w.name : this.world.name || ''}`.toUpperCase();
   }
 
   startMusic() {
@@ -243,7 +257,9 @@ export class Game {
       if (navigator.userActivation && navigator.userActivation.isActive) this.input.lock();
       else this.hud.message('CLICK TO JOIN THE FIGHT');
     }
-    this.startMusic();
+    this.intro = this.countdownT > 3.5;
+    this.setIntroLabel();
+    if (this.intro) this.music.hype(this.countdownT); else this.startMusic();
   }
 
   addBot(team) {
@@ -253,7 +269,7 @@ export class Game {
     const brain = new BotBrain(b, this);
     this.brains.set(b, brain);
     if (this.state === 'playing' || this.state === 'paused') {
-      b.spawn(this.chooseSpawn(team), this.world.spawnYaw[team]);
+      b.spawn(this.chooseSpawn(team), this.spawnYawOut);
       brain.reset();
     }
     return b;
@@ -291,6 +307,8 @@ export class Game {
   }
 
   quitToMenu() {
+    this.music.cancelHype();
+    this.intro = false;
     if (this.session) { if (this.session.leave) this.session.leave(); this.session.dispose(); }
     this.session = null;
     if (this.gm) { this.gm.dispose(); this.gm = null; }
@@ -378,10 +396,15 @@ export class Game {
       const n = Math.ceil(this.countdownT);
       if (n !== this.lastBeep) {
         this.lastBeep = n;
-        if (n > 0) this.audio.play('beep', null, { ui: true, freq: 520 });
-        else { this.audio.play('beep', null, { ui: true, freq: 1040 }); this.hud.medal('FIGHT'); }
+        // the intro's drums carry the count; short beeps only for the last three and for round freezes
+        if (n > 0) { if (!this.intro || n <= 3) this.audio.play('beep', null, { ui: true, freq: 520 }); }
+        else {
+          this.audio.play('beep', null, { ui: true, freq: 1040 });
+          this.hud.medal('FIGHT');
+          if (this.intro) { this.intro = false; this.startMusic(); }
+        }
       }
-      this.hud.countdown(Math.max(0, n));
+      this.hud.countdown(Math.max(0, n), this.intro);
     } else {
       this.timeLeft = Math.max(0, this.timeLeft - dt);
       if (this.timeLeft <= 0 && !guest && !this.gm) { this.endMatch(); return; }
@@ -731,6 +754,7 @@ export class Game {
 
   onKill(killer, victim, weaponId, headshot) {
     victim.alive = false;
+    (this.recentDeaths || (this.recentDeaths = [])).push({ x: victim.pos.x, z: victim.pos.z, t: this.time }); // spawns avoid fresh fights
     victim.deaths++;
     victim.streak = 0;
     victim.respawnT = PLAYER.respawnDelay;
@@ -793,28 +817,46 @@ export class Game {
     const p = this.chooseSpawn(c.team);
     if (c.isBot && Math.random() < 0.3) c.pendingLoadout = randomLoadout(c.primaryId);
     const before = c.loadout;
-    c.spawn(p, this.world.spawnYaw[c.team]);
+    c.spawn(p, this.spawnYawOut);
     if (c.loadout !== before) this.emit(['lo', c.id, c.loadout]);
     if (c.isBot) this.brains.get(c).reset();
     if (!c.isBot) this.notify(c, 'spawn', +c.pos.x.toFixed(2), +c.pos.y.toFixed(2), +c.pos.z.toFixed(2), +c.yaw.toFixed(3));
   }
 
+  // Respawn point, Call of Duty style: any spawn on the map can be used (in Team Deathmatch), so the
+  // spawns "flip" when one side pushes into the other's. Points are scored by how far the nearest enemy
+  // is, whether an enemy can see the point (much worse if they're looking that way), recent deaths
+  // there, and how close friendlies are. The yaw to face comes back in this.spawnYawOut.
   chooseSpawn(team) {
-    let best = null, bestScore = -Infinity;
-    for (const s of this.world.spawns[team]) {
-      let minEnemy = 60, crowd = false, seen = false;
-      for (const c of this.characters) {
-        if (!c.alive) continue;
-        const d = Math.hypot(c.pos.x - s.x, c.pos.z - s.z);
-        if (d < 1.5) crowd = true;
-        if (c.team !== team) {
+    const flip = !this.gm;
+    const sets = flip ? [team, 1 - team] : [team];
+    let best = null, bestScore = -Infinity, bestYaw = this.world.spawnYaw[team];
+    this.recentDeaths = (this.recentDeaths || []).filter(d => this.time - d.t < 8);
+    for (const set of sets) {
+      for (const s of this.world.spawns[set]) {
+        let minEnemy = 80, crowd = false, threat = 0, friends = 0;
+        for (const c of this.characters) {
+          if (!c.alive) continue;
+          const dx = s.x - c.pos.x, dz = s.z - c.pos.z, d = Math.hypot(dx, dz);
+          if (d < 1.5) crowd = true;
+          if (c.team === team) { if (d < 22) friends++; continue; }
           minEnemy = Math.min(minEnemy, d);
-          if (d < 40 && !seen && !this.physics.blocked(c.eyePos(_a), _b.set(s.x, 1.5, s.z))) seen = true;
+          if (d < 55 && !this.physics.blocked(c.eyePos(_a), _b.set(s.x, 1.5, s.z))) {
+            // facing: 1 when the enemy looks straight at the point
+            const fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
+            const facing = d > 0.01 ? (fx * dx + fz * dz) / d : 1;
+            threat += facing > 0.5 ? 70 : facing > 0 ? 40 : 20;
+          }
         }
+        let score = Math.min(minEnemy, 45) - threat - (crowd ? 200 : 0) + Math.random() * 5;
+        if (minEnemy < 12) score -= 60;                                  // never right next to an enemy
+        if (minEnemy > 18) score += Math.min(friends, 3) * 5;            // near the team, away from the fight
+        for (const dth of this.recentDeaths) if (Math.hypot(dth.x - s.x, dth.z - s.z) < 10) score -= 15;
+        if (set !== team) score -= 8;                                    // home spawns win ties
+        if (score > bestScore) { bestScore = score; best = s; bestYaw = this.world.spawnYaw[set]; }
       }
-      const score = minEnemy - (crowd ? 100 : 0) - (seen ? 25 : 0) + Math.random() * 6;
-      if (score > bestScore) { bestScore = score; best = s; }
     }
+    this.spawnYawOut = bestYaw;
     return best;
   }
 
