@@ -22,55 +22,86 @@ export const WRIST = new THREE.Vector3(0, 0.002, 0.058 * HAND_SCALE); // wrist p
 // (base yaw toward the fingers' side, pitch toward the palm, roll, then two curls)
 const W = [1.5, 1.35, 0.75];
 export const POSES = {
-  trigger: { f: [[0.32, 0.5, 0.32], W, W, W], spread: [0.04, 0, -0.02, -0.05], t: [0.5, -0.5, 0.2, 0.25, 0.3] },
-  wrap: { f: [W, W, W, W], spread: [0.03, 0, -0.02, -0.05], t: [0.5, -0.55, 0.2, 0.3, 0.35] },
-  support: { f: [[0.95, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.8, 0.45]], spread: [0.06, 0, -0.04, -0.08], t: [0.55, -0.15, 0.1, 0.1, 0.15] },
+  trigger: { f: [[0.75, 1.45, 0.8], W, W, W], spread: [0.04, 0, -0.02, -0.05], t: [0.65, -0.5, 0.2, 0.25, 0.3] },
+  wrap: { f: [W, W, W, W], spread: [0.03, 0, -0.02, -0.05], t: [0.65, -0.55, 0.2, 0.3, 0.35] },
+  support: { f: [[0.95, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.8, 0.45]], spread: [0.06, 0, -0.04, -0.08], t: [0.4, -0.15, 0.1, 0.15, 0.2] },
   cup: { f: [[0.75, 0.75, 0.45], [0.8, 0.8, 0.5], [0.85, 0.8, 0.5], [0.9, 0.85, 0.5]], spread: [0.05, 0, -0.04, -0.08], t: [0.6, -0.55, 0.2, 0.3, 0.3] },
   fist: { f: [[1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1]], spread: [0, 0, 0, 0], t: [0.25, -0.95, 0.3, 0.55, 0.5] },
   open: { f: [[0.25, 0.3, 0.2], [0.25, 0.3, 0.2], [0.3, 0.35, 0.2], [0.35, 0.4, 0.25]], spread: [0.1, 0, -0.08, -0.16], t: [0.75, -0.2, 0.0, 0.1, 0.1] },
 };
 
-function fabricTex(color) {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const g = c.getContext('2d'), col = new THREE.Color(color);
-  g.fillStyle = `#${col.getHexString()}`; g.fillRect(0, 0, 128, 128);
-  // twill weave + a few creases
-  for (let y = 0; y < 128; y += 2) for (let x = 0; x < 128; x += 2) {
-    const v = ((x + y) % 8 < 4 ? 0.06 : -0.04) + (Math.random() - 0.5) * 0.08;
-    g.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, 2, 2);
+// cloth: colour with a soft mottle, and a normal map with twill weave and a few loose folds
+function fabricMaps(color) {
+  const N = 256, col = new THREE.Color(color);
+  const c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  const n = document.createElement('canvas'); n.width = n.height = N;
+  const gn = n.getContext('2d'), nimg = gn.createImageData(N, N);
+  const h = new Float32Array(N * N);
+  let seed = 9; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const blobs = Array.from({ length: 30 }, () => [rnd() * N, rnd() * N, 10 + rnd() * 30, rnd() - 0.5]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let v = ((x + y * 2) % 6 < 3 ? 1 : 0) * 0.35 + rnd() * 0.25;                         // twill
+    v += Math.sin(y * 0.09 + Math.sin(x * 0.05) * 1.5) * 0.9;                             // loose folds round the sleeve
+    h[y * N + x] = v;
+    let m = 0; for (const [bx, by, br, bv] of blobs) { const d = Math.hypot(x - bx, y - by); if (d < br) m += bv * (1 - d / br); }
+    const f = 1 + m * 0.12 + (rnd() - 0.5) * 0.05, i = (y * N + x) * 4;
+    img.data[i] = Math.min(255, col.r * 255 * f); img.data[i + 1] = Math.min(255, col.g * 255 * f); img.data[i + 2] = Math.min(255, col.b * 255 * f); img.data[i + 3] = 255;
   }
-  for (let i = 0; i < 10; i++) {
-    g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1 + Math.random() * 2;
-    g.beginPath(); const y = Math.random() * 128; g.moveTo(0, y); g.bezierCurveTo(40, y + 10, 80, y - 10, 128, y + (Math.random() - 0.5) * 20); g.stroke();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const hx = h[y * N + (x + 1) % N] - h[y * N + (x + N - 1) % N], hy = h[((y + 1) % N) * N + x] - h[((y + N - 1) % N) * N + x];
+    const nx = -hx * 0.6, ny = -hy * 0.6, l = Math.hypot(nx, ny, 1), i = (y * N + x) * 4;
+    nimg.data[i] = (nx / l * 0.5 + 0.5) * 255; nimg.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; nimg.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; nimg.data[i + 3] = 255;
   }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3);
-  return t;
+  g.putImageData(img, 0, 0); gn.putImageData(nimg, 0, 0);
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace;
+  const normalMap = new THREE.CanvasTexture(n);
+  for (const t of [map, normalMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3); t.anisotropy = 4; }
+  return { map, normalMap };
 }
 
 function buildHand(side, M) {
   const s = side === 'R' ? -1 : 1; // placement: right thumb on -x, left on +x; rotations use -s
   const hand = new THREE.Group();
   const add = (parent, geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
-  add(hand, new RoundedBoxGeometry(0.084, 0.03, 0.094, 3, 0.012), M.glove, 0, 0, 0);
-  add(hand, new RoundedBoxGeometry(0.064, 0.008, 0.056, 2, 0.003), M.pad, 0, 0.016, 0.004);        // back-of-hand panel
-  add(hand, new RoundedBoxGeometry(0.076, 0.012, 0.018, 2, 0.005), M.pad, 0, 0.012, -0.04);         // knuckle guard
-  // gauntlet cuff over the wrist
-  const cuff = add(hand, new THREE.CapsuleGeometry(0.033, 0.03, 4, 14), M.glove, 0, 0.002, 0.07);
-  cuff.rotation.x = Math.PI / 2; cuff.scale.set(1.12, 1, 0.82);
-  { const st = add(hand, new THREE.CylinderGeometry(0.036, 0.036, 0.012, 14), M.strap, 0, 0.002, 0.072); st.rotation.x = Math.PI / 2; st.scale.set(1.12, 1, 0.8); }
-  const seg = (parent, L, r) => {
-    const g = new THREE.CapsuleGeometry(r, Math.max(0.001, L - r), 3, 8); g.rotateX(Math.PI / 2); g.translate(0, 0, -L / 2);
-    parent.add(new THREE.Mesh(g, M.glove));
+  // palm: narrower and thicker toward the heel
+  const palm = new RoundedBoxGeometry(0.08, 0.026, 0.09, 3, 0.011);
+  const pp = palm.attributes.position;
+  for (let i = 0; i < pp.count; i++) {
+    const t = (pp.getZ(i) + 0.045) / 0.09; // 0 at the knuckles, 1 at the heel
+    pp.setX(i, pp.getX(i) * (1 - 0.13 * t)); pp.setY(i, pp.getY(i) * (0.88 + 0.24 * t) - 0.002 * t);
+  }
+  palm.computeVertexNormals();
+  add(hand, palm, M.glove, 0, 0, 0);
+  // thumb pad (thenar) and the outer heel (hypothenar)
+  const pad = (x, y, z, sx, sy, sz, ry) => { const m = add(hand, new THREE.SphereGeometry(1, 14, 10), M.glove, x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = ry; };
+  pad(s * 0.024, -0.006, 0.02, 0.018, 0.014, 0.032, s * 0.45);
+  pad(-s * 0.026, -0.005, 0.026, 0.013, 0.012, 0.026, 0);
+  // tactical glove: padded back panel, a knuckle protector over each knuckle, velcro strap at the wrist
+  { const b = add(hand, new THREE.SphereGeometry(1, 18, 10), M.pad, 0, 0.0095, 0.006); b.scale.set(0.028, 0.0055, 0.03); }
+  FINGERS.forEach(f => { const k = add(hand, new THREE.SphereGeometry(1, 10, 6), M.pad, s * f.x, 0.0085, f.z + 0.003); k.scale.set(0.0088, 0.0055, 0.0085); });
+  // wrist: an oval gauntlet that matches the sleeve's section, closed by a strap
+  const wr = (r0, r1, L, z, mat, sx, sy) => { const g = new THREE.CylinderGeometry(r0, r1, L, 18); g.rotateX(Math.PI / 2); const m = add(hand, g, mat, 0, 0.001, z); m.scale.set(sx, sy, 1); return m; };
+  wr(0.03, 0.026, 0.05, 0.066, M.glove, 1.22, 0.62);
+  wr(0.0305, 0.0305, 0.012, 0.074, M.strap, 1.24, 0.66);
+  // fingers: tapered segments with rounded knuckles and fingertips; the last pad in the lighter palm material
+  const seg = (parent, L, r0, r1, mat, tip) => {
+    const g = new THREE.CylinderGeometry(r0, r1, L, 12, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, -L / 2);
+    parent.add(new THREE.Mesh(g, mat));
+    const k = new THREE.Mesh(new THREE.SphereGeometry(r0 * 1.04, 12, 8), mat); parent.add(k);
     const next = new THREE.Group(); next.position.z = -L; parent.add(next);
+    if (tip) { const t = new THREE.Mesh(new THREE.SphereGeometry(r1, 12, 8), mat); t.scale.set(1, 0.85, 1.15); next.add(t); }
     return next;
   };
   const fingers = FINGERS.map(f => {
-    const j0 = new THREE.Group(); j0.position.set(s * f.x, 0.001, f.z); hand.add(j0);
-    const j1 = seg(j0, f.len[0], f.r), j2 = seg(j1, f.len[1], f.r * 0.95); seg(j2, f.len[2], f.r * 0.9);
+    const j0 = new THREE.Group(); j0.position.set(s * f.x, 0.0, f.z); hand.add(j0);
+    const j1 = seg(j0, f.len[0], f.r, f.r * 0.92, M.glove), j2 = seg(j1, f.len[1], f.r * 0.92, f.r * 0.86, M.glove);
+    seg(j2, f.len[2], f.r * 0.86, f.r * 0.8, M.tip, true);
     return [j0, j1, j2];
   });
   const tb = new THREE.Group(); tb.position.set(s * THUMB.x, THUMB.y, THUMB.z); hand.add(tb);
-  const t1 = seg(tb, THUMB.len[0], THUMB.r), t2 = seg(t1, THUMB.len[1], THUMB.r * 0.95); seg(t2, THUMB.len[2], THUMB.r * 0.9);
+  const t1 = seg(tb, THUMB.len[0], THUMB.r * 1.1, THUMB.r, M.glove), t2 = seg(t1, THUMB.len[1], THUMB.r, THUMB.r * 0.92, M.glove);
+  seg(t2, THUMB.len[2], THUMB.r * 0.92, THUMB.r * 0.84, M.tip, true);
   hand.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
   hand.scale.setScalar(HAND_SCALE);
   return { group: hand, s: -s, fingers, thumb: [tb, t1, t2], pose: clonePose(POSES.wrap) };
@@ -90,38 +121,51 @@ function applyPose(h, p) {
     j1.rotation.x = -p.f[i][1]; j2.rotation.x = -p.f[i][2];
   });
   const [tb, t1, t2] = h.thumb;
-  tb.rotation.set(p.t[1], s * p.t[0], s * p.t[2], 'YXZ');
+  tb.rotation.set(p.t[1], -s * p.t[0], s * p.t[2], 'YXZ');
   t1.rotation.x = -p.t[3]; t2.rotation.x = -p.t[4];
 }
 
-// limb segment: tapered sleeve from the joint toward -y, scaled to the solved length
-function limb(r0, r1, L, mat, cuffMat) {
+// sleeve segment: a lathe from the joint toward -y with a rounded cap, a muscle swell, cloth bunching near the
+// joints and a hem at the far end; oval in section (wider across x). Scaled to the solved length.
+function limb(L, prof, mat, hem) {
+  const pts = [new THREE.Vector2(0.0001, prof[0] * 0.9)];
+  pts.push(new THREE.Vector2(prof[0] * 0.62, prof[0] * 0.66), new THREE.Vector2(prof[0] * 0.9, prof[0] * 0.36));
+  const n = 28;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const k = t * (prof.length - 2), a = Math.floor(k), f = k - a;
+    let r = prof[1 + a] + ((prof[2 + a] ?? prof[1 + a]) - prof[1 + a]) * (f * f * (3 - 2 * f));
+    r += 0.0016 * Math.sin(t * 41 + 1.3) * (t < 0.3 || t > 0.7 ? 1 : 0.35); // folds
+    pts.push(new THREE.Vector2(r, -t * L));
+  }
+  if (hem) { const r = prof[prof.length - 1]; pts.push(new THREE.Vector2(r * 1.1, -L - 0.004), new THREE.Vector2(r * 1.1, -L - 0.016), new THREE.Vector2(r * 0.8, -L - 0.018)); }
+  else pts.push(new THREE.Vector2(0.0001, -L - 0.001));
+  const g = new THREE.LatheGeometry(pts.reverse(), 22);
+  g.scale(1.12, 1, 0.88);
+  g.computeVertexNormals();
   const grp = new THREE.Group();
-  const g = new THREE.CylinderGeometry(r0, r1, L, 16, 1, true); g.translate(0, -L / 2, 0);
-  const m = new THREE.Mesh(g, mat); grp.add(m);
-  if (cuffMat) { const c = new THREE.Mesh(new THREE.CylinderGeometry(r1 * 1.12, r1 * 1.12, 0.035, 16), cuffMat); c.position.y = -L + 0.03; grp.add(c); }
-  const e = new THREE.Mesh(new THREE.SphereGeometry(r0, 14, 10), mat); grp.add(e); // elbow / shoulder cap
-  grp.userData.L = L;
+  const m = new THREE.Mesh(g, mat); m.castShadow = false; grp.add(m);
   return grp;
 }
 
 export function createVmArms(team) {
   const k = TEAMS[team].kit;
   // a touch lighter than the third-person kit so the arms read against dark scenes
-  const shirt = new THREE.Color(k.shirt).offsetHSL(0, 0, 0.08);
-  const sleeve = new THREE.MeshStandardMaterial({ color: 0xffffff, map: fabricTex(shirt), roughness: 0.95 });
+  const shirt = new THREE.Color(k.shirt).offsetHSL(0, 0, 0.07);
+  const fab = fabricMaps(shirt);
+  const glove = new THREE.Color(k.glove).offsetHSL(0, 0, 0.04);
   const M = {
-    glove: new THREE.MeshStandardMaterial({ color: new THREE.Color(k.glove).offsetHSL(0, 0, 0.04), roughness: 0.7, metalness: 0.05 }),
-    pad: new THREE.MeshStandardMaterial({ color: new THREE.Color(k.glove).offsetHSL(0, 0, 0.14), roughness: 0.55 }),
-    strap: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.6 }),
-    sleeve,
-    cuff: new THREE.MeshStandardMaterial({ color: 0xffffff, map: sleeve.map, roughness: 0.95 }),
+    glove: new THREE.MeshStandardMaterial({ color: glove, roughness: 0.68, metalness: 0.05 }),
+    tip: new THREE.MeshStandardMaterial({ color: glove.clone().offsetHSL(0, 0, 0.025), roughness: 0.85 }),
+    pad: new THREE.MeshStandardMaterial({ color: glove.clone().offsetHSL(0, -0.03, 0.035), roughness: 0.45, metalness: 0.08 }),
+    strap: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.75 }),
+    sleeve: new THREE.MeshStandardMaterial({ map: fab.map, normalMap: fab.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.92 }),
   };
-  M.cuff.color.setScalar(0.8);
   const root = new THREE.Group();
   const mkArm = (side) => {
     const hand = buildHand(side, M);
-    const upper = limb(0.047, 0.042, UPPER, M.sleeve), fore = limb(0.042, 0.034, FORE, M.sleeve, M.cuff);
+    const upper = limb(UPPER, [0.05, 0.052, 0.054, 0.05, 0.046], M.sleeve, false);
+    const fore = limb(FORE, [0.044, 0.046, 0.05, 0.048, 0.043, 0.038, 0.035], M.sleeve, true);
     root.add(upper, fore, hand.group);
     return { hand, upper, fore };
   };
@@ -152,6 +196,17 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 // place one arm: hand at (pos, q) with pose, elbow solved toward pole, shoulder fixed (camera space)
+// point a limb (extends along its local -y) along dir, rolled so its wide (x) side lines up with xHint
+const _ox = new THREE.Vector3(), _oy = new THREE.Vector3(), _oz = new THREE.Vector3(), _om = new THREE.Matrix4(), _hx = new THREE.Vector3();
+function orient(obj, dir, xHint) {
+  _oy.copy(dir).negate();
+  _ox.copy(xHint).addScaledVector(_oy, -xHint.dot(_oy));
+  if (_ox.lengthSq() < 1e-6) _ox.set(1, 0, 0).addScaledVector(_oy, -_oy.x);
+  _ox.normalize();
+  _oz.crossVectors(_ox, _oy);
+  _om.makeBasis(_ox, _oy, _oz);
+  obj.quaternion.setFromRotationMatrix(_om);
+}
 export function poseArm(arm, shoulder, pos, q, pose, pole) {
   const h = arm.hand;
   h.group.position.copy(pos); h.group.quaternion.copy(q);
@@ -159,10 +214,13 @@ export function poseArm(arm, shoulder, pos, q, pose, pole) {
   h.pose = pose;
   _w.copy(WRIST).applyQuaternion(q).add(pos);
   solveElbow(shoulder, _w, UPPER, FORE, pole, _e);
-  arm.upper.position.copy(shoulder);
-  arm.upper.quaternion.setFromUnitVectors(DOWN, _d.subVectors(_e, shoulder).normalize());
-  arm.upper.scale.y = shoulder.distanceTo(_e) / UPPER;
+  // forearm rolls with the wrist (flat side of the arm = back of the hand), upper arm follows the forearm
+  _hx.set(1, 0, 0).applyQuaternion(q);
   arm.fore.position.copy(_e);
-  arm.fore.quaternion.setFromUnitVectors(DOWN, _d.subVectors(_w, _e).normalize());
+  orient(arm.fore, _d.subVectors(_w, _e).normalize(), _hx);
   arm.fore.scale.y = _e.distanceTo(_w) / FORE;
+  _hx.set(1, 0, 0).applyQuaternion(arm.fore.quaternion);
+  arm.upper.position.copy(shoulder);
+  orient(arm.upper, _d.subVectors(_e, shoulder).normalize(), _hx);
+  arm.upper.scale.y = shoulder.distanceTo(_e) / UPPER;
 }

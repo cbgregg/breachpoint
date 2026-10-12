@@ -14,8 +14,8 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const _E = new THREE.Vector3(), _R = new THREE.Vector3(), _L = new THREE.Vector3(), _D = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
-const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Vector3(-0.32, -0.38, 0.05);
-const POLE_R = new THREE.Vector3(0.7, -1.4, 0.2), POLE_L = new THREE.Vector3(-1, -0.65, 0.05);
+const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Vector3(-0.2, -0.5, 0.05);
+const POLE_R = new THREE.Vector3(0.7, -1.4, 0.2), POLE_L = new THREE.Vector3(-0.4, -1, 0.2);
 // where the hands go, in the gun's frame (origin = top of the pistol grip, barrel toward -z)
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const RH_LONG = V3(0.031, -0.052, 0.018), RH_PISTOL = V3(0.031, -0.045, 0.012);
@@ -27,6 +27,7 @@ const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
 const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
 const COOK_F = V3(0.25, 0.1, -1);
+export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
 const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
@@ -100,7 +101,7 @@ export class PlayerController {
         id: w.id, holder, gun, type, magHold,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.1, -0.12, -0.3) : new THREE.Vector3(0.11, -0.145, -0.21),
+          : pistol ? new THREE.Vector3(0.088, -0.112, -0.245) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
       };
     });
@@ -411,7 +412,7 @@ export class PlayerController {
     }
     // the sight fills more of the screen when aiming (viewmodel FOV narrows, like MW)
     const vmc = this.game.vmCamera;
-    const vmBase = this.game.input.isTouch ? 72 : 66;
+    const vmBase = this.game.input.isTouch ? 68 : 60;
     const a = c.adsT, ae = a * a * (3 - 2 * a);
     const vf = vmBase * lerp(1, SIGHT_SIZE[s.sightSize] ?? SIGHT_SIZE.large, ae);
     if (Math.abs(vf - this.lastVmFov) > 0.01) { vmc.fov = vf; vmc.updateProjectionMatrix(); this.lastVmFov = vf; }
