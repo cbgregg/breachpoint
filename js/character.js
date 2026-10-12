@@ -797,6 +797,12 @@ export function createFpBody(team) {
   sol.mixer.update(0);
   root.updateMatrixWorld(true);
   const b = sol.bones;
+  // viewmodel arms are longer than life (as in every shooter) so the hands reach a rifle's foregrip
+  for (const side of ['Left', 'Right']) {
+    b[side + 'ForeArm'].position.multiplyScalar(FP_ARM);
+    b[side + 'Hand'].position.multiplyScalar(FP_ARM);
+  }
+  root.updateMatrixWorld(true);
   const len = (a, c) => b[a].getWorldPosition(_w1).distanceTo(b[c].getWorldPosition(_w2));
   const neck = b.Neck.getWorldPosition(new THREE.Vector3());
   sol.root.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
@@ -807,12 +813,41 @@ export function createFpBody(team) {
 }
 
 const _I = new THREE.Quaternion();
-export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gunQ = _I) {
+const FP_ARM = 1.4;
+export const FINGER_AXIS = [1, 0, 0], THUMB_AXIS = [0, 0, 1], FINGER_SIGN = [1, 1];
+export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gunQ = _I, grip = 1) {
   fp.mixer.update(dt);
+  // the clip keys bone positions, so re-stretch the arms after every update
+  for (const side of ['Left', 'Right']) {
+    fp.bones[side + 'ForeArm'].position.multiplyScalar(FP_ARM);
+    fp.bones[side + 'Hand'].position.multiplyScalar(FP_ARM);
+  }
   // neck sits just behind and below the camera; the head is collapsed so it never clips
-  fp.root.position.set(-fp.neck.x, -0.16 - fp.neck.y - shoulderDrop, 0.09 - fp.neck.z);
+  fp.root.position.set(-fp.neck.x, -0.16 - fp.neck.y - shoulderDrop, 0.05 - fp.neck.z);
   fp.bones.Head.scale.setScalar(0.001);
   fp.bones.Neck.scale.setScalar(0.4);
   fp.root.updateMatrixWorld(true);
   ikArms(fp, rightTarget, leftTarget, gunQ);
+  curlFingers(fp.bones, grip);
+}
+
+// close the hands around the grips (the idle clip leaves them open)
+const _fq = new THREE.Quaternion(), _fa = new THREE.Vector3();
+export function curlFingers(B, k = 1) {
+  for (const side of ['Left', 'Right']) {
+    for (const f of ['Index', 'Middle', 'Ring', 'Pinky']) {
+      for (let j = 1; j <= 3; j++) {
+        const bone = B[side + 'Hand' + f + j];
+        if (!bone) continue;
+        const amt = (j === 1 ? 0.95 : j === 2 ? 1.25 : 0.8) * k * (f === 'Index' && side === 'Right' ? 0.6 : 1);
+        bone.quaternion.multiply(_fq.setFromAxisAngle(_fa.set(FINGER_AXIS[0], FINGER_AXIS[1], FINGER_AXIS[2]), amt * (side === 'Left' ? FINGER_SIGN[0] : FINGER_SIGN[1])));
+      }
+    }
+    for (let j = 1; j <= 3; j++) {
+      const bone = B[side + 'HandThumb' + j];
+      if (bone) bone.quaternion.multiply(_fq.setFromAxisAngle(_fa.set(THUMB_AXIS[0], THUMB_AXIS[1], THUMB_AXIS[2]), 0.35 * k * (side === 'Left' ? FINGER_SIGN[0] : FINGER_SIGN[1])));
+    }
+  }
+  B.LeftHand.updateMatrixWorld(true);
+  B.RightHand.updateMatrixWorld(true);
 }

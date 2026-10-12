@@ -16,6 +16,8 @@ export class BotBrain {
     this.lastKnown = new THREE.Vector3();
     this.aimErr = new THREE.Vector3();
     this.lastPos = new THREE.Vector3();
+    this.aimPt = new THREE.Vector3(); this.aimLocal = new THREE.Vector3(0, 1.2, 0);
+    this.spot = new Map(); this.expo = 1;
     this.reset();
   }
 
@@ -31,6 +33,7 @@ export class BotBrain {
     this.stuckT = 1; this.lastPos.copy(this.bot.pos);
     this.grenadeT = rand(4, 10);
     this.crouch = false;
+    if (this.spot) this.spot.clear();
   }
 
   update(dt) {
@@ -45,35 +48,72 @@ export class BotBrain {
     this.combat(dt);
   }
 
+  // How much of an enemy this bot can actually see (0..1), and the best visible point to aim at.
+  exposure(eye, e) {
+    const ph = this.game.physics;
+    const sy = Math.sin(e.yaw), cy = Math.cos(e.yaw);
+    const h = e.height;
+    const pts = [
+      [e.pos.x, e.pos.y + h - 0.16, e.pos.z, 0.2],                       // head
+      [e.pos.x, e.pos.y + h * 0.68, e.pos.z, 0.3],                       // chest
+      [e.pos.x, e.pos.y + h * 0.45, e.pos.z, 0.2],                       // hips
+      [e.pos.x + cy * 0.28, e.pos.y + h * 0.7, e.pos.z - sy * 0.28, 0.15], // shoulders
+      [e.pos.x - cy * 0.28, e.pos.y + h * 0.7, e.pos.z + sy * 0.28, 0.15],
+    ];
+    let vis = 0, best = -1, bestW = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [x, y, z, w] = pts[i];
+      if (!ph.blocked(eye, _e.set(x, y, z))) { vis += w; if (w > bestW || (w === bestW && i === 1)) { bestW = w; best = i; } }
+    }
+    if (best >= 0) this.aimPt.set(pts[best][0] - e.pos.x, pts[best][1] - e.pos.y, pts[best][2] - e.pos.z);
+    return vis;
+  }
+
+  // Spotting is gradual: a meter per enemy fills with exposure, distance, view angle, movement and noise,
+  // and drains when they're out of sight. Bots only engage once it's full, so a quick peek isn't an
+  // instant death sentence, and they can't snap onto a sliver of head behind cover.
   perceive() {
-    const b = this.bot, g = this.game, d = this.diff;
+    const b = this.bot, g = this.game, d = this.diff, step = 0.12;
     const eye = b.eyePos(_a);
     const fwd = _b.set(-Math.sin(b.yaw), 0, -Math.cos(b.yaw));
-    let best = null, bestScore = Infinity;
+    let best = null, bestScore = Infinity, bestExp = 0;
     for (const e of g.characters) {
-      if (!e.alive || e.team === b.team) continue;
+      if (!e.alive || e.team === b.team) { this.spot.delete(e); continue; }
+      let m = this.spot.get(e) || 0;
       const dist = e.pos.distanceTo(b.pos);
-      if (dist > d.sight) continue;
       _c.subVectors(e.pos, b.pos); _c.y = 0;
       const len = _c.length() || 1;
       _c.divideScalar(len);
       const ang = Math.acos(clamp(_c.dot(fwd), -1, 1));
-      const aware = ang < d.fov || dist < 5 || e === this.target ||
-        (b.lastAttacker === e && g.time - b.lastAttackerT < 2.5) ||
-        (g.time - e.lastFireT < 0.6 && dist < (e.weapon.def.quiet ? 10 : 30));
-      if (!aware) continue;
-      if (g.physics.blocked(eye, e.headPos(_d)) && g.physics.blocked(eye, e.chestPos(_d))) continue;
+      const loud = g.time - e.lastFireT < 0.6 && dist < (e.weapon.def.quiet ? 10 : 30);
+      const hurt = b.lastAttacker === e && g.time - b.lastAttackerT < 2.5;
+      const aware = dist <= d.sight && (ang < d.fov || dist < 4 || e === this.target || hurt || loud);
+      const exp = aware ? this.exposure(eye, e) : 0;
+      if (exp <= 0) {
+        m = Math.max(0, m - step * (e === this.target ? 0.35 : 0.8));
+        this.spot.set(e, m);
+        continue;
+      }
+      const center = ang < d.fov * 0.45 ? 1 : 0.5;
+      const near = clamp(1.35 - dist / 40, 0.3, 1.25);
+      const moving = Math.hypot(e.vel.x, e.vel.z) > 3 ? 1.25 : e.crouchT > 0.5 ? 0.7 : 1;
+      const rate = d.spot * Math.pow(exp, 1.5) * center * near * moving * (loud ? 1.6 : 1) * (hurt ? 2 : 1) * (dist < 4 ? 3 : 1);
+      m = Math.min(1.6, m + rate * step);
+      this.spot.set(e, m);
+      if (m < 1) continue;
       const score = dist - (e === this.target ? 8 : 0);
-      if (score < bestScore) { bestScore = score; best = e; }
+      if (score < bestScore) { bestScore = score; best = e; bestExp = exp; this.bestAim = this.bestAim || new THREE.Vector3(); this.bestAim.copy(this.aimPt); }
     }
     if (best) {
       if (best !== this.target || !this.visible) {
-        this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible ? 0.5 : 1);
+        this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible || g.time - this.lastKnownT < 1.5 ? 0.5 : 1);
         this.seenT = 0;
         this.newAimError(best);
       }
       this.target = best;
       this.visible = true;
+      this.expo = bestExp;
+      this.aimLocal.copy(this.bestAim);
       this.lastKnown.copy(best.pos);
       this.lastKnownT = g.time;
       g.reportIntel(b.team, best.pos);
@@ -95,7 +135,8 @@ export class BotBrain {
 
   newAimError(t) {
     const dist = t.pos.distanceTo(this.bot.pos);
-    const mag = this.diff.aimError * dist * rand(0.4, 1.2);
+    const cover = 1 + (1 - clamp(this.expo ?? 1, 0, 1)) * 1.6; // harder to hit what you can barely see
+    const mag = this.diff.aimError * dist * rand(0.4, 1.2) * cover + 0.15;
     this.aimErr.set(rand(-1, 1), rand(-0.6, 0.6), rand(-1, 1)).normalize().multiplyScalar(mag);
     this.aimHead = Math.random() < this.diff.headChance;
     this.aimErrT = rand(0.25, 0.55);
@@ -230,7 +271,10 @@ export class BotBrain {
       if (this.aimErrT <= 0) this.newAimError(t);
       const shrink = Math.max(d.aimFloor, 1 - this.seenT * 0.3);
       // aim slightly behind moving targets to simulate tracking lag
-      (this.aimHead ? t.headPos(_b) : t.chestPos(_b)).addScaledVector(this.aimErr, shrink).addScaledVector(t.vel, -d.lag);
+      // aim at the part of them that's actually visible (head if only the head is), with tracking lag
+      if (this.expo >= 0.7) (this.aimHead ? t.headPos(_b) : t.chestPos(_b));
+      else _b.copy(t.pos).add(this.aimLocal);
+      _b.addScaledVector(this.aimErr, shrink).addScaledVector(t.vel, -d.lag);
       _c.subVectors(_b, eye);
       dy = Math.atan2(-_c.x, -_c.z);
       dp = Math.atan2(_c.y, Math.hypot(_c.x, _c.z));

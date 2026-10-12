@@ -142,19 +142,23 @@
         <section class="pane" id="pane-loadout">
           <h2 class="pane-title">LOADOUT</h2>
           <p class="notice in-match-only">Changes apply the next time you spawn.</p>
-          <div class="rows">
-            <div class="row"><label for="opt-name">Callsign</label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+          <div class="lo-grid">
+            <div class="lo-left">
+              <div class="rows">
+                <div class="row"><label for="opt-name">Callsign</label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+              </div>
+              <div class="group">PRIMARY</div>
+              <div id="weapon-list" class="weapons"></div>
+              <div class="group">SECONDARY · P-45 SIDEARM</div>
+              <div class="rows" id="gs-pistol"></div>
+            </div>
+            <div class="gs lo-right" id="gunsmith">
+              <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
+              <div class="gs-view"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
+              <div class="rows" id="gs-slots"></div>
+              <div class="gs-stats" id="gs-stats"></div>
+            </div>
           </div>
-          <div class="group">PRIMARY</div>
-          <div id="weapon-list" class="weapons"></div>
-          <div class="gs" id="gunsmith">
-            <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
-            <div class="gs-view"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
-            <div class="rows" id="gs-slots"></div>
-            <div class="gs-stats" id="gs-stats"></div>
-          </div>
-          <div class="group">SECONDARY · P-45 SIDEARM</div>
-          <div class="rows" id="gs-pistol"></div>
         </section>
 
         <section class="pane" id="pane-options">

@@ -38,7 +38,7 @@ export class Game {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.04, 600);
+    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 600); // near 0.1: 2.5x the depth precision of 0.04, no distant z-fighting
     this.scene.add(this.camera);
     this.vmScene = new THREE.Scene();
     // a wider viewmodel FOV on phones makes the gun and optic take up less of the small screen
@@ -846,6 +846,8 @@ export class Game {
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
     setCharacterDetail(this.world.textures.fabric);
+    const lit = !this.renderer.quality || this.renderer.quality.shadows > 0;
+    this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; });
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
     this.buildPickups();

@@ -449,25 +449,26 @@ export class PlayerController {
     const bx = Math.sin(this.bobT) * 0.01 * bobAmt, by = -Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;
 
     h.position.set(
-      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) - this.sprintT * 0.03 - mel * 0.08 + slide * -0.04,
-      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle - tilt * 0.04 - sw * 0.25 - gren * 0.22 - this.sprintT * 0.05 - this.landDip * 0.025 + slide * -0.02,
-      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) - mel * 0.12,
+      // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
+      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) - tilt * 0.07 - this.sprintT * 0.06 - mel * 0.08 + slide * -0.04,
+      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * 0.075 - sw * 0.25 - gren * 0.22 - this.sprintT * 0.02 - this.landDip * 0.025 + slide * -0.02,
+      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * 0.02 - mel * 0.12,
     );
     h.rotation.set(
-      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * 0.1 - this.sprintT * 0.3 + this.swayY * 0.8 + mel * 0.2,
-      this.sprintT * 0.75 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
-      tilt * 0.32 + this.sprintT * 0.45 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
+      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * 0.06 - this.sprintT * 0.25 + this.swayY * 0.8 + mel * 0.2,
+      this.sprintT * 0.55 - tilt * 0.04 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
+      -tilt * 0.55 + this.sprintT * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
     // tactical sprint: gun swung up beside the face, muzzle high (MW style)
     const tk = this.tacK || 0;
     if (tk > 0.01) {
       // undo most of the normal sprint pose, then swing the muzzle up, held off to the right
-      h.position.x += (0.07 + this.sprintT * 0.03) * tk;
-      h.position.y += (-0.07 + this.sprintT * 0.05) * tk + by * 0.8;
+      h.position.x += (0.07 + this.sprintT * 0.06) * tk;
+      h.position.y += (-0.07 + this.sprintT * 0.02) * tk + by * 0.8;
       h.position.z += -0.12 * tk;
-      h.rotation.x += (0.85 + this.sprintT * 0.3) * tk;
-      h.rotation.y += (-0.35 - this.sprintT * 0.75) * tk;
-      h.rotation.z += (0.15 - this.sprintT * 0.45) * tk + bx * 4;
+      h.rotation.x += (0.85 + this.sprintT * 0.25) * tk;
+      h.rotation.y += (-0.35 - this.sprintT * 0.55) * tk;
+      h.rotation.z += (0.15 - this.sprintT * 0.55) * tk + bx * 4;
     }
     if (s1 + s2 > 0) {
       const w2 = Math.sin(ip * Math.PI * 3) * 0.04; // a little life in the hands
@@ -488,7 +489,7 @@ export class PlayerController {
     if (w.reloading && w.id !== 'shotgun') {
       const out = smooth(0.12, 0.32, rp), back = 1 - smooth(0.5, 0.72, rp);
       const off = rp < 0.42 ? out : rp < 0.5 ? 1 : back;
-      mag.position.y -= off * 0.3;
+      mag.position.y -= off * 0.2;
       mag.position.z += off * 0.06;
       mag.visible = !(rp > 0.34 && rp < 0.5);
       leftMode = rp < 0.08 || rp > 0.82 ? 'grip' : rp > 0.34 && rp < 0.5 ? 'pouch' : 'mag';

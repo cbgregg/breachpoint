@@ -476,3 +476,16 @@ body.dead #touch { display: none !important; }
 #spawn-hint { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); display: none; align-items: center; gap: 8px; font-size: 14px; letter-spacing: 0.16em; color: var(--ink-dim); background: rgba(10, 11, 11, 0.55); padding: 6px 12px; }
 #spawn-hint.on { display: flex; }
 @media (pointer: coarse) { #death-actions .glyph { display: none; } .dbtn { font-size: 18px; padding: 12px 18px; } }
+
+/* loadout: contained two-column layout; the menu body scrolls, header and footer stay put */
+#menu .mw { overflow: hidden; }
+#menu .mw-body { overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; }
+#pane-loadout.on { grid-column: 1 / 3; }
+.lo-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 24px; align-items: start; }
+.lo-left { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lo-left .weapons { grid-template-columns: 1fr; }
+.lo-right { margin-top: 0; min-width: 0; }
+@media (max-width: 1100px) { #pane-loadout.on { grid-column: 1; } }
+@media (max-width: 760px) { .lo-grid { grid-template-columns: 1fr; } .lo-left .weapons { grid-template-columns: 1fr 1fr; } }
+.psec-pane .lo-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+@media (max-width: 1000px) { .psec-pane .lo-grid { grid-template-columns: 1fr; } }
