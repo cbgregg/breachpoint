@@ -3,7 +3,7 @@
 
 const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const KEY_ACTIONS = {
-  KeyR: 'reload', KeyG: 'grenade', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
+  KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
   KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause',
 };
 // Standard gamepad mapping (Xbox layout)
@@ -12,7 +12,7 @@ export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8
 // are handled separately below. RB (tactical) and the D-pad (killstreaks etc.) have nothing to do here.
 const PAD_ACTIONS = {
   [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap',
-  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee',
+  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect',
 };
 
 // Some browsers (Firefox on Linux/macOS, older Safari) report Xbox pads without the "standard"
@@ -123,6 +123,8 @@ export class Input {
   clearAds() { this.adsToggled = false; }
   get moveX() { return Math.max(-1, Math.min(1, this.touchMoveX + this.padMoveX)); }
   get moveY() { return Math.max(-1, Math.min(1, this.touchMoveY + this.padMoveY)); }
+  // frag button held (cook while held, throw on release)
+  get grenadeHeld() { return this.keys.has('KeyG') || !!this.lbHeld || !!this.touchGren; }
   get scoreboard() { return this.keys.has('Tab') || this.touchScore || this.padScore; }
 
   lock() {
@@ -202,10 +204,8 @@ export class Input {
         const a = PAD_ACTIONS[i];
         if (a) this.actions.add(a);
       }
-      // lethal: hold LB to line it up, release to throw
-      const lb = btn(PAD.LB);
-      if (this.lbHeld && !lb) this.actions.add('grenade');
-      this.lbHeld = lb;
+      // lethal: hold LB to cook, release to throw (handled by the player controller)
+      this.lbHeld = btn(PAD.LB);
     } else if (this.onNav) {
       // menu navigation with D-pad / left stick (with key-repeat)
       this.lbHeld = false;
@@ -244,6 +244,7 @@ export class Input {
     this.touchMoveX = this.touchMoveY = 0;
     this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
     this.padAds = this.padFire = this.padScore = false;
+    this.lbHeld = false; this.touchGren = false;
   }
 
   setupTouch() {
@@ -270,6 +271,7 @@ export class Input {
           if (k === 'fire') { this.touchFire = true; if (lookId === null) lookStart(t); }
           else if (k === 'ads') { this.touchAdsHeld = true; this.adsPress(); if (lookId === null) lookStart(t); }
           else if (k === 'score') this.touchScore = true;
+          else if (k === 'grenade') this.touchGren = true;
           else this.actions.add(k);
           continue;
         }
@@ -316,6 +318,7 @@ export class Input {
           if (btn.dataset.btn === 'fire') this.touchFire = false;
           if (btn.dataset.btn === 'ads') this.touchAdsHeld = false;
           if (btn.dataset.btn === 'score') this.touchScore = false;
+          if (btn.dataset.btn === 'grenade') this.touchGren = false;
         }
       }
     };

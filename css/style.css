@@ -211,7 +211,7 @@ kbd { font-family: var(--display); font-weight: 600; font-size: 13px; color: var
 #scope .v { top: 0; bottom: 0; left: 50%; width: 1.5px; }
 #scope .dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #ff3a2a; box-shadow: 0 0 6px #ff3a2a; }
 
-#death { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); text-align: center; display: none; background: rgba(10, 11, 11, 0.7); padding: 14px 34px; border-top: 2px solid var(--enemy); min-width: 300px; }
+#death { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); text-align: center; display: none; background: rgba(10, 11, 11, 0.7); padding: 14px 34px; border-top: 2px solid var(--enemy); min-width: 300px; }
 #death.on { display: block; }
 .d-label { font-size: 13px; letter-spacing: 0.3em; color: var(--ink-dim); }
 #death-killer { font-weight: 700; font-size: 34px; letter-spacing: 0.06em; color: var(--enemy); }
@@ -291,7 +291,7 @@ body.ads-on #tb-fire { width: 104px; height: 104px; right: 18px; bottom: 86px; }
   #ammo-mag { font-size: 38px; }
   #ammo-res { font-size: 16px; }
   .equip { display: none; }
-  #death { bottom: 40px; }
+  #death { bottom: 12px; }
   #countdown { font-size: 70px; }
 }
 #rotate { position: fixed; inset: 0; z-index: 100; background: #0b0d0e; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--ink-dim); letter-spacing: 0.1em; }
@@ -457,3 +457,22 @@ body.online #restart { display: none; }
   .pm-me b { font-size: 20px; }
   #pause-hints { display: none; }
 }
+
+/* ---------- death card actions, cook timer, spawn hint ---------- */
+#death-actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.dbtn { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; background: rgba(236, 233, 225, 0.12); border: 1px solid var(--line); color: var(--ink); font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.14em; padding: 9px 14px; cursor: pointer; }
+.dbtn:hover { background: rgba(236, 233, 225, 0.22); }
+#death-respawn { background: var(--sel-bg); color: var(--sel-ink); border-color: transparent; }
+#death-respawn.wait { opacity: 0.45; }
+body.dead #touch { display: none !important; }
+#cook { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: 28px 0 0 -28px; display: none; align-items: center; justify-content: center; }
+#cook.on { display: flex; }
+#cook svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+#cook .trk { fill: rgba(10, 11, 11, 0.45); stroke: rgba(236, 233, 225, 0.2); stroke-width: 3; }
+#cook .arc { fill: none; stroke: var(--amber); stroke-width: 3; stroke-dasharray: 106.8; stroke-dashoffset: 0; }
+#cook.hot .arc { stroke: var(--enemy); }
+#cook b { position: relative; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+#cook.hot b { color: var(--enemy); }
+#spawn-hint { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); display: none; align-items: center; gap: 8px; font-size: 14px; letter-spacing: 0.16em; color: var(--ink-dim); background: rgba(10, 11, 11, 0.55); padding: 6px 12px; }
+#spawn-hint.on { display: flex; }
+@media (pointer: coarse) { #death-actions .glyph { display: none; } .dbtn { font-size: 18px; padding: 12px 18px; } }

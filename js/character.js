@@ -302,6 +302,7 @@ export class Character {
   }
 
   spawn(p, yaw) {
+    this.spawnT = this.game.time;
     if (this.pendingLoadout) { const l = this.pendingLoadout; this.pendingLoadout = null; if (l !== this.loadout) this.setLoadout(l); }
     this.pos.copy(p);
     this.vel.set(0, 0, 0);
@@ -372,12 +373,15 @@ export class Character {
     return true;
   }
 
-  throwGrenade(target) {
-    if (!this.alive || this.grenades <= 0 || this.grenadeCd > 0 || this.meleeT > 0) return false;
+  canThrow() { return this.alive && this.grenades > 0 && this.grenadeCd <= 0 && this.meleeT <= 0; }
+
+  // cook: seconds the grenade was held after pulling the pin (bots cook a little so you can't run)
+  throwGrenade(target, cook = target ? 0.5 + Math.random() * 0.8 : 0) {
+    if (!this.canThrow()) return false;
     this.grenades--;
     this.grenadeCd = GRENADE.cooldown;
     this.weapon.cancelReload();
-    this.game.throwGrenade(this, target);
+    this.game.throwGrenade(this, target, Math.max(0, Math.min(GRENADE.fuse, cook || 0)));
     return true;
   }
 

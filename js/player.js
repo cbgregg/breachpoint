@@ -1,7 +1,7 @@
 // Local player: input -> movement/weapons, first-person camera, viewmodel (IK arms, reloads, recoil),
 // gamepad look with response curve + aim assist.
 import * as THREE from 'three';
-import { TEAMS, MELEE } from './config.js';
+import { TEAMS, MELEE, GRENADE, PLAYER } from './config.js';
 import { buildGun } from './weapons.js';
 import { Seg, teamMat, createFpBody, poseFpBody } from './character.js';
 
@@ -16,8 +16,10 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
 const POLE_R = new THREE.Vector3(1, -0.8, 0.2), POLE_L = new THREE.Vector3(-1, -0.9, 0);
-const _lq = new THREE.Quaternion();
-const EYE_RELIEF = -0.15; // close to the eye, like CoD: the optic frames the target
+const _lq = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
+const EYE_RELIEF = -0.15;
+const INSPECT = 3.0; // seconds
+const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multiplier at full ADS // close to the eye, like CoD: the optic frames the target
 // The FOV setting works like Call of Duty's: degrees across a 4:3 frame (80 = MW default). three.js
 // wants the vertical angle, which is what makes players and the gun look the right size.
 export const vfov = (h) => 2 * Math.atan(Math.tan((h * Math.PI) / 360) * 0.75) * 180 / Math.PI;
@@ -50,7 +52,10 @@ export class PlayerController {
     this.cycleT = 0; // bolt / pump cycle after a shot
     this.correction = new THREE.Vector3(); // smooths network position corrections (camera only)
     this.cmd = null;
-    this.lastFov = 0;
+    this.lastFov = 0; this.lastVmFov = 0;
+    this.cookT = null; this.gLatch = false; this.cookBlend = 0; this.nextTick = 0; // frag cooking
+    this.inspectT = 0; // weapon inspect animation (seconds left)
+    this.prevDeadFire = true; this.wasDead = false;
     this.buildArms();
     this.fp = createFpBody(char.team);
     if (this.fp) {
@@ -132,16 +137,23 @@ export class PlayerController {
     const c = this.c, g = this.game, inp = g.input, s = g.settings;
     if (!c.alive) {
       this.vmRoot.visible = false;
+      this.cookT = null; this.inspectT = 0;
+      if (!this.wasDead) { this.wasDead = true; this.prevDeadFire = true; this.dcDeathT = -1; }
+      // respawn early: X / R, A / Space, a fresh click — after a short moment so you see who got you
+      const fireEdge = inp.fire && !this.prevDeadFire;
+      this.prevDeadFire = inp.fire;
+      if (g.time - c.deathT > PLAYER.respawnMin && (inp.action('reload') || inp.action('jump') || fireEdge)) g.requestRespawn();
       this.deathCam(dt);
       return;
     }
+    if (this.wasDead) { this.wasDead = false; this.lastFov = 0; }
     this.vmRoot.visible = true;
     const canAct = !g.frozen;
     const def = c.weapon.def;
 
     // ---- look ----
     const baseFov = vfov(s.fov);
-    const zoom = lerp(1, def.adsFov / baseFov, c.adsT);
+    const zoom = lerp(1, this.adsFov(def) / baseFov, c.adsT);
     const sens = 0.0022 * s.sensitivity * zoom;
     const inv = s.invertY ? -1 : 1;
     c.yaw -= inp.mouseDX * sens;
@@ -205,22 +217,51 @@ export class PlayerController {
       if (inp.action('slot2')) c.switchTo(1);
       if (inp.action('swap') || inp.wheel !== 0) c.switchTo(c.prev);
       if (inp.action('reload')) { c.reload(); this.padSprint = false; }
-      if (inp.action('grenade')) c.throwGrenade();
       if (inp.action('melee')) c.melee();
+    }
+    // frag: hold to pull the pin and cook, release to throw. Hold past the fuse and it goes off in your hand.
+    let thrownCook = null;
+    const gHeld = inp.grenadeHeld;
+    if (this.cookT === null) {
+      if (canAct && gHeld && !this.gLatch && c.canThrow()) {
+        this.cookT = 0; this.nextTick = 1; this.inspectT = 0;
+        c.weapon.cancelReload();
+        g.audio.play('pin', null);
+      }
+    } else {
+      this.cookT += dt;
+      if (this.cookT >= this.nextTick && this.cookT < GRENADE.fuse) { g.audio.play('ui', null, { ui: true, freq: 1500 + this.nextTick * 250 }); this.nextTick += this.cookT > GRENADE.fuse - 1.2 ? 0.25 : 1; }
+      if ((!gHeld || this.cookT >= GRENADE.fuse) && canAct) {
+        thrownCook = this.cookT;
+        this.cookT = null;
+        this.gLatch = gHeld;
+        c.throwGrenade(undefined, thrownCook);
+      } else if (!canAct) this.cookT = null;
+    }
+    if (!gHeld) this.gLatch = false;
+    // inspect (I / D-pad down): works during the start countdown too
+    if (inp.action('inspect') && !c.weapon.reloading && c.switchT <= 0 && this.cookT === null) { this.inspectT = INSPECT; this.inspectCur = c.cur; }
+    if (this.inspectT > 0) {
+      if (this.inspectCur === undefined) this.inspectCur = c.cur;
+      this.inspectT -= dt;
+      if (inp.fire || inp.ads || c.sprinting || c.weapon.reloading || this.inspectCur !== c.cur || c.meleeT > 0) this.inspectT = 0;
     }
     // toggle ADS drops out on reload, weapon swap, sprint, melee and throws, like hold ADS would
     if (c.weapon.reloading || c.switchT > 0 || c.sprinting || c.meleeT > 0 || c.grenadeCd > 0.6) inp.clearAds();
-    const adsWant = canAct && inp.ads && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
+    const cooking = this.cookT !== null;
+    if (cooking) inp.clearAds();
+    const adsWant = canAct && inp.ads && !cooking && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
     this.cmd.ads = adsWant;
-    this.cmd.f = canAct && inp.fire ? 1 : 0;
-    const acts = inp.used.filter(a => a === 'reload' || a === 'grenade' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
+    this.cmd.f = canAct && inp.fire && !cooking ? 1 : 0;
+    const acts = inp.used.filter(a => a === 'reload' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
+    if (thrownCook !== null) { acts.push('grenade'); this.cmd.gk = thrownCook; }
     if (acts.length) this.cmd.a = acts;
     c.adsT = clamp(c.adsT + Math.sign(adsWant - c.adsT) * dt / def.adsTime, 0, 1);
 
     // touch auto-fire: shoot while the crosshair is on an enemy in range (Call of Duty Mobile "simple mode")
     const auto = autoOn && !c.sprinting;
     let fired = false;
-    if (canAct && (inp.fire || auto) && this.cycleT <= 0) {
+    if (canAct && !cooking && (inp.fire || auto) && this.cycleT <= 0) {
       if (def.auto || !this.triggerLatch || auto) {
         if (c.tryFire(c.eyePos(_a), c.forward(_b))) { this.onFired(c.weapon.def); fired = true; }
       }
@@ -336,12 +377,26 @@ export class PlayerController {
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     cam.rotation.order = 'YXZ';
     cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
-    const fov = lerp(vfov(s.fov), c.weapon.def.adsFov, c.adsT) * (c.sprinting ? 1.06 : 1);
+    const fov = lerp(vfov(s.fov), this.adsFov(c.weapon.def), c.adsT) * (c.sprinting ? 1.06 : 1);
     if (Math.abs(fov - this.lastFov) > 0.01) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
       this.lastFov = fov;
     }
+    // the sight fills more of the screen when aiming (viewmodel FOV narrows, like MW)
+    const vmc = this.game.vmCamera;
+    const vmBase = this.game.input.isTouch ? 72 : 66;
+    const a = c.adsT, ae = a * a * (3 - 2 * a);
+    const vf = vmBase * lerp(1, SIGHT_SIZE[s.sightSize] ?? SIGHT_SIZE.large, ae);
+    if (Math.abs(vf - this.lastVmFov) > 0.01) { vmc.fov = vf; vmc.updateProjectionMatrix(); this.lastVmFov = vf; }
+  }
+
+  // aim-down-sights field of view after the player's zoom preference (scales each optic's magnification)
+  adsFov(def) {
+    const s = this.game.settings, base = vfov(s.fov);
+    const mag = base / def.adsFov;
+    const z = clamp(Number(s.adsZoom) || 1, 0.5, 1.6);
+    return base / Math.max(1, 1 + (mag - 1) * z);
   }
 
   updateViewmodel(dt, mdx, mdy) {
@@ -364,7 +419,13 @@ export class PlayerController {
     const bobAmt = Math.min(1, hs / 6) * (1 - 0.9 * a) * (c.onGround ? 1 : 0.2) * (c.slideT > 0 ? 0 : 1);
     const rp = w.reloadProgress;
     const sw = c.switchT > 0 ? c.switchT / 0.4 : 0;
-    const gren = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / 0.9, 0, 1) * Math.PI) : 0;
+    const gren0 = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / 0.9, 0, 1) * Math.PI) : 0;
+    this.cookBlend = lerp(this.cookBlend, this.cookT !== null ? 1 : 0, Math.min(1, dt * 12));
+    const gren = Math.max(gren0, this.cookBlend * 0.75);
+    // inspect: turn the gun to show its left side, then roll it over to the ejection side and check the mag
+    const ip = this.inspectT > 0 ? clamp(1 - this.inspectT / (INSPECT - 0.25), 0, 1) : 0;
+    const s1 = this.inspectT > 0 ? smooth(0.04, 0.25, ip) * (1 - smooth(0.42, 0.56, ip)) : 0;
+    const s2 = this.inspectT > 0 ? smooth(0.42, 0.56, ip) * (1 - smooth(0.82, 0.98, ip)) : 0;
     const mel = c.meleeT > 0 ? Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) : 0;
     const idle = Math.sin(this.breathT * 1.6) * 0.002 * (1 - a);
     const tilt = w.reloading ? bump(0.0, 1.0, rp) : 0;
@@ -381,12 +442,22 @@ export class PlayerController {
       this.sprintT * 0.75 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
       tilt * 0.32 + this.sprintT * 0.45 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
+    if (s1 + s2 > 0) {
+      const w2 = Math.sin(ip * Math.PI * 3) * 0.04; // a little life in the hands
+      h.position.x += -0.05 * s1 - 0.035 * s2;
+      h.position.y += 0.02 * s1 + 0.03 * s2;
+      h.position.z += -0.04 * (s1 + s2);
+      h.rotation.x += 0.1 * s1 + 0.28 * s2 + w2;
+      h.rotation.y += 0.75 * s1 - 0.3 * s2;
+      h.rotation.z += 0.4 * s1 - 0.85 * s2 + w2;
+    }
 
     // magazine + hand choreography during reload
     const mag = gun.mag;
     mag.position.copy(gun.magHome);
     mag.visible = true;
     let leftMode = 'grip';
+    if (s2 > 0.6 && w.id !== 'shotgun') leftMode = 'mag';
     if (w.reloading && w.id !== 'shotgun') {
       const out = smooth(0.12, 0.32, rp), back = 1 - smooth(0.5, 0.72, rp);
       const off = rp < 0.42 ? out : rp < 0.5 ? 1 : back;
@@ -439,7 +510,20 @@ export class PlayerController {
     } else {
       _L.set(-0.12, -0.42, -0.15);
     }
-    if (c.grenadeCd > 0.4) _L.set(-0.1, -0.05 - gren * 0.1, -0.45 + gren * 0.1);
+    if (c.grenadeCd > 0.4) _L.set(-0.1, -0.05 - gren0 * 0.1, -0.45 + gren0 * 0.1);
+    // cooking: frag in the left hand, held up beside the lowered gun
+    if (!this.vmNade) {
+      this.vmNade = new THREE.Mesh(this.game.grenadeGeo, this.game.grenadeMat);
+      this.vmNade.scale.setScalar(0.55);
+      this.vmRoot.add(this.vmNade);
+    }
+    this.vmNade.visible = this.cookBlend > 0.3;
+    if (this.vmNade.visible) {
+      const shake = this.cookT !== null && this.cookT > GRENADE.fuse - 1.2 ? (Math.random() - 0.5) * 0.006 : 0;
+      _L.set(-0.17 + shake, -0.15 - (1 - this.cookBlend) * 0.2, -0.36);
+      this.vmNade.position.copy(_L).add(_a.set(0.03, 0.045, -0.035));
+      this.vmNade.rotation.set(0.4, 0.3, 0);
+    }
     if (this.fp) {
       // wrist sits slightly behind/below the grip point
       _R.add(_a.set(0.004, -0.004, 0.045).applyQuaternion(h.quaternion));
@@ -461,19 +545,57 @@ export class PlayerController {
     arm.hand.quaternion.copy(holder.quaternion);
   }
 
+  // Death: drop back from where you were standing, swing round to the killer and zoom in on them
   deathCam(dt) {
-    const c = this.c, cam = this.camera;
-    const k = c.killer && c.killer !== c && c.killer.alive ? c.killer : null;
-    _a.set(c.pos.x, c.pos.y + 2.2, c.pos.z);
-    if (k) {
-      _b.subVectors(c.pos, k.pos).setY(0);
-      if (_b.lengthSq() > 0.01) _b.normalize().multiplyScalar(2.2);
-      _a.add(_b);
+    const c = this.c, cam = this.camera, g = this.game;
+    const t = g.time - c.deathT;
+    if (this.dcDeathT !== c.deathT) {
+      this.dcDeathT = c.deathT;
+      this.dcCheck = -9; this.dcPos = null;
+      this.dcFrom = (this.dcFrom || new THREE.Vector3()).copy(cam.position);
+      this.dcQ = (this.dcQ || new THREE.Quaternion()).copy(cam.quaternion);
+      this.dcLook = (this.dcLook || new THREE.Vector3()).copy(c.pos).add(_a.set(0, 1, 0));
     }
-    cam.position.lerp(_a, Math.min(1, dt * 3));
-    if (k) k.eyePos(_b); else _b.copy(c.pos);
-    cam.lookAt(_b);
-    const df = vfov(this.game.settings.fov);
-    if (Math.abs(cam.fov - df) > 0.01) { cam.fov = df; cam.updateProjectionMatrix(); this.lastFov = cam.fov; }
+    const k = c.killer && c.killer !== c && !c.killer.hidden ? c.killer : null;
+    if (k) {
+      // track the killer's chest (keeps following them as they move on)
+      k.chestPos(_b);
+      this.dcLook.lerp(_b, Math.min(1, dt * (t < 0.8 ? 4 : 8)));
+    }
+    // camera: from the death spot, backed away from the killer; climbs higher if cover blocks the view
+    if (k && (!this.dcPos || g.time - (this.dcCheck || 0) > 0.5)) {
+      this.dcCheck = g.time;
+      _c.subVectors(c.pos, k.pos).setY(0);
+      if (_c.lengthSq() < 0.01) _c.set(1, 0, 0);
+      _c.normalize();
+      this.dcPos = this.dcPos || new THREE.Vector3();
+      for (const [up, back] of [[1.05, 0.45], [1.9, 1.2], [3, 2.2], [4.5, 3.5]]) {
+        this.dcPos.set(c.pos.x, c.pos.y + up, c.pos.z).addScaledVector(_c, back);
+        if (!g.physics.blocked(this.dcPos, k.chestPos(_E)) && !g.physics.overlap(this.dcPos.x, this.dcPos.y - 0.1, this.dcPos.z, 0.15, 0.2)) break;
+      }
+    }
+    if (k && this.dcPos) {
+      this.dcCur = this.dcCur && this.dcCurT === c.deathT ? this.dcCur.lerp(this.dcPos, Math.min(1, dt * 5)) : (this.dcCur || new THREE.Vector3()).copy(this.dcPos);
+      this.dcCurT = c.deathT;
+      _a.copy(this.dcCur);
+    }
+    else _a.set(c.pos.x, c.pos.y + 1.05, c.pos.z);
+    const mv = smooth(0, 0.7, t);
+    cam.position.lerpVectors(this.dcFrom, _a, mv);
+    // aim: blend from the last view to looking at the killer
+    _qd.copy(cam.quaternion);
+    cam.lookAt(this.dcLook);
+    _qe.copy(cam.quaternion);
+    cam.quaternion.copy(this.dcQ).slerp(_qe, smooth(0.1, 0.8, t));
+    // zoom: frame the killer at ~40% of the screen height
+    const base = vfov(g.settings.fov);
+    let fov = base;
+    if (k) {
+      const dist = Math.max(1, cam.position.distanceTo(this.dcLook));
+      const want = clamp(2 * Math.atan(1.25 / dist) * 180 / Math.PI / 0.4, 7, base);
+      fov = lerp(base, want, smooth(0.7, 1.6, t));
+    }
+    if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); this.lastFov = fov; }
   }
+
 }

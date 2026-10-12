@@ -15,6 +15,8 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Weapons | Guns built from real side-profile silhouettes with rounded edges, lathed barrels, muzzle devices and scopes. MK-4 Carbine (holographic sight), VX-9 SMG (reflex sight), M12 pump shotgun, LR-50 bolt-action with scope, P-45 sidearm, frag grenades, melee. Detailed models with glowing reticles, animated magazine reloads (faster tactical reloads), pump and bolt cycling, ejected brass, recoil with recovery, ADS breathing sway (hold breath on the sniper), damage falloff, headshots |
 | Gunsmith | Five attachment slots with real trade-offs, modeled on the gun in first and third person and previewed in 3D on the Loadout tab. **Optics:** iron sights, reflex, holographic, 4× prism scope (eyecup-framed magnified view with a chevron), 8× sniper scope. **Muzzle:** compensator, suppressor (off the compass and minimap, quieter, no muzzle flash, bots hear it less, −15% range), full choke for the shotgun. **Underbarrel:** vertical grip (recoil) or angled grip (aim speed). **Magazine:** extended (+50%, slower reload) or fast mag. **Tac laser:** tighter hip fire and faster aim, but a visible beam. Stat bars show gains and losses against stock. Bots roll random builds; online, loadouts sync to everyone |
 | Movement | Walk, sprint, crouch, **slide**, jump, step-up onto stairs/ledges |
+| Grenades & inspect | **Cook frags:** hold G / LB / FRAG to pull the pin (ticking fuse ring by the crosshair, frag in hand), release to throw with the remaining fuse; hold too long and it goes off in your hand. Bots cook too. **Inspect** your weapon with I / D-pad down; it plays automatically during the start countdown |
+| Death & respawn | The camera swings round to your killer and zooms in on them (rising over cover if needed), with a 5-second countdown. Respawn early after 1.5 s with X / A, R / Space or a click, or press Start / Esc (or the CHANGE LOADOUT button) to open the pause menu straight onto Change Loadout. Loadout changes made in the first 5 seconds after spawning (before you fire) apply instantly, so you can also pick your class during the countdown |
 | Online | Host a match and share a 6-digit code (or invite link); friends type it in and join. Peer-to-peer over WebRTC, so it runs on GitHub Pages with no game server. Host-authoritative with input validation, lag compensation, client-side prediction and wallhack-resistant culling (see below). Up to 8 humans, bots fill the rest, players can drop in mid-match |
 | Readability | Black Ops 2-style: friendly names with a blue marker above teammates (visible through walls), enemy names in red when your crosshair is on them, a soft rim light on every soldier, distinct kits (tan vs. cool slate) and a brighter, more saturated grade |
 | Bots | Up to 15 bots (8v8). Vision cone + line of sight, hearing, team intel, A* pathfinding, strafing, crouching, grenades, melee at close range, health/ammo seeking, weapon swaps by range. Three difficulties |
@@ -24,7 +26,7 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Music | Original score synthesized live (no recordings, so nothing to license): a slow D-minor menu theme and a 112 BPM action track whose layers build with recent fighting, the last minute and close finishes; end-of-match stings; separate music volume. Swap in your own tracks via `MUSIC_FILES` in `js/config.js` |
 | Audio | Synthesized: layered gunshots (crack, body, thump, tail) with distance filtering and street reverb, bolt/pump foley, bullet whiz on near misses, casing tinkles, footsteps, explosions, hit/headshot/kill confirms |
 | Platforms | Desktop (pointer lock with free-look fallback), controller, touch (virtual stick + buttons; push the stick all the way forward to sprint; tap-to-aim and auto-fire on target by default, both in Options) |
-| Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, FOV (Call of Duty-style: degrees across a 4:3 frame, 80 = MW default), mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
+| Settings | Saved to `localStorage`: callsign, loadout, match size, difficulty, limits, friendly fire, quality, ADS zoom (scales every optic's magnification), sight size when aiming (Normal / Large / Huge: how much of the screen the optic fills), FOV (Call of Duty-style: degrees across a 4:3 frame, 80 = MW default), mouse/stick sensitivity, deadzone, aim assist, vibration, invert, volume, FPS counter |
 
 ## Controls
 
@@ -39,13 +41,15 @@ A browser first-person shooter in the style of modern military shooters: **Team 
 | Sprint (cancels reload) / hold breath (scoped) | `Shift` | L3 (click) | SPRINT |
 | Reload | `R` | X | RELOAD |
 | Swap weapon | `Q`, `1` `2`, wheel | Y | SWAP |
-| Frag grenade | `G` | LB (hold to aim, release to throw) | FRAG |
+| Frag grenade (hold to cook, release to throw) | `G` | LB | FRAG |
+| Inspect weapon | `I` | D-pad down | — |
+| Respawn early (while dead) | `R` / `Space` / click | X / A | RESPAWN |
 | Melee | `V` | R3 | MELEE |
 | Scoreboard | `Tab` (hold) | View (hold) | TAB |
 | Pause | `Esc` / `P` | Menu | ❚❚ |
 | Menu tabs | `Q` / `E` | LB / RB | tap |
 
-The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and the D-pad (killstreaks) are unused because the game has neither.
+The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and the rest of the D-pad (killstreaks) are unused because the game has neither; D-pad down inspects your weapon.
 
 Browsers only expose a controller after you press a button on it, so press any button once the page is open. Xbox controllers that a browser reports without the standard layout (common in Firefox on macOS and Linux) are remapped automatically.
 

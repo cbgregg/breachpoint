@@ -70,7 +70,13 @@
       <div id="death-killer"></div>
       <div id="death-detail"></div>
       <div id="death-timer"></div>
+      <div id="death-actions">
+        <button id="death-respawn" class="dbtn">RESPAWN <span class="glyph" data-act="reload"></span></button>
+        <button id="death-loadout" class="dbtn">CHANGE LOADOUT <span class="glyph" data-act="pause"></span></button>
+      </div>
     </div>
+    <div id="cook"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" class="trk"/><circle id="cook-arc" cx="20" cy="20" r="17" class="arc"/></svg><b id="cook-t"></b></div>
+    <div id="spawn-hint">CHANGE LOADOUT <span class="glyph" data-act="pause"></span></div>
     <div id="scoreboard"></div>
     <div id="toast"></div>
   </div>
@@ -162,6 +168,9 @@
             <div class="group">AIMING</div>
             <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
               <option value="hold">Hold</option><option value="toggle">Toggle</option></select></div>
+            <div class="row"><label for="opt-adszoom">ADS zoom <output id="out-adszoom"></output></label><input type="range" id="opt-adszoom" min="0.5" max="1.6" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-sightsize">Sight size when aiming</label><select id="opt-sightsize" data-nav>
+              <option value="normal">Normal</option><option value="large">Large</option><option value="huge">Huge</option></select></div>
             <div class="row touch-only"><label for="opt-touchads">Touch: aim down sights</label><select id="opt-touchads" data-nav>
               <option value="toggle">Tap</option><option value="hold">Hold</option></select></div>
             <div class="row touch-only"><label for="opt-autofire">Touch: auto-fire on target</label><input type="checkbox" id="opt-autofire" data-nav></div>
@@ -191,7 +200,9 @@
                 <tr><td>Sprint · hold breath</td><td>Shift</td><td>L3</td></tr>
                 <tr><td>Reload</td><td>R</td><td>X</td></tr>
                 <tr><td>Swap weapon</td><td>Q / 1 / 2 / wheel</td><td>Y</td></tr>
-                <tr><td>Frag grenade</td><td>G</td><td>LB (release to throw)</td></tr>
+                <tr><td>Frag grenade · hold to cook</td><td>G</td><td>LB (release to throw)</td></tr>
+                <tr><td>Inspect weapon</td><td>I</td><td>D-pad down</td></tr>
+                <tr><td>Respawn early (when dead)</td><td>R / Space / click</td><td>X / A</td></tr>
                 <tr><td>Melee</td><td>V</td><td>R3</td></tr>
                 <tr><td>Scoreboard</td><td>Tab</td><td>View</td></tr>
                 <tr><td>Pause</td><td>Esc</td><td>Menu</td></tr>
@@ -222,8 +233,8 @@
       <div class="pause-body">
         <nav class="pause-nav">
           <button id="resume" class="cta" data-nav><span>RESUME</span><span class="glyph" data-act="pause"></span></button>
-          <button class="menu-btn psec on" data-sec="match" data-nav>MATCH</button>
           <button class="menu-btn psec" data-sec="loadout" data-nav>CHANGE LOADOUT</button>
+          <button class="menu-btn psec on" data-sec="match" data-nav>MATCH</button>
           <button class="menu-btn psec" data-sec="options" data-nav>OPTIONS</button>
           <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
           <button id="pause-end" class="menu-btn online-only host-only danger" data-nav>END MATCH FOR EVERYONE</button>

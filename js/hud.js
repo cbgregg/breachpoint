@@ -1,6 +1,6 @@
 // HUD (modern military shooter style): compass, rotating minimap, score widget, ammo cluster,
 // score popups, medals, killfeed, prompts with device-aware button glyphs, scoreboard.
-import { WEAPONS, PLAYER, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
+import { WEAPONS, PLAYER, FRIENDLY_CSS, ENEMY_CSS, GRENADE } from './config.js';
 import { MAP } from './world.js';
 
 const $ = (id) => document.getElementById(id);
@@ -174,7 +174,25 @@ export class HUD {
     this.cls('scoreboard', 'on', tab);
     if (tab) { this.sbT -= dt; if (this.sbT <= 0) { this.renderScoreboard($('scoreboard')); this.sbT = 0.25; } }
 
-    if (!p.alive && g.state === 'playing') this.txt('death-timer', `RESPAWNING IN ${Math.max(0, p.respawnT).toFixed(1)}`);
+    // death card: countdown + respawn / change loadout
+    const dead = !p.alive && (g.state === 'playing' || g.state === 'paused');
+    document.body.classList.toggle('dead', dead && g.state === 'playing');
+    if (dead) {
+      const since = g.time - p.deathT;
+      this.txt('death-timer', `RESPAWNING IN ${Math.max(0, PLAYER.respawnDelay - since).toFixed(1)}`);
+      this.cls('death-respawn', 'wait', since < PLAYER.respawnMin);
+    }
+    // frag cook timer
+    const ctl = g.playerCtl, cooking = p.alive && ctl && ctl.cookT !== null;
+    this.cls('cook', 'on', cooking);
+    if (cooking) {
+      const left = Math.max(0, GRENADE.fuse - ctl.cookT);
+      this.txt('cook-t', left.toFixed(1));
+      $('cook-arc').style.strokeDashoffset = String(106.8 * (1 - left / GRENADE.fuse));
+      this.cls('cook', 'hot', left < 1.2);
+    }
+    // just spawned and haven't fired: you can still swap loadout on the spot
+    this.cls('spawn-hint', 'on', g.state === 'playing' && !!g.inSpawnWindow?.(p) && !g.input.isTouch);
 
     // canvases at ~30 Hz
     this.drawT -= dt;

@@ -49,12 +49,12 @@ const bindings = [
   ['opt-name', 'name', 'text'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
-  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
+  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
-  'opt-fov': ['out-fov', v => `${v}°`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
+  'opt-fov': ['out-fov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
 function writeForm() {
@@ -82,7 +82,7 @@ for (const [id, key, type] of bindings) {
     if (outputs[id]) $(outputs[id][0]).textContent = outputs[id][1](el.value);
     saveSettings(settings);
     game.applySettings(settings);
-    if (game.settings) Object.assign(game.settings, { sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps });
+    if (game.settings) Object.assign(game.settings, { sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
   });
 }
 
@@ -246,12 +246,16 @@ game.onPause = (paused) => {
   clearInterval(pauseTimer);
   if (paused) {
     $('quit').textContent = lobby.active ? 'LEAVE MATCH' : 'QUIT TO MENU';
-    setPauseSec('match');
+    // dead, or only just spawned: open straight onto Change Loadout
+    const p = game.player;
+    setPauseSec(p && (!p.alive || game.inSpawnWindow(p)) ? 'loadout' : 'match');
     showScreen('pause');
     pauseTimer = setInterval(() => { if (screen === 'pause' && pauseSec === 'match') renderPauseMatch(); }, 1000);
   } else { restorePanes(); showScreen(null); }
 };
 $('resume').addEventListener('click', () => game.resume());
+$('death-respawn').addEventListener('click', () => game.requestRespawn());
+$('death-loadout').addEventListener('click', () => { if (game.state === 'playing') game.pause(); });
 confirmBtn($('restart'), () => { restorePanes(); showScreen(null); game.startMatch(settings); });
 confirmBtn($('quit'), () => { clearInterval(pauseTimer); restorePanes(); leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
@@ -569,7 +573,7 @@ function focusEl(el) {
 }
 function focusFirst() {
   const items = navItems();
-  const pref = screen === 'menu' ? $('play') : screen === 'pause' ? $('resume')
+  const pref = screen === 'menu' ? $('play') : screen === 'pause' ? (pauseSec === 'loadout' ? document.querySelector('.psec[data-sec="loadout"]') : $('resume'))
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
     : $('again');
   focusEl(items.includes(pref) && pref.offsetParent ? pref : items[0]);

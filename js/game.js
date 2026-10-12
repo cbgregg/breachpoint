@@ -174,6 +174,8 @@ export class Game {
     this.countdownT = 3;
     this.lastBeep = 4;
     this.state = 'playing';
+    this.characters.forEach(c => { c.spawnT = this.time; });
+    if (this.playerCtl) this.playerCtl.inspectT = 3.4; // check your weapon while the countdown runs
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -211,6 +213,8 @@ export class Game {
     this.timeLeft = Number.isFinite(start.tl) ? start.tl : this.settings.timeLimit * 60;
     this.countdownT = Number.isFinite(start.cd) ? start.cd : 0;
     this.lastBeep = Math.ceil(this.countdownT) || 4;
+    this.player.spawnT = this.time;
+    if (this.countdownT > 0.5 && this.playerCtl) this.playerCtl.inspectT = 3.4;
     this.intel.forEach(i => { i.time = -99; });
     this.endT = 0;
     this.damageFx = 0;
@@ -485,11 +489,27 @@ export class Game {
     fx.endLasers();
   }
 
-  // change class: applies at the next spawn (guests ask the host)
+  // change class: right away if you only just spawned and haven't fired (like CoD), otherwise at
+  // the next spawn. Guests ask the host, which applies the same rule.
   requestLoadout(l) {
     if (!this.player) return;
     if (this.mode === 'guest') { this.session?.sendLoadout(l); return; }
-    this.player.pendingLoadout = l;
+    this.applyLoadout(this.player, l);
+  }
+  applyLoadout(c, l) {
+    if (c.alive && this.time - (c.spawnT ?? -99) < 5 && c.lastFireT < (c.spawnT ?? 0)) {
+      c.pendingLoadout = null;
+      if (l !== c.loadout) { c.setLoadout(l); this.emit(['lo', c.id, c.loadout]); }
+    } else c.pendingLoadout = l;
+  }
+  inSpawnWindow(c = this.player) { return !!c && c.alive && this.time - (c.spawnT ?? -99) < 5 && c.lastFireT < (c.spawnT ?? 0); }
+
+  // respawn now (after a short minimum) instead of waiting out the timer
+  requestRespawn() {
+    const p = this.player;
+    if (!p || p.alive || !this.live || this.time - p.deathT < PLAYER.respawnMin) return;
+    if (this.mode === 'guest') { this.session?.sendRespawn(); return; }
+    p.respawnT = Math.min(p.respawnT, 0);
   }
 
   charById(id) { return this.characters.find(c => c.id === id) || null; }
@@ -590,11 +610,12 @@ export class Game {
     this.notify(attacker, 'hit', wasAlive && !best.alive, false, true);
   }
 
-  throwGrenade(c, target) {
+  throwGrenade(c, target, cook = 0) {
     if (this.mode === 'guest') return; // the host spawns it and tells us
     const origin = c.eyePos(new THREE.Vector3());
     const f = c.forward(_d);
-    origin.addScaledVector(f, 0.5);
+    const fuse = Math.max(0, GRENADE.fuse - cook);
+    origin.addScaledVector(f, fuse <= 0 ? 0.2 : 0.5);
     let vel;
     if (target) {
       const dx = target.x - origin.x, dz = target.z - origin.z, dy = target.y + 0.3 - origin.y;
@@ -605,17 +626,18 @@ export class Game {
       vel = f.clone().multiplyScalar(GRENADE.throwSpeed).add(new THREE.Vector3(0, 3, 0)).addScaledVector(c.vel, 0.5);
     }
     const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
-    this.spawnGrenade(id, origin, vel, c);
-    this.emit(['gren', id, +origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), c.id]);
+    if (fuse <= 0) vel.set(0, 0, 0); // cooked too long: it goes off in your hand
+    this.spawnGrenade(id, origin, vel, c, fuse);
+    this.emit(['gren', id, +origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), c.id, +fuse.toFixed(2)]);
   }
 
-  spawnGrenade(id, origin, vel, owner) {
+  spawnGrenade(id, origin, vel, owner, fuse = GRENADE.fuse) {
     const mesh = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
     mesh.castShadow = true;
     mesh.position.copy(origin);
     this.scene.add(mesh);
-    this.grenades.push({ id, pos: origin, vel, fuse: GRENADE.fuse, owner, mesh });
-    this.audio.play('pin', owner === this.player ? null : owner ? owner.pos : origin);
+    this.grenades.push({ id, pos: origin, vel, fuse, owner, mesh });
+    if (owner !== this.player) this.audio.play('pin', owner ? owner.pos : origin); // our own pin was pulled when cooking began
   }
 
   updateGrenades(dt) {

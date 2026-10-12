@@ -35,13 +35,14 @@ export const PLAYER = {
   maxHealth: 100,
   regenDelay: 4.5,
   regenRate: 18,
-  respawnDelay: 4,
+  respawnDelay: 5,
+  respawnMin: 1.5, // earliest you can press to respawn
   spawnProtect: 2.5,
   slideSpeed: 10.5,
   slideTime: 0.75,
 };
 
-export const GRENADE = { start: 1, max: 2, fuse: 2.2, radius: 7, damage: 140, throwSpeed: 17, cooldown: 0.9 };
+export const GRENADE = { start: 1, max: 2, fuse: 3.2, radius: 7, damage: 140, throwSpeed: 17, cooldown: 0.9 };
 export const MELEE = { damage: 100, range: 2.3, cooldown: 0.75, time: 0.4 };
 export const SCORE = { kill: 100, headshot: 25, assist: 50, melee: 25 };
 
@@ -115,6 +116,8 @@ export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
   musicVolume: 0.5,
+  adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
+  sightSize: 'large',  // how much of the screen the sight fills when aiming: normal | large | huge
   privateRelay: false,
   touchAds: 'toggle',   // touch screens: tap ADS once to aim, again to stop
   touchAutoFire: true,  // touch screens: fire automatically while the crosshair is on an enemy // route private matches through the TURN relay too (hides your IP)

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { Net, newCode } from './net.js';
 import { Board } from './quickplay.js';
 import { safeName } from './names.js';
-import { PRIMARIES, PLAYER, MELEE, WEAPONS } from './config.js';
+import { PRIMARIES, PLAYER, MELEE, WEAPONS, GRENADE } from './config.js';
 import { Character } from './character.js';
 import { hitPower } from './motion.js';
 import { parseLoadout } from './attachments.js';
@@ -305,6 +305,9 @@ export class Lobby {
       case 'in':
         if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.input(id, m);
         break;
+      case 'rs': // a guest pressed respawn
+        if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.respawnReq(id);
+        break;
       case 'lo': // a guest changed loadout; it takes effect on their next spawn
         if (this.players.has(id) && typeof m.l === 'string') {
           const l = parseLoadout(m.l).str;
@@ -441,7 +444,11 @@ export class HostSession {
 
   setLoadout(peerId, l) {
     const r = this.remotes.get(peerId);
-    if (r && r.c) r.c.pendingLoadout = l;
+    if (r && r.c) this.game.applyLoadout(r.c, l);
+  }
+  respawnReq(peerId) {
+    const r = this.remotes.get(peerId), g = this.game;
+    if (r && r.c && !r.c.alive && g.time - r.c.deathT >= PLAYER.respawnMin) r.c.respawnT = Math.min(r.c.respawnT, 0);
   }
 
   rosterEntry(c) { return [c.id, c.name, c.team, c.loadout, c.isBot ? 1 : 0, c.remote ? 1 : 0]; }
@@ -519,7 +526,7 @@ export class HostSession {
         else if (a === 'slot2') c.switchTo(1);
         else if (a === 'swap') c.switchTo(c.prev);
         else if (a === 'reload') c.reload();
-        else if (a === 'grenade') c.throwGrenade();
+        else if (a === 'grenade') c.throwGrenade(undefined, cmd.gk || 0);
         else if (a === 'melee') c.melee();
       }
     }
@@ -659,13 +666,13 @@ export class HostSession {
 
 function sanitize(a) {
   if (!Array.isArray(a) || a.length < 8) return null;
-  const [s, dt, mx, my, y, p, bits, acts, v] = a;
+  const [s, dt, mx, my, y, p, bits, acts, v, gk] = a;
   if (!Number.isInteger(s) || s <= 0 || !fin(dt) || !fin(mx) || !fin(my) || !fin(y) || !fin(p) || !Number.isInteger(bits)) return null;
   const cmd = {
     s, dt: clamp(dt, 0.001, 0.05), mx: clamp(mx, -1, 1), my: clamp(my, -1, 1),
     y: ((y % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI, p: clamp(p, -1.5, 1.5),
     sp: !!(bits & 1), cr: !!(bits & 2), j: !!(bits & 4), sl: !!(bits & 8), f: !!(bits & 16), ads: !!(bits & 32),
-    a: null, v: fin(v) ? v : null,
+    a: null, v: fin(v) ? v : null, gk: fin(gk) ? clamp(gk, 0, GRENADE.fuse) : 0,
   };
   if (Array.isArray(acts)) cmd.a = acts.slice(0, 4).filter(x => ACTIONS.includes(x));
   return cmd;
@@ -690,6 +697,7 @@ export class GuestSession {
 
   get hostId() { return this.lobby.hostId; }
   sendLoadout(l) { if (this.hostId) this.net.send({ t: 'lo', l }, this.hostId); }
+  sendRespawn() { if (this.hostId) this.net.send({ t: 'rs' }, this.hostId); }
 
 
   get hostId() { return this.lobby.hostId; }
@@ -706,7 +714,7 @@ export class GuestSession {
       this.pending.push({ cmd, adsT: c.adsT });
       if (this.pending.length > 120) this.pending.shift();
       const bits = (cmd.sp ? 1 : 0) | (cmd.cr ? 2 : 0) | (cmd.j ? 4 : 0) | (cmd.sl ? 8 : 0) | (cmd.f ? 16 : 0) | (cmd.ads ? 32 : 0);
-      this.outbox.push([cmd.s, r3(cmd.dt), r3(cmd.mx), r3(cmd.my), r3(cmd.y), r3(cmd.p), bits, cmd.a || 0, r3(this.viewTime())]);
+      this.outbox.push([cmd.s, r3(cmd.dt), r3(cmd.mx), r3(cmd.my), r3(cmd.y), r3(cmd.p), bits, cmd.a || 0, r3(this.viewTime()), cmd.gk ? r2(cmd.gk) : 0]);
     }
     this.sendT -= dt;
     if (this.outbox.length && (this.sendT <= 0 || this.outbox.length >= 8)) {
@@ -919,9 +927,9 @@ export class GuestSession {
         break;
       }
       case 'gren': {
-        const [, id, ox, oy, oz, vx, vy, vz, owner] = ev;
+        const [, id, ox, oy, oz, vx, vy, vz, owner, fz] = ev;
         if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
-        g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner));
+        g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), fin(fz) ? clamp(fz, 0, GRENADE.fuse) : GRENADE.fuse);
         break;
       }
       case 'lo': {
