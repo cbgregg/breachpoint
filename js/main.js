@@ -890,6 +890,7 @@ account.onChange = () => {
   if (!account.ready && playMode === 'online' && account.enabled && screen === 'menu') openMode();
   // the email link was opened in another tab while this one waits
   if (screen === 'signin' && account.signedIn && siCur === 'sent') signedIn();
+  if (!account.signedIn) hbLast = '';
   heartbeat();
 };
 $('acct-out').addEventListener('click', () => account.signOut());
@@ -1012,7 +1013,7 @@ function openSide() {
   $('side').setAttribute('aria-hidden', 'false');
   game.audio.play('ui', null, { ui: true });
   renderSide();
-  if (account.signedIn) account.loadFriends().catch(() => {});
+  if (account.signedIn) { friendsAt = Date.now(); account.loadFriends().catch(() => {}); }
   if (game.input.lastDevice === 'pad') focusFirst();
 }
 function closeSide() {
@@ -1210,8 +1211,8 @@ function joinFriend(code) {
   tryJoin();
 }
 
-// presence: friends see you online and which match to join; a heartbeat every 45 s
-let hbTimer = 0, hbLast = '';
+// presence: friends see you online and which match to join
+let hbLast = '';
 function presenceNow() {
   const inMatch = game.state !== 'menu' && lobby.active;
   const st = inMatch ? 'match' : lobby.active && lobby.code ? 'lobby' : 'menu';
@@ -1226,26 +1227,27 @@ function presenceNow() {
   }
   return p;
 }
+// Presence is sent only when it changes (menus / lobby / match) plus a keepalive every 10 minutes,
+// which keeps account-server writes low enough for Cloudflare's free plan.
+const KEEPALIVE_MS = 10 * 60 * 1000;
+let hbSentAt = 0;
 function heartbeat(force = false) {
-  clearTimeout(hbTimer);
-  if (!account.enabled || !account.signedIn || window.BREACHPOINT_OFFLINE) return;
-  hbTimer = setTimeout(() => heartbeat(true), 45000);
-  if (document.hidden) return;
+  if (!account.enabled || !account.signedIn || window.BREACHPOINT_OFFLINE || document.hidden) return;
   const p = presenceNow(), k = JSON.stringify(p);
-  if (!force && k === hbLast) return;
+  if (!force && k === hbLast && Date.now() - hbSentAt < KEEPALIVE_MS) return;
   hbLast = k;
+  hbSentAt = Date.now();
   account.presence(p);
-  // friends list: keep the online count and requests fresh (more often while the sidebar is open)
-  account.loadFriends().catch(() => {});
 }
+// friends list: every 20 s while the sidebar is open, every 2 minutes otherwise (reads are cheap but not free)
+let friendsAt = 0;
 setInterval(() => {
-  if (!account.signedIn) return;
-  if (sideOpen) account.loadFriends().catch(() => {});
-  const k = JSON.stringify(presenceNow());
-  if (k !== hbLast) heartbeat(true); // joined or left a lobby or match: tell friends right away
-}, 15000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(true); });
-window.addEventListener('pagehide', () => account.presenceOff());
+  if (!account.signedIn || document.hidden) return;
+  heartbeat(); // sends only on a change or when the keepalive is due
+  if (Date.now() - friendsAt > (sideOpen ? 20000 : 120000)) { friendsAt = Date.now(); account.loadFriends().catch(() => {}); }
+}, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); });
+window.addEventListener('pagehide', () => { account.presenceOff(); hbLast = ''; });
 
 // ---------- device-aware hints ----------
 function renderHints(device) {

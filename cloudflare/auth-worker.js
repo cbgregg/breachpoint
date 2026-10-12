@@ -37,7 +37,10 @@ const SESSION_SHORT = 24 * 3600;        // otherwise a day
 const TICKET_TTL = 3 * 3600;            // match passes
 const TAG_EVERY = 24 * 3600;            // Name Tag changes
 const HIST_KEEP = 10;                   // previous Name Tags kept for friends
-const PRESENCE_TTL = 120;               // seconds a heartbeat keeps you "online"
+// Presence is written only when it changes, plus a keepalive every 10 minutes, to stay well inside
+// the Workers KV free plan (1,000 writes a day). Closing the game clears it straight away.
+const PRESENCE_ONLINE = 11 * 60;        // seconds since the last update that still count as online
+const PRESENCE_TTL = 15 * 60;           // KV expiry for presence records
 const MAX_FRIENDS = 200, MAX_PENDING = 50, MAX_REQ_PER_DAY = 40;
 const MAX_STARTS_PER_EMAIL = 4;         // per 15 minutes
 const MAX_STARTS_PER_IP = 12;           // per hour
@@ -235,7 +238,7 @@ async function friends({ env, cors }, user) {
   const users = new Map();
   await Promise.all(ids.map(async (id) => { const u = await getUser(env, id); if (u) users.set(id, u); }));
   const pres = new Map();
-  await Promise.all(Object.keys(d.f).map(async (id) => { const p = await getJSON(env, `pres:${id}`); if (p && now() - p.at < PRESENCE_TTL + 30) pres.set(id, p); }));
+  await Promise.all(Object.keys(d.f).map(async (id) => { const p = await getJSON(env, `pres:${id}`); if (p && now() - p.at < PRESENCE_ONLINE) pres.set(id, p); }));
   const friendsList = Object.entries(d.f).filter(([id]) => users.has(id)).map(([id, since]) => {
     const u = users.get(id), p = pres.get(id);
     return {
