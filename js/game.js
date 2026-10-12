@@ -38,15 +38,15 @@ export class Game {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 600); // near 0.1: 2.5x the depth precision of 0.04, no distant z-fighting
+    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 2600); // near 0.1: 2.5x the depth precision of 0.04, no distant z-fighting
     this.scene.add(this.camera);
     this.vmScene = new THREE.Scene();
     // a wider viewmodel FOV on phones makes the gun and optic take up less of the small screen
     this.vmCamera = new THREE.PerspectiveCamera(window.matchMedia('(pointer: coarse)').matches ? 72 : 66, window.innerWidth / window.innerHeight, 0.01, 10);
     this.renderer = new Renderer(container, this.scene, this.camera, this.vmScene, this.vmCamera);
     this.vmScene.environment = this.scene.environment;
-    this.vmScene.add(new THREE.HemisphereLight(0xa8a4cc, 0x4a3022, 0.6));
-    this.vmSun = new THREE.DirectionalLight(0xffa868, 2.6);
+    this.vmScene.add(new THREE.HemisphereLight(0x8890c0, 0x3a2a22, 0.75));
+    this.vmSun = new THREE.DirectionalLight(0xff8a50, 1.8);
     this.vmScene.add(this.vmSun);
 
     this.physics = new Physics();
@@ -847,7 +847,7 @@ export class Game {
     this.world = buildWorld(this.scene, this.physics, id);
     setCharacterDetail(this.world.textures.fabric);
     const lit = !this.renderer.quality || this.renderer.quality.label !== 'Low';
-    const lamps = !!this.renderer.quality && (this.renderer.quality.label === 'High' || this.renderer.quality.label === 'Ultra');
+    const lamps = !!this.renderer.quality && this.renderer.quality.label !== 'Low';
     this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; if (o.userData.lampLight) o.visible = lamps; });
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];

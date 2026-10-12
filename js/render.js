@@ -22,8 +22,8 @@ const GradeShader = {
     flash: { value: 0 },
     saturation: { value: 1.0 },
     contrast: { value: 1.06 },
-    lift: { value: new THREE.Vector3(0.022, 0.012, 0.03) },  // dusky violet in the shadows
-    gain: { value: new THREE.Vector3(1.09, 0.98, 0.84) },    // golden highlights
+    lift: { value: new THREE.Vector3(0.018, 0.016, 0.04) },  // blue-violet dusk in the shadows
+    gain: { value: new THREE.Vector3(1.08, 0.97, 0.88) },    // warm highlights
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -58,8 +58,8 @@ const GradeShader = {
     }`,
 };
 
-// evening: a low sun (16° up) for long shadows and warm light
-export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 16), THREE.MathUtils.degToRad(222));
+// dusk: the sun just above the horizon (5°), red-orange and weak; the street lamps carry the scene
+export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 5), THREE.MathUtils.degToRad(222));
 
 // Height fog: distance haze plus a dense layer that hugs the ground and thins with altitude,
 // glowing warm when looking towards the sun. Patched into three's fog chunks so every lit
@@ -102,7 +102,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
     float fogFactor = clamp(fHaze + fGround * (1.0 - fHaze), 0.0, 0.92);
     float fSun = pow(max(dot(fDir, vec3(${fv(_sd.x)}, ${fv(_sd.y)}, ${fv(_sd.z)})), 0.0), 5.0);
-    vec3 fCol = mix(fogColor, fogColor * vec3(1.55, 1.05, 0.62), fSun);
+    vec3 fCol = mix(fogColor, fogColor * vec3(1.9, 1.05, 0.55), fSun);
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fCol, fogFactor);
   }
 #endif`;
@@ -113,7 +113,7 @@ export class Renderer {
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
     r.setSize(window.innerWidth, window.innerHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 0.78;
+    r.toneMappingExposure = 0.9;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -146,10 +146,10 @@ export class Renderer {
     const sky = new Sky();
     sky.scale.setScalar(450);
     const u = sky.material.uniforms;
-    u.turbidity.value = 10;
-    u.rayleigh.value = 2.4;
-    u.mieCoefficient.value = 0.009;
-    u.mieDirectionalG.value = 0.9;
+    u.turbidity.value = 12;
+    u.rayleigh.value = 3.2;
+    u.mieCoefficient.value = 0.012;
+    u.mieDirectionalG.value = 0.93;
     u.sunPosition.value.copy(SUN_DIR);
     scene.add(sky);
     this.sky = sky;
@@ -170,9 +170,9 @@ export class Renderer {
     scene.environmentIntensity = 1;
     pmrem.dispose();
 
-    scene.fog = new THREE.FogExp2(0xc99a74, 0.0062);
+    scene.fog = new THREE.FogExp2(0x7d6a72, 0.0066);
 
-    const sun = new THREE.DirectionalLight(0xffa25a, 4.4);
+    const sun = new THREE.DirectionalLight(0xff7a42, 2.6);
     sun.position.copy(SUN_DIR).multiplyScalar(80);
     sun.castShadow = true;
     const sc = sun.shadow.camera;
@@ -183,8 +183,8 @@ export class Renderer {
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0x8f98c8, 0x5a3626, 0.2)); // cool dusk sky above, warm bounce below
-    scene.environmentIntensity = 0.55; // less fill so the sun's shadows read clearly
+    scene.add(new THREE.HemisphereLight(0x6f7fb8, 0x3a2a26, 0.45)); // blue dusk sky above, dim warm bounce below
+    scene.environmentIntensity = 0.6;
   }
 
   applyQuality(name) {
@@ -203,7 +203,7 @@ export class Renderer {
     }
     this.scene.traverse(o => {
       if (o.isPointLight && o.userData.mapLight) o.visible = q.label !== 'Low';
-      if (o.userData.lampLight) o.visible = q.label === 'High' || q.label === 'Ultra';
+      if (o.userData.lampLight) o.visible = q.label !== 'Low';
     });
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao;

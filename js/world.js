@@ -261,7 +261,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     leaf: std({ color: 0x5b6a2e, roughness: 0.8, side: THREE.DoubleSide }),
     rust: tex.paint ? pbr(tex.paint, { color: 0x8a5a3a, metalness: 0.4 }) : std({ color: 0x5c3a26, roughness: 0.8, metalness: 0.4 }),
     line: std({ color: 0xd8d0b8, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
-    lamp: new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffd9a0, emissiveIntensity: 7 }),
+    lamp: new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffd9a0, emissiveIntensity: 10 }),
     bulb: new THREE.MeshStandardMaterial({ color: 0xffe8c0, emissive: 0xffc070, emissiveIntensity: 9 }),
     frame: tex.paint ? pbr(tex.paint, { roughness: 0.7, metalness: 0.1 }) : std({ roughness: 0.6 }),
     dim: std({ color: 0x0c0d0e, roughness: 0.95 }),
@@ -304,7 +304,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   };
   const glowTex = radial([[0, 'rgba(255,255,255,1)'], [0.25, 'rgba(255,220,170,0.55)'], [1, 'rgba(255,200,140,0)']]);
-  const poolMat = new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(255,214,150,0.9)'], [0.5, 'rgba(255,190,120,0.35)'], [1, 'rgba(255,180,100,0)']]), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.55 });
+  const poolMat = new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(255,214,150,0.9)'], [0.5, 'rgba(255,190,120,0.35)'], [1, 'rgba(255,180,100,0)']]), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.8 });
   const streakTex = (() => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128;
     const g = c.getContext('2d');
@@ -924,6 +924,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   batch.build(group);
+  group.add(buildMountain());
 
   const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
   for (const [x, z] of LAYOUT.spawns) {
@@ -933,6 +934,72 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
   return world;
+}
+
+// Mount Rainier on the horizon: a broad stratovolcano with glaciers, rock ribs and forested foothills,
+// far beyond the fog (it uses its own haze so it stays visible), lined up with the lanes to the east so
+// it looms over the rooftops. The low sun behind the player lights it with alpenglow.
+function buildMountain() {
+  const rnd = seeded(4392);
+  const R = 1500, H = 640, segR = 110, segA = 180;
+  const pos = [], col = [], idx = [];
+  // value noise for ridges
+  const N = 64, tab = Array.from({ length: N * N }, () => rnd());
+  const vn = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+    const g = (i, j) => tab[((i % N + N) % N) + ((j % N + N) % N) * N];
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return (g(xi, yi) * (1 - sx) + g(xi + 1, yi) * sx) * (1 - sy) + (g(xi, yi + 1) * (1 - sx) + g(xi + 1, yi + 1) * sx) * sy;
+  };
+  const fbm = (x, y) => vn(x, y) * 0.5 + vn(x * 2.1, y * 2.1) * 0.27 + vn(x * 4.3, y * 4.3) * 0.15 + vn(x * 9, y * 9) * 0.08;
+  const snow = new THREE.Color(0.86, 0.87, 0.93), rock = new THREE.Color(0.34, 0.31, 0.32), forest = new THREE.Color(0.1, 0.14, 0.11), c = new THREE.Color();
+  for (let i = 0; i <= segR; i++) {
+    const t = i / segR;                         // 0 at the summit, 1 at the base
+    // concave flanks under a broad rounded summit dome, with a shoulder (Little Tahoma) on one side
+    const dome = t < 0.1 ? 0.012 * Math.cos(t / 0.1 * Math.PI / 2) : 0;
+    const prof = Math.pow(1 - t, 2.1) * 0.74 + (1 - t) * 0.26 + dome;
+    for (let j = 0; j <= segA; j++) {
+      const a = (j / segA) * Math.PI * 2;
+      const r = t * R * (0.86 + 0.28 * vn(Math.cos(a) * 3 + 9, Math.sin(a) * 3 + 9));
+      const ridge = fbm(Math.cos(a) * 6 + t * 2, Math.sin(a) * 6 + t * 2);
+      // summit plateau with twin crater rims (Columbia Crest and Liberty Cap)
+      const crest = t < 0.05 ? -0.01 * (1 - t / 0.05) : 0;
+      const shoulder = 0.05 * Math.exp(-Math.pow((t - 0.3) / 0.08, 2)) * Math.max(0, Math.cos(a - 3.6)) ** 4;
+      const h = H * (prof + crest + shoulder) + (ridge - 0.5) * H * 0.16 * Math.min(1, t * 3) * (1 - t * 0.6);
+      pos.push(Math.cos(a) * r, Math.max(0, h), Math.sin(a) * r);
+      // glaciers down to ~40% of the height, broken by rock ribs; forest on the foothills
+      const hn = h / H;
+      const rib = fbm(Math.cos(a) * 14 + 3, Math.sin(a) * 14 + t * 6);
+      const snowLine = 0.36 + (rib - 0.5) * 0.35;
+      if (hn > snowLine) c.copy(snow).lerp(rock, rib > 0.72 && hn < 0.85 ? 0.75 : 0.04);
+      else if (hn > 0.16) c.copy(rock).lerp(snow, Math.max(0, (hn - snowLine + 0.06) / 0.06));
+      else c.copy(forest).lerp(rock, hn / 0.16 * 0.6);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  for (let i = 0; i < segR; i++) for (let j = 0; j < segA; j++) {
+    const a = i * (segA + 1) + j, b = a + segA + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, fog: false });
+  // distance haze of its own: the base melts into the dusk sky, the summit stays crisp
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vMy;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvMy = position.y;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMy;')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        float hz = 1.0 - smoothstep(0.0, ${(H * 0.75).toFixed(1)}, vMy);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.5, 0.46, 0.55), 0.22 + 0.6 * hz);`);
+  };
+  const m = new THREE.Mesh(g, mat);
+  m.position.set(1750, -20, 160);
+  m.frustumCulled = false;
+  m.renderOrder = -2;
+  return m;
 }
 
 // Top-down render of the map for the minimap (needs the renderer, so it runs after the scene is built)
