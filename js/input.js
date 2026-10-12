@@ -1,7 +1,7 @@
 // Input: keyboard + mouse (pointer lock), Xbox / standard gamepads, touch.
 // Everything funnels into: analog move/look, held fire/ads, and one-shot "actions".
 
-const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const KEY_ACTIONS = {
   KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
   KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause',
@@ -125,6 +125,11 @@ export class Input {
   get moveY() { return Math.max(-1, Math.min(1, this.touchMoveY + this.padMoveY)); }
   // frag button held (cook while held, throw on release)
   get grenadeHeld() { return this.keys.has('KeyG') || !!this.lbHeld || !!this.touchGren; }
+  // plant / defuse: hold F or R, X on a controller, or the RELOAD touch button
+  get useHeld() {
+    const b = this.pad && this.pad.buttons[PAD.X];
+    return this.keys.has('KeyF') || this.keys.has('KeyR') || !!(b && b.pressed) || !!this.touchUse;
+  }
   get scoreboard() { return this.keys.has('Tab') || this.touchScore || this.padScore; }
 
   lock() {
@@ -272,7 +277,7 @@ export class Input {
           else if (k === 'ads') { this.touchAdsHeld = true; this.adsPress(); if (lookId === null) lookStart(t); }
           else if (k === 'score') this.touchScore = true;
           else if (k === 'grenade') this.touchGren = true;
-          else this.actions.add(k);
+          else { if (k === 'reload') this.touchUse = true; this.actions.add(k); }
           continue;
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
@@ -319,6 +324,7 @@ export class Input {
           if (btn.dataset.btn === 'ads') this.touchAdsHeld = false;
           if (btn.dataset.btn === 'score') this.touchScore = false;
           if (btn.dataset.btn === 'grenade') this.touchGren = false;
+          if (btn.dataset.btn === 'reload') this.touchUse = false;
         }
       }
     };

@@ -9,6 +9,7 @@ import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
 import { GunPreview } from './gunsmith.js';
 import { Account, takeLoginToken } from './account.js';
+import { MODES } from './modes.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -53,7 +54,7 @@ game.applySettings(settings);
 
 // ---------- form binding ----------
 const bindings = [
-  ['opt-name', 'name', 'text'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
+  ['opt-name', 'name', 'text'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
@@ -72,6 +73,7 @@ function writeForm() {
   }
   for (const id in outputs) $(outputs[id][0]).textContent = outputs[id][1]($(id).value);
   $('opt-name').value = myName();
+  syncModeRows();
   renderWeapons();
 }
 function readField(id, key, type) {
@@ -94,6 +96,16 @@ for (const [id, key, type] of bindings) {
     if (game.settings) Object.assign(game.settings, { sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
   });
 }
+
+// match mode: show only the settings that apply
+function syncModeRows() {
+  const m = MODES[settings.mode] || MODES.tdm;
+  document.body.dataset.gmode = m.id;
+  $('intel-mode').textContent = m.name.toUpperCase();
+  if (!(typeof playMode !== 'undefined' && playMode === 'online')) $('play-title').textContent = m.name.toUpperCase();
+  document.querySelector('#pane-play .pane-sub').textContent = m.blurb;
+}
+$('opt-mode').addEventListener('change', () => { syncModeRows(); if (lobby && lobby.role === 'host') lobby.broadcastLobby(); });
 
 // ---------- loadout + gunsmith ----------
 const preview = new GunPreview($('gs-view'));
@@ -216,7 +228,7 @@ const mmss = (t) => `${Math.floor(Math.max(0, t) / 60)}:${String(Math.floor(Math
 function renderPauseMatch() {
   const g = game, p = g.player;
   if (!p) return;
-  $('pause-meta').textContent = `TEAM DEATHMATCH · ${(MAPS[g.world.id]?.name || '').toUpperCase()}${g.mode === 'local' ? ' · VS BOTS' : ' · ONLINE'}`;
+  $('pause-meta').textContent = `${(MODES[g.settings.mode] || MODES.tdm).name.toUpperCase()} · ${(MAPS[g.world.id]?.name || '').toUpperCase()}${g.mode === 'local' ? ' · VS BOTS' : ' · ONLINE'}`;
   $('pm-f').textContent = g.scores[p.team];
   $('pm-e').textContent = g.scores[1 - p.team];
   $('pm-time').textContent = mmss(g.timeLeft);
@@ -394,7 +406,7 @@ function renderLobby() {
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
-      : `${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.teamSize}v${settings.teamSize} · ${settings.scoreLimit} kills · ${settings.timeLimit} min${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
+      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
     $('lobby-leave').textContent = inMatch ? 'END SESSION' : 'CLOSE LOBBY';
   } else {
     const slots = $('code-slots').querySelectorAll('i');
@@ -694,7 +706,8 @@ function setPlayMode(m) {
   $('mode-chip').innerHTML = m === 'online'
     ? `<i></i>ONLINE${onlineName() ? ` <small>${esc(onlineName().toUpperCase())}</small>` : ''}`
     : '<i></i>OFFLINE <small>VS BOTS</small>';
-  $('play-title').textContent = m === 'online' ? 'ONLINE · TEAM DEATHMATCH' : 'TEAM DEATHMATCH';
+  const mn = (MODES[settings.mode] || MODES.tdm).name.toUpperCase();
+  $('play-title').textContent = m === 'online' ? `ONLINE · ${mn}` : mn;
   $('opt-name').value = myName();
   renderHints(game.input.lastDevice);
 }

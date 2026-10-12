@@ -33,7 +33,7 @@
       <div id="scorebox">
         <div class="srow friendly"><span class="sname">FRIENDLY</span><div class="sbar"><i id="bar-f"></i></div><b id="score-f">0</b></div>
         <div class="srow enemy"><span class="sname">ENEMY</span><div class="sbar"><i id="bar-e"></i></div><b id="score-e">0</b></div>
-        <div class="smeta"><span id="timer">10:00</span><span class="dot">•</span><span>TDM</span><span class="dot">•</span><span id="limit">75</span></div>
+        <div class="smeta"><span id="timer">10:00</span><span class="dot">•</span><span id="mode-short">TDM</span><span class="dot">•</span><span id="limit">75</span></div>
       </div>
     </div>
 
@@ -174,16 +174,18 @@
           <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
           <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
           <div class="rows">
+            <div class="row"><label for="opt-mode">Mode</label><select id="opt-mode" data-nav>
+              <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="random">Random</option></select></div>
-            <div class="row"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
+            <div class="row tdm-snd"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
               <option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option>
               <option value="5">5v5</option><option value="6">6v6</option><option value="8">8v8</option></select></div>
             <div class="row"><label for="opt-diff">Bot difficulty</label><select id="opt-diff" data-nav>
               <option value="easy">Recruit</option><option value="normal">Regular</option><option value="hard">Veteran</option></select></div>
-            <div class="row"><label for="opt-score">Score limit</label><select id="opt-score" data-nav>
+            <div class="row tdm-only"><label for="opt-score">Score limit</label><select id="opt-score" data-nav>
               <option>25</option><option>50</option><option>75</option><option>100</option><option>150</option></select></div>
-            <div class="row"><label for="opt-time">Time limit</label><select id="opt-time" data-nav>
+            <div class="row tdm-only"><label for="opt-time">Time limit</label><select id="opt-time" data-nav>
               <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
@@ -266,6 +268,8 @@
                 <tr><td>Reload</td><td>R</td><td>X</td></tr>
                 <tr><td>Swap weapon</td><td>Q / 1 / 2 / wheel</td><td>Y</td></tr>
                 <tr><td>Frag grenade · hold to cook</td><td>G</td><td>LB (release to throw)</td></tr>
+                <tr><td>Plant / defuse bomb (Search &amp; Destroy)</td><td>Hold R or F</td><td>Hold X</td></tr>
+                <tr><td>Next teammate (spectating)</td><td>Space / click</td><td>A</td></tr>
                 <tr><td>Inspect weapon</td><td>I</td><td>D-pad down</td></tr>
                 <tr><td>Respawn early (when dead)</td><td>R / Space / click</td><td>X / A</td></tr>
                 <tr><td>Melee</td><td>V</td><td>R3</td></tr>
@@ -279,7 +283,7 @@
         <aside class="intel">
           <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
           <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
-          <div class="intel-k">MODE</div><div class="intel-v">TEAM DEATHMATCH</div>
+          <div class="intel-k">MODE</div><div class="intel-v" id="intel-mode">TEAM DEATHMATCH</div>
           <div class="intel-k">INPUT</div><div class="intel-v" id="intel-input">KEYBOARD &amp; MOUSE</div>
         </aside>
       </div>

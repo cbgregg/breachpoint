@@ -157,6 +157,15 @@ export class BotBrain {
     this.goalT -= dt;
     if (this.visible && this.target) { this.goalKind = 'engage'; return; }
     if (this.goalKind === 'engage') { this.goalKind = 'hunt'; this.goal = null; }
+    // round modes hand out objectives: plant, defuse, guard a site, take the flag
+    const og = g.gm && g.gm.botGoal(this, b);
+    if (og) {
+      // chase a fresh sighting first unless the objective is urgent
+      const urgent = og.kind === 'plant' || og.kind === 'defuse' || og.kind === 'flag' || og.kind === 'bomb';
+      if (!urgent && this.target && this.target.alive && g.time - this.lastKnownT < 4) { this.setGoal(this.lastKnown, 'hunt'); return; }
+      this.setGoal(og.pos, og.kind);
+      return;
+    }
     if (b.health < 45) {
       const p = g.nearestPickup('health', b.pos, true);
       if (p && p.pos.distanceTo(b.pos) < 35) { this.setGoal(p.pos, 'health'); return; }
@@ -202,6 +211,16 @@ export class BotBrain {
     const wish = this.wish.set(0, 0, 0);
     let sprint = false, jump = false;
     this.crouch = false;
+    b.useHeld = false;
+    // objective spots: stop there (and hold the button to plant / defuse)
+    const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6 }[this.goalKind];
+    if (hold && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < hold) {
+      if (this.goalKind === 'plant' || this.goalKind === 'defuse') b.useHeld = true;
+      this.goalT = 30;
+      b.wantCrouch = this.goalKind === 'guard' && Math.random() < 0.002 ? !b.wantCrouch : b.wantCrouch;
+      b.updateMovement(dt, wish, false, false, false, false);
+      return;
+    }
 
     if (this.goalKind === 'engage' && this.target) {
       const t = this.target;

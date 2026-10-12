@@ -118,6 +118,7 @@ export class HUD {
     this.txt('timer', fmtTime(g.timeLeft));
     this.cls('timer', 'low', g.timeLeft < 30);
     this.txt('limit', g.settings.scoreLimit);
+    this.txt('mode-short', g.gm ? g.gm.cfg.short : 'TDM');
 
     // health: only shown while hurt
     const hurt = p.alive && p.health < PLAYER.maxHealth - 0.5;
@@ -137,7 +138,8 @@ export class HUD {
 
     // prompt
     let key = '', html = '', warn = false;
-    if (p.alive && !w.reloading) {
+    if (p.alive && this.objPrompt) { key = 'obj' + this.objPrompt; html = this.objPrompt; }
+    else if (p.alive && !w.reloading) {
       if (w.mag === 0 && w.reserve === 0) { key = 'noammo'; html = 'NO AMMO'; warn = true; }
       else if (w.mag <= Math.ceil(w.def.mag * 0.25) && w.reserve > 0) { key = 'reload' + this.device; html = `${glyph('reload', this.device)} RELOAD`; }
       else if (w.mag + w.reserve <= w.def.mag) { key = 'low'; html = 'LOW AMMO'; warn = true; }
@@ -179,7 +181,9 @@ export class HUD {
     document.body.classList.toggle('dead', dead && g.state === 'playing');
     if (dead) {
       const since = g.time - p.deathT;
-      this.txt('death-timer', `RESPAWNING IN ${Math.max(0, PLAYER.respawnDelay - since).toFixed(1)}`);
+      this.txt('death-timer', g.gm ? 'NO RESPAWNS THIS ROUND' : `RESPAWNING IN ${Math.max(0, PLAYER.respawnDelay - since).toFixed(1)}`);
+      // round modes: the card gives way to spectating after the kill cam
+      if (g.gm) this.cls('death', 'on', since < 2.5 || !(g.playerCtl && g.playerCtl.specTarget));
       this.cls('death-respawn', 'wait', since < PLAYER.respawnMin);
     }
     // frag cook timer

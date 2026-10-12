@@ -53,6 +53,18 @@ The controller follows Call of Duty's **Default** button layout. RB (tactical eq
 
 Browsers only expose a controller after you press a button on it, so press any button once the page is open. Xbox controllers that a browser reports without the standard layout (common in Firefox on macOS and Linux) are remapped automatically.
 
+## Game modes
+
+Pick a mode on the Play tab. All three work offline against bots and online.
+
+| Mode | Teams | How you win a round | Match |
+|---|---|---|---|
+| **Team Deathmatch** | 2v2 to 8v8 | Respawns on; every kill scores | Score or time limit |
+| **Gunfight** | 2v2 | One life each. Everyone gets the same random loadout (new every two rounds). After 40 s a flag appears in the middle: hold it for 3 s to win, or the team with more health left after 10 s of overtime takes the round | First to 6 rounds |
+| **Search & Destroy** | 2v2 to 8v8 | One life each. Attackers carry a bomb to site A or B and hold **R / F** (controller **X**) for 5 s to plant; it goes off 45 s later. Defenders hold the same button for 7.5 s to defuse. Wipe the other team, run out the clock (defenders), or detonate / defuse | First to 4 rounds, sides switch at halftime |
+
+In round modes there are no pickups, the bomb carrier drops it on death (any attacker can pick it up), and once you're out you spectate a living teammate (**Space / click / A** to switch). Bots play the objective: they plant, defuse, guard sites and rush the overtime flag.
+
 ## Online play
 
 The game opens on a title screen (**press Enter / A / tap to start**), then **Offline** (versus bots, no account) or **Online**. With accounts turned on (below), Online asks you to sign in first.
@@ -136,6 +148,7 @@ npx serve .            # or: python3 -m http.server 8000
 |---|---|
 | `index.html` | Page shell, HUD, menus, import map for Three.js + addons (CDN) |
 | `css/style.css` | Menus, HUD, scoreboard, touch controls |
+| `js/modes.js` | Gunfight and Search & Destroy: rounds, bomb, sites, overtime flag, bot objectives, HUD |
 | `js/main.js` | Boot, title screen, Offline/Online, sign-in screens, menu tabs, controller/keyboard menu navigation, settings persistence |
 | `js/game.js` | Match loop (local / host / guest modes), hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
 | `js/net.js` | Peer-to-peer transport: 6-digit codes, Nostr signaling, WebRTC data channels |

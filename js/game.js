@@ -18,6 +18,7 @@ import { applySpread } from './weapons.js';
 import { Renderer, SUN_DIR } from './render.js';
 import { HostSession, GuestSession } from './online.js';
 import { Music } from './music.js';
+import { createMode, MODES } from './modes.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -120,7 +121,11 @@ export class Game {
       this.settings.scoreLimit = +cfg.scoreLimit || 75;
       this.settings.friendlyFire = !!cfg.friendlyFire;
       this.settings.map = MAPS[cfg.map] ? cfg.map : 'tarsa';
+      this.settings.mode = MODES[cfg.mode] ? cfg.mode : 'tdm';
     }
+    if (!MODES[this.settings.mode]) this.settings.mode = 'tdm';
+    const modeCfg = MODES[this.settings.mode];
+    if (modeCfg.rounds) this.settings.scoreLimit = modeCfg.winRounds;
     // 'random' (or an unknown id) picks one of the maps
     if (!MAPS[this.settings.map]) this.settings.map = MAP_IDS[(Math.random() * MAP_IDS.length) | 0];
     this.applySettings(this.settings);
@@ -135,6 +140,10 @@ export class Game {
     this.loadMap(this.settings.map);
     this.pickups = this.pickups.filter(p => { if (p.dynamic) this.scene.remove(p.mesh); return !p.dynamic; });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; p.timer = 0; }
+    if (this.gm) this.gm.dispose();
+    this.gm = createMode(this.settings.mode, this);
+    // round modes: no health or ammo pickups
+    if (this.gm) for (const p of this.pickups) { p.active = false; p.mesh.visible = false; p.timer = Infinity; }
     this.effects.clear();
     this.brains.clear();
     this.grenadeSeq = 0;
@@ -142,7 +151,7 @@ export class Game {
 
     if (this.mode === 'guest') return this.startGuest(online.start);
 
-    const N = Math.max(1, Math.min(8, settings.teamSize | 0));
+    const N = this.gm && this.gm.cfg.teamSize ? this.gm.cfg.teamSize : Math.max(1, Math.min(8, settings.teamSize | 0));
     const myTeam = this.mode === 'host' ? online.lobby.hostTeam : 0;
     this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: loadoutFromSettings(settings) });
     this.characters = [this.player];
@@ -176,6 +185,7 @@ export class Game {
     this.state = 'playing';
     this.characters.forEach(c => { c.spawnT = this.time; });
     if (this.playerCtl) this.playerCtl.inspectT = 3.4; // check your weapon while the countdown runs
+    if (this.gm) this.gm.start(); // round modes place everyone and run their own freeze time
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -280,6 +290,7 @@ export class Game {
   quitToMenu() {
     if (this.session) { if (this.session.leave) this.session.leave(); this.session.dispose(); }
     this.session = null;
+    if (this.gm) { this.gm.dispose(); this.gm = null; }
     this.mode = 'local';
     this.state = 'menu';
     this.music.setDuck(false);
@@ -359,7 +370,7 @@ export class Game {
       this.hud.countdown(Math.max(0, n));
     } else {
       this.timeLeft = Math.max(0, this.timeLeft - dt);
-      if (this.timeLeft <= 0 && !guest) { this.endMatch(); return; }
+      if (this.timeLeft <= 0 && !guest && !this.gm) { this.endMatch(); return; }
     }
     if (this.endT > 0 && !guest) { this.endT -= dt; if (this.endT <= 0) { this.endMatch(); return; } }
 
@@ -377,13 +388,15 @@ export class Game {
           else this.brains.get(c).update(dt);
         }
         c.updateCommon(dt);
-        if (!c.alive && this.live) {
+        if (!c.alive && this.live && !this.gm) {
           c.respawnT -= dt;
           if (c.respawnT <= 0) this.respawn(c);
         }
       }
+      if (this.gm) { this.gm.update(dt); if (this.state === 'ended') return; }
       if (this.session) this.session.update(dt);
     }
+    if (this.gm) this.gm.frame(dt);
 
     this.updateAimTarget();
     this.camera.updateMatrixWorld();
@@ -492,7 +505,7 @@ export class Game {
   // change class: right away if you only just spawned and haven't fired (like CoD), otherwise at
   // the next spawn. Guests ask the host, which applies the same rule.
   requestLoadout(l) {
-    if (!this.player) return;
+    if (!this.player || (this.gm && this.gm.fixedLoadout)) return;
     if (this.mode === 'guest') { this.session?.sendLoadout(l); return; }
     this.applyLoadout(this.player, l);
   }
@@ -507,7 +520,7 @@ export class Game {
   // respawn now (after a short minimum) instead of waiting out the timer
   requestRespawn() {
     const p = this.player;
-    if (!p || p.alive || !this.live || this.time - p.deathT < PLAYER.respawnMin) return;
+    if (!p || p.alive || !this.live || this.gm || this.time - p.deathT < PLAYER.respawnMin) return;
     if (this.mode === 'guest') { this.session?.sendRespawn(); return; }
     p.respawnT = Math.min(p.respawnT, 0);
   }
@@ -720,7 +733,7 @@ export class Game {
       killer.streak++;
       const bonus = (headshot ? SCORE.headshot : 0) + (weaponId === 'melee' ? SCORE.melee : 0);
       killer.score += SCORE.kill + bonus;
-      this.scores[killer.team]++;
+      if (!this.gm) this.scores[killer.team]++; // round modes score rounds, not kills
       if (!killer.isBot) {
         this.notify(killer, 'kill');
         this.notify(killer, 'score', 'KILL', SCORE.kill);
@@ -754,8 +767,9 @@ export class Game {
       victim.lastKiller = killer && killer !== victim ? killer : null;
       this.notify(victim, 'death', killer ? killer.id : -1, weaponId);
     }
-    if (Math.random() < 0.5) this.dropAmmo(victim.pos);
-    if (enemyKill && this.scores[killer.team] >= this.settings.scoreLimit && this.endT <= 0) {
+    if (this.gm) this.gm.onKill(killer, victim);
+    else if (Math.random() < 0.5) this.dropAmmo(victim.pos);
+    if (!this.gm && enemyKill && this.scores[killer.team] >= this.settings.scoreLimit && this.endT <= 0) {
       this.endT = 1.4;
       this.hud.medal(killer.team === this.player.team ? 'VICTORY' : 'DEFEAT', 'SCORE LIMIT REACHED');
     }

@@ -11,7 +11,7 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 const bump = (a, b, x) => smooth(a, a + (b - a) * 0.3, x) * (1 - smooth(b - (b - a) * 0.3, b, x));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _wish = new THREE.Vector3();
-const _E = new THREE.Vector3(), _R = new THREE.Vector3(), _L = new THREE.Vector3();
+const _E = new THREE.Vector3(), _R = new THREE.Vector3(), _L = new THREE.Vector3(), _D = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
 const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
@@ -144,13 +144,18 @@ export class PlayerController {
       // respawn early: X / R, A / Space, a fresh click — after a short moment so you see who got you
       const fireEdge = inp.fire && !this.prevDeadFire;
       this.prevDeadFire = inp.fire;
-      if (g.time - c.deathT > PLAYER.respawnMin && (inp.action('reload') || inp.action('jump') || fireEdge)) g.requestRespawn();
+      if (g.gm) {
+        // round modes: no respawn. After the kill cam, watch a living teammate (jump / fire / X: next one)
+        const next = g.time - c.deathT > 2.5 && (inp.action('reload') || inp.action('jump') || fireEdge);
+        if (this.specCam(dt, next)) return;
+      } else if (g.time - c.deathT > PLAYER.respawnMin && (inp.action('reload') || inp.action('jump') || fireEdge)) g.requestRespawn();
       this.deathCam(dt);
       return;
     }
+    this.specTarget = null;
     if (this.wasDead) { this.wasDead = false; this.lastFov = 0; }
     this.vmRoot.visible = true;
-    const canAct = !g.frozen;
+    const canAct = !g.frozen && !c.busy; // planting / defusing roots you in place
     const def = c.weapon.def;
 
     // ---- look ----
@@ -233,7 +238,8 @@ export class PlayerController {
       if (inp.action('slot1')) c.switchTo(0);
       if (inp.action('slot2')) c.switchTo(1);
       if (inp.action('swap') || inp.wheel !== 0) c.switchTo(c.prev);
-      if (inp.action('reload')) { c.reload(); this.padSprint = false; }
+      // in a plant / defuse zone the reload button is the use button
+      if (inp.action('reload') && !(g.gm && (g.gm.authority ? g.gm.useZone(c) : g.gm.guestZone(c)))) { c.reload(); this.padSprint = false; }
       if (inp.action('melee')) c.melee();
     }
     // frag: hold to pull the pin and cook, release to throw. Hold past the fuse and it goes off in your hand.
@@ -270,6 +276,7 @@ export class PlayerController {
     const adsWant = canAct && inp.ads && !cooking && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
     this.cmd.ads = adsWant;
     this.cmd.f = canAct && inp.fire && !cooking ? 1 : 0;
+    this.cmd.u = g.gm && inp.useHeld && !g.frozen ? 1 : 0;
     const acts = inp.used.filter(a => a === 'reload' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
     if (thrownCook !== null) { acts.push('grenade'); this.cmd.gk = thrownCook; }
     if (acts.length) this.cmd.a = acts;
@@ -604,6 +611,34 @@ export class PlayerController {
     arm.fore.quaternion.setFromUnitVectors(DOWN, _a.subVectors(H, _E).normalize());
     arm.hand.position.copy(H);
     arm.hand.quaternion.copy(holder.quaternion);
+  }
+
+  // Round modes: over-the-shoulder view of a living teammate. Returns false when there's nobody to watch.
+  specCam(dt, next) {
+    const c = this.c, g = this.game, cam = this.camera;
+    if (g.time - c.deathT < 2.5) return false;
+    const mates = g.characters.filter(m => m !== c && m.team === c.team && m.alive && !m.hidden);
+    if (!mates.length) { this.specTarget = null; return false; }
+    if (!mates.includes(this.specTarget) || next) {
+      const i = mates.indexOf(this.specTarget);
+      this.specTarget = mates[(i + 1) % mates.length];
+      this.specSnap = true;
+      if (next) g.audio.play('ui', null, { ui: true });
+    }
+    const m = this.specTarget;
+    const eye = m.eyePos(_a), fwd = m.forward(_b);
+    const right = _c.set(-fwd.z, 0, fwd.x).normalize();
+    _E.copy(eye).addScaledVector(fwd, -2.2).addScaledVector(right, 0.55);
+    _E.y += 0.35;
+    // pull in if a wall is in the way
+    const hit = g.physics.raycast(eye, _D.subVectors(_E, eye).normalize(), eye.distanceTo(_E));
+    if (hit) _E.copy(eye).addScaledVector(_D, Math.max(0.3, hit.t - 0.25));
+    if (this.specSnap) { cam.position.copy(_E); this.specSnap = false; }
+    else cam.position.lerp(_E, Math.min(1, dt * 12));
+    cam.lookAt(_D.copy(eye).addScaledVector(fwd, 12));
+    const base = vfov(g.settings.fov);
+    if (Math.abs(cam.fov - base) > 0.01) { cam.fov = base; cam.updateProjectionMatrix(); this.lastFov = base; }
+    return true;
   }
 
   // Death: drop back from where you were standing, swing round to the killer and zoom in on them

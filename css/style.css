@@ -554,3 +554,38 @@ body.mode-online #pane-play .pane-title, body.mode-online #pane-play .pane-sub {
 body.mode-online #pane-play .online-row { order: -2; }
 body.mode-online #pane-play .pane-note { order: -1; margin-top: 0; }
 body.mode-online #pane-play .rows::before { content: 'PRIVATE MATCH SETTINGS (WHEN YOU HOST)'; font-size: 11px; letter-spacing: 0.22em; color: var(--ink-faint); margin: 6px 0 2px; }
+
+/* ---------- round modes (gunfight, search & destroy) ---------- */
+#gm { position: absolute; inset: 0; pointer-events: none; }
+.gm-top { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.gm-round { font-weight: 700; font-size: 15px; letter-spacing: 0.22em; color: var(--ink); }
+.gm-pips { display: flex; gap: 18px; }
+.gm-pips span { display: flex; gap: 4px; }
+.gm-pips i { width: 10px; height: 14px; display: block; transform: skewX(-12deg); }
+.gm-pips .f i { background: var(--friendly); } .gm-pips .e i { background: var(--enemy); }
+.gm-pips i.x { background: rgba(236, 233, 225, 0.18) !important; }
+.gm-pips i.bomb { box-shadow: 0 0 0 2px var(--amber); }
+.gm-sub { font-size: 13px; letter-spacing: 0.16em; color: var(--amber); min-height: 16px; }
+.gm-bar { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); width: min(320px, 60vw); display: none; flex-direction: column; gap: 6px; align-items: center; }
+.gm-bar.on { display: flex; }
+.gm-bar span { font-weight: 700; font-size: 15px; letter-spacing: 0.24em; }
+.gm-bar i { display: block; width: 100%; height: 6px; background: rgba(236, 233, 225, 0.2); }
+.gm-bar b { display: block; height: 100%; width: 0; background: var(--amber); }
+.gm-bar.enemy b { background: var(--enemy); }
+.gm-banner { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity .35s; text-align: center; width: 90vw; }
+.gm-banner.on { opacity: 1; }
+.gm-banner b { font-size: clamp(30px, 4.6vw, 54px); letter-spacing: 0.2em; padding-left: 0.2em; font-weight: 700; }
+.gm-banner span { font-size: 14px; letter-spacing: 0.2em; color: var(--ink-dim); }
+.gm-banner.win b { color: var(--friendly); } .gm-banner.lose b { color: var(--enemy); } .gm-banner.warn b { color: var(--amber); }
+.gm-mark { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.gm-mark b { min-width: 28px; height: 28px; padding: 0 6px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; border: 2px solid var(--ink); background: rgba(10, 12, 12, 0.55); }
+.gm-mark small { font-size: 11px; letter-spacing: 0.1em; color: var(--ink-dim); }
+.gm-mark.atk b { border-color: var(--amber); color: var(--amber); }
+.gm-mark.def b { border-color: var(--friendly); color: var(--friendly); }
+.gm-mark.hot b { border-color: var(--enemy); color: var(--enemy); animation: pulse 0.8s ease-in-out infinite; }
+.gm-mark.mine b { border-color: var(--friendly); color: var(--friendly); }
+.gm-mark.bomb b { font-size: 11px; letter-spacing: 0.1em; border-color: var(--amber); color: var(--amber); }
+body.rounds #death-respawn { display: none; }
+body.rounds.fixed-loadout #death-loadout, body.rounds.fixed-loadout #spawn-hint { display: none !important; }
+@media (max-width: 760px) { .gm-top { top: 70px; } }
+body[data-gmode="gunfight"] .tdm-snd, body[data-gmode="gunfight"] .tdm-only, body[data-gmode="snd"] .tdm-only { display: none; }

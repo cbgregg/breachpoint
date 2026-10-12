@@ -461,6 +461,7 @@ export class HostSession {
     const c = this.createRemote(p);
     g.characters.push(c);
     c.spawn(g.chooseSpawn(c.team), g.world.spawnYaw[c.team]);
+    if (g.gm) g.gm.onJoin(c);
     this.rosterAdd.push(c);
     this.sendStart(this.remotes.get(p.peerId));
   }
@@ -494,7 +495,7 @@ export class HostSession {
     r.started = true;
     this.net.send({
       t: 'start', v: PROTO, you: c.id,
-      cfg: { timeLimit: s.timeLimit, scoreLimit: s.scoreLimit, friendlyFire: !!s.friendlyFire, teamSize: s.teamSize, map: g.world.id },
+      cfg: { timeLimit: s.timeLimit, scoreLimit: s.scoreLimit, friendlyFire: !!s.friendlyFire, teamSize: s.teamSize, map: g.world.id, mode: s.mode || 'tdm' },
       ro: g.characters.map(x => this.rosterEntry(x)),
       sp: [r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r3(c.yaw)],
       tm: r3(g.time), tl: r2(g.timeLeft), cd: r2(g.countdownT), sc: [...g.scores],
@@ -540,8 +541,9 @@ export class HostSession {
   // mirrors PlayerController.update so the guest's prediction lines up with the result
   apply(r, cmd) {
     const c = r.c, g = this.game;
-    if (!c.alive) { r.latch = false; return; }
-    const canAct = !g.frozen;
+    if (!c.alive) { r.latch = false; c.useHeld = false; return; }
+    c.useHeld = !!cmd.u && !g.frozen;
+    const canAct = !g.frozen && !c.busy; // planting or defusing: rooted in place, gun down
     c.yaw = cmd.y;
     c.pitch = cmd.p;
     const f = canAct ? cmd.my : 0, rr = canAct ? cmd.mx : 0;
@@ -561,7 +563,7 @@ export class HostSession {
         if (a === 'slot1') c.switchTo(0);
         else if (a === 'slot2') c.switchTo(1);
         else if (a === 'swap') c.switchTo(c.prev);
-        else if (a === 'reload') c.reload();
+        else if (a === 'reload') { if (!(g.gm && g.gm.useZone(c))) c.reload(); }
         else if (a === 'grenade') c.throwGrenade(undefined, cmd.gk || 0);
         else if (a === 'melee') c.melee();
       }
@@ -681,6 +683,7 @@ export class HostSession {
         r2(o.crouchT), o.cur, w.reloading ? r2(w.reloadProgress) : 0, Math.round(o.health)]);
     }
     const msg = { t: 's', tm: r3(g.time), ack: r.ack, sc: [...g.scores], tl: r2(g.timeLeft), cd: r2(Math.max(0, g.countdownT)), me, ch, pk };
+    if (g.gm) msg.gm = g.gm.netState();
     if (r.ev.length) { msg.ev = r.ev; r.ev = []; }
     if (r.pv.length) { msg.pv = r.pv; r.pv = []; }
     if (sb) msg.sb = sb;
@@ -707,7 +710,7 @@ function sanitize(a) {
   const cmd = {
     s, dt: clamp(dt, 0.001, 0.05), mx: clamp(mx, -1, 1), my: clamp(my, -1, 1),
     y: ((y % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI, p: clamp(p, -1.5, 1.5),
-    sp: !!(bits & 1), cr: !!(bits & 2), j: !!(bits & 4), sl: !!(bits & 8), f: !!(bits & 16), ads: !!(bits & 32), tac: !!(bits & 64),
+    sp: !!(bits & 1), cr: !!(bits & 2), j: !!(bits & 4), sl: !!(bits & 8), f: !!(bits & 16), ads: !!(bits & 32), tac: !!(bits & 64), u: !!(bits & 128),
     a: null, v: fin(v) ? v : null, gk: fin(gk) ? clamp(gk, 0, GRENADE.fuse) : 0,
   };
   if (Array.isArray(acts)) cmd.a = acts.slice(0, 4).filter(x => ACTIONS.includes(x));
@@ -749,7 +752,7 @@ export class GuestSession {
       cmd.s = ++this.seq;
       this.pending.push({ cmd, adsT: c.adsT });
       if (this.pending.length > 120) this.pending.shift();
-      const bits = (cmd.sp ? 1 : 0) | (cmd.cr ? 2 : 0) | (cmd.j ? 4 : 0) | (cmd.sl ? 8 : 0) | (cmd.f ? 16 : 0) | (cmd.ads ? 32 : 0) | (cmd.tac ? 64 : 0);
+      const bits = (cmd.sp ? 1 : 0) | (cmd.cr ? 2 : 0) | (cmd.j ? 4 : 0) | (cmd.sl ? 8 : 0) | (cmd.f ? 16 : 0) | (cmd.ads ? 32 : 0) | (cmd.tac ? 64 : 0) | (cmd.u ? 128 : 0);
       this.outbox.push([cmd.s, r3(cmd.dt), r3(cmd.mx), r3(cmd.my), r3(cmd.y), r3(cmd.p), bits, cmd.a || 0, r3(this.viewTime()), cmd.gk ? r2(cmd.gk) : 0]);
     }
     this.sendT -= dt;
@@ -808,6 +811,7 @@ export class GuestSession {
     if (Array.isArray(m.sc)) g.scores = [m.sc[0] | 0, m.sc[1] | 0];
     if (fin(m.tl)) g.timeLeft = m.tl;
     if (fin(m.cd)) g.countdownT = m.cd;
+    if (m.gm && g.gm) g.gm.applyNet(m.gm);
     this.curTm = m.tm;
     if (Array.isArray(m.ev)) for (const ev of m.ev) if (Array.isArray(ev)) this.event(ev);
     if (Array.isArray(m.pv)) for (const ev of m.pv) if (Array.isArray(ev)) this.personal(ev);
@@ -998,6 +1002,14 @@ export class GuestSession {
       case 'take': {
         const p = g.pickups.find(q => q.dynamic && q.pid === ev[1]);
         if (p) p.active = false;
+        break;
+      }
+      case 'gm': {
+        // mode banners: only known types, plain values
+        const [, type, a, b, c] = ev;
+        if (!g.gm || !['round', 'half', 'ot', 'end', 'planted', 'drop', 'pickup'].includes(type)) return;
+        const ok = (v) => v === undefined || fin(v) || (typeof v === 'string' && v.length < 12);
+        if (ok(a) && ok(b) && ok(c)) g.gm.onEvent(type, a, b, c);
         break;
       }
       default: break;
