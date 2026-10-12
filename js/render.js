@@ -58,8 +58,8 @@ const GradeShader = {
     }`,
 };
 
-// evening: a low sun (9° up) for long shadows and warm light
-export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 9), THREE.MathUtils.degToRad(215));
+// evening: a low sun (16° up) for long shadows and warm light
+export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 16), THREE.MathUtils.degToRad(222));
 
 // Height fog: distance haze plus a dense layer that hugs the ground and thins with altitude,
 // glowing warm when looking towards the sun. Patched into three's fog chunks so every lit
@@ -172,7 +172,7 @@ export class Renderer {
 
     scene.fog = new THREE.FogExp2(0xc99a74, 0.0062);
 
-    const sun = new THREE.DirectionalLight(0xffa25a, 3.6);
+    const sun = new THREE.DirectionalLight(0xffa25a, 4.4);
     sun.position.copy(SUN_DIR).multiplyScalar(80);
     sun.castShadow = true;
     const sc = sun.shadow.camera;
@@ -183,8 +183,8 @@ export class Renderer {
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0x8f98c8, 0x5a3626, 0.32)); // cool dusk sky above, warm bounce below
-    scene.environmentIntensity = 0.85;
+    scene.add(new THREE.HemisphereLight(0x8f98c8, 0x5a3626, 0.2)); // cool dusk sky above, warm bounce below
+    scene.environmentIntensity = 0.55; // less fill so the sun's shadows read clearly
   }
 
   applyQuality(name) {
@@ -196,12 +196,12 @@ export class Renderer {
     this.renderer.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
     this.renderer.shadowMap.enabled = q.shadows > 0;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = q.softShadows === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (q.shadows > 0 && this.sun.shadow.mapSize.x !== q.shadows) {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
-    this.scene.traverse(o => { if (o.isPointLight && o.userData.mapLight) o.visible = q.shadows > 0; });
+    this.scene.traverse(o => { if (o.isPointLight && o.userData.mapLight) o.visible = q.label !== 'Low'; });
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao;
     this.bloomPass.enabled = q.bloom;

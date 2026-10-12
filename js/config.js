@@ -99,7 +99,7 @@ export const DIFFICULTY = {
 };
 
 export const QUALITY = {
-  low: { label: 'Low', pixelRatio: 0.75, shadows: 0, ao: false, bloom: false, aa: false },
+  low: { label: 'Low', pixelRatio: 0.75, shadows: 1024, softShadows: false, ao: false, bloom: true, aa: false },
   medium: { label: 'Medium', pixelRatio: 1, shadows: 2048, ao: false, bloom: true, aa: true },
   high: { label: 'High', pixelRatio: 1.25, shadows: 4096, ao: true, bloom: true, aa: true },
   ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, ao: true, bloom: true, aa: true },

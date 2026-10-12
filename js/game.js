@@ -846,7 +846,7 @@ export class Game {
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
     setCharacterDetail(this.world.textures.fabric);
-    const lit = !this.renderer.quality || this.renderer.quality.shadows > 0;
+    const lit = !this.renderer.quality || this.renderer.quality.label !== 'Low';
     this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; });
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
