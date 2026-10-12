@@ -103,6 +103,8 @@ export class Game {
 
   applySettings(s) {
     if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); this.effects?.setQuality(s.quality); }
+    const dyn = s.dynamicRes !== false;
+    if (this.renderer.dynamic !== dyn) { this.renderer.dynamic = dyn; if (!dyn) { this.renderer.drs.scale = 1; this.renderer.applyPR(); this.renderer.setSize(); } }
     this.audio.setVolume(s.volume);
     this.music.setVolume(s.musicVolume ?? 0.5);
     this.input.deadzone = s.padDeadzone;
@@ -114,6 +116,7 @@ export class Game {
   // ---------- match lifecycle ----------
   // online: { mode: 'host', lobby } or { mode: 'guest', lobby, start }
   startMatch(settings, online = null) {
+    this.renderer.resetDRS();
     this.settings = { ...settings };
     if (online && online.mode === 'guest') {
       const cfg = online.start.cfg || {};
@@ -418,7 +421,7 @@ export class Game {
       if (c.hidden) { if (c.model) c.model.root.visible = false; continue; }
       _sph.center.set(c.pos.x, c.pos.y + 0.9, c.pos.z);
       const dist = _sph.center.distanceTo(this.camera.position);
-      const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 32 ? 2 : 1;
+      const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 22 ? 2 : 1;
       c.updateModel(dt, c.team === this.player.team || c === this.aimTarget, lod);
     }
     this.updateLasers();

@@ -23,12 +23,12 @@ export const PLAYER = {
   crouchHeight: 1.2,
   eye: 1.62,
   crouchEye: 1.05,
-  walk: 5.2,
-  sprint: 7.8,
-  tacSprint: 9.8,   // tactical sprint (double-tap sprint): faster, gun up, limited
-  tacTime: 4,       // seconds of tactical sprint on a full charge
+  walk: 4.5,
+  sprint: 6.6,
+  tacSprint: 8.1,   // tactical sprint (double-tap sprint): faster, gun up, limited
+  tacTime: 3,       // seconds of tactical sprint on a full charge
   tacRecharge: 3.5, // seconds to fully recharge (starts 1 s after you stop)
-  crouchSpeed: 2.7,
+  crouchSpeed: 2.4,
   adsSpeedMult: 0.6,
   jump: 7.0,
   gravity: 22,
@@ -41,7 +41,7 @@ export const PLAYER = {
   respawnDelay: 5,
   respawnMin: 1.5, // earliest you can press to respawn
   spawnProtect: 2.5,
-  slideSpeed: 10.5,
+  slideSpeed: 9.0,
   slideTime: 0.75,
 };
 
@@ -144,6 +144,7 @@ export const DEFAULT_SETTINGS = {
   friendlyFire: false,
   invertY: false,
   quality: coarse ? 'low' : 'high',
+  dynamicRes: true,
   padSensitivity: 1,
   padDeadzone: 0.12,
   aimAssist: true,

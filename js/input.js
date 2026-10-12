@@ -215,11 +215,13 @@ export class Input {
       // menu navigation with D-pad / left stick (with key-repeat)
       this.lbHeld = false;
       for (const i of edges) {
-        const m = { [PAD.UP]: 'up', [PAD.DOWN]: 'down', [PAD.LEFT]: 'left', [PAD.RIGHT]: 'right', [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab' }[i];
+        // directions come from the D-pad / stick below (with key-repeat); bumpers switch tabs
+        const m = { [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab' }[i];
         if (m) this.onNav(m);
       }
       const sx = ax(0), sy = ax(1);
-      const dir = Math.abs(sy) > 0.6 ? (sy < 0 ? 'up' : 'down') : Math.abs(sx) > 0.6 ? (sx < 0 ? 'left' : 'right') : null;
+      const dir = btn(PAD.UP) ? 'up' : btn(PAD.DOWN) ? 'down' : btn(PAD.LEFT) ? 'left' : btn(PAD.RIGHT) ? 'right'
+        : Math.abs(sy) > 0.6 ? (sy < 0 ? 'up' : 'down') : Math.abs(sx) > 0.6 ? (sx < 0 ? 'left' : 'right') : null;
       if (dir !== this.navDir) { this.navDir = dir; this.navRepeat = 0.38; if (dir) this.onNav(dir); }
       else if (dir) { this.navRepeat -= dt; if (this.navRepeat <= 0) { this.navRepeat = 0.12; this.onNav(dir); } }
     }

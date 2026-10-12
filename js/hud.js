@@ -107,7 +107,7 @@ export class HUD {
     const g = this.game, p = g.player;
     this.updateTags();
     this.frames++; this.fpsT += dt;
-    if (this.fpsT >= 0.5) { $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS`; this.frames = 0; this.fpsT = 0; }
+    if (this.fpsT >= 0.5) { { const r = g.renderer; const sc = r.dynamic !== false && r.drs && r.drs.scale < 0.99 ? ` · ${Math.round(r.drs.scale * 100)}% RES` : ''; $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS${sc}`; } this.frames = 0; this.fpsT = 0; }
     this.sty('fps', 'display', g.settings.showFps ? 'block' : 'none');
 
     const mine = p.team, theirs = 1 - mine;

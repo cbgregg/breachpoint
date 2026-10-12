@@ -126,8 +126,8 @@ export class Renderer {
     this.composer = new EffectComposer(r);
     this.worldPass = new RenderPass(scene, camera);
     this.aoPass = new GTAOPass(scene, camera, w, h);
-    this.aoPass.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 12 });
-    this.aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 12 });
+    this.aoPass.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 8 });
+    this.aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
     this.aoPass.blendIntensity = 0.9;
     this.vmPass = new RenderPass(vmScene, vmCamera);
     this.vmPass.clear = false;
@@ -192,9 +192,9 @@ export class Renderer {
     this.quality = q;
     // phones: never render below 1.25× CSS pixels, or distant players blur into the background
     const touch = window.matchMedia('(pointer: coarse)').matches;
-    const pr = Math.min(window.devicePixelRatio || 1, touch ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
-    this.renderer.setPixelRatio(pr);
-    this.composer.setPixelRatio(pr);
+    this.basePR = Math.min(window.devicePixelRatio || 1, touch ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
+    this.drs = { scale: 1, slow: 0, fast: 0, ema: 1 / 60, last: 0, ceil: 1, grace: 3 };
+    this.applyPR();
     this.renderer.shadowMap.enabled = q.shadows > 0;
     this.renderer.shadowMap.type = q.softShadows === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (q.shadows > 0 && this.sun.shadow.mapSize.x !== q.shadows) {
@@ -212,6 +212,33 @@ export class Renderer {
     this.setSize();
   }
 
+  // dynamic resolution: when frames run long the render resolution drops in steps (down to 55%), and
+  // climbs back when there's headroom. A level that keeps failing becomes the ceiling, so it doesn't
+  // bounce up and down.
+  applyPR() {
+    const pr = Math.max(0.5, this.basePR * (this.dynamic === false ? 1 : this.drs.scale));
+    this.renderer.setPixelRatio(pr);
+    this.composer.setPixelRatio(pr);
+  }
+  resetDRS() { const d = this.drs; d.grace = 3; d.slow = d.fast = 0; d.ema = 1 / 60; d.last = 0; }
+  updateDRS() {
+    const d = this.drs, now = performance.now();
+    const ft = d.last ? Math.min(0.2, (now - d.last) / 1000) : 1 / 60;
+    d.last = now;
+    if (this.dynamic === false || document.hidden) return;
+    if (d.grace > 0) { d.grace -= ft; return; }              // shader compiles right after a load don't count
+    d.ema += (ft - d.ema) * 0.08;
+    if (d.ema > 1 / 48) { d.slow += ft; d.fast = 0; } else if (d.ema < 1 / 58) { d.fast += ft; d.slow = 0; } else { d.slow = Math.max(0, d.slow - ft); d.fast = 0; }
+    if (d.slow > 1.2 && d.scale > 0.55) {
+      d.ceil = Math.min(d.ceil, d.scale);                       // this level was too heavy
+      d.scale = Math.max(0.55, +(d.scale - 0.1).toFixed(2));
+      d.slow = 0; d.ema = 1 / 55; this.applyPR(); this.setSize();
+    } else if (d.fast > 8 && d.scale < d.ceil - 0.05) {
+      d.scale = Math.min(d.ceil - 0.05, +(d.scale + 0.1).toFixed(2));
+      d.fast = 0; this.applyPR(); this.setSize();
+    } else if (d.fast > 30 && d.ceil < 1) { d.ceil = Math.min(1, d.ceil + 0.1); d.fast = 0; } // conditions improved: allow a step up again
+  }
+
   setSize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h);
@@ -221,6 +248,15 @@ export class Renderer {
   }
 
   render(dt, showViewmodel) {
+    this.updateDRS();
+    // the sun's shadow map is the single biggest pass: below Ultra it refreshes every other frame
+    const sm = this.renderer.shadowMap;
+    if (sm.enabled) {
+      const every = this.quality && this.quality.label === 'Ultra' ? 1 : 2;
+      sm.autoUpdate = false;
+      this.shadowTick = ((this.shadowTick || 0) + 1) % every;
+      if (this.shadowTick === 0) sm.needsUpdate = true;
+    }
     this.time += dt;
     this.grade.time.value = this.time;
     this.vmPass.enabled = showViewmodel;

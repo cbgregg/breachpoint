@@ -32,15 +32,34 @@ let playMode = 'offline';            // chosen on the Offline / Online screen
 const onlineName = () => playMode === 'online' && account.enabled && account.user && account.user.name;
 const myName = () => onlineName() || settings.name;
 
+const TIPS = [
+  'Press sprint again while sprinting for a short tactical sprint.',
+  'Hold the grenade button to cook a frag; release to throw it.',
+  'Crouch while sprinting to slide. It carries you faster than a sprint for a moment.',
+  'Headshots score bonus points and drop enemies faster.',
+  'Choose Class from the pause menu: changes apply on your next spawn.',
+  'Search & Destroy: hold reload on a bomb site to plant, or on the bomb to defuse.',
+  'Gunfight: both teams get the same guns each round. Take the flag if time runs out.',
+  'Stick sensitivity, deadzone and aim assist are in Options under Controller.',
+  'Dynamic resolution keeps the frame rate smooth. Turn it off in Options for a sharper image.',
+  'Health comes back on its own a few seconds after you stop taking damage.',
+  'Upstairs at Freshway Market overlooks the aisles. Bots won\'t follow you up there.',
+];
+
 // ---------- game bootstrap ----------
 let game;
 // let the loading screen paint before the (synchronous) world build
 {
   let op = 0, tx = 0;
-  const show = () => { $('load-text').textContent = `Loading operators ${Math.round(op * 100)}% · textures ${Math.round(tx * 100)}%`; };
+  document.getElementById('loading').classList.add('boot');
+  $('ld-tip').textContent = TIPS[(Math.random() * TIPS.length) | 0];
+  const show = () => {
+    $('load-text').textContent = `Loading soldiers ${Math.round(op * 100)}% · textures ${Math.round(tx * 100)}%`;
+    $('load-fill').style.width = `${Math.round(10 + (op + tx) * 40)}%`;
+  };
   await loadAssets((f) => { op = f; show(); }, (f) => { tx = f; show(); });
 }
-$('load-text').textContent = 'Building Tarsa Market…';
+$('load-text').textContent = 'Building the map…'; $('load-fill').style.width = '95%';
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
 try {
   game = new Game($('app'));
@@ -56,7 +75,7 @@ game.applySettings(settings);
 const bindings = [
   ['opt-name', 'name', 'text'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
-  ['opt-quality', 'quality', 'str'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
+  ['opt-quality', 'quality', 'str'], ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
@@ -206,11 +225,46 @@ function showScreen(id) {
   if (id && game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
 
+// ---------- loading screen (between the menu and a match) ----------
+function drawLoadingMap(id) {
+  const c = $('ld-mapc'), wrap = c.parentElement;
+  const have = id && game.world.id === id && game.minimap;
+  wrap.classList.toggle('on', !!have);
+  if (have) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(game.minimap.canvas, 0, 0, c.width, c.height); }
+}
+function launch(cfg, online = null) {
+  const gm = MODES[(online && online.start && online.start.cfg && online.start.cfg.mode) || cfg.mode] || MODES.tdm;
+  const mapId = (online && online.start && online.start.cfg && online.start.cfg.map) || cfg.map;
+  const map = MAPS[mapId];
+  const ld = $('loading');
+  ld.classList.remove('boot');
+  $('ld-mode').textContent = `${gm.name.toUpperCase()}${online ? ' · MULTIPLAYER' : ' · COMBAT TRAINING'}`;
+  $('ld-name').textContent = map ? map.name.toUpperCase() : 'RANDOM MAP';
+  $('ld-desc').textContent = map ? (map.blurb || '') : 'Picking a map…';
+  $('ld-tip').textContent = TIPS[(Math.random() * TIPS.length) | 0];
+  $('load-text').textContent = 'Building the map…';
+  const fill = $('load-fill');
+  fill.style.transition = 'none'; fill.style.width = '8%';
+  drawLoadingMap(map ? mapId : null);
+  showScreen('loading');
+  return new Promise((resolve, reject) => requestAnimationFrame(() => {
+    fill.style.transition = ''; fill.style.width = '62%';
+    setTimeout(() => {
+      try { game.startMatch(cfg, online); } catch (e) { showScreen('menu'); reject(e); return; }
+      const w = MAPS[game.world.id];
+      $('ld-name').textContent = (w ? w.name : game.world.name || '').toUpperCase();
+      if (w) $('ld-desc').textContent = w.blurb || '';
+      drawLoadingMap(game.world.id);
+      fill.style.width = '100%';
+      $('load-text').textContent = 'Ready';
+      setTimeout(() => { if (screen === 'loading') showScreen(null); resolve(); }, online && online.mode === 'guest' ? 120 : 650);
+    }, 90);
+  }));
+}
 function deploy() {
   for (const [id, key, type] of bindings) readField(id, key, type);
   saveSettings(settings);
-  showScreen(null);
-  game.startMatch(settings);
+  launch(settings);
 }
 $('play').addEventListener('click', deploy);
 $('opt-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { if (playMode === 'online') e.target.blur(); else deploy(); } });
@@ -252,11 +306,12 @@ function renderPauseMatch() {
 document.querySelectorAll('.psec').forEach(b => b.addEventListener('click', () => { setPauseSec(b.dataset.sec); game.audio.play('ui', null, { ui: true }); }));
 // destructive buttons need a second press
 function confirmBtn(el, fn) {
-  const label = el.textContent;
+  let label = el.textContent;
   let armed = 0, t = 0;
   const disarm = () => { armed = 0; el.classList.remove('armed'); el.textContent = label; };
   el.addEventListener('click', () => {
     if (armed) { clearTimeout(t); disarm(); fn(); return; }
+    label = el.textContent;
     armed = 1; el.classList.add('armed'); el.textContent = 'PRESS AGAIN TO CONFIRM';
     t = setTimeout(disarm, 3500);
   });
@@ -275,7 +330,7 @@ game.onPause = (paused) => {
   $('pause-conn').textContent = !lobby.active ? '' : lobby.net.relayed ? 'Connection: Cloudflare relay (your IP is hidden)' : `Connection: direct peer-to-peer${turnAvailable() && !turnStatus.ok ? ` (relay unavailable: ${turnStatus.detail})` : ''}`;
   clearInterval(pauseTimer);
   if (paused) {
-    $('quit').textContent = lobby.active ? 'LEAVE MATCH' : 'QUIT TO MENU';
+    $('quit').textContent = lobby.active ? 'LEAVE GAME' : 'END GAME';
     // dead, or only just spawned: open straight onto Change Loadout
     const p = game.player;
     setPauseSec(p && (!p.alive || game.inSpawnWindow(p)) ? 'loadout' : 'match');
@@ -286,7 +341,7 @@ game.onPause = (paused) => {
 $('resume').addEventListener('click', () => game.resume());
 $('death-respawn').addEventListener('click', () => game.requestRespawn());
 $('death-loadout').addEventListener('click', () => { if (game.state === 'playing') game.pause(); });
-confirmBtn($('restart'), () => { restorePanes(); showScreen(null); game.startMatch(settings); });
+confirmBtn($('restart'), () => { restorePanes(); launch(settings); });
 confirmBtn($('quit'), () => { clearInterval(pauseTimer); restorePanes(); leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
 // end of match
@@ -307,10 +362,7 @@ game.onEnd = (r) => {
     clearTimeout(nextMatchT);
     nextMatchT = setTimeout(() => {
       if (!lobby.public || lobby.role !== 'host' || game.state !== 'ended') return;
-      game.startMatch(publicSettings(), { mode: 'host', lobby });
-      lobby.broadcastLobby();
-      syncOnlineFlags();
-      showScreen(null);
+      launch(publicSettings(), { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
     }, 15000);
     game.hud.toast('NEXT PUBLIC MATCH IN 15 SECONDS');
   }
@@ -318,7 +370,7 @@ game.onEnd = (r) => {
 let nextMatchT = 0;
 $('again').addEventListener('click', () => {
   if (lobby.active) { openLobby(); return; }
-  showScreen(null); game.startMatch(settings);
+  launch(settings);
 });
 $('menu-btn').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
@@ -475,10 +527,10 @@ $('quick-btn').addEventListener('click', () => {
 $('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, '1'); } catch (_) { /* ignore */ } startQuick(); });
 const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH });
 lobby.onQuickHost = () => {
-  game.startMatch(publicSettings(), { mode: 'host', lobby });
-  syncOnlineFlags();
-  showScreen(null);
-  game.hud.toast('NO OPEN MATCHES — YOU\'RE HOSTING. PLAYERS WILL DROP IN');
+  launch(publicSettings(), { mode: 'host', lobby }).then(() => {
+    syncOnlineFlags();
+    game.hud.toast('NO OPEN MATCHES — YOU\'RE HOSTING. PLAYERS WILL DROP IN');
+  });
 };
 
 $('join-btn').addEventListener('click', () => {
@@ -524,11 +576,8 @@ lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(i
 const setMapHint = () => { lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : ''); };
 $('lobby-start').addEventListener('click', () => {
   readAll();
-  showScreen(null);
   clearTimeout(nextMatchT);
-  game.startMatch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby });
-  lobby.broadcastLobby();
-  syncOnlineFlags();
+  launch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
 });
 $('lobby-back').addEventListener('click', () => showScreen('pause'));
 $('lobby-leave').addEventListener('click', () => {
@@ -543,14 +592,10 @@ $('pause-lobby').addEventListener('click', () => openLobby());
 confirmBtn($('pause-end'), () => game.endMatch());
 
 lobby.onStart = (m) => {
-  try {
-    game.startMatch(settings, { mode: 'guest', lobby, start: m });
-    syncOnlineFlags();
-    showScreen(null);
-  } catch (err) {
+  launch(settings, { mode: 'guest', lobby, start: m }).then(() => syncOnlineFlags(), (err) => {
     console.error(err);
     lobby.close('The host sent a match this version can\'t load.');
-  }
+  });
 };
 lobby.onClosed = (reason, wasPublic) => {
   if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
@@ -606,7 +651,8 @@ function focusFirst() {
   const items = navItems();
   const pref = screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
     : screen === 'signin' ? document.querySelector('#signin .si-step.on input')
-    : screen === 'menu' ? $(playMode === 'online' ? 'quick-btn' : 'play') : screen === 'pause' ? (pauseSec === 'loadout' ? document.querySelector('.psec[data-sec="loadout"]') : $('resume'))
+    : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
+    : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
     : $('again');
   focusEl(items.includes(pref) && pref.offsetParent ? pref : items[0]);
@@ -620,35 +666,61 @@ function stepRange(el, d) {
   if (d > 0) el.stepUp(); else el.stepDown();
   el.dispatchEvent(new Event('input'));
 }
+// spatial navigation: the nearest item in the pressed direction (BO2 style lists and grids)
+function spatial(el, items, dir, strict = true) {
+  if (!el) return null;
+  const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const it of items) {
+    if (it === el) continue;
+    const q = it.getBoundingClientRect();
+    if (!q.width && !q.height) continue;
+    const qx = q.left + q.width / 2, qy = q.top + q.height / 2;
+    let along, across;
+    if (dir === 'up') { along = r.top - q.bottom + 1; across = Math.max(0, Math.max(q.left - r.right, r.left - q.right)); if (q.bottom > r.top + r.height * 0.5 || qy >= cy - 2) continue; }
+    else if (dir === 'down') { along = q.top - r.bottom + 1; across = Math.max(0, Math.max(q.left - r.right, r.left - q.right)); if (q.top < r.bottom - r.height * 0.5 || qy <= cy + 2) continue; }
+    else if (dir === 'left') { along = r.left - q.right + 1; across = Math.max(0, Math.max(q.top - r.bottom, r.top - q.bottom)); if (q.right > r.left + Math.min(r.width * 0.5, 40) || qx >= cx - 2) continue; }
+    else { along = q.left - r.right + 1; across = Math.max(0, Math.max(q.top - r.bottom, r.top - q.bottom)); if (q.left < r.right - Math.min(r.width * 0.5, 40) || qx <= cx + 2) continue; }
+    if (strict && (dir === 'left' || dir === 'right') && across > 0) continue;   // same row first
+    const score = Math.max(0, along) + across * 3 + (dir === 'up' || dir === 'down' ? Math.abs(qx - cx) * 0.05 : Math.abs(qy - cy) * 0.3);
+    if (score < bestScore) { bestScore = score; best = it; }
+  }
+  if (!best && strict && (dir === 'left' || dir === 'right') && r.width < window.innerWidth * 0.3) return spatial(el, items, dir, false);
+  return best;
+}
+const PAUSE_SECS = ['match', 'loadout', 'options'];
 game.input.onNav = (dir) => {
   if (!screen) return;
   if (screen === 'title') { if (dir === 'accept' || dir === 'start') titleGo(); return; }
+  if (screen === 'loading') return;
   const items = navItems();
-  const el = document.activeElement && items.includes(document.activeElement) ? document.activeElement : null;
-  const move = (d) => {
-    const i = el ? items.indexOf(el) : -1;
-    focusEl(items[Math.max(0, Math.min(items.length - 1, i + d))]);
-    game.audio.play('ui', null, { ui: true, freq: 2600 });
+  const el = document.activeElement && items.includes(document.activeElement) ? document.activeElement : (document.querySelector('.pad-focus') && items.includes(document.querySelector('.pad-focus')) ? document.querySelector('.pad-focus') : null);
+  const tick = () => game.audio.play('ui', null, { ui: true, freq: 2600 });
+  const go = (d) => {
+    if (!el) { focusFirst(); return; }
+    let to = spatial(el, items, d);
+    if (!to && (d === 'up' || d === 'down')) { const i = items.indexOf(el); to = items[i + (d === 'down' ? 1 : -1)] || null; }
+    if (to) { focusEl(to); tick(); }
   };
   switch (dir) {
-    case 'up': move(-1); break;
-    case 'down': move(1); break;
+    case 'up': case 'down': go(dir); break;
     case 'left': case 'right': {
       const d = dir === 'left' ? -1 : 1;
-      if (el && el.tagName === 'SELECT') cycleSelect(el, d);
-      else if (el && el.type === 'range') stepRange(el, d);
-      else if (el && el.type === 'checkbox') { el.checked = d > 0; el.dispatchEvent(new Event('change')); }
-      else if (el && el.classList.contains('wcard')) move(d);
-      else if (screen === 'menu') game.input.onNav(d > 0 ? 'nextTab' : 'prevTab');
-      else move(d);
+      // value controls change with left/right; everything else moves to its neighbour. Tabs are LB / RB only.
+      if (el && el.tagName === 'SELECT') { cycleSelect(el, d); tick(); }
+      else if (el && el.type === 'range') { stepRange(el, d); tick(); }
+      else if (el && el.type === 'checkbox') { if (el.checked !== d > 0) { el.checked = d > 0; el.dispatchEvent(new Event('change')); tick(); } }
+      else go(dir);
       break;
     }
     case 'accept':
       if (!el) { focusFirst(); break; }
       if (el.type === 'checkbox') { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
       else if (el.tagName === 'SELECT') cycleSelect(el, el.selectedIndex === el.options.length - 1 ? -el.selectedIndex : 1);
+      else if (el.tagName === 'INPUT' && el.type !== 'range') { el.focus(); break; }
       else if (el.tagName === 'INPUT') break;
       else el.click();
+      game.audio.play('ui', null, { ui: true });
       break;
     case 'back':
       if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
@@ -657,6 +729,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'menu') openMode();
       else if (screen === 'mode') { showScreen('title'); }
       else if (screen === 'signin') $('si-back').click();
+      else if (screen === 'end') $('menu-btn').click();
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
         else if (lobby.role !== 'guest' && joinCode.length) keypad('del');
@@ -670,13 +743,20 @@ game.input.onNav = (dir) => {
       else if (screen === 'lobby' && lobby.role === 'host' && $('lobby-start').offsetParent) $('lobby-start').click();
       else if (screen === 'lobby' && !lobby.role) tryJoin();
       break;
-    case 'prevTab': case 'nextTab':
+    case 'prevTab': case 'nextTab': {
+      const step = dir === 'nextTab' ? 1 : -1;
       if (screen === 'menu') {
         const i = TABS.indexOf(tab);
-        setTab(TABS[(i + (dir === 'nextTab' ? 1 : TABS.length - 1)) % TABS.length]);
+        setTab(TABS[(i + step + TABS.length) % TABS.length]);
+        focusFirst();
+      } else if (screen === 'pause') {
+        const i = PAUSE_SECS.indexOf(pauseSec);
+        setPauseSec(PAUSE_SECS[(i + step + PAUSE_SECS.length) % PAUSE_SECS.length]);
+        game.audio.play('ui', null, { ui: true });
         focusFirst();
       }
       break;
+    }
     default: break;
   }
 };
@@ -684,9 +764,12 @@ window.addEventListener('keydown', (e) => {
   if (!screen || game.input.enabled) return;
   const typing = document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
   if (e.key === 'Escape') { e.preventDefault(); game.input.onNav('back'); }
-  else if (!typing && screen === 'menu' && (e.key === 'q' || e.key === 'Q')) game.input.onNav('prevTab');
-  else if (!typing && screen === 'menu' && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
+  else if (!typing && screen !== 'title' && ARROWS[e.key]) { e.preventDefault(); if (!document.querySelector('.pad-focus') && document.activeElement && document.activeElement.matches('[data-nav]')) focusEl(document.activeElement); game.input.onNav(ARROWS[e.key]); }
+  else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'q' || e.key === 'Q')) game.input.onNav('prevTab');
+  else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
 });
+
+const ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
 // ---------- title screen ----------
 function titleGo() {
@@ -712,9 +795,10 @@ function setPlayMode(m) {
   playMode = m;
   document.body.classList.toggle('mode-online', m === 'online');
   document.body.classList.toggle('mode-offline', m !== 'online');
-  $('mode-chip').innerHTML = m === 'online'
-    ? `<i></i>ONLINE${onlineName() ? ` <small>${esc(onlineName().toUpperCase())}</small>` : ''}`
-    : '<i></i>OFFLINE <small>VS BOTS</small>';
+  const nm = myName() || 'Operator';
+  $('mode-chip').innerHTML = `<span class="pc-emb">${esc(nm.slice(0, 1).toUpperCase())}</span><span class="pc-txt"><b>${esc(nm.toUpperCase())}</b><small><i></i>${m === 'online' ? 'ONLINE · MULTIPLAYER' : 'OFFLINE · COMBAT TRAINING'}</small></span>`;
+  $('menu-title').textContent = m === 'online' ? 'MULTIPLAYER' : 'COMBAT TRAINING';
+  $('menu-subtitle').textContent = m === 'online' ? (onlineName() ? `ONLINE · SIGNED IN AS ${onlineName().toUpperCase()}` : 'ONLINE · PEER-TO-PEER') : 'OFFLINE · VERSUS BOTS';
   const mn = (MODES[settings.mode] || MODES.tdm).name.toUpperCase();
   $('play-title').textContent = m === 'online' ? `ONLINE · ${mn}` : mn;
   $('opt-name').value = myName();
@@ -857,10 +941,12 @@ for (const [inp, fn] of [['si-email-in', siSend], ['si-code-in', siVerify], ['si
 // ---------- device-aware hints ----------
 function renderHints(device) {
   const hint = (act, text) => (device === 'touch' ? '' : `<span>${glyph(act, device)} ${text}</span>`);
+  const kb = (keys, text) => `<span>${keys.map(k => `<kbd>${k}</kbd>`).join('')} ${text}</span>`;
+  const bumpers = (text) => `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} ${text}</span>`;
   $('menu-hints').innerHTML = device === 'pad'
-    ? [hint('accept', 'Select'), hint('back', 'Back'), `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} Tabs</span>`, hint('pause', playMode === 'online' ? 'Quick match' : 'Deploy')].join('')
-    : device === 'touch' ? '' : [playMode === 'online' ? '' : hint('accept', 'Deploy'), `<span><kbd>Q</kbd><kbd>E</kbd> Tabs</span>`, hint('back', 'Back')].join('');
-  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Resume')].join('') : device === 'touch' ? '' : hint('back', 'Resume');
+    ? [hint('accept', 'Select'), hint('back', 'Back'), bumpers('Tabs'), hint('pause', playMode === 'online' ? 'Quick match' : 'Start match')].join('')
+    : device === 'touch' ? '' : [kb(['↑', '↓'], 'Navigate'), kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Tabs'), kb(['Esc'], 'Back')].join('');
+  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Resume'), bumpers('Sections')].join('') : device === 'touch' ? '' : [kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Sections'), kb(['Esc'], 'Resume')].join('');
   $('lobby-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : '<span><kbd>0</kbd>–<kbd>9</kbd> Code</span><span><kbd>Enter</kbd> Join</span>' + hint('back', 'Back');
   $('title-press').innerHTML = device === 'pad' ? `PRESS ${glyph('accept', 'pad')} TO START` : device === 'touch' ? 'TAP TO START' : 'PRESS <kbd>ENTER</kbd> TO START';
   $('mode-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : hint('back', 'Back');

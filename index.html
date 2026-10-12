@@ -23,6 +23,7 @@
 </head>
 <body data-device="kbm">
   <div id="app"></div>
+  <div id="bo-fx" aria-hidden="true"></div>
 
   <!-- ============ HUD ============ -->
   <div id="hud">
@@ -73,11 +74,11 @@
       <div id="death-timer"></div>
       <div id="death-actions">
         <button id="death-respawn" class="dbtn">RESPAWN <span class="glyph" data-act="reload"></span></button>
-        <button id="death-loadout" class="dbtn">CHANGE LOADOUT <span class="glyph" data-act="pause"></span></button>
+        <button id="death-loadout" class="dbtn">CHOOSE CLASS <span class="glyph" data-act="pause"></span></button>
       </div>
     </div>
     <div id="cook"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" class="trk"/><circle id="cook-arc" cx="20" cy="20" r="17" class="arc"/></svg><b id="cook-t"></b></div>
-    <div id="spawn-hint">CHANGE LOADOUT <span class="glyph" data-act="pause"></span></div>
+    <div id="spawn-hint">CHOOSE CLASS <span class="glyph" data-act="pause"></span></div>
     <div id="scoreboard"></div>
     <div id="toast"></div>
   </div>
@@ -103,7 +104,7 @@
   <div id="title" class="screen">
     <div class="title-wrap">
       <div class="title-logo"><span class="mark"></span>BREACHPOINT</div>
-      <div class="title-sub">DEATHMATCH · GUNFIGHT · SEARCH &amp; DESTROY</div>
+      <div class="title-sub">TEAM DEATHMATCH · GUNFIGHT · SEARCH &amp; DESTROY</div>
       <div class="title-press" id="title-press">PRESS ENTER TO START</div>
     </div>
     <div class="title-foot"><span id="title-acct"></span></div>
@@ -112,18 +113,19 @@
   <!-- ============ Offline / online ============ -->
   <div id="mode" class="screen">
     <div class="mw mode-wrap">
-      <header class="mw-head"><div class="logo"><span class="mark"></span>BREACHPOINT</div></header>
+      <header class="mw-head"><div class="bo-title"><b>BREACHPOINT</b><small>SELECT GAME TYPE</small></div></header>
       <div class="mode-cards">
         <button class="mode-card" id="mode-offline" data-nav>
-          <span class="mc-k">OFFLINE</span><span class="mc-t">VERSUS BOTS</span>
+          <span class="mc-k">OFFLINE · VERSUS BOTS</span><span class="mc-t">COMBAT TRAINING</span>
           <span class="mc-d">Play against AI squads on your own. No account, no internet needed once loaded.</span>
         </button>
         <button class="mode-card" id="mode-online" data-nav>
-          <span class="mc-k">ONLINE</span><span class="mc-t">MULTIPLAYER</span>
+          <span class="mc-k">ONLINE · PLAYERS</span><span class="mc-t">MULTIPLAYER</span>
           <span class="mc-d" id="mode-online-d">Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.</span>
         </button>
       </div>
       <div class="mode-acct" id="mode-acct"></div>
+      <div class="cf-badge mode-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
       <footer class="mw-foot" id="mode-hints"></footer>
     </div>
   </div>
@@ -131,7 +133,7 @@
   <!-- ============ Sign in (email link or code, no passwords) ============ -->
   <div id="signin" class="screen">
     <div class="mw narrow signin">
-      <header class="mw-head"><div class="logo"><span class="mark"></span><span id="si-title">SIGN IN</span></div></header>
+      <header class="mw-head"><div class="bo-title"><b id="si-title">SIGN IN</b><small>MULTIPLAYER ACCOUNT · NO PASSWORD</small></div></header>
       <div class="si-step" id="si-email">
         <p class="si-lead">Enter your email. We'll send a sign-in link and a 6-digit code. There's no password to remember or leak.</p>
         <input id="si-email-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
@@ -150,6 +152,7 @@
       </div>
       <div class="join-status" id="si-status"></div>
       <p class="pane-note si-fine">Your email is only used to sign you in. It's never shown to other players.</p>
+      <div class="cf-badge" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
       <button id="si-back" class="menu-btn" data-nav>BACK</button>
     </div>
   </div>
@@ -158,15 +161,15 @@
   <div id="menu" class="screen">
     <div class="mw">
       <header class="mw-head">
-        <div class="logo"><span class="mark"></span>BREACHPOINT</div>
+        <div class="bo-title"><b id="menu-title">COMBAT TRAINING</b><small id="menu-subtitle">OFFLINE · VERSUS BOTS</small></div>
         <nav class="tabs" role="tablist">
           <span class="glyph bumper" data-act="prevTab"></span>
           <button class="tab on" data-tab="play" data-nav>PLAY</button>
-          <button class="tab" data-tab="loadout" data-nav>LOADOUT</button>
+          <button class="tab" data-tab="loadout" data-nav>CREATE A CLASS</button>
           <button class="tab" data-tab="options" data-nav>OPTIONS</button>
           <span class="glyph bumper" data-act="nextTab"></span>
         </nav>
-        <button id="mode-chip" class="mode-chip" data-nav title="Switch between offline and online"></button>
+        <button id="mode-chip" class="pcard" data-nav title="Change game type (offline / online)"></button>
       </header>
 
       <div class="mw-body">
@@ -194,17 +197,18 @@
               <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
-          <button id="play" class="cta" data-nav><span>DEPLOY VS BOTS</span><span class="glyph" data-act="accept"></span></button>
+          <button id="play" class="cta" data-nav><span>START MATCH</span><span class="glyph" data-act="pause"></span></button>
           <div class="online-row">
             <button id="quick-btn" class="menu-btn quick" data-nav>QUICK MATCH <small>PUBLIC · DROP IN</small></button>
-            <button id="host-btn" class="menu-btn" data-nav>HOST ONLINE MATCH</button>
-            <button id="join-btn" class="menu-btn" data-nav>JOIN WITH CODE</button>
+            <button id="host-btn" class="menu-btn" data-nav>PRIVATE MATCH <small>HOST · 6-DIGIT CODE</small></button>
+            <button id="join-btn" class="menu-btn" data-nav>JOIN PRIVATE MATCH <small>ENTER CODE</small></button>
           </div>
           <p class="pane-note">Online play is peer-to-peer: the host's browser runs the match. Quick match puts you in a public game; host/join use a private 6-digit code. Bots fill empty slots.</p>
+          <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
         </section>
 
         <section class="pane" id="pane-loadout">
-          <h2 class="pane-title">LOADOUT</h2>
+          <h2 class="pane-title">CREATE A CLASS</h2>
           <p class="notice in-match-only">Changes apply the next time you spawn.</p>
           <div class="lo-grid">
             <div class="lo-left">
@@ -232,6 +236,7 @@
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
             <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
+            <div class="row"><label for="opt-dynres">Dynamic resolution<small>Lowers render resolution when the frame rate drops</small></label><input type="checkbox" id="opt-dynres" data-nav></div>
             <div class="row"><label for="opt-fps">FPS counter</label><input type="checkbox" id="opt-fps" data-nav></div>
             <div class="group">AIMING</div>
             <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
@@ -301,19 +306,19 @@
   <div id="pause" class="screen">
     <div class="mw pause-wrap">
       <header class="mw-head">
-        <div class="logo"><span class="mark"></span>PAUSED</div>
-        <div class="pause-meta" id="pause-meta"></div>
+        <div class="bo-title"><b>PAUSED</b><small id="pause-meta"></small></div>
+        <nav class="tabs ptabs"><span class="glyph bumper" data-act="prevTab"></span><span class="glyph bumper" data-act="nextTab"></span></nav>
       </header>
       <div class="pause-body">
         <nav class="pause-nav">
-          <button id="resume" class="cta" data-nav><span>RESUME</span><span class="glyph" data-act="pause"></span></button>
-          <button class="menu-btn psec" data-sec="loadout" data-nav>CHANGE LOADOUT</button>
-          <button class="menu-btn psec on" data-sec="match" data-nav>MATCH</button>
+          <button id="resume" class="cta" data-nav><span>RESUME GAME</span><span class="glyph" data-act="pause"></span></button>
+          <button class="menu-btn psec on" data-sec="match" data-nav>SCOREBOARD</button>
+          <button class="menu-btn psec" data-sec="loadout" data-nav>CHOOSE CLASS</button>
           <button class="menu-btn psec" data-sec="options" data-nav>OPTIONS</button>
           <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
           <button id="pause-end" class="menu-btn online-only host-only danger" data-nav>END MATCH FOR EVERYONE</button>
-          <button id="restart" class="menu-btn" data-nav>RESTART MATCH</button>
-          <button id="quit" class="menu-btn danger" data-nav>QUIT TO MENU</button>
+          <button id="restart" class="menu-btn" data-nav>RESTART GAME</button>
+          <button id="quit" class="menu-btn danger" data-nav>END GAME</button>
           <p class="pane-note online-only">The match keeps running while this menu is open.</p>
           <p class="pane-note online-only" id="pause-conn"></p>
         </nav>
@@ -338,7 +343,7 @@
   <!-- ============ Online lobby ============ -->
   <div id="lobby" class="screen">
     <div class="mw narrow lobby">
-      <header class="mw-head"><div class="logo"><span class="mark"></span><span id="lobby-title">ONLINE MATCH</span></div></header>
+      <header class="mw-head"><div class="bo-title"><b id="lobby-title">ONLINE MATCH</b><small>MULTIPLAYER</small></div></header>
 
       <!-- host view -->
       <div id="lobby-host" class="lobby-view">
@@ -388,6 +393,7 @@
       </div>
 
       <div class="conn-note" id="conn-note"></div>
+      <div class="cf-badge" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
       <button id="lobby-leave" class="menu-btn" data-nav>LEAVE</button>
       <footer class="mw-foot" id="lobby-hints"></footer>
     </div>
@@ -408,7 +414,20 @@
   </div>
 
   <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
-  <div id="loading" class="screen on"><div class="load-logo">BREACHPOINT</div><div class="load-bar"><i></i></div><p id="load-text">Building Tarsa Market…</p></div>
+  <div id="loading" class="screen on">
+    <div class="ld-top"><div class="load-logo">BREACHPOINT</div></div>
+    <div class="ld-map"><canvas id="ld-mapc" width="336" height="240"></canvas></div>
+    <div class="ld-info">
+      <div class="ld-mode" id="ld-mode">LOADING</div>
+      <div class="ld-name" id="ld-name">BREACHPOINT</div>
+      <div class="ld-desc" id="ld-desc"></div>
+    </div>
+    <div class="ld-foot">
+      <p class="ld-tip"><b>TIP</b> <span id="ld-tip"></span></p>
+      <div class="load-bar"><i id="load-fill"></i></div>
+      <p id="load-text">Loading…</p>
+    </div>
+  </div>
   <noscript><p style="color:#fff;padding:2rem">Breachpoint requires JavaScript and WebGL.</p></noscript>
 
   <script type="module" src="js/main.js"></script>
