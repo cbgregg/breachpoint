@@ -45,8 +45,8 @@ export class Game {
     this.vmCamera = new THREE.PerspectiveCamera(window.matchMedia('(pointer: coarse)').matches ? 72 : 66, window.innerWidth / window.innerHeight, 0.01, 10);
     this.renderer = new Renderer(container, this.scene, this.camera, this.vmScene, this.vmCamera);
     this.vmScene.environment = this.scene.environment;
-    this.vmScene.add(new THREE.HemisphereLight(0xc8d4e4, 0x4a4034, 0.6));
-    this.vmSun = new THREE.DirectionalLight(0xffe2bd, 2.6);
+    this.vmScene.add(new THREE.HemisphereLight(0xa8a4cc, 0x4a3022, 0.6));
+    this.vmSun = new THREE.DirectionalLight(0xffa868, 2.6);
     this.vmScene.add(this.vmSun);
 
     this.physics = new Physics();

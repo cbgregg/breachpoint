@@ -22,8 +22,8 @@ const GradeShader = {
     flash: { value: 0 },
     saturation: { value: 1.0 },
     contrast: { value: 1.06 },
-    lift: { value: new THREE.Vector3(0.012, 0.016, 0.02) },
-    gain: { value: new THREE.Vector3(1.04, 1.0, 0.93) },
+    lift: { value: new THREE.Vector3(0.022, 0.012, 0.03) },  // dusky violet in the shadows
+    gain: { value: new THREE.Vector3(1.09, 0.98, 0.84) },    // golden highlights
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -58,7 +58,8 @@ const GradeShader = {
     }`,
 };
 
-export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 24), THREE.MathUtils.degToRad(215));
+// evening: a low sun (9° up) for long shadows and warm light
+export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 9), THREE.MathUtils.degToRad(215));
 
 // Height fog: distance haze plus a dense layer that hugs the ground and thins with altitude,
 // glowing warm when looking towards the sun. Patched into three's fog chunks so every lit
@@ -101,7 +102,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
     float fogFactor = clamp(fHaze + fGround * (1.0 - fHaze), 0.0, 0.92);
     float fSun = pow(max(dot(fDir, vec3(${fv(_sd.x)}, ${fv(_sd.y)}, ${fv(_sd.z)})), 0.0), 5.0);
-    vec3 fCol = mix(fogColor, fogColor * vec3(1.35, 1.12, 0.82), fSun);
+    vec3 fCol = mix(fogColor, fogColor * vec3(1.55, 1.05, 0.62), fSun);
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fCol, fogFactor);
   }
 #endif`;
@@ -112,7 +113,7 @@ export class Renderer {
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
     r.setSize(window.innerWidth, window.innerHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 0.7;
+    r.toneMappingExposure = 0.78;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -145,10 +146,10 @@ export class Renderer {
     const sky = new Sky();
     sky.scale.setScalar(450);
     const u = sky.material.uniforms;
-    u.turbidity.value = 7.5;
-    u.rayleigh.value = 1.1;
-    u.mieCoefficient.value = 0.0065;
-    u.mieDirectionalG.value = 0.86;
+    u.turbidity.value = 10;
+    u.rayleigh.value = 2.4;
+    u.mieCoefficient.value = 0.009;
+    u.mieDirectionalG.value = 0.9;
     u.sunPosition.value.copy(SUN_DIR);
     scene.add(sky);
     this.sky = sky;
@@ -161,7 +162,7 @@ export class Renderer {
     Object.keys(u).forEach(k => { envSky.material.uniforms[k].value = u[k].value; });
     envScene.add(envSky);
     // warm ground bounce in the environment
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: 0x6b5d48 }));
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: 0x5e4030 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -2;
     envScene.add(ground);
@@ -169,20 +170,20 @@ export class Renderer {
     scene.environmentIntensity = 1;
     pmrem.dispose();
 
-    scene.fog = new THREE.FogExp2(0xc2b49c, 0.0062);
+    scene.fog = new THREE.FogExp2(0xc99a74, 0.0062);
 
-    const sun = new THREE.DirectionalLight(0xffe2bd, 3.4);
+    const sun = new THREE.DirectionalLight(0xffa25a, 3.6);
     sun.position.copy(SUN_DIR).multiplyScalar(80);
     sun.castShadow = true;
     const sc = sun.shadow.camera;
     sc.left = -52; sc.right = 52; sc.top = 52; sc.bottom = -52; sc.near = 10; sc.far = 200;
     sun.shadow.bias = -0.00015;
-    sun.shadow.normalBias = 0.025;
+    sun.shadow.normalBias = 0.04; // grazing evening light needs a little more bias
     scene.add(sun);
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0xbcd0e8, 0x5b4c3a, 0.2));
+    scene.add(new THREE.HemisphereLight(0x8f98c8, 0x5a3626, 0.32)); // cool dusk sky above, warm bounce below
     scene.environmentIntensity = 0.85;
   }
 
