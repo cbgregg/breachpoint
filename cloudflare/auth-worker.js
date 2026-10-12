@@ -16,7 +16,8 @@
 //   Secrets:    RESEND_API_KEY   API key from resend.com (domain breach-point.net verified there)
 //   Variables:  MAIL_FROM        e.g.  Breachpoint <login@breach-point.net>
 //               APP_URL          e.g.  https://breach-point.net   (where sign-in links point)
-//               ALLOWED_ORIGINS  optional, comma-separated; default breach-point.net + cbgregg.github.io
+//               ALLOWED_ORIGINS  optional, comma-separated list of sites allowed to call this Worker;
+//                                default breach-point.net, www.breach-point.net
 // The ticket signing key is generated on first use and kept in KV.
 
 const LOGIN_TTL = 15 * 60;              // sign-in links and codes
@@ -30,9 +31,8 @@ const enc = new TextEncoder();
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
-    const allowed = (env.ALLOWED_ORIGINS || 'https://breach-point.net,https://www.breach-point.net,https://cbgregg.github.io').split(',').map(s => s.trim()).filter(Boolean);
-    const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-    const okOrigin = allowed.includes(origin) || local;
+    const allowed = (env.ALLOWED_ORIGINS || 'https://breach-point.net,https://www.breach-point.net').split(',').map(s => s.trim()).filter(Boolean);
+    const okOrigin = allowed.includes(origin);
     const cors = {
       'Access-Control-Allow-Origin': okOrigin ? origin : allowed[0] || '',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -48,7 +48,7 @@ export default {
       if (request.method !== 'POST') return json({ error: 'not found' }, 404, cors);
       if (!okOrigin) return json({ error: 'origin not allowed' }, 403, cors);
       const body = await request.json().catch(() => ({}));
-      const ctx = { env, body, request, cors, local };
+      const ctx = { env, body, request, cors };
       switch (path) {
         case '/start': return await start(ctx);
         case '/verify': return await verify(ctx);
@@ -66,7 +66,7 @@ export default {
 };
 
 // ---------- sign-in ----------
-async function start({ env, body, request, cors, local }) {
+async function start({ env, body, request, cors }) {
   const email = normEmail(body.email);
   if (!email) return json({ error: 'That doesn\'t look like an email address.' }, 400, cors);
   const ip = request.headers.get('CF-Connecting-IP') || 'local';
@@ -82,8 +82,6 @@ async function start({ env, body, request, cors, local }) {
   const app = (env.APP_URL || 'https://breach-point.net').replace(/\/+$/, '');
   // the token goes in the URL fragment, which browsers never send to any server
   const link = `${app}/#login=${token}`;
-  // local testing only: with DEV_ECHO=1 and a localhost page, return the link instead of emailing it
-  if (env.DEV_ECHO === '1' && local) return json({ ok: true, rid, dev: { link, code, token } }, 200, cors);
   const sent = await sendMail(env, email, link, code);
   if (!sent.ok) return json({ error: sent.error }, 502, cors);
   return json({ ok: true, rid }, 200, cors);

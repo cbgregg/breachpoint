@@ -62,10 +62,10 @@ The game opens on a title screen (**press Enter / A / tap to start**), then **Of
 There are no passwords. You enter your email and get a message with a **sign-in link** and a **6-digit code**: open the link on the same device, or type the code (handy on a console or TV while the email is on your phone). Then you pick a **callsign**, which is unique to your account. Sessions last 60 days on that device. *Options → Account* has Sign out and Delete account.
 
 Why it's safe:
-- Links and codes expire after 15 minutes and work once; a code allows 5 guesses. Only SHA-256 hashes of links, codes and sessions are stored, so a leaked database can't sign anyone in.
+- Links and codes expire quickly and work once, and wrong codes are limited. Only hashes of links, codes and sessions are stored, so a leaked database can't sign anyone in.
 - The link token sits in the URL fragment (`#login=…`), which browsers never send to a server, and the game wipes it from the address bar immediately. The page sends no referrer.
-- Sign-in emails are rate-limited per address and per network, and the Worker gives the same answer whether or not an email has an account.
-- In online matches each player carries a **signed match pass** (ECDSA P-256) naming their account and that match code, valid 3 hours. The host checks the signature before letting anyone in, so nobody can join without an account or under someone else's callsign, a pass for one match is useless in another, and a kicked or declined account can't rejoin from a new tab.
+- Sign-in emails are rate-limited, and the server gives the same answer whether or not an email has an account.
+- In online matches each player carries a **signed match pass** for that match only. The host checks it before letting anyone in, so nobody can join without an account or under someone else's callsign, and a kicked or declined account can't rejoin from a new tab.
 - Other players never see your email.
 
 The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers KV, email sent through Resend). With `AUTH_ENDPOINT` empty in `js/config.js`, accounts are off and Online works without signing in.
@@ -82,7 +82,7 @@ Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a d
 
 ### Matches
 
-**Quick match** puts you in a public game with no code: the game checks for open public lobbies for a few seconds and drops you into the fullest one, mid-match if one is running, taking a bot's slot. If none are open, you host one and others drop in. Public matches use fixed rules (6v6 with bots, 75 kills, 10 minutes, no friendly fire), start the next match automatically, and if the host leaves everyone is moved to another match. Finding a match only reads small public notices on Nostr relays, so nothing connects to you until you join one. The first time, the game explains that other players in a public match can see your IP address.
+**Quick match** puts you in a public game with no code: the game checks for open public lobbies for a few seconds and drops you into the fullest one, mid-match if one is running, taking a bot's slot. If none are open, you host one and others drop in. Public matches use fixed rules (6v6 with bots, 75 kills, 10 minutes, no friendly fire), start the next match automatically, and if the host leaves everyone is moved to another match. Finding a match only reads small public notices on Nostr relays, so nothing connects to you until you join one. Public matches go through a Cloudflare relay, so other players can't see your IP address.
 
 **Private matches** use a code:
 
@@ -93,25 +93,16 @@ Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a d
 
 The match keeps running while the pause menu is open in online play. The host should keep their tab in the foreground: browsers slow down background tabs.
 
-### How it's secured
+### Security and privacy
 
-There is no game server. The host's browser runs the match and everyone else connects to it directly.
+There is no game server: the host's browser runs the match and checks everything guests send, so a modified client can't move faster, heal, refill ammo or report its own hits, and players are only sent what they could plausibly see. Signaling is encrypted with a key derived from the match code and game traffic is encrypted WebRTC. Callsigns are filtered, hosts can approve, kick and ban players, and with accounts on, every guest's identity is checked with a signed pass.
 
-- **Host-authoritative:** guests only ever send inputs (stick axes, view angles, buttons). The host checks every field, rejects anything malformed, and simulates the movement, shots, damage and scoring itself. A modified client can't teleport, fly, give itself ammo or health, or report hits.
-- **Speed-hack guard:** a guest's inputs are spent against a real-time budget, so sending inputs faster than real time doesn't make them move faster.
-- **Lag compensation:** the host rewinds other players to where the shooter actually saw them (up to 0.5 s), so hits register fairly on normal connections.
-- **Anti-wallhack:** each guest is only sent enemies they could plausibly see (line-of-sight checked from their eye to the enemy's head, chest and legs, plus anyone very close). Enemies behind walls aren't in the data, so there's nothing to reveal.
-- **Join control:** optional per-player approval (private matches), kick and ban. Offensive callsigns (including letter swaps like `4`→`a`) are replaced with `Operator-123` on every screen. Guests ignore game messages from anyone except the host, and every peer is rate-limited.
-- **Encrypted transport:** the code is used to find the host through public Nostr relays. That signaling is encrypted with a key derived from the code, and game traffic is WebRTC (DTLS), end to end between players.
+- **IP addresses:** quick matches go through a Cloudflare relay, so other players can't see your IP. Private matches connect directly unless *Options → Hide my IP in private matches* is on.
+- Online play needs HTTPS (or `localhost`). Some strict networks block WebRTC; if a player can't connect, try another network or let someone else host.
 
-**Limits to know:**
-- The host can cheat, since their browser is the referee. Play with people you'd hand the code to.
-- **IP addresses:** quick matches go through a Cloudflare TURN relay (relay-only ICE), so no player sees another's IP; the lobby shows "Connected through Cloudflare relay" when that's active. Private matches connect directly (players can see each other's IPs) and use the relay only if a direct connection fails, unless *Options → Hide my IP in private matches* is on. If the relay is unreachable the game falls back to direct and says so.
-- Six digits keep codes easy to type, but someone could guess an active code. Leave *Approve each player* on if that matters to you.
-- Some strict networks (certain corporate or mobile carriers) block direct WebRTC connections. Without a TURN relay server, roughly 1 in 10 player pairs may fail to connect; try another network, or have someone else host.
-- Online play needs the game served over HTTPS (GitHub Pages is fine) or `localhost`.
+Found a security problem? Please report it privately through GitHub's *Security → Report a vulnerability* on this repository rather than opening a public issue.
 
-**TURN relay setup:** `cloudflare/turn-worker.js` is a Cloudflare Worker that turns a Cloudflare Realtime TURN key into short-lived credentials (the key's token stays in the Worker as a secret). Deploy it, set `TURN_KEY_ID` (text) and `TURN_KEY_API_TOKEN` (secret), and put its URL in `TURN_ENDPOINT` in `js/config.js`. It only answers requests from `ALLOWED_ORIGINS` (default `https://cbgregg.github.io`) and rate-limits per IP.
+**TURN relay setup:** `cloudflare/turn-worker.js` is a Cloudflare Worker that turns a Cloudflare Realtime TURN key into short-lived credentials (the key's token stays in the Worker as a secret). Deploy it, set `TURN_KEY_ID` (text) and `TURN_KEY_API_TOKEN` (secret), and put its URL in `TURN_ENDPOINT` in `js/config.js`. It only answers requests from the game's own site (`ALLOWED_ORIGINS`).
 
 **Advanced URL options:** `?relay=wss://relay1,wss://relay2` uses your own Nostr relays; `?stun=0` skips public STUN servers (LAN play).
 

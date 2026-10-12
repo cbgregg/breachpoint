@@ -18,7 +18,7 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const allowed = (env.ALLOWED_ORIGINS || 'https://breach-point.net,https://www.breach-point.net,https://cbgregg.github.io').split(',').map(s => s.trim()).filter(Boolean);
-    const okOrigin = allowed.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    const okOrigin = allowed.includes(origin);
     const cors = {
       'Access-Control-Allow-Origin': okOrigin ? origin : allowed[0] || '',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
