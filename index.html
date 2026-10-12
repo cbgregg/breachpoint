@@ -103,7 +103,7 @@
   <div id="title" class="screen">
     <div class="title-wrap">
       <div class="title-logo"><span class="mark"></span>BREACHPOINT</div>
-      <div class="title-sub">TEAM DEATHMATCH</div>
+      <div class="title-sub">DEATHMATCH · GUNFIGHT · SEARCH &amp; DESTROY</div>
       <div class="title-press" id="title-press">PRESS ENTER TO START</div>
     </div>
     <div class="title-foot"><span id="title-acct"></span></div>
@@ -173,8 +173,13 @@
         <section class="pane on" id="pane-play">
           <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
           <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
+          <div class="mode-pick" role="radiogroup" aria-label="Game mode">
+            <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
+            <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
+            <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
+          </div>
           <div class="rows">
-            <div class="row"><label for="opt-mode">Mode</label><select id="opt-mode" data-nav>
+            <div class="row" style="display:none"><label for="opt-mode">Mode</label><select id="opt-mode">
               <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="random">Random</option></select></div>

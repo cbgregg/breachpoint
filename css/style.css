@@ -589,3 +589,13 @@ body.rounds #death-respawn { display: none; }
 body.rounds.fixed-loadout #death-loadout, body.rounds.fixed-loadout #spawn-hint { display: none !important; }
 @media (max-width: 760px) { .gm-top { top: 70px; } }
 body[data-gmode="gunfight"] .tdm-snd, body[data-gmode="gunfight"] .tdm-only, body[data-gmode="snd"] .tdm-only { display: none; }
+/* game mode picker on the Play tab */
+.mode-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mode-pick .mp { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 12px 10px; background: var(--panel); border: 1px solid var(--line); border-bottom: 3px solid transparent; cursor: pointer; text-align: left; transition: background .15s, border-color .15s; }
+.mode-pick .mp:hover { background: rgba(236, 233, 225, 0.08); }
+.mode-pick .mp b { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; line-height: 1.05; }
+.mode-pick .mp small { font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); text-transform: uppercase; }
+.mode-pick .mp.on { background: rgba(232, 176, 74, 0.1); border-color: rgba(232, 176, 74, 0.35); border-bottom-color: var(--amber); }
+.mode-pick .mp.on small { color: var(--ink-dim); }
+body.mode-online #pane-play .mode-pick { order: -2; }
+@media (max-width: 560px) { .mode-pick .mp b { font-size: 15px; } .mode-pick .mp small { display: none; } }

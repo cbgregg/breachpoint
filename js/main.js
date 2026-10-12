@@ -101,11 +101,20 @@ for (const [id, key, type] of bindings) {
 function syncModeRows() {
   const m = MODES[settings.mode] || MODES.tdm;
   document.body.dataset.gmode = m.id;
+  document.querySelectorAll('.mode-pick .mp').forEach(b => { const on = b.dataset.mode === m.id; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
   $('intel-mode').textContent = m.name.toUpperCase();
   if (!(typeof playMode !== 'undefined' && playMode === 'online')) $('play-title').textContent = m.name.toUpperCase();
   document.querySelector('#pane-play .pane-sub').textContent = m.blurb;
 }
 $('opt-mode').addEventListener('change', () => { syncModeRows(); if (lobby && lobby.role === 'host') lobby.broadcastLobby(); });
+// big mode buttons on the Play tab drive the (hidden) mode select
+document.querySelectorAll('.mode-pick .mp').forEach(b => b.addEventListener('click', () => {
+  const sel = $('opt-mode');
+  if (sel.value === b.dataset.mode) return;
+  sel.value = b.dataset.mode;
+  sel.dispatchEvent(new Event('change'));
+  game.audio.play('ui', null, { ui: true });
+}));
 
 // ---------- loadout + gunsmith ----------
 const preview = new GunPreview($('gs-view'));
