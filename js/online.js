@@ -61,6 +61,8 @@ export class Lobby {
     this.onQuickHost = null;   // quick match found nothing: we host a public match
     this.board = new Board();  // public lobby notices (quick match)
     this.quickMode = false;    // looking for / playing a quick match
+    this.account = null;       // set by main.js: online accounts (js/account.js)
+    this.checking = new Set(); // join requests whose match pass is being verified
     this.public = false;       // this session is a public quick match
     this.net.on('msg', (m, id) => this.receive(m, id));
     this.net.on('peerJoin', (id) => this.peerJoin(id));
@@ -128,8 +130,10 @@ export class Lobby {
 
   deny(peerId) {
     if (!this.pending.has(peerId)) return;
+    const p = this.pending.get(peerId);
     this.pending.delete(peerId);
     this.banned.add(peerId);
+    if (p.uid) this.banned.add('u:' + p.uid); // a kicked or declined account can't rejoin from a new tab
     this.net.send({ t: 'lobby', st: 'denied' }, peerId);
     this.changed();
   }
@@ -138,6 +142,7 @@ export class Lobby {
     const p = this.players.get(peerId);
     if (!p) return;
     this.banned.add(peerId);
+    if (p.uid) this.banned.add('u:' + p.uid);
     this.net.send({ t: 'lobby', st: 'kicked' }, peerId);
     this.dropPlayer(peerId);
     this.toast(`${p.name.toUpperCase()} WAS REMOVED`);
@@ -249,8 +254,16 @@ export class Lobby {
   }
 
   // ---------- shared ----------
-  peerJoin(id) {
-    if (this.role === 'guest' && !this.hostId) this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary }, id);
+  async peerJoin(id) {
+    if (this.role !== 'guest' || this.hostId) return;
+    // signed-in players carry a pass for this match code, so the host knows who they are
+    let tk = null;
+    const code = this.code;
+    if (this.account && this.account.enabled) {
+      try { tk = await this.account.ticket(code); } catch (e) { this.lastError = e.message; }
+      if (this.role !== 'guest' || this.code !== code || this.hostId) return;
+    }
+    this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary, tk }, id);
   }
 
   peerLeave(id) {
@@ -282,6 +295,15 @@ export class Lobby {
     else if (this.role === 'guest') this.guestReceive(m, id);
   }
 
+  admit(id, p) {
+    this.pending.set(id, p);
+    if (this.approval) {
+      this.net.send({ t: 'lobby', st: 'pending' }, id);
+      this.toast(`${p.name.toUpperCase()} WANTS TO JOIN`);
+      this.changed();
+    } else this.accept(id);
+  }
+
   hostReceive(m, id) {
     switch (m.t) {
       case 'hello': {
@@ -290,12 +312,23 @@ export class Lobby {
         if (m.v !== PROTO) { this.net.send({ t: 'lobby', st: 'version' }, id); return; }
         if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, id); return; }
         const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str };
-        this.pending.set(id, p);
-        if (this.approval) {
-          this.net.send({ t: 'lobby', st: 'pending' }, id);
-          this.toast(`${p.name.toUpperCase()} WANTS TO JOIN`);
-          this.changed();
-        } else this.accept(id);
+        if (this.account && this.account.enabled) {
+          // accounts are on: only players with a valid pass for this code get in, under their account callsign
+          if (this.checking.has(id)) return;
+          this.checking.add(id);
+          const code = this.code;
+          this.account.checkTicket(m.tk, code).then((who) => {
+            this.checking.delete(id);
+            if (this.role !== 'host' || this.code !== code || this.players.has(id) || this.pending.has(id)) return;
+            if (!who) { this.net.send({ t: 'lobby', st: 'signin' }, id); return; }
+            if (this.banned.has('u:' + who.id)) { this.net.send({ t: 'lobby', st: 'denied' }, id); return; }
+            const dupe = (this.account.user && who.id === this.account.user.id) || [...this.players.values(), ...this.pending.values()].some(q => q.uid === who.id);
+            if (dupe) { this.net.send({ t: 'lobby', st: 'dupe' }, id); return; }
+            this.admit(id, { ...p, name: cleanName(who.name), uid: who.id });
+          });
+          return;
+        }
+        this.admit(id, p);
         break;
       }
       case 'lobby':
@@ -340,6 +373,8 @@ export class Lobby {
         else if (st === 'denied') return this.fail('The host declined your request.');
         else if (st === 'kicked') return this.close('You were removed from the match by the host.');
         else if (st === 'full') return this.fail('That match is full.');
+        else if (st === 'signin') return this.fail(this.account && this.account.enabled && !this.account.signedIn ? 'Sign in to play online.' : 'The host couldn\'t verify your account. Sign out and back in, then try again.');
+        else if (st === 'dupe') return this.fail('Your account is already in that match.');
         else if (st === 'version') return this.fail('The host is running a different version of Breachpoint. Both of you should reload the page.');
         this.changed();
         break;
@@ -383,6 +418,7 @@ export class Lobby {
     this.roster = [];
     this.rate.clear();
     this.hostInGame = false;
+    this.checking.clear();
   }
 }
 

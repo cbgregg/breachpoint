@@ -8,6 +8,7 @@ import { Lobby, MAX_HUMANS } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
 import { GunPreview } from './gunsmith.js';
+import { Account, takeLoginToken } from './account.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -23,6 +24,12 @@ function saveSettings(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
 }
 const settings = loadSettings();
+const account = new Account();
+const loginToken = takeLoginToken(); // sign-in link opened: read and wipe it before anything else runs
+let playMode = 'offline';            // chosen on the Offline / Online screen
+// online with accounts on, your callsign is your account's; offline it's the local one
+const onlineName = () => playMode === 'online' && account.enabled && account.user && account.user.name;
+const myName = () => onlineName() || settings.name;
 
 // ---------- game bootstrap ----------
 let game;
@@ -64,6 +71,7 @@ function writeForm() {
     else el.value = String(settings[key]);
   }
   for (const id in outputs) $(outputs[id][0]).textContent = outputs[id][1]($(id).value);
+  $('opt-name').value = myName();
   renderWeapons();
 }
 function readField(id, key, type) {
@@ -72,6 +80,7 @@ function readField(id, key, type) {
   if (type === 'int') v = parseInt(v, 10);
   if (type === 'float') v = parseFloat(v);
   if (type === 'text') v = (v || 'Operator').trim().slice(0, 16) || 'Operator';
+  if (key === 'name' && onlineName()) return; // edits go to the account instead (see below)
   settings[key] = v;
 }
 for (const [id, key, type] of bindings) {
@@ -183,7 +192,7 @@ function deploy() {
   game.startMatch(settings);
 }
 $('play').addEventListener('click', deploy);
-$('opt-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') deploy(); });
+$('opt-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { if (playMode === 'online') e.target.blur(); else deploy(); } });
 
 // ---------- pause menu ----------
 // Loadout and Options are the same panes as the main menu, moved into the pause panel while it's open.
@@ -299,6 +308,7 @@ if (window.BREACHPOINT_OFFLINE) {
   document.querySelector('#pane-play .pane-note').textContent = 'Online play (6-digit codes) works on the GitHub Pages version of the game.';
 }
 const lobby = new Lobby(game);
+lobby.account = account;
 window.__lobby = lobby;
 let joinCode = '';
 let joinError = '';
@@ -376,7 +386,7 @@ function renderLobby() {
           <button class="ok" data-accept="${esc(p.peerId)}" data-nav>ACCEPT</button><button data-deny="${esc(p.peerId)}" data-nav>DENY</button></div>`).join('')
       : '<div class="empty">No one is waiting. Share the code above.</div>');
     const swap = (id) => (inMatch ? '' : `<button data-swap="${esc(id)}" data-nav title="Switch team">⇄</button>`);
-    const rows = [playerRow({ name: settings.name || 'Operator', team: lobby.hostTeam, tag: 'HOST (YOU)' }, swap('host'))];
+    const rows = [playerRow({ name: myName() || 'Operator', team: lobby.hostTeam, tag: 'HOST (YOU)' }, swap('host'))];
     for (const p of lobby.players.values()) rows.push(playerRow(p, swap(p.peerId) + `<button class="warn" data-kick="${esc(p.peerId)}" data-nav>KICK</button>`));
     setHTML('host-players', rows.join(''));
     $('host-count').textContent = `${lobby.players.size + 1}/${MAX_HUMANS}`;
@@ -419,7 +429,7 @@ lobby.onToast = (s) => game.hud.toast(s);
 $('host-btn').addEventListener('click', () => {
   readAll();
   game.audio.init();
-  lobby.host(settings.name, loadoutFromSettings(settings));
+  lobby.host(myName(), loadoutFromSettings(settings));
   setMapHint();
   openLobby();
 });
@@ -431,7 +441,7 @@ function startQuick() {
   game.audio.init();
   quickIntro = false;
   joinError = '';
-  lobby.quick(settings.name, loadoutFromSettings(settings));
+  lobby.quick(myName(), loadoutFromSettings(settings));
   showScreen('lobby');
   renderLobby();
 }
@@ -487,7 +497,7 @@ function tryJoin() {
   readAll();
   game.audio.init();
   joinError = '';
-  lobby.join(joinCode, settings.name, loadoutFromSettings(settings));
+  lobby.join(joinCode, myName(), loadoutFromSettings(settings));
 }
 lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(id); };
 const setMapHint = () => { lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : ''); };
@@ -525,7 +535,7 @@ lobby.onClosed = (reason, wasPublic) => {
   if (game.mode === 'guest' && game.state !== 'menu') game.quitToMenu();
   // a public host went away: find another match automatically
   if (wasPublic && /host closed|Lost connection/.test(reason)) {
-    lobby.quick(settings.name, loadoutFromSettings(settings));
+    lobby.quick(myName(), loadoutFromSettings(settings));
     game.hud.toast('HOST LEFT — FINDING ANOTHER MATCH');
     showScreen('lobby');
     renderLobby();
@@ -573,7 +583,9 @@ function focusEl(el) {
 }
 function focusFirst() {
   const items = navItems();
-  const pref = screen === 'menu' ? $('play') : screen === 'pause' ? (pauseSec === 'loadout' ? document.querySelector('.psec[data-sec="loadout"]') : $('resume'))
+  const pref = screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
+    : screen === 'signin' ? document.querySelector('#signin .si-step.on input')
+    : screen === 'menu' ? $(playMode === 'online' ? 'quick-btn' : 'play') : screen === 'pause' ? (pauseSec === 'loadout' ? document.querySelector('.psec[data-sec="loadout"]') : $('resume'))
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
     : $('again');
   focusEl(items.includes(pref) && pref.offsetParent ? pref : items[0]);
@@ -589,6 +601,7 @@ function stepRange(el, d) {
 }
 game.input.onNav = (dir) => {
   if (!screen) return;
+  if (screen === 'title') { if (dir === 'accept' || dir === 'start') titleGo(); return; }
   const items = navItems();
   const el = document.activeElement && items.includes(document.activeElement) ? document.activeElement : null;
   const move = (d) => {
@@ -620,6 +633,9 @@ game.input.onNav = (dir) => {
       if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
       else if (screen === 'pause') game.resume();
       else if (screen === 'menu' && tab !== 'play') { setTab('play'); focusFirst(); }
+      else if (screen === 'menu') openMode();
+      else if (screen === 'mode') { showScreen('title'); }
+      else if (screen === 'signin') $('si-back').click();
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
         else if (lobby.role !== 'guest' && joinCode.length) keypad('del');
@@ -628,7 +644,7 @@ game.input.onNav = (dir) => {
       break;
     case 'start':
       if (screen === 'pause') game.resume();
-      else if (screen === 'menu') deploy();
+      else if (screen === 'menu') { if (playMode === 'online') $('quick-btn').click(); else deploy(); }
       else if (screen === 'end') $('again').click();
       else if (screen === 'lobby' && lobby.role === 'host' && $('lobby-start').offsetParent) $('lobby-start').click();
       else if (screen === 'lobby' && !lobby.role) tryJoin();
@@ -651,14 +667,181 @@ window.addEventListener('keydown', (e) => {
   else if (!typing && screen === 'menu' && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
 });
 
+// ---------- title screen ----------
+function titleGo() {
+  if (screen !== 'title') return;
+  game.audio.init();
+  game.audio.play('ui', null, { ui: true });
+  openMode();
+}
+$('title').addEventListener('click', titleGo);
+window.addEventListener('keydown', (e) => {
+  if (screen !== 'title' || e.repeat || ['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
+  e.preventDefault();
+  titleGo();
+});
+
+// ---------- offline / online ----------
+function openMode() {
+  if (lobby.active) leaveOnline();
+  syncAccount();
+  showScreen('mode');
+}
+function setPlayMode(m) {
+  playMode = m;
+  document.body.classList.toggle('mode-online', m === 'online');
+  document.body.classList.toggle('mode-offline', m !== 'online');
+  $('mode-chip').innerHTML = m === 'online'
+    ? `<i></i>ONLINE${onlineName() ? ` <small>${esc(onlineName().toUpperCase())}</small>` : ''}`
+    : '<i></i>OFFLINE <small>VS BOTS</small>';
+  $('play-title').textContent = m === 'online' ? 'ONLINE · TEAM DEATHMATCH' : 'TEAM DEATHMATCH';
+  $('opt-name').value = myName();
+  renderHints(game.input.lastDevice);
+}
+function enterMenu(m) {
+  setPlayMode(m);
+  writeForm();
+  setTab('play');
+  showScreen('menu');
+}
+$('mode-offline').addEventListener('click', () => enterMenu('offline'));
+$('mode-online').addEventListener('click', () => {
+  if (window.BREACHPOINT_OFFLINE) { game.hud.toast('ONLINE PLAY WORKS ON BREACH-POINT.NET'); return; }
+  if (!account.ready) { setPlayMode('online'); openSignin(); return; }
+  enterMenu('online');
+});
+$('mode-chip').addEventListener('click', () => openMode());
+
+// account state shown around the menus
+function syncAccount() {
+  const u = account.signedIn ? account.user : null;
+  document.body.classList.toggle('has-account', !!u);
+  $('acct-email').textContent = u ? u.email : '';
+  $('title-acct').textContent = u && u.name ? `Signed in as ${u.name}` : '';
+  $('mode-online-d').textContent = !account.enabled
+    ? 'Quick match with anyone, or a private 6-digit code for friends.'
+    : u && u.name ? `Quick match with anyone, or a private 6-digit code for friends. Playing as ${u.name}.`
+      : 'Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.';
+  $('mode-acct').innerHTML = u ? `<span>Signed in as <b>${esc(u.name || u.email)}</b></span><button id="mode-out" class="menu-btn small" data-nav>SIGN OUT</button>` : '';
+  if (u) $('mode-out').addEventListener('click', () => { account.signOut(); });
+  if (screen === 'menu' || screen === 'pause') setPlayMode(playMode);
+}
+account.onChange = () => {
+  syncAccount();
+  // signed out while in the online menu: back to the mode screen
+  if (!account.ready && playMode === 'online' && account.enabled && screen === 'menu') openMode();
+  // the email link was opened in another tab while this one waits for the code
+  if (screen === 'signin' && account.signedIn && siCur === 'code') signedIn();
+};
+$('acct-out').addEventListener('click', () => account.signOut());
+confirmBtn($('acct-del'), async () => {
+  try { await account.deleteAccount(); game.hud.toast('ACCOUNT DELETED'); } catch (e) { game.hud.toast(e.message.toUpperCase()); }
+});
+
+// online callsign changes are claimed on the account server (unique names)
+$('opt-name').addEventListener('change', async () => {
+  if (!onlineName()) return;
+  const el = $('opt-name'), want = el.value.trim();
+  if (!want || want === account.user.name) { el.value = account.user.name; return; }
+  try { await account.setName(want); game.hud.toast(`CALLSIGN IS NOW ${account.user.name.toUpperCase()}`); }
+  catch (e) { game.hud.toast(e.message.toUpperCase()); }
+  el.value = myName();
+  setPlayMode(playMode);
+});
+
+// ---------- sign in ----------
+let siCur = 'email', afterSignin = null;
+function siStep(st) {
+  siCur = st;
+  document.querySelectorAll('.si-step').forEach(el => el.classList.toggle('on', el.id === `si-${st}`));
+  $('si-title').textContent = st === 'name' ? 'YOUR CALLSIGN' : 'SIGN IN';
+  $('si-back').textContent = st === 'name' ? 'SIGN OUT' : 'BACK';
+  siStatus('');
+  const inp = document.querySelector(`#si-${st} input`);
+  if (st === 'name') inp.value = account.user && account.user.name || (settings.name !== 'Operator' ? settings.name : '');
+  if (game.input.lastDevice !== 'touch') setTimeout(() => inp.focus({ preventScroll: true }), 30);
+}
+function siStatus(html, cls) { const el = $('si-status'); el.className = 'join-status' + (cls ? ' ' + cls : ''); el.innerHTML = html; }
+let siBusyNow = false;
+function siBusy(b) { siBusyNow = b; document.querySelectorAll('#signin .cta, #signin input').forEach(x => { x.disabled = b; }); }
+function openSignin() {
+  showScreen('signin');
+  siStep(account.signedIn && !account.user.name ? 'name' : 'email');
+}
+function signedIn() {
+  if (!account.user.name) { siStep('name'); return; }
+  game.hud.toast(`SIGNED IN AS ${account.user.name.toUpperCase()}`);
+  const next = afterSignin;
+  afterSignin = null;
+  enterMenu('online');
+  if (next) next();
+}
+async function siSend() {
+  if (siBusyNow) return;
+  const email = $('si-email-in').value.trim();
+  if (!email) { siStatus('Enter your email address.', 'bad'); return; }
+  siBusy(true);
+  siStatus('<span class="spin"></span>Sending…');
+  try {
+    const r = await account.start(email);
+    siStep('code');
+    $('si-to').textContent = email;
+    if (r.dev) { console.info('[dev] sign-in link', r.dev.link, 'code', r.dev.code); window.__devLogin = r.dev; }
+    siStatus('Check your inbox (and spam folder). The link and code work for 15 minutes.', 'good');
+  } catch (e) { siStatus(esc(e.message), 'bad'); }
+  siBusy(false);
+}
+async function siVerify() {
+  const code = $('si-code-in').value.replace(/\D/g, '');
+  if (code.length !== 6) { siStatus('The code is 6 digits.', 'bad'); return; }
+  if (siBusyNow) return;
+  siBusy(true);
+  siStatus('<span class="spin"></span>Checking…');
+  try { await account.verifyCode(code); siBusy(false); signedIn(); }
+  catch (e) {
+    siBusy(false);
+    $('si-code-in').value = '';
+    $('si-code-in').focus({ preventScroll: true });
+    siStatus(esc(e.message), 'bad');
+    if (e.expired) setTimeout(() => siStep('email'), 1800);
+  }
+}
+async function siName() {
+  if (siBusyNow) return;
+  const name = $('si-name-in').value.trim();
+  siBusy(true);
+  siStatus('<span class="spin"></span>Saving…');
+  try { await account.setName(name); siBusy(false); signedIn(); }
+  catch (e) { siBusy(false); siStatus(esc(e.message), 'bad'); }
+}
+$('si-send').addEventListener('click', siSend);
+$('si-verify').addEventListener('click', siVerify);
+$('si-name-save').addEventListener('click', siName);
+$('si-resend').addEventListener('click', () => { $('si-email-in').value = account.email; siSend(); });
+$('si-other').addEventListener('click', () => siStep('email'));
+$('si-back').addEventListener('click', () => {
+  if (siCur === 'name') account.signOut();
+  afterSignin = null;
+  openMode();
+});
+$('si-code-in').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  if (e.target.value.length === 6) siVerify();
+});
+for (const [inp, fn] of [['si-email-in', siSend], ['si-code-in', siVerify], ['si-name-in', siName]]) {
+  $(inp).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fn(); } });
+}
+
 // ---------- device-aware hints ----------
 function renderHints(device) {
   const hint = (act, text) => (device === 'touch' ? '' : `<span>${glyph(act, device)} ${text}</span>`);
   $('menu-hints').innerHTML = device === 'pad'
-    ? [hint('accept', 'Select'), hint('back', 'Back'), `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} Tabs</span>`, hint('pause', 'Deploy')].join('')
-    : device === 'touch' ? '' : [hint('accept', 'Deploy'), `<span><kbd>Q</kbd><kbd>E</kbd> Tabs</span>`, hint('back', 'Back')].join('');
+    ? [hint('accept', 'Select'), hint('back', 'Back'), `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} Tabs</span>`, hint('pause', playMode === 'online' ? 'Quick match' : 'Deploy')].join('')
+    : device === 'touch' ? '' : [playMode === 'online' ? '' : hint('accept', 'Deploy'), `<span><kbd>Q</kbd><kbd>E</kbd> Tabs</span>`, hint('back', 'Back')].join('');
   $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Resume')].join('') : device === 'touch' ? '' : hint('back', 'Resume');
   $('lobby-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : '<span><kbd>0</kbd>–<kbd>9</kbd> Code</span><span><kbd>Enter</kbd> Join</span>' + hint('back', 'Back');
+  $('title-press').innerHTML = device === 'pad' ? `PRESS ${glyph('accept', 'pad')} TO START` : device === 'touch' ? 'TAP TO START' : 'PRESS <kbd>ENTER</kbd> TO START';
+  $('mode-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : hint('back', 'Back');
   $('intel-input').textContent = device === 'pad' ? 'CONTROLLER' : device === 'touch' ? 'TOUCH' : 'KEYBOARD & MOUSE';
   game.hud.setDevice(device);
 }
@@ -694,8 +877,21 @@ drawIntel();
 
 writeForm();
 renderHints(game.input.lastDevice);
-showScreen('menu');
+syncAccount();
 {
   const inv = new URLSearchParams(location.search).get('join');
-  if (inv && /^\d{6}$/.test(inv)) { joinCode = inv; openLobby(); }
+  if (loginToken && account.enabled) {
+    // arrived from the sign-in email
+    setPlayMode('online');
+    openSignin();
+    siBusy(true);
+    siStatus('<span class="spin"></span>Signing you in…');
+    account.verifyToken(loginToken).then(() => { siBusy(false); signedIn(); }, (e) => { siBusy(false); siStep('email'); siStatus(esc(e.message), 'bad'); });
+  } else if (inv && /^\d{6}$/.test(inv)) {
+    joinCode = inv;
+    setPlayMode('online');
+    if (account.ready) openLobby();
+    else { afterSignin = () => openLobby(); openSignin(); }
+  } else showScreen('title');
+  account.refresh();
 }

@@ -55,6 +55,33 @@ Browsers only expose a controller after you press a button on it, so press any b
 
 ## Online play
 
+The game opens on a title screen (**press Enter / A / tap to start**), then **Offline** (versus bots, no account) or **Online**. With accounts turned on (below), Online asks you to sign in first.
+
+### Accounts (passwordless email sign-in)
+
+There are no passwords. You enter your email and get a message with a **sign-in link** and a **6-digit code**: open the link on the same device, or type the code (handy on a console or TV while the email is on your phone). Then you pick a **callsign**, which is unique to your account. Sessions last 60 days on that device. *Options → Account* has Sign out and Delete account.
+
+Why it's safe:
+- Links and codes expire after 15 minutes and work once; a code allows 5 guesses. Only SHA-256 hashes of links, codes and sessions are stored, so a leaked database can't sign anyone in.
+- The link token sits in the URL fragment (`#login=…`), which browsers never send to a server, and the game wipes it from the address bar immediately. The page sends no referrer.
+- Sign-in emails are rate-limited per address and per network, and the Worker gives the same answer whether or not an email has an account.
+- In online matches each player carries a **signed match pass** (ECDSA P-256) naming their account and that match code, valid 3 hours. The host checks the signature before letting anyone in, so nobody can join without an account or under someone else's callsign, a pass for one match is useless in another, and a kicked or declined account can't rejoin from a new tab.
+- Other players never see your email.
+
+The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers KV, email sent through Resend). With `AUTH_ENDPOINT` empty in `js/config.js`, accounts are off and Online works without signing in.
+
+**Setup** (about 15 minutes, free tiers):
+1. **Resend** (resend.com): sign up → *Domains → Add domain* `breach-point.net` → add the DNS records it lists in Cloudflare DNS (Resend can do this automatically) → wait for *Verified* → *API Keys → Create* (sending access).
+2. **Cloudflare → Storage & Databases → KV → Create** a namespace, e.g. `breachpoint-accounts`.
+3. **Workers & Pages → Create → Worker**, name it `breachpoint-auth` → *Edit code* → paste `cloudflare/auth-worker.js` → *Deploy*.
+4. Worker → **Settings → Bindings → Add → KV namespace**: variable name `ACCOUNTS`, the namespace from step 2.
+5. Worker → **Settings → Variables and Secrets**: `RESEND_API_KEY` (Secret), `MAIL_FROM` = `Breachpoint <login@breach-point.net>` (Text), `APP_URL` = `https://breach-point.net` (Text).
+6. Open `https://breachpoint-auth.<you>.workers.dev/pubkey`: it should show a JSON key. Put the Worker URL in `AUTH_ENDPOINT` in `js/config.js` and push.
+
+Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a day; sessions last 60 days so returning players don't count), Resend 100 emails a day. The $5/month Workers plan lifts the KV limit.
+
+### Matches
+
 **Quick match** puts you in a public game with no code: the game checks for open public lobbies for a few seconds and drops you into the fullest one, mid-match if one is running, taking a bot's slot. If none are open, you host one and others drop in. Public matches use fixed rules (6v6 with bots, 75 kills, 10 minutes, no friendly fire), start the next match automatically, and if the host leaves everyone is moved to another match. Finding a match only reads small public notices on Nostr relays, so nothing connects to you until you join one. The first time, the game explains that other players in a public match can see your IP address.
 
 **Private matches** use a code:
@@ -118,12 +145,15 @@ npx serve .            # or: python3 -m http.server 8000
 |---|---|
 | `index.html` | Page shell, HUD, menus, import map for Three.js + addons (CDN) |
 | `css/style.css` | Menus, HUD, scoreboard, touch controls |
-| `js/main.js` | Boot, menu tabs, controller/keyboard menu navigation, settings persistence |
+| `js/main.js` | Boot, title screen, Offline/Online, sign-in screens, menu tabs, controller/keyboard menu navigation, settings persistence |
 | `js/game.js` | Match loop (local / host / guest modes), hitscan + melee + grenades, kills/assists/medals, spawns, pickups |
 | `js/net.js` | Peer-to-peer transport: 6-digit codes, Nostr signaling, WebRTC data channels |
 | `js/online.js` | Lobby (approval, kick, teams), host session (input validation, lag compensation, culled snapshots), guest session (prediction, reconciliation, interpolation) |
 | `js/quickplay.js` | Quick match: public lobby notices over Nostr, choosing a lobby |
 | `js/names.js` | Callsign filter |
+| `js/account.js` | Online accounts: email sign-in (link or code), sessions, callsigns, signed match passes |
+| `cloudflare/auth-worker.js` | Account server (Cloudflare Worker): sign-in emails via Resend, KV storage, pass signing |
+| `cloudflare/turn-worker.js` | TURN relay credentials (Cloudflare Worker) |
 | `lib/trystero.js` | Vendored [Trystero](https://github.com/dmotz/trystero) 0.25 (Nostr strategy), MIT |
 | `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
