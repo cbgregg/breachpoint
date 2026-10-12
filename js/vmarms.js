@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { TEAMS } from './config.js';
+import { ASSETS } from './assets.js';
+import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
 
 // hand local frame: palm centre at the origin, fingers toward -z, palm facing -y, back of the hand +y.
 // right hand: thumb on -x; left hand is mirrored (thumb on +x). FINGERS/THUMB x is given for the left hand.
@@ -20,14 +22,14 @@ export const WRIST = new THREE.Vector3(0, 0.002, 0.058 * HAND_SCALE); // wrist p
 
 // grip poses: per finger [proximal, middle, distal] curl (radians), spread, and the thumb
 // (base yaw toward the fingers' side, pitch toward the palm, roll, then two curls)
-const W = [1.5, 1.35, 0.75];
+const W = [1.62, 1.45, 0.85];
 export const POSES = {
-  trigger: { f: [[0.75, 1.45, 0.8], W, W, W], spread: [0.04, 0, -0.02, -0.05], t: [0.65, -0.5, 0.2, 0.25, 0.3] },
-  wrap: { f: [W, W, W, W], spread: [0.03, 0, -0.02, -0.05], t: [0.65, -0.55, 0.2, 0.3, 0.35] },
-  support: { f: [[0.95, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.8, 0.45]], spread: [0.06, 0, -0.04, -0.08], t: [0.4, -0.15, 0.1, 0.15, 0.2] },
-  cup: { f: [[0.75, 0.75, 0.45], [0.8, 0.8, 0.5], [0.85, 0.8, 0.5], [0.9, 0.85, 0.5]], spread: [0.05, 0, -0.04, -0.08], t: [0.6, -0.55, 0.2, 0.3, 0.3] },
-  fist: { f: [[1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1]], spread: [0, 0, 0, 0], t: [0.25, -0.95, 0.3, 0.55, 0.5] },
-  open: { f: [[0.25, 0.3, 0.2], [0.25, 0.3, 0.2], [0.3, 0.35, 0.2], [0.35, 0.4, 0.25]], spread: [0.1, 0, -0.08, -0.16], t: [0.75, -0.2, 0.0, 0.1, 0.1] },
+  trigger: { f: [[1.25, 1.7, 1.1], W, W, W], spread: [0.04, 0, -0.02, -0.05], t: [0.65, -0.5, 0.2, 0.25, 0.3], rt: [1.0, 1.1, 0.5, 0.5] },
+  wrap: { f: [W, W, W, W], spread: [0.03, 0, -0.02, -0.05], t: [0.65, -0.55, 0.2, 0.3, 0.35], rt: [0.7, 0.95, 0.45, 0.45] },
+  support: { f: [[0.95, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.75, 0.4], [1.0, 0.8, 0.45]], spread: [0.06, 0, -0.04, -0.08], t: [0.4, -0.15, 0.1, 0.15, 0.2], rt: [0.1, 0.15, 0.15, 0.2] },
+  cup: { f: [[0.75, 0.75, 0.45], [0.8, 0.8, 0.5], [0.85, 0.8, 0.5], [0.9, 0.85, 0.5]], spread: [0.05, 0, -0.04, -0.08], t: [0.6, -0.55, 0.2, 0.3, 0.3], rt: [0.35, 0.5, 0.35, 0.35] },
+  fist: { f: [[1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1], [1.55, 1.6, 1.1]], spread: [0, 0, 0, 0], t: [0.25, -0.95, 0.3, 0.55, 0.5], rt: [0.6, 0.9, 0.6, 0.6] },
+  open: { f: [[0.25, 0.3, 0.2], [0.25, 0.3, 0.2], [0.3, 0.35, 0.2], [0.35, 0.4, 0.25]], spread: [0.1, 0, -0.08, -0.16], t: [0.75, -0.2, 0.0, 0.1, 0.1], rt: [0.0, 0.1, 0.1, 0.1] },
 };
 
 // cloth: colour with a soft mottle, and a normal map with twill weave and a few loose folds
@@ -107,11 +109,12 @@ function buildHand(side, M) {
   return { group: hand, s: -s, fingers, thumb: [tb, t1, t2], pose: clonePose(POSES.wrap) };
 }
 
-export const clonePose = (p) => ({ f: p.f.map(a => a.slice()), spread: p.spread.slice(), t: p.t.slice() });
+export const clonePose = (p) => ({ f: p.f.map(a => a.slice()), spread: p.spread.slice(), t: p.t.slice(), rt: p.rt.slice() });
 // blend a hand's current pose toward a target pose (k = 0..1)
 export function blendPose(out, a, b, k) {
   for (let i = 0; i < 4; i++) { for (let j = 0; j < 3; j++) out.f[i][j] = a.f[i][j] + (b.f[i][j] - a.f[i][j]) * k; out.spread[i] = a.spread[i] + (b.spread[i] - a.spread[i]) * k; }
   for (let j = 0; j < 5; j++) out.t[j] = a.t[j] + (b.t[j] - a.t[j]) * k;
+  for (let j = 0; j < 4; j++) out.rt[j] = a.rt[j] + (b.rt[j] - a.rt[j]) * k;
   return out;
 }
 function applyPose(h, p) {
@@ -162,12 +165,16 @@ export function createVmArms(team) {
     sleeve: new THREE.MeshStandardMaterial({ map: fab.map, normalMap: fab.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.92 }),
   };
   const root = new THREE.Group();
+  const HA = ASSETS.hands;
+  if (HA) M.skin = new THREE.MeshStandardMaterial({ map: HA.map, normalMap: HA.normalMap, roughnessMap: HA.roughnessMap, roughness: 1, metalness: 0 });
   const mkArm = (side) => {
     const hand = buildHand(side, M);
+    let rig = null;
+    if (HA) { rig = makeRig(HA, M.skin, side === 'L'); root.add(rig.root); hand.group.visible = false; }
     const upper = limb(UPPER, [0.05, 0.052, 0.054, 0.05, 0.046], M.sleeve, false);
     const fore = limb(FORE, [0.044, 0.046, 0.05, 0.048, 0.043, 0.038, 0.035], M.sleeve, true);
     root.add(upper, fore, hand.group);
-    return { hand, upper, fore };
+    return { hand, upper, fore, rig };
   };
   return { root, R: mkArm('R'), L: mkArm('L'), M };
 }
@@ -196,6 +203,86 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 // place one arm: hand at (pos, q) with pose, elbow solved toward pole, shoulder fixed (camera space)
+// ---------- skinned hand rig (assets/models/hands.glb) ----------
+// The model is a right hand + wrist on a full arm skeleton. The left hand is the same rig under a
+// mirrored root, driven with mirrored targets. Calibration maps our hand frame (palm centre, fingers -z,
+// palm -y, thumb -x) onto the hand bone, so every grip pose and placement carries over.
+const RIG_SCALE = 1.06;
+// palm surface vs the bone line (our frame: +y toward the back of the hand, -z toward the fingers)
+export const RIG_TUNE = { palmY: 0.035, palmZ: 0.0 };
+const FINGER_BONES = ['index', 'middle', 'ring', 'pinky'];
+function makeRig(asset, mat, mirror) {
+  const root = new THREE.Group();
+  const inner = skClone(asset.scene);
+  inner.scale.setScalar(RIG_SCALE);
+  root.add(inner);
+  inner.traverse(o => { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; } });
+  // the FBX export nests each bone under a same-named node; the outer one moves the whole chain
+  const bone = (n) => { let b = null; inner.traverse(o => { if (!b && o.name === n) b = o; }); if (!b) throw new Error('hand rig: missing ' + n); return b; };
+  root.updateMatrixWorld(true);
+  const wp = (b) => b.getWorldPosition(new THREE.Vector3()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
+  const hand = bone('handR'), fore = bone('forearmR');
+  const H = wp(hand), F = wp(fore), Mid = wp(bone('finger_middle01R')), I = wp(bone('finger_index01R')), Pk = wp(bone('finger_pinky01R'));
+  const zf = Mid.clone().sub(H).normalize().negate();
+  const xf = Pk.clone().sub(I); xf.addScaledVector(zf, -xf.dot(zf)).normalize(); // away from the thumb = +x (right hand)
+  const yf = new THREE.Vector3().crossVectors(zf, xf);
+  const restQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xf, yf, zf));
+  const handRestQ = wq(hand), foreRestQ = wq(fore);
+  const invRest = restQ.clone().invert();
+  // palm centre: a little over halfway from the wrist bone to the knuckles
+  const palm = H.clone().lerp(Mid, 0.52);
+  const R = {
+    root, inner, mirror, hand, fore,
+    off: invRest.clone().multiply(handRestQ),                         // hand bone = ourQ * off
+    palmOff: palm.clone().sub(H).applyQuaternion(invRest).add(new THREE.Vector3(0, RIG_TUNE.palmY, RIG_TUNE.palmZ)), // palm centre from the wrist, our frame
+    foreRel: handRestQ.clone().invert().multiply(foreRestQ),          // forearm in the hand's frame
+    handInFore: H.clone().sub(F).applyQuaternion(foreRestQ.clone().invert()),
+    foreAxis: H.clone().sub(F).applyQuaternion(foreRestQ.clone().invert()).normalize(),
+    fScale: fore.getWorldScale(new THREE.Vector3()), hScale: hand.getWorldScale(new THREE.Vector3()),
+    fingers: FINGER_BONES.map(f => [1, 2, 3].map(j => { const b = bone(`finger_${f}0${j}R`); return { b, rest: b.quaternion.clone() }; })),
+    thumb: [1, 2, 3].map(j => { const b = bone(`thumb0${j}R`); return { b, rest: b.quaternion.clone() }; }),
+  };
+  if (mirror) root.scale.x = -1;
+  return R;
+}
+const _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4(), _rinv = new THREE.Matrix4(), _rs = new THREE.Vector3();
+const _ax = new THREE.Vector3(1, 0, 0), _az = new THREE.Vector3(0, 0, 1), _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion();
+// set a bone's transform given in rig-root space
+function setRootSpace(R, b, p, q, sc) {
+  _rinv.copy(R.root.matrixWorld).invert();
+  _rm2.multiplyMatrices(_rinv, b.parent.matrixWorld).invert();      // root space -> parent local
+  _rm.compose(p, q, sc);
+  _rm.premultiply(_rm2);
+  _rm.decompose(b.position, b.quaternion, b.scale);
+  b.updateMatrixWorld(true);
+}
+const _rq0 = new THREE.Quaternion(), _rq1 = new THREE.Quaternion(), _rv = new THREE.Vector3(), _rv2 = new THREE.Vector3();
+function driveRig(R, wrist, q, foreDir, pose) {
+  R.root.updateMatrixWorld(true);
+  // forearm: keep its natural twist relative to the hand, swung to lie along the solved forearm
+  _rq0.copy(q).multiply(R.off);                                       // hand bone orientation
+  _rq1.copy(_rq0).multiply(R.foreRel);
+  _rv.copy(R.foreAxis).applyQuaternion(_rq1);
+  _fq.setFromUnitVectors(_rv, _rv2.copy(foreDir).normalize());
+  _rq1.premultiply(_fq);
+  _rv.copy(R.handInFore).applyQuaternion(_rq1);
+  setRootSpace(R, R.fore, _rv.negate().add(wrist), _rq1, R.fScale);
+  setRootSpace(R, R.hand, wrist, _rq0, R.hScale);
+  // fingers: curl about local x, spread about local z
+  R.fingers.forEach((chain, i) => chain.forEach(({ b, rest }, j) => {
+    b.quaternion.copy(rest);
+    if (j === 0) b.quaternion.multiply(_fq.setFromAxisAngle(_az, pose.spread[i]));
+    b.quaternion.multiply(_fq.setFromAxisAngle(_ax, pose.f[i][j]));
+  }));
+  const [t1, t2, t3] = R.thumb, rt = pose.rt;
+  t1.b.quaternion.copy(t1.rest).multiply(_fq.setFromAxisAngle(_az, rt[0])).multiply(_fq2.setFromAxisAngle(_ax, rt[1]));
+  t2.b.quaternion.copy(t2.rest).multiply(_fq.setFromAxisAngle(_ax, rt[2]));
+  t3.b.quaternion.copy(t3.rest).multiply(_fq.setFromAxisAngle(_ax, rt[3]));
+  R.hand.updateMatrixWorld(true);
+}
+const _mp = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mw = new THREE.Vector3(), _me = new THREE.Vector3(), _md = new THREE.Vector3();
+const mirrorQ = (q) => q.set(q.x, -q.y, -q.z, q.w);
+
 // point a limb (extends along its local -y) along dir, rolled so its wide (x) side lines up with xHint
 const _ox = new THREE.Vector3(), _oy = new THREE.Vector3(), _oz = new THREE.Vector3(), _om = new THREE.Matrix4(), _hx = new THREE.Vector3();
 function orient(obj, dir, xHint) {
@@ -209,6 +296,27 @@ function orient(obj, dir, xHint) {
 }
 export function poseArm(arm, shoulder, pos, q, pose, pole) {
   const h = arm.hand;
+  if (arm.rig) {
+    const R = arm.rig, m = R.mirror;
+    // work in the rig's right-hand space (mirrored for the left)
+    _mp.copy(pos); _mq.copy(q); if (m) { _mp.x = -_mp.x; mirrorQ(_mq); }
+    _mw.copy(R.palmOff).applyQuaternion(_mq).negate().add(_mp);      // wrist (hand bone), rig space
+    _w.copy(_mw); if (m) _w.x = -_w.x;                                  // wrist, camera space
+    solveElbow(shoulder, _w, UPPER, FORE, pole, _e);
+    _me.copy(_e); if (m) _me.x = -_me.x;
+    driveRig(R, _mw, _mq, _md.subVectors(_mw, _me), pose);
+    // sleeve stops just short of the wrist so the wrist itself shows
+    _hx.set(1, 0, 0).applyQuaternion(q);
+    arm.fore.position.copy(_e);
+    _d.subVectors(_w, _e); const L = _d.length(); _d.normalize();
+    orient(arm.fore, _d, _hx);
+    arm.fore.scale.y = Math.max(0.1, L - 0.004) / FORE;
+    _hx.set(1, 0, 0).applyQuaternion(arm.fore.quaternion);
+    arm.upper.position.copy(shoulder);
+    orient(arm.upper, _d.subVectors(_e, shoulder).normalize(), _hx);
+    arm.upper.scale.y = shoulder.distanceTo(_e) / UPPER;
+    return;
+  }
   h.group.position.copy(pos); h.group.quaternion.copy(q);
   applyPose(h, pose);
   h.pose = pose;

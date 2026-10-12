@@ -1,10 +1,10 @@
-// Loads external 3D assets (currently the rigged soldier). Everything degrades gracefully:
+// Loads external 3D assets (the rigged soldier and the first-person hands). Everything degrades gracefully:
 // if a model fails to load, the procedural operator is used instead.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-export const ASSETS = { soldier: null, photo: {} };
+export const ASSETS = { soldier: null, photo: {}, hands: null };
 
 // Photo-scanned PBR sets (CC0, from ambientCG and Poly Haven) in assets/textures/<name>/.
 // Any set that fails to load falls back to the generated texture of the same name.
@@ -30,8 +30,30 @@ async function loadPhotoTextures(onProgress) {
   }));
 }
 
+// First-person hands: a skinned, textured hand (both viewmodel hands are this one, the left mirrored).
+export async function loadHandsAsset() {
+  if (ASSETS.hands) return ASSETS.hands;
+  try {
+    const tl = new THREE.TextureLoader();
+    const glb = new GLTFLoader().loadAsync('assets/models/hands.glb').catch(async () => {
+      // hosts that won't serve .glb get the model as a base64 module (like the soldier)
+      const { HANDS_B64 } = await import('./hands-data.js');
+      return new GLTFLoader().parseAsync(Uint8Array.from(atob(HANDS_B64), ch => ch.charCodeAt(0)).buffer, '');
+    });
+    const [gltf, map, normalMap, roughnessMap] = await Promise.all([
+      glb,
+      tl.loadAsync('assets/textures/hands/color.jpg'), tl.loadAsync('assets/textures/hands/normal.jpg'), tl.loadAsync('assets/textures/hands/rough.jpg'),
+    ]);
+    map.colorSpace = THREE.SRGBColorSpace;
+    for (const t of [map, normalMap, roughnessMap]) t.anisotropy = 8;
+    ASSETS.hands = { scene: gltf.scene, map, normalMap, roughnessMap };
+  } catch (e) { console.warn('Hand model unavailable, using procedural hands.', e); }
+  return ASSETS.hands;
+}
+
 export async function loadAssets(onProgress, onTexProgress) {
   const textures = loadPhotoTextures(onTexProgress);
+  const hands = loadHandsAsset();
   const loader = new GLTFLoader();
   try {
     let gltf;
@@ -61,7 +83,7 @@ export async function loadAssets(onProgress, onTexProgress) {
   } catch (err) {
     console.warn('Soldier model unavailable, using procedural operators.', err);
   }
-  await textures;
+  await Promise.all([textures, hands]);
 }
 
 // Readability (Black Ops 2 style): both kits stay bright, and every soldier gets a soft rim light
