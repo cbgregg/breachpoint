@@ -269,6 +269,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     dim: std({ color: 0x0c0d0e, roughness: 0.95 }),
   };
   M.bag = pbr(tex.bag || tex.fabric);
+  // patterned cement floor tiles in the houses (centre house gets grey marble)
+  if (tex.cement) M.houseFloor = pbr(tex.cement, { roughness: 1 });
+  if (tex.marblegrey) M.centerFloor = pbr(tex.marblegrey, { roughness: 1 });
   M.bag.normalScale = new THREE.Vector2(1.5, 1.5);
   // metres per texture repeat; photo sets are real-world scale, so they tile tighter than the generated ones
   const photo = (k) => !!(tex[k] && tex[k].photo);
@@ -461,8 +464,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (rnd() < 0.6 && !spec.light) put(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 14), M.metal, cx + (rnd() - 0.5) * (w - 2), y0 + h + 0.75, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0x3d6b8a, grime: 0.2, base: y0 + h });
     // floor
     const fl = new THREE.PlaneGeometry(w - 2 * T, d - 2 * T);
-    const uv = fl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w - 2 * T) / 1.6, uv.getY(i) * (d - 2 * T) / 1.6);
-    put(fl, M.tile, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xd8cbb4 });
+    const center = cx === 0 && cz === 0 && M.centerFloor;
+    const flMat = center ? M.centerFloor : M.houseFloor || M.tile, flS = center ? 3.2 : M.houseFloor ? 2.2 : 1.6;
+    const uv = fl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w - 2 * T) / flS, uv.getY(i) * (d - 2 * T) / flS);
+    put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
     // props
     for (const [k, dx, dz, rot] of spec.props || []) {
       const px = cx + dx, pz = cz + dz;
@@ -884,7 +889,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
   // custom maps build themselves with the same helpers
   let custom = null;
-  if (!street) custom = LAYOUT.build({ THREE, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
+  if (!street) custom = LAYOUT.build({ THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
 
   // street lamps and power poles inside the map edge
   if (street) for (const sz of [-1, 1]) for (let x = -24; x <= 24; x += 16) {

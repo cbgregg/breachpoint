@@ -8,7 +8,9 @@ export const ASSETS = { soldier: null, photo: {} };
 
 // Photo-scanned PBR sets (CC0, from ambientCG and Poly Haven) in assets/textures/<name>/.
 // Any set that fails to load falls back to the generated texture of the same name.
-export const PHOTO_SETS = ['asphalt', 'concrete', 'plaster', 'brick', 'metal', 'paint', 'wood', 'woodold', 'dirt', 'tile', 'bag', 'cloth', 'hesco', 'rubber'];
+export const PHOTO_SETS = ['asphalt', 'concrete', 'plaster', 'brick', 'metal', 'paint', 'wood', 'woodold', 'dirt', 'tile', 'bag', 'cloth', 'hesco', 'rubber',
+  // floor and wall tiles (supermarket, houses)
+  'storefloor', 'terracotta', 'subway', 'hexblack', 'checker', 'marble', 'octagon', 'whitetile', 'cement', 'marblegrey', 'tactile'];
 async function loadPhotoTextures(onProgress) {
   const loader = new THREE.TextureLoader();
   let done = 0;

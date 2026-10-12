@@ -177,6 +177,17 @@ function build(ctx) {
     goodsBottle: std({ map: goodsTex('bottle', 7), roughness: 0.25 }),
   });
   ctx.S.vinyl = 1.2; // metres per floor texture (4 x 4 tiles of 30 cm)
+  // photo tile sets (uploaded) where available, procedural otherwise
+  const T_ = ctx.tex, tile = (k, o = {}) => (T_[k] && T_[k].photo ? ctx.pbr(T_[k], { roughness: 1, ...o }) : null);
+  M.storeFloor = tile('storefloor') || M.vinyl;
+  M.bakeryFloor = tile('terracotta') || M.tile;
+  M.subway = tile('subway');
+  M.hexblack = tile('hexblack');
+  M.checker = tile('checker');
+  M.marble = tile('marble');
+  M.octagon = tile('octagon');
+  M.whitetile = tile('whitetile');
+  Object.assign(ctx.S, { storeFloor: 3.6, bakeryFloor: 3.0, subway: 1.4, hexblack: 1.0, checker: 3.0, marble: 3.6, octagon: 1.8, whitetile: 1.6 });
   const GOODS = [M.goodsBox, M.goodsCan, M.goodsBox2, M.goodsBottle];
   // solid + dressed box (bottom at y)
   const SB = (mat, w, h, d, x, y, z, opts = {}, surf = 'concrete') => { solid(x, z, w, d, h, y, surf); B(mat, w, h, d, x, y, z, 0, opts); };
@@ -202,8 +213,12 @@ function build(ctx) {
   plane(M.asphalt, 20.4, 61, -32.2, 0, 0.0);                 // parking lot
   plane(M.concrete, 20, 61, 32.4, 0, 0.004);                  // delivery yard
   for (const sz of [-1, 1]) plane(M.concrete, 44.8, 6.6, 0, sz * 27.4, 0.003); // side alleys
-  plane(M.vinyl, 44, 48, 0, 0, 0.01);                          // sales floor
-  plane(M.tile, 11, 18, 16.5, -15, 0.014);                     // bakery quarry tile
+  plane(M.storeFloor, 44, 48, 0, 0, 0.01);                     // sales floor
+  plane(M.bakeryFloor, 11.2, 18, 16.4, -15, 0.014);            // bakery: terracotta diamonds
+  if (M.marble) { plane(M.marble, 3.6, 7.2, -20.2, -19, 0.016); plane(M.marble, 3.6, 7.2, -20.2, 18.6, 0.016); } // entrance halls
+  if (M.hexblack) plane(M.hexblack, 4.3, 10, 12.85, 0, 0.015);  // behind the deli counter
+  if (M.checker) plane(M.checker, 5, 8, 19.5, 12, 0.02);        // break room
+  if (M.octagon) plane(M.octagon, 5, 8, 19.5, 20, 0.02);        // locker room
   // front sidewalk + curb
   plane(M.tile, 3, 61, -23.9, 0, 0.02);
   B(M.concrete, 0.25, 0.14, 61, -25.5, 0, 0, 0, { grime: 0.2, cast: false });
@@ -435,6 +450,17 @@ function build(ctx) {
   breadCart(17.6, -9); breadCart(12.4, -17.3); breadCart(18.6, -9);
   for (let i = 0; i < 6; i++) ctx.bag(18.3 + (i % 3) * 0.62, 0.12 + ((i / 3) | 0) * 0.2, -23.1, 0, 0xe8e0d0);
   solid(18.9, -23.1, 2, 0.5, 0.5, 0, 'dirt');
+  // tiled walls behind the ovens (herringbone) and behind the deli (white grid), up to 2.4 m
+  const wallTiles = (mat, x, z0, z1, gaps = []) => {
+    if (!mat) return;
+    let cur = z0;
+    for (const [a, b] of [...gaps, [z1, z1]]) {
+      if (a - cur > 0.05) { const g = new THREE.PlaneGeometry(a - cur, 2.4); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (a - cur) / ctx.S[mat === M.subway ? 'subway' : 'whitetile'], uv.getY(i) * 2.4 / ctx.S[mat === M.subway ? 'subway' : 'whitetile']); P(g, mat, x, 1.2, (a + cur) / 2, -Math.PI / 2, { cast: false }); }
+      cur = b;
+    }
+  };
+  wallTiles(M.subway, 21.98, -24, -6, [[-19.4, -17.8]]);
+  wallTiles(M.whitetile, 14.86, -6, 6, [[-1, 1]]);
   // the bakery back door has a scuffed kick plate; dumpsters wait outside
 
   // ---------- deli ----------
