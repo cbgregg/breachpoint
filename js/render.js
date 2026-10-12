@@ -201,7 +201,10 @@ export class Renderer {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
-    this.scene.traverse(o => { if (o.isPointLight && o.userData.mapLight) o.visible = q.label !== 'Low'; });
+    this.scene.traverse(o => {
+      if (o.isPointLight && o.userData.mapLight) o.visible = q.label !== 'Low';
+      if (o.userData.lampLight) o.visible = q.label === 'High' || q.label === 'Ultra';
+    });
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao;
     this.bloomPass.enabled = q.bloom;

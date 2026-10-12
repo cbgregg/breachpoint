@@ -887,6 +887,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     group.add(lamp);
     glows.push([x, 5.75, z - sz * 1.1, 1.6]);
     decal(poolMat, 7, 7, x, 0.05, z - sz * 2.2, 0, -Math.PI / 2);
+    // a real light under each lamp head (High / Ultra): lights walls, players and the street below
+    const spot = new THREE.SpotLight(0xffc27a, 130, 18, 0.95, 0.65, 1.6);
+    spot.position.set(x, 5.7, z - sz * 1.1);
+    spot.target.position.set(x, 0, z - sz * 3.2);
+    spot.userData.lampLight = true;
+    group.add(spot, spot.target);
   }
   // glow sprites for every bulb (bloom does the rest)
   if (glows.length) {

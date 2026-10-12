@@ -847,7 +847,8 @@ export class Game {
     this.world = buildWorld(this.scene, this.physics, id);
     setCharacterDetail(this.world.textures.fabric);
     const lit = !this.renderer.quality || this.renderer.quality.label !== 'Low';
-    this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; });
+    const lamps = !!this.renderer.quality && (this.renderer.quality.label === 'High' || this.renderer.quality.label === 'Ultra');
+    this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; if (o.userData.lampLight) o.visible = lamps; });
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
     this.buildPickups();

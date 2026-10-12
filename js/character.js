@@ -771,7 +771,7 @@ function animateSoldier(c, dt, showName) {
   m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
 }
 
-function ikArms(m, rightTarget, leftTarget, aimQ) {
+function ikArms(m, rightTarget, leftTarget, aimQ, leftDir = null, leftFree = false) {
   const B = m.bones;
   const solveArm = (sideName, target, pole) => {
     const upper = B[sideName + 'Arm'], fore = B[sideName + 'ForeArm'], hand = B[sideName + 'Hand'];
@@ -780,10 +780,13 @@ function ikArms(m, rightTarget, leftTarget, aimQ) {
     swingBone(upper, fore, E.clone().sub(S).normalize());
     swingBone(fore, hand, target.clone().sub(E).normalize());
   };
-  solveArm('Right', rightTarget, new THREE.Vector3(1, -1.2, 0.4).applyQuaternion(aimQ));
-  solveArm('Left', leftTarget, new THREE.Vector3(-1, -1.3, 0.1).applyQuaternion(aimQ));
+  // first person: the right elbow stays out and down in camera space, so canting the gun for a reload or
+  // swinging it up for tactical sprint can't flip the arm across the screen (third person keeps it gun-relative)
+  solveArm('Right', rightTarget, m.fp ? new THREE.Vector3(1, -1.25, 0.35) : new THREE.Vector3(1, -1.2, 0.4).applyQuaternion(aimQ));
+  // a free left hand (reloading, tactical sprint) keeps its elbow down and out in camera space
+  solveArm('Left', leftTarget, leftFree ? new THREE.Vector3(-0.25, -1, 0.12) : new THREE.Vector3(-1, -1.3, 0.1).applyQuaternion(aimQ));
   swingBone(B.RightHand, B.RightHandMiddle1, new THREE.Vector3(-0.55, -0.45, -0.7).applyQuaternion(aimQ).normalize());
-  swingBone(B.LeftHand, B.LeftHandMiddle1, new THREE.Vector3(0.55, 0.35, -0.75).applyQuaternion(aimQ).normalize());
+  swingBone(B.LeftHand, B.LeftHandMiddle1, leftDir ? leftDir.clone().normalize() : new THREE.Vector3(0.55, 0.35, -0.75).applyQuaternion(aimQ).normalize());
 }
 
 // First-person body: the same rig placed under the camera with the head collapsed, so only
@@ -807,6 +810,7 @@ export function createFpBody(team) {
   const neck = b.Neck.getWorldPosition(new THREE.Vector3());
   sol.root.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
   return {
+    fp: true,
     root, inner: sol.root, bones: b, mixer: sol.mixer, neck,
     armLen: { upper: len('RightArm', 'RightForeArm'), fore: len('RightForeArm', 'RightHand') },
   };
@@ -815,7 +819,7 @@ export function createFpBody(team) {
 const _I = new THREE.Quaternion();
 const FP_ARM = 1.4;
 export const FINGER_AXIS = [1, 0, 0], THUMB_AXIS = [0, 0, 1], FINGER_SIGN = [1, 1];
-export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gunQ = _I, grip = 1) {
+export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gunQ = _I, grip = 1, leftDir = null, leftFree = false, leftGrip = 1) {
   fp.mixer.update(dt);
   // the clip keys bone positions, so re-stretch the arms after every update
   for (const side of ['Left', 'Right']) {
@@ -827,14 +831,15 @@ export function poseFpBody(fp, dt, rightTarget, leftTarget, shoulderDrop = 0, gu
   fp.bones.Head.scale.setScalar(0.001);
   fp.bones.Neck.scale.setScalar(0.4);
   fp.root.updateMatrixWorld(true);
-  ikArms(fp, rightTarget, leftTarget, gunQ);
-  curlFingers(fp.bones, grip);
+  ikArms(fp, rightTarget, leftTarget, gunQ, leftDir, leftFree);
+  curlFingers(fp.bones, grip, leftGrip);
 }
 
 // close the hands around the grips (the idle clip leaves them open)
 const _fq = new THREE.Quaternion(), _fa = new THREE.Vector3();
-export function curlFingers(B, k = 1) {
+export function curlFingers(B, kR = 1, kL = kR) {
   for (const side of ['Left', 'Right']) {
+    const k = side === 'Left' ? kL : kR;
     for (const f of ['Index', 'Middle', 'Ring', 'Pinky']) {
       for (let j = 1; j <= 3; j++) {
         const bone = B[side + 'Hand' + f + j];

@@ -16,6 +16,8 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 const SHOULDER_R = new THREE.Vector3(0.24, -0.4, 0.15), SHOULDER_L = new THREE.Vector3(-0.24, -0.42, 0.05);
 const POLE_R = new THREE.Vector3(1, -0.8, 0.2), POLE_L = new THREE.Vector3(-1, -0.9, 0);
+const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
+const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
 const _lq = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
 const EYE_RELIEF = -0.15;
 const INSPECT = 3.0; // seconds
@@ -480,20 +482,18 @@ export class PlayerController {
       h.rotation.z += 0.4 * s1 - 0.85 * s2 + w2;
     }
 
-    // magazine + hand choreography during reload
+    // magazine + hand choreography during reload: the left hand grips the mag, pulls it, takes it down
+    // out of view, comes back with a fresh one, seats it, slaps it home and returns to the foregrip.
+    // The mag stays in the hand the whole time.
     const mag = gun.mag;
     mag.position.copy(gun.magHome);
     mag.visible = true;
-    let leftMode = 'grip';
+    let leftMode = 'grip', leftFree = false, leftGrip = 1;
+    _ld.set(0, 0, 0);
     if (s2 > 0.6 && w.id !== 'shotgun') leftMode = 'mag';
-    if (w.reloading && w.id !== 'shotgun') {
-      const out = smooth(0.12, 0.32, rp), back = 1 - smooth(0.5, 0.72, rp);
-      const off = rp < 0.42 ? out : rp < 0.5 ? 1 : back;
-      mag.position.y -= off * 0.2;
-      mag.position.z += off * 0.06;
-      mag.visible = !(rp > 0.34 && rp < 0.5);
-      leftMode = rp < 0.08 || rp > 0.82 ? 'grip' : rp > 0.34 && rp < 0.5 ? 'pouch' : 'mag';
-    } else if (w.reloading && w.id === 'shotgun') {
+    const magReload = w.reloading && w.id !== 'shotgun';
+    if (magReload) leftMode = 'magReload';
+    else if (w.reloading && w.id === 'shotgun') {
       leftMode = Math.sin(rp * Math.PI * 10) > 0 ? 'pouch' : 'port';
     }
     // bolt / pump cycling after a shot
@@ -528,15 +528,48 @@ export class PlayerController {
     gun.group.localToWorld(_R.set(0, -0.04, 0.03));
     if (leftMode === 'grip') {
       (gun.pump || gun.foregrip).getWorldPosition(_L);
-      if (gun.pump) _L.y -= 0.0;
     } else if (leftMode === 'mag') {
       mag.getWorldPosition(_L);
       _L.y -= 0.06;
     } else if (leftMode === 'port') {
       gun.eject.getWorldPosition(_L);
       _L.y -= 0.05;
-    } else {
-      _L.set(-0.12, -0.42, -0.15);
+      _ld.set(0.3, 0.4, -0.85).applyQuaternion(h.quaternion);
+    } else if (leftMode === 'pouch') {
+      gun.mag.getWorldPosition(_L); _L.add(_a.set(-0.05, -0.4, 0.05)); leftGrip = 0.8; leftFree = true;
+    } else if (leftMode === 'magReload') {
+      const bottom = MAG_BOTTOM[w.def.model.type] ?? -0.18;
+      _gl.copy(gun.magHome).add(_a.set(0, bottom * 0.62, -0.01));          // where the fingers wrap the mag
+      gun.group.localToWorld(_m0.copy(_gl));                                 // M0: mag seated
+      (gun.pump || gun.foregrip).getWorldPosition(_fg);                      // F: foregrip
+      _m1.copy(_m0).add(_a.set(0.01, -0.15, 0.05));                         // M1: mag pulled clear
+      _pp.copy(_m0).add(_a.set(-0.06, -0.42, 0.06));                         // P: straight down, out of view
+      const seg = (a, b) => smooth(a, b, rp);
+      let attach = true;
+      if (rp < 0.1) { _L.lerpVectors(_fg, _m0, seg(0, 0.1)); attach = false; }
+      else if (rp < 0.24) _L.lerpVectors(_m0, _m1, seg(0.1, 0.24));
+      else if (rp < 0.4) _L.lerpVectors(_m1, _pp, seg(0.24, 0.4));
+      else if (rp < 0.56) _L.lerpVectors(_pp, _m1, seg(0.4, 0.56));
+      else if (rp < 0.7) _L.lerpVectors(_m1, _m0, seg(0.56, 0.7));
+      else if (rp < 0.78) { _L.copy(_m0); _L.y += 0.025 * bump(0.7, 0.78, rp); attach = rp < 0.72; }
+      else { _L.lerpVectors(_m0, _fg, seg(0.78, 0.92)); attach = false; }
+      if (attach) {
+        // the magazine rides in the hand
+        gun.group.worldToLocal(_a.copy(_L));
+        mag.position.copy(gun.magHome).add(_a.sub(_gl));
+      }
+      // palm wraps the front of the mag, fingers forward and a little up
+      _ld.set(0.35, 0.3, -0.9).applyQuaternion(h.quaternion);
+      leftGrip = attach ? 1 : 0.85;
+      leftFree = rp > 0.06 && rp < 0.86; // elbow tucked down while the hand works the mag
+    }
+    // tactical sprint: the left hand lets go and the arm drops, pumping below the frame like a running arm
+    const tkL = this.tacK || 0;
+    if (tkL > 0.35 && !w.reloading) {
+      const sw = Math.sin(this.bobT), k = smooth(0.35, 0.8, tkL);
+      _a.set(-0.2, -0.78 + 0.05 * Math.abs(sw), -0.12 + 0.1 * sw);
+      _L.lerp(_a, k);
+      leftGrip = 0.6; leftFree = k > 0.3;
     }
     if (c.grenadeCd > 0.4) _L.set(-0.1, -0.05 - gren0 * 0.1, -0.45 + gren0 * 0.1);
     // cooking: frag in the left hand, held up beside the lowered gun
@@ -556,7 +589,7 @@ export class PlayerController {
       // wrist sits slightly behind/below the grip point
       _R.add(_a.set(0.004, -0.004, 0.045).applyQuaternion(h.quaternion));
       _L.add(_a.set(-0.02, -0.025, 0.045).applyQuaternion(h.quaternion));
-      poseFpBody(this.fp, dt, _R, _L, this.sprintT * 0.05, h.quaternion);
+      poseFpBody(this.fp, dt, _R, _L, this.sprintT * 0.05, h.quaternion, 1, _ld.lengthSq() > 0 ? _ld : null, leftFree, leftGrip);
     } else {
       this.poseArm(this.armR, SHOULDER_R, _R, POLE_R, h);
       this.poseArm(this.armL, SHOULDER_L, _L, POLE_L, h);
