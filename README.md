@@ -79,6 +79,7 @@ There are no passwords. You enter your email and get a **6-digit code** and a **
 - **Display name**: optional, and only your friends see it.
 - **Friend code** (`ABCD-2345`): every account gets one. Give it to friends; they enter it to send you a request.
 - **Social sidebar**: press **Y** on a controller, **F** on a keyboard, or tap **FRIENDS** in any menu. Sign in, change your Name Tag and display name, copy your friend code, add friends by code, accept / decline / cancel requests, see who's online and where (menus, lobby or match, mode and map), and **Join** a friend's lobby or match. Friends skip the host's approval step.
+- **Recent players**: everyone you shared an online lobby or match with (signed-in players) is listed in the sidebar with an **Add** button, so you can friend them without swapping codes.
 - *Options → Account* has Sign out and Delete account (which also removes you from friends' lists).
 
 Why it's safe:
@@ -104,6 +105,9 @@ The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers K
 Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a day; sessions last 60 days so returning players don't count), Resend 100 emails a day. The $5/month Workers plan lifts the KV limit.
 
 ### Matches
+
+- **Text chat** in lobbies, the pause menu and during matches: press **T** or **Enter** to type (touch: the CHAT button). The host relays every line and filters it: offensive words become `***`, links are removed, and each player is limited to 5 lines per 8 seconds. Turn it off in *Options → Online*.
+- **Private match settings**: the host picks mode, map, size and friendly fire on the Play tab, and can switch **Fill empty slots with bots** off for a players-only match (each team needs at least one player). Guests see the settings while they wait. Friends skip the host's approval.
 
 **Quick match** puts you in a public game with no code: the game checks for open public lobbies for a few seconds and drops you into the fullest one, mid-match if one is running, taking a bot's slot. If none are open, you host one and others drop in. Public matches use fixed rules (6v6 with bots, 75 kills, 10 minutes, no friendly fire), start the next match automatically, and if the host leaves everyone is moved to another match. Finding a match only reads small public notices on Nostr relays, so nothing connects to you until you join one. Public matches go through a Cloudflare relay, so other players can't see your IP address.
 

@@ -73,7 +73,7 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       this.setDevice('kbm');
-      if (!this.enabled) return;
+      if (!this.enabled || this.chatting) return; // typing in chat never moves or shoots
       if (GAME_KEYS.has(e.code)) e.preventDefault();
       if (!this.keys.has(e.code) && KEY_ACTIONS[e.code]) this.actions.add(KEY_ACTIONS[e.code]);
       this.keys.add(e.code);
@@ -82,7 +82,7 @@ export class Input {
     window.addEventListener('blur', () => { this.keys.clear(); this.mouseFire = false; this.mouseAds = false; });
     canvas.addEventListener('mousedown', (e) => {
       this.setDevice('kbm');
-      if (!this.enabled || this.isTouch) return;
+      if (!this.enabled || this.isTouch || this.chatting) return;
       if (!this.locked && !this.fallback) return;
       if (e.button === 0) this.mouseFire = true;
       if (e.button === 2) { this.mouseAds = true; this.adsPress(); }

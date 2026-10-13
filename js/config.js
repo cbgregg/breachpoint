@@ -116,12 +116,13 @@ export const TURN_ENDPOINT = 'https://breachpoint-turn.broad-mouse-d2f9.workers.
 export const AUTH_ENDPOINT = 'https://breachpoint-auth.broad-mouse-d2f9.workers.dev';
 
 // Quick match (public) rules: the same for every public lobby
-export const PUBLIC_MATCH = { mode: 'tdm', teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false, map: 'random' };
+export const PUBLIC_MATCH = { fillBots: true, mode: 'tdm', teamSize: 6, difficulty: 'normal', scoreLimit: 75, timeLimit: 10, friendlyFire: false, map: 'random' };
 
 // Optional: your own music files (paths in the repo, e.g. 'assets/music/menu.mp3'). null = the built-in score.
 export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
+  fillBots: true, chat: true,
   musicVolume: 0.5,
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
   sightSize: 'large',  // how much of the screen the sight fills when aiming: normal | large | huge

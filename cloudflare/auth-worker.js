@@ -281,12 +281,21 @@ async function friends({ env, cors }, user) {
   return json({ friends: friendsList, incoming: pend(d.i), outgoing: pend(d.o) }, 200, cors);
 }
 
+// add by friend code, or by account id (Recent Players: ids are only shared inside signed online matches)
 async function friendAdd({ env, body, cors }, user) {
-  const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (!/^[A-Z0-9]{8}$/.test(code)) return json({ error: 'Friend codes look like ABCD-2345.' }, 400, cors);
-  if (!await allow(env, `rl:fr:${user.id}`, MAX_REQ_PER_DAY, 86400)) return json({ error: 'Too many friend requests today. Try again tomorrow.' }, 429, cors);
-  const them = await env.ACCOUNTS.get(`fcode:${code}`);
-  if (!them) return json({ error: 'No player has that friend code.' }, 404, cors);
+  let them = null;
+  if (typeof body.id === 'string' && !body.code) {
+    if (!/^[A-Za-z0-9_-]{8,40}$/.test(body.id)) return json({ error: 'bad id' }, 400, cors);
+    if (!await allow(env, `rl:fr:${user.id}`, MAX_REQ_PER_DAY, 86400)) return json({ error: 'Too many friend requests today. Try again tomorrow.' }, 429, cors);
+    if (!await getJSON(env, `user:${body.id}`)) return json({ error: 'That player\'s account no longer exists.' }, 404, cors);
+    them = body.id;
+  } else {
+    const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^[A-Z0-9]{8}$/.test(code)) return json({ error: 'Friend codes look like ABCD-2345.' }, 400, cors);
+    if (!await allow(env, `rl:fr:${user.id}`, MAX_REQ_PER_DAY, 86400)) return json({ error: 'Too many friend requests today. Try again tomorrow.' }, 429, cors);
+    them = await env.ACCOUNTS.get(`fcode:${code}`);
+    if (!them) return json({ error: 'No player has that friend code.' }, 404, cors);
+  }
   if (them === user.id) return json({ error: 'That\'s your own friend code.' }, 400, cors);
   const me = await frGet(env, user.id), other = await frGet(env, them);
   if (me.f[them]) return json({ error: 'You\'re already friends.' }, 400, cors);

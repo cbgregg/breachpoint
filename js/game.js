@@ -166,9 +166,11 @@ export class Game {
       for (const p of online.lobby.players.values()) this.characters.push(this.session.createRemote(p));
     }
     this.botNames = shuffle([...BOT_NAMES]);
+    // private online matches can be humans only (host's "Fill empty slots with bots" switch)
+    const fill = !(this.mode === 'host' && settings.fillBots === false);
     for (let t = 0; t < 2; t++) {
       const humans = this.characters.filter(c => c.team === t).length;
-      for (let i = humans; i < N; i++) this.addBot(t);
+      for (let i = humans; fill && i < N; i++) this.addBot(t);
     }
     this.playerCtl = new PlayerController(this, this.player);
 

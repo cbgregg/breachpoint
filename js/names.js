@@ -38,3 +38,26 @@ export function safeName(name) {
   for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return `Operator-${(h % 900) + 100}`;
 }
+
+// Chat filter: offensive words become ***, links are removed (no phishing), length and spacing are capped.
+// Runs of single letters ("f u c k") are checked as one word.
+export function cleanChat(text) {
+  let s = String(text || '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁠-⁯]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  s = s.replace(/\b(?:https?:\/\/|www\.)\S+/gi, '[link]').replace(/\b[a-z0-9-]+\.(?:com|net|org|gg|io|ly|xyz|ru|co|me|tv)(?:\/\S*)?\b/gi, '[link]');
+  const words = s.split(' ');
+  const out = [];
+  for (let i = 0; i < words.length; i++) {
+    // gather a run of single characters (spaced-out words)
+    if (words[i].length === 1) {
+      let j = i;
+      while (j < words.length && words[j].length === 1) j++;
+      if (j - i >= 3) {
+        const joined = words.slice(i, j).join('');
+        if (isOffensive(joined)) { out.push('*'.repeat(joined.length)); i = j - 1; continue; }
+      }
+    }
+    const w = words[i];
+    out.push(isOffensive(w.replace(/[^\p{L}\p{N}@$!|+]/gu, '')) ? '*'.repeat(Math.min(8, w.length)) : w);
+  }
+  return out.join(' ').trim();
+}

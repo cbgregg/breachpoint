@@ -82,7 +82,7 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
@@ -228,6 +228,7 @@ function showScreen(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
   document.body.classList.toggle('side-ok', sideAllowed());
   document.body.classList.toggle('in-menus', !!id && id !== 'loading');
+  if (window.__chatReady) { if (chatOpen) closeChat(); syncChat(); }
   if (sideOpen && !sideAllowed()) closeSide();
   document.body.classList.toggle('ingame', id === null);
   if (id && game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
@@ -240,34 +241,47 @@ function drawLoadingMap(id) {
   wrap.classList.toggle('on', !!have);
   if (have) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(game.minimap.canvas, 0, 0, c.width, c.height); }
 }
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
 function launch(cfg, online = null) {
-  const gm = MODES[(online && online.start && online.start.cfg && online.start.cfg.mode) || cfg.mode] || MODES.tdm;
-  const mapId = (online && online.start && online.start.cfg && online.start.cfg.map) || cfg.map;
+  const guestCfg = online && online.start && online.start.cfg;
+  // "Random" is decided here, before the loading screen, so it can name the map
+  if (!guestCfg && !MAPS[cfg.map]) { const ids = Object.keys(MAPS); cfg = { ...cfg, map: ids[(Math.random() * ids.length) | 0] }; }
+  const gm = MODES[(guestCfg && guestCfg.mode) || cfg.mode] || MODES.tdm;
+  const mapId = (guestCfg && guestCfg.map) || cfg.map;
   const map = MAPS[mapId];
   const ld = $('loading');
   ld.classList.remove('boot');
   $('ld-mode').textContent = `${gm.name.toUpperCase()}${online ? ' · MULTIPLAYER' : ' · COMBAT TRAINING'}`;
-  $('ld-name').textContent = map ? map.name.toUpperCase() : 'RANDOM MAP';
-  $('ld-desc').textContent = map ? (map.blurb || '') : 'Picking a map…';
+  $('ld-name').textContent = map ? map.name.toUpperCase() : 'LOADING';
+  $('ld-desc').textContent = map ? (map.blurb || '') : '';
   $('ld-tip').textContent = TIPS[(Math.random() * TIPS.length) | 0];
-  $('load-text').textContent = 'Building the map…';
   const fill = $('load-fill');
-  fill.style.transition = 'none'; fill.style.width = '8%';
+  const step = (pct, text) => { fill.style.width = `${pct}%`; $('load-text').textContent = `${text} · ${pct}%`; };
+  fill.style.transition = 'none'; step(0, 'Loading');
   drawLoadingMap(map ? mapId : null);
   showScreen('loading');
-  return new Promise((resolve, reject) => requestAnimationFrame(() => {
-    fill.style.transition = ''; fill.style.width = '62%';
-    setTimeout(() => {
-      try { game.startMatch(cfg, online); } catch (e) { showScreen('menu'); reject(e); return; }
-      const w = MAPS[game.world.id];
-      $('ld-name').textContent = (w ? w.name : game.world.name || '').toUpperCase();
-      if (w) $('ld-desc').textContent = w.blurb || '';
-      drawLoadingMap(game.world.id);
-      fill.style.width = '100%';
-      $('load-text').textContent = 'Ready';
-      setTimeout(() => { if (screen === 'loading') showScreen(null); resolve(); }, online && online.mode === 'guest' ? 120 : 650);
-    }, 90);
-  }));
+  const t0 = performance.now();
+  return (async () => {
+    await nextFrame();
+    fill.style.transition = '';
+    step(15, 'Loading textures');
+    await wait(160); await nextFrame();
+    step(35, 'Building the map');
+    await wait(220); await nextFrame();   // let the bar paint before the (blocking) build
+    try { game.startMatch(cfg, online); } catch (e) { showScreen('menu'); throw e; }
+    const w = MAPS[game.world.id];
+    $('ld-name').textContent = (w ? w.name : game.world.name || '').toUpperCase();
+    if (w) $('ld-desc').textContent = w.blurb || '';
+    drawLoadingMap(game.world.id);
+    step(80, 'Deploying squads');
+    await wait(200); await nextFrame();
+    // warm up shaders so the first seconds of the match don't stutter
+    try { game.renderer.renderer.compile(game.scene, game.camera); } catch (_) { /* optional */ }
+    step(100, 'Ready');
+    await wait(Math.max(online && online.mode === 'guest' ? 150 : 450, 1300 - (performance.now() - t0)));
+    if (screen === 'loading') showScreen(null);
+  })();
 }
 function deploy() {
   for (const [id, key, type] of bindings) readField(id, key, type);
@@ -407,6 +421,7 @@ function syncOnlineFlags() {
 function leaveOnline() {
   if (lobby.active) lobby.close();
   syncOnlineFlags();
+  clearChat();
 }
 
 let quickIntro = false;
@@ -449,6 +464,10 @@ function renderLobby() {
   $('lobby-quickintro').classList.toggle('on', quickIntro);
   $('lobby-title').textContent = quickIntro || lobby.quickMode || lobby.public ? 'QUICK MATCH' : host ? 'HOSTING' : 'JOIN MATCH';
   $('opt-approve').closest('.row').style.display = lobby.public ? 'none' : '';
+  $('fillbots-row').style.display = lobby.public ? 'none' : '';
+  $('opt-fillbots').checked = settings.fillBots !== false;
+  const inf = lobby.role === 'guest' ? lobby.info : null;
+  $('join-info').textContent = inf ? [(MODES[inf.m] || MODES.tdm).name, MAPS[inf.map] ? MAPS[inf.map].name : 'Random map', `${inf.n}v${inf.n}`, inf.b ? 'bots fill empty slots' : 'no bots, players only', inf.ff ? 'friendly fire' : ''].filter(Boolean).join(' · ') : '';
   $('code-slots').style.display = lobby.quickMode && !lobby.code ? 'none' : '';
   const quickish = quickIntro || lobby.quickMode || lobby.public;
   $('join-label').textContent = quickish ? 'PUBLIC MATCH' : 'ENTER MATCH CODE';
@@ -475,7 +494,7 @@ function renderLobby() {
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
-      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; bots fill empty slots.`;
+      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; ${settings.fillBots === false ? 'no bots: only real players.' : 'bots fill empty slots.'}`;
     $('lobby-leave').textContent = inMatch ? 'END SESSION' : 'CLOSE LOBBY';
   } else {
     const slots = $('code-slots').querySelectorAll('i');
@@ -504,7 +523,7 @@ function renderLobby() {
   }
   if (game.input.lastDevice === 'pad' && !document.querySelector('#lobby .pad-focus')) focusFirst();
 }
-lobby.onUpdate = () => renderLobby();
+lobby.onUpdate = () => { renderLobby(); noteRecent(lobbyPeople()); syncChat(); };
 lobby.onToast = (s) => game.hud.toast(s);
 
 $('host-btn').addEventListener('click', () => {
@@ -536,6 +555,7 @@ $('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, 
 // public matches use fixed rules, but in the game mode you picked (players are matched by mode)
 const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || settings.mode || 'tdm' });
 lobby.onQuickHost = () => {
+  setMapHint();
   launch(publicSettings(), { mode: 'host', lobby }).then(() => {
     syncOnlineFlags();
     game.hud.toast('NO OPEN MATCHES — YOU\'RE HOSTING. PLAYERS WILL DROP IN');
@@ -582,9 +602,20 @@ function tryJoin() {
   lobby.join(joinCode, myName(), loadoutFromSettings(settings));
 }
 lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(id); };
-const setMapHint = () => { lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : ''); };
+const setMapHint = () => {
+  lobby.mapHint = lobby.public ? '' : (MAPS[settings.map] ? settings.map : '');
+  // what guests see about the match they're waiting for
+  const cfg = lobby.public ? publicSettings() : settings;
+  lobby.info = { m: cfg.mode || 'tdm', map: MAPS[cfg.map] ? cfg.map : 'random', n: cfg.mode === 'gunfight' ? 2 : cfg.teamSize, b: cfg.fillBots === false ? 0 : 1, ff: !!cfg.friendlyFire };
+};
+for (const id of ['opt-fillbots', 'opt-team', 'opt-ff']) $(id).addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); renderLobby(); } });
+$('opt-mode').addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); } });
 $('lobby-start').addEventListener('click', () => {
   readAll();
+  if (!lobby.public && settings.fillBots === false) {
+    const teams = [lobby.hostTeam, ...[...lobby.players.values()].map(p => p.team)];
+    if (!teams.includes(0) || !teams.includes(1)) { game.hud.toast('BOTS ARE OFF: PUT AT LEAST ONE PLAYER ON EACH TEAM (⇄)'); return; }
+  }
   clearTimeout(nextMatchT);
   launch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
 });
@@ -1149,11 +1180,122 @@ function renderSide() {
       ${canJoin ? `<button class="menu-btn small ok" data-join="${esc(f.join)}" data-nav>JOIN</button>` : ''}
       <button class="menu-btn small warn" data-fr="remove" data-id="${esc(f.id)}" data-nav title="Remove friend">✕</button></div>`;
   }).join('') : '<div class="sd-empty">No friends yet. Share your friend code, or enter a friend\'s code above.</div>');
+  renderRecent(d);
 }
 account.onFriends = (d, fresh) => {
   renderSide();
   for (const r of fresh) game.hud.toast(`FRIEND REQUEST FROM ${String(r.tag).toUpperCase()}`);
 };
+
+// ---------- recent players (people you were in an online lobby or match with) ----------
+const RECENT_KEY = 'breachpoint.recent.v1';
+let recent = (() => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').filter(r => r && r.u); } catch (_) { return []; } })();
+let recentDirty = false;
+function noteRecent(list) {
+  if (!account.signedIn) return;
+  const me = account.user.id, now = Date.now();
+  const where = { m: (lobby.info && lobby.info.m) || settings.mode, map: game.state !== 'menu' ? game.world.id : (lobby.info && lobby.info.map) || '' };
+  for (const p of list) {
+    if (!p.u || p.u === me) continue;
+    const old = recent.find(r => r.u === p.u);
+    if (old) { if (old.n !== p.n || now - old.at > 60000) { old.n = p.n; old.at = now; Object.assign(old, where); recentDirty = true; } }
+    else { recent.unshift({ u: p.u, n: p.n, at: now, ...where }); recentDirty = true; }
+  }
+  if (!recentDirty) return;
+  recent.sort((a, b) => b.at - a.at);
+  recent = recent.slice(0, 30);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (_) { /* ignore */ }
+  recentDirty = false;
+  if (sideOpen) renderSide();
+}
+function lobbyPeople() {
+  if (lobby.role === 'host') return [...lobby.players.values()].map(p => ({ u: p.uid || '', n: p.name }));
+  if (lobby.role === 'guest') return (lobby.roster || []).map(p => ({ u: p.u, n: p.n }));
+  return [];
+}
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+function renderRecent(d) {
+  const fr = new Set(d.friends.map(f => f.id)), out = new Set(d.outgoing.map(f => f.id)), inc = new Set(d.incoming.map(f => f.id));
+  setHTML('sd-recent', recent.length ? recent.map(r => {
+    const state = fr.has(r.u) ? '<span class="sd-tagline">FRIEND</span>' : out.has(r.u) ? '<span class="sd-tagline">REQUESTED</span>'
+      : inc.has(r.u) ? `<button class="menu-btn small ok" data-fr="accept" data-id="${esc(r.u)}" data-nav>ACCEPT</button>`
+        : `<button class="menu-btn small" data-addid="${esc(r.u)}" data-nav>ADD</button>`;
+    const where = [MODE_SHORT[r.m] || '', MAPS[r.map] ? MAPS[r.map].name : ''].filter(Boolean).join(' · ');
+    return `<div class="sd-row off"><span class="sd-dot"></span><span class="sd-n"><b>${esc(r.n)}</b><small>${esc([where, ago(r.at)].filter(Boolean).join(' · '))}</small></span>${state}</div>`;
+  }).join('') : '<div class="sd-empty">Players you meet in online matches show up here, so you can add them.</div>');
+}
+
+// ---------- text chat (online lobbies and matches; the host filters and relays every line) ----------
+const chatLines = [];
+let chatOpen = false;
+const chatOn = () => lobby.active && settings.chat !== false;
+function clearChat() { chatLines.length = 0; $('chat-log').innerHTML = ''; closeChat(); syncChat(); }
+function syncChat() {
+  const on = chatOn();
+  const menuChat = on && (screen === 'lobby' || screen === 'pause' || screen === 'end');
+  document.body.classList.toggle('chat-on', on);
+  document.body.classList.toggle('chat-menu', menuChat);
+  document.body.classList.toggle('chat-open', on && (chatOpen || menuChat));
+  // in the lobby and pause menus the chat sits inside the panel; in a match it floats over the HUD
+  const chat = $('chat');
+  const dock = !menuChat ? document.body : screen === 'lobby' ? document.querySelector('#lobby .mw') : screen === 'pause' ? document.querySelector('#pause .pause-panel') : document.querySelector('#end .mw') || document.body;
+  if (dock && chat.parentElement !== dock) {
+    if (dock === document.body) document.body.insertBefore(chat, $('chat-btn'));
+    else dock.appendChild(chat);
+  }
+  chat.classList.toggle('docked', !!dock && dock !== document.body);
+}
+function addChat(line) {
+  if (settings.chat === false) return;
+  const my = game.state !== 'menu' && game.player ? game.player.team : (lobby.role === 'host' ? lobby.hostTeam : null);
+  const cls = line.sys ? 'sys' : my == null ? `t${line.tm}` : line.tm === my ? 'f' : 'e';
+  const el = document.createElement('div');
+  el.className = `cl ${cls}`;
+  el.innerHTML = line.sys ? `<i>${esc(line.x)}</i>` : `<b>${esc(line.n)}:</b> ${esc(line.x)}`;
+  el.dataset.t = Date.now();
+  const log = $('chat-log');
+  log.appendChild(el);
+  chatLines.push(el);
+  while (chatLines.length > 40) chatLines.shift().remove();
+  log.scrollTop = log.scrollHeight;
+  if (!line.me && !line.sys && !chatOpen && screen === null) game.audio.play('ui', null, { ui: true, freq: 1800 });
+}
+lobby.onChat = addChat;
+// in a match, old lines fade out unless the chat box is open
+setInterval(() => { const now = Date.now(); for (const el of chatLines) el.classList.toggle('old', now - el.dataset.t > 9000); }, 1000);
+function openChat() {
+  if (!chatOn()) return;
+  chatOpen = true;
+  game.input.chatting = true;
+  game.input.keys.clear();
+  syncChat();
+  $('chat-in').focus({ preventScroll: true });
+}
+function closeChat() {
+  chatOpen = false;
+  game.input.chatting = false;
+  syncChat();
+  if (document.activeElement === $('chat-in')) $('chat-in').blur();
+}
+$('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('chat-in').value;
+  if (v.trim() && !lobby.sendChat(v)) game.hud.toast('NOT CONNECTED');
+  $('chat-in').value = '';
+  if (screen === null) { closeChat(); if (game.state === 'playing' && !game.input.locked && !game.input.isTouch && game.input.lastDevice !== 'pad') game.input.lock(); }
+});
+$('chat-in').addEventListener('keydown', (e) => {
+  e.stopPropagation(); // typing never reaches the game or the menus
+  if (e.key === 'Escape') { e.preventDefault(); $('chat-in').value = ''; if (screen === null) closeChat(); else $('chat-in').blur(); }
+});
+$('chat-in').addEventListener('focus', () => { if (screen === null) { chatOpen = true; game.input.chatting = true; game.input.keys.clear(); syncChat(); } });
+$('chat-btn').addEventListener('click', () => (chatOpen ? closeChat() : openChat()));
+window.addEventListener('keydown', (e) => {
+  if (screen !== null || game.state !== 'playing' || chatOpen || !chatOn() || e.repeat) return;
+  if (e.code === 'KeyT' || e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); openChat(); }
+});
+$('opt-chat').addEventListener('change', () => { if (settings.chat === false) $('chat-log').innerHTML = ''; syncChat(); });
+window.__chatReady = true;
 
 // signed out: send the link from the sidebar
 let sdBusy = false;
@@ -1205,6 +1347,12 @@ $('side').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.join) { joinFriend(b.dataset.join); return; }
+  if (b.dataset.addid) {
+    b.disabled = true;
+    try { const r = await account.addFriendById(b.dataset.addid); game.hud.toast(r.friends ? 'YOU\'RE NOW FRIENDS' : 'FRIEND REQUEST SENT'); }
+    catch (err) { game.hud.toast(err.message.toUpperCase()); b.disabled = false; }
+    return;
+  }
   if (!b.dataset.fr) return;
   if (b.dataset.fr === 'remove' && !b.classList.contains('confirm')) {
     // remove asks twice

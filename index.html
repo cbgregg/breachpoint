@@ -283,6 +283,7 @@
             <div class="row"><label for="opt-aa">Aim assist</label><input type="checkbox" id="opt-aa" data-nav></div>
             <div class="row"><label for="opt-vib">Vibration</label><input type="checkbox" id="opt-vib" data-nav></div>
             <div class="group relay-only">ONLINE</div>
+            <div class="row"><label for="opt-chat">Text chat<small>Online matches and lobbies. Press T or Enter to type.</small></label><input type="checkbox" id="opt-chat" data-nav></div>
             <div class="row relay-only"><label for="opt-relay">Hide my IP in private matches</label><input type="checkbox" id="opt-relay" data-nav></div>
             <div class="row relay-only"><label>Cloudflare relay <output id="relay-status"></output></label><button id="relay-test" class="menu-btn small" data-nav>TEST</button></div>
             <div class="group acct-only">ACCOUNT</div>
@@ -384,7 +385,8 @@
           <button id="copy-code" class="menu-btn small" data-nav>COPY CODE</button>
           <button id="copy-link" class="menu-btn small" data-nav>COPY INVITE LINK</button>
         </div>
-        <div class="row"><label for="opt-approve">Approve each player before they join</label><input type="checkbox" id="opt-approve" data-nav checked></div>
+        <div class="row"><label for="opt-approve">Approve each player before they join<small>Friends always get straight in</small></label><input type="checkbox" id="opt-approve" data-nav checked></div>
+        <div class="row" id="fillbots-row"><label for="opt-fillbots">Fill empty slots with bots<small>Off: only real players. Each team needs at least one player.</small></label><input type="checkbox" id="opt-fillbots" data-nav checked></div>
         <div id="pending-wrap" class="lobby-block">
           <div class="group">JOIN REQUESTS</div>
           <div id="pending-list" class="plist"></div>
@@ -402,7 +404,7 @@
       <div id="lobby-quickintro" class="lobby-view">
         <div class="code-label">PUBLIC MATCH</div>
         <p class="notice" id="quick-ipnote">Quick match puts you in a game with strangers. Like any peer-to-peer game, <b>the other players in your match can see your IP address</b>, and whoever hosts runs the match.</p>
-        <p class="notice dim">There's no chat. Offensive Name Tags are replaced automatically. Use <b>Host online match</b> for a private game with friends.</p>
+        <p class="notice dim">Text chat is filtered (offensive words and links are removed) and can be turned off in Options. Offensive Name Tags are replaced automatically. Use <b>Private match</b> for a game with friends.</p>
         <button id="quick-go" class="cta" data-nav><span>FIND A MATCH</span></button>
       </div>
 
@@ -417,6 +419,7 @@
           <button data-key="del" data-nav>⌫</button><button data-key="0" data-nav>0</button><button data-key="go" class="go" data-nav>JOIN</button>
         </div>
         <div class="join-status" id="join-status"></div>
+        <div class="join-info" id="join-info"></div>
         <div class="lobby-block" id="join-players-wrap">
           <div class="group">PLAYERS</div>
           <div id="join-players" class="plist"></div>
@@ -445,6 +448,13 @@
   </div>
 
   <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
+  <!-- ============ Text chat (online) ============ -->
+  <div id="chat" aria-live="polite">
+    <div id="chat-log"></div>
+    <form id="chat-form" autocomplete="off"><span class="chat-to">ALL</span><input id="chat-in" maxlength="120" spellcheck="false" placeholder="Say something… (Enter to send)" enterkeyhint="send"></form>
+  </div>
+  <button id="chat-btn" class="chat-btn" title="Chat">CHAT</button>
+
   <!-- ============ Pre-alpha + support (all menus) ============ -->
   <div id="support" class="support">
     <span class="pa-chip">PRE-ALPHA</span>
@@ -506,6 +516,9 @@
         <div id="sd-req-wrap"><div class="sd-k">FRIEND REQUESTS</div><div id="sd-req" class="sd-list"></div></div>
         <div class="sd-k">FRIENDS <small id="sd-fcount"></small></div>
         <div id="sd-friends" class="sd-list"></div>
+
+        <div class="sd-k">RECENT PLAYERS <small>from your online matches</small></div>
+        <div id="sd-recent" class="sd-list"></div>
 
         <div class="sd-foot"><button id="sd-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
       </section>

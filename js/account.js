@@ -174,6 +174,7 @@ export class Account {
     return this.friends;
   }
   async addFriend(code) { const r = await this.call('/friends/add', { code }, true); await this.loadFriends().catch(() => {}); return r; }
+  async addFriendById(id) { const r = await this.call('/friends/add', { id }, true); await this.loadFriends().catch(() => {}); return r; }
   async friendAction(kind, id) { await this.call(`/friends/${kind}`, { id }, true); await this.loadFriends().catch(() => {}); }
 
   // where you are, so friends can see you're online and join you
