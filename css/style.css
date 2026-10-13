@@ -960,3 +960,10 @@ body.in-menus .side-btn { bottom: calc(28px + clamp(10px, 2vh, 22px)); }
 .fb-count { text-align: right; font-size: 11px; color: var(--ink-faint); margin-top: -8px; }
 #fb-status:empty { display: none; }
 @media (max-height: 520px) { #fb-text { min-height: 70px; } .fb-kinds .mp small { display: none; } .fbw { gap: 8px; } }
+/* sign-in code */
+#si-code-in { font-size: 34px; letter-spacing: 0.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.sd-codebox { display: none; flex-direction: column; gap: 8px; }
+.sd-codebox.on { display: flex; }
+#sd-code-in { font-size: 22px; letter-spacing: 0.4em; text-align: center; }
+.mw.narrow.signin { max-height: 100%; overflow-y: auto; }
+.signin .bo-title b { font-size: clamp(26px, 4vw, 38px); white-space: nowrap; }

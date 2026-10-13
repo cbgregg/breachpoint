@@ -1,4 +1,4 @@
-// Online accounts: passwordless sign-in by email link through the account Worker in
+// Online accounts: passwordless sign-in by email link or 6-digit code through the account Worker in
 // cloudflare/auth-worker.js, plus Name Tags, friend codes, friends, presence and signed match passes
 // ("tickets") that hosts check before letting a player into an online match. With AUTH_ENDPOINT empty,
 // accounts are off and online play works without signing in, as before.
@@ -96,6 +96,8 @@ export class Account {
   async start(email, remember) {
     const r = await this.call('/start', { email });
     this.email = email;
+    this.rid = r.rid || null;          // pairs this browser with the 6-digit code in the email
+    this.pendingRemember = !!remember;
     // the link may be opened in a new tab: it reads this to know whether to remember the session
     store(() => localStorage.setItem(PENDING, JSON.stringify({ remember: !!remember, at: Date.now() })));
     return r;
@@ -105,7 +107,17 @@ export class Account {
     try { p = JSON.parse(store(() => localStorage.getItem(PENDING)) || 'null'); } catch (_) { /* ignore */ }
     store(() => localStorage.removeItem(PENDING));
     const remember = !!(p && p.remember && Date.now() - p.at < 30 * 60 * 1000);
-    const r = await this.call('/verify', { token, remember });
+    return this.finish(await this.call('/verify', { token, remember }));
+  }
+  // the 6-digit code from the email, typed into the browser that asked for it
+  async verifyCode(code) {
+    if (!this.rid) throw new Error('Send yourself a sign-in email first.');
+    const r = await this.call('/verify', { rid: this.rid, code, remember: !!this.pendingRemember });
+    store(() => localStorage.removeItem(PENDING));
+    return this.finish(r);
+  }
+  finish(r) {
+    this.rid = null;
     this.session = r.session;
     this.user = r.user;
     this.remember = !!r.remember;

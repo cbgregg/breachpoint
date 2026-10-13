@@ -137,15 +137,17 @@
     <div class="mw narrow signin">
       <header class="mw-head"><div class="bo-title"><b id="si-title">SIGN IN</b><small>MULTIPLAYER ACCOUNT · NO PASSWORD</small></div></header>
       <div class="si-step" id="si-email">
-        <p class="si-lead">Enter your email and we'll send you a sign-in link. There's no password to remember or leak.</p>
+        <p class="si-lead">Enter your email and we'll send you a sign-in code and link. There's no password to remember or leak.</p>
         <input id="si-email-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
         <label class="si-remember"><input type="checkbox" id="si-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
         <p class="si-warn" id="si-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link, and sign out on shared or public computers.</p>
-        <button id="si-send" class="cta" data-nav><span>EMAIL ME A SIGN-IN LINK</span><span class="glyph" data-act="accept"></span></button>
+        <button id="si-send" class="cta" data-nav><span>EMAIL ME A SIGN-IN CODE</span><span class="glyph" data-act="accept"></span></button>
       </div>
       <div class="si-step" id="si-sent">
         <div class="si-mail" aria-hidden="true"></div>
-        <p class="si-lead">We sent a sign-in link to <b id="si-to"></b>. Open it <b>on this device</b> and you'll be signed in here. It works once, for 15 minutes.</p>
+        <p class="si-lead">We emailed a 6-digit code and a sign-in link to <b id="si-to"></b>. Type the code here, or open the link on this device. Both work once, for 15 minutes.</p>
+        <input id="si-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" data-nav>
+        <button id="si-verify" class="cta" data-nav><span>SIGN IN</span><span class="glyph" data-act="accept"></span></button>
         <p class="si-lead dim">Nothing yet? Check your spam folder, or send it again.</p>
         <div class="si-row"><button id="si-resend" class="menu-btn small" data-nav>SEND AGAIN</button><button id="si-other" class="menu-btn small" data-nav>USE A DIFFERENT EMAIL</button></div>
       </div>
@@ -471,8 +473,12 @@
         <input id="sd-email" class="sd-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
         <label class="si-remember"><input type="checkbox" id="sd-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
         <p class="si-warn" id="sd-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link.</p>
-        <button id="sd-send" class="menu-btn sd-cta" data-nav>EMAIL ME A SIGN-IN LINK</button>
+        <button id="sd-send" class="menu-btn sd-cta" data-nav>EMAIL ME A SIGN-IN CODE</button>
         <div class="join-status" id="sd-in-status"></div>
+        <div class="sd-codebox" id="sd-codebox">
+          <div class="sd-k">ENTER THE CODE <small>or open the link on this device</small></div>
+          <div class="sd-line"><input id="sd-code-in" class="sd-in code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" data-nav><button id="sd-verify" class="menu-btn small" data-nav>SIGN IN</button></div>
+        </div>
       </section>
 
       <!-- signed in -->

@@ -985,6 +985,28 @@ async function siName() {
   try { await account.setTag(name); siBusy(false); signedIn(); }
   catch (e) { siBusy(false); siStatus(esc(e.message), 'bad'); }
 }
+// 6-digit code from the email (works on any device: the email can be on your phone)
+async function codeSignIn(inp, status, done) {
+  const code = inp.value.replace(/\D/g, '');
+  if (code.length !== 6) { status('The code is 6 digits.', 'bad'); return; }
+  status('<span class="spin"></span>Checking…');
+  inp.disabled = true;
+  try { await account.verifyCode(code); inp.value = ''; status(''); done(); }
+  catch (e) { status(esc(e.message), 'bad'); inp.value = ''; if (e.expired) done(true); }
+  inp.disabled = false;
+  if (!account.signedIn && game.input.lastDevice !== 'touch') inp.focus({ preventScroll: true });
+}
+const siVerify = () => codeSignIn($('si-code-in'), siStatus, (expired) => { if (expired) setTimeout(() => siStep('email'), 1800); else if (screen === 'signin' && siCur !== 'name') signedIn(); });
+const sdVerify = () => codeSignIn($('sd-code-in'), sdStatus, (expired) => {
+  if (expired) { $('sd-codebox').classList.remove('on'); return; }
+  game.hud.toast(account.tag ? `SIGNED IN AS ${account.tag.toUpperCase()}` : 'SIGNED IN · CHOOSE A NAME TAG');
+});
+for (const [inp, fn] of [['si-code-in', siVerify], ['sd-code-in', sdVerify]]) {
+  $(inp).addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); if (e.target.value.length === 6) fn(); });
+  $(inp).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fn(); } });
+}
+$('si-verify').addEventListener('click', siVerify);
+$('sd-verify').addEventListener('click', sdVerify);
 $('si-send').addEventListener('click', siSend);
 $('si-name-save').addEventListener('click', siName);
 $('si-resend').addEventListener('click', () => { $('si-email-in').value = account.email; siSend(); });
@@ -1099,6 +1121,7 @@ function renderSide() {
   $('sb-req').textContent = d.incoming.length ? String(d.incoming.length) : '';
   $('sd-sub').textContent = u ? `${online} OF ${d.friends.length} FRIENDS ONLINE` : 'FRIENDS · ACCOUNT';
   if (!u) return;
+  $('sd-codebox').classList.remove('on');
   $('sd-emb').textContent = (u.tag || '?').slice(0, 1).toUpperCase();
   $('sd-tag').textContent = (u.tag || 'Choose a Name Tag').toUpperCase();
   $('sd-acct').textContent = `${u.email} · ${account.remember ? 'remembered on this device' : 'signed in until you close the browser'}`;
@@ -1139,7 +1162,11 @@ async function sdSend() {
   if (sdBusy) return;
   sdBusy = true;
   const email = $('sd-email').value;
-  if (await sendLink(email, $('sd-remember').checked, sdStatus)) sdStatus(`Sign-in link sent to <b>${esc(email.trim())}</b>. Open it on this device. It works once, for 15 minutes.`, 'good');
+  if (await sendLink(email, $('sd-remember').checked, sdStatus)) {
+    sdStatus(`Sent to <b>${esc(email.trim())}</b>. Type the 6-digit code below, or open the link on this device. Both work once, for 15 minutes.`, 'good');
+    $('sd-codebox').classList.add('on');
+    if (game.input.lastDevice === 'pad') focusEl($('sd-code-in')); else if (game.input.lastDevice !== 'touch') $('sd-code-in').focus({ preventScroll: true });
+  }
   sdBusy = false;
 }
 $('sd-send').addEventListener('click', sdSend);

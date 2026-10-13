@@ -1,14 +1,16 @@
-// Breachpoint account Worker: passwordless sign-in by email link, Name Tags, friend codes, friends and
+// Breachpoint account Worker: passwordless sign-in by email link or code, Name Tags, friend codes, friends and
 // presence (Cloudflare Workers + Workers KV + Resend).
 //
 // Sign-in
-//   1. The game posts an email address to /start. The Worker emails a one-time sign-in link. The
-//      response is the same whether or not the address has an account, so it can't be used to find out
-//      who plays.
-//   2. Opening the link calls /verify, which creates the account on first use and returns a session.
-//      Links expire after 15 minutes and work once. "Remember me" keeps the session for 60 days; without
-//      it the session lasts a day (and the game keeps it only until the browser closes). Only SHA-256
-//      hashes of links and sessions are stored.
+//   1. The game posts an email address to /start. The Worker emails a one-time sign-in link and a
+//      6-digit code, and returns a request id to that browser. The response is the same whether or not
+//      the address has an account, so it can't be used to find out who plays.
+//   2. Opening the link, or typing the code (which only works with that browser's request id, 5 tries),
+//      calls /verify, which creates the account on first use and returns a session. Both expire after
+//      15 minutes and using either one cancels the other. "Remember me" keeps the session for 60 days;
+//      without it the session lasts a day (and the game keeps it only until the browser closes). Only
+//      SHA-256 hashes of links, codes and sessions are stored. The code is never put in the subject
+//      line, so it doesn't show on a locked phone's notification.
 //   3. For online matches the game asks /ticket for a short-lived signed pass naming the player and the
 //      match code. Hosts check the signature with the public key from /pubkey.
 //
@@ -42,6 +44,7 @@ const HIST_KEEP = 10;                   // previous Name Tags kept for friends
 const PRESENCE_ONLINE = 11 * 60;        // seconds since the last update that still count as online
 const PRESENCE_TTL = 15 * 60;           // KV expiry for presence records
 const MAX_FRIENDS = 200, MAX_PENDING = 50, MAX_REQ_PER_DAY = 40;
+const MAX_CODE_TRIES = 5;              // wrong codes before a sign-in request is cancelled
 const MAX_STARTS_PER_EMAIL = 4;         // per 15 minutes
 const MAX_STARTS_PER_IP = 12;           // per hour
 const CODE_ABC = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // friend codes: no 0/O, 1/I
@@ -102,22 +105,50 @@ async function start({ env, body, request, cors }) {
   if (!await allow(env, `rl:e:${eh}`, MAX_STARTS_PER_EMAIL, LOGIN_TTL)) return json({ error: 'Too many sign-in emails. Wait a few minutes and check your inbox (and spam folder).' }, 429, cors);
   if (!await allow(env, `rl:ip:${await sha(ip)}`, MAX_STARTS_PER_IP, 3600)) return json({ error: 'Too many sign-in attempts from this network. Try again later.' }, 429, cors);
 
-  const token = rand(32);
-  await env.ACCOUNTS.put(`tok:${await sha(token)}`, JSON.stringify({ email, exp: now() + LOGIN_TTL }), { expirationTtl: LOGIN_TTL });
+  // one sign-in request = a link token and a 6-digit code; either one works, once. The code only
+  // works together with the request id this browser got back, so it can't be guessed for anyone else.
+  const token = rand(32), rid = rand(18);
+  const code = String(randInt() % 1000000).padStart(6, '0');
+  const th = await sha(token), exp = now() + LOGIN_TTL;
+  await env.ACCOUNTS.put(`tok:${th}`, JSON.stringify({ email, exp, rid }), { expirationTtl: LOGIN_TTL });
+  await env.ACCOUNTS.put(`req:${rid}`, JSON.stringify({ email, exp, th, ch: await sha(`${rid}:${code}`), tries: 0 }), { expirationTtl: LOGIN_TTL });
   const app = (env.APP_URL || 'https://breach-point.net').replace(/\/+$/, '');
   // the token goes in the URL fragment, which browsers never send to any server
   const link = `${app}/#login=${token}`;
-  const sent = await sendMail(env, email, link);
+  const sent = await sendMail(env, email, link, code);
   if (!sent.ok) return json({ error: sent.error }, 502, cors);
-  return json({ ok: true }, 200, cors);
+  return json({ ok: true, rid }, 200, cors);
 }
 
 async function verify({ env, body, cors }) {
-  if (typeof body.token !== 'string' || !/^[A-Za-z0-9_-]{20,80}$/.test(body.token)) return json({ error: 'Missing sign-in link.' }, 400, cors);
-  const tk = `tok:${await sha(body.token)}`;
-  const rec = await getJSON(env, tk);
-  await env.ACCOUNTS.delete(tk); // one use only
-  if (!rec || rec.exp < now()) return json({ error: 'This sign-in link has expired or was already used. Request a new one.' }, 400, cors);
+  let rec;
+  if (typeof body.code === 'string') {
+    // 6-digit code from the email, typed into the browser that asked for it
+    const rid = String(body.rid || ''), code = body.code.replace(/\D/g, '');
+    if (!/^[A-Za-z0-9_-]{20,40}$/.test(rid) || code.length !== 6) return json({ error: 'Enter the 6-digit code from the email.' }, 400, cors);
+    const rk = `req:${rid}`;
+    const req = await getJSON(env, rk);
+    if (!req || req.exp < now() || req.tries >= MAX_CODE_TRIES) {
+      if (req) { await env.ACCOUNTS.delete(rk); await env.ACCOUNTS.delete(`tok:${req.th}`); }
+      return json({ error: 'This code has expired or was used up. Send a new email.', expired: true }, 400, cors);
+    }
+    if (await sha(`${rid}:${code}`) !== req.ch) {
+      req.tries = (req.tries || 0) + 1;
+      const left = MAX_CODE_TRIES - req.tries;
+      if (left <= 0) { await env.ACCOUNTS.delete(rk); await env.ACCOUNTS.delete(`tok:${req.th}`); return json({ error: 'Too many wrong codes. Send a new email.', expired: true }, 400, cors); }
+      await env.ACCOUNTS.put(rk, JSON.stringify(req), { expirationTtl: Math.max(60, req.exp - now()) });
+      return json({ error: `That code isn't right. ${left} ${left === 1 ? 'try' : 'tries'} left.` }, 400, cors);
+    }
+    await env.ACCOUNTS.delete(rk); await env.ACCOUNTS.delete(`tok:${req.th}`); // one use: the link stops working too
+    rec = req;
+  } else {
+    if (typeof body.token !== 'string' || !/^[A-Za-z0-9_-]{20,80}$/.test(body.token)) return json({ error: 'Missing sign-in link.' }, 400, cors);
+    const tk = `tok:${await sha(body.token)}`;
+    rec = await getJSON(env, tk);
+    await env.ACCOUNTS.delete(tk); // one use only
+    if (rec && rec.rid) await env.ACCOUNTS.delete(`req:${rec.rid}`); // and the code stops working
+    if (!rec || rec.exp < now()) return json({ error: 'This sign-in link has expired or was already used. Request a new one.' }, 400, cors);
+  }
 
   // find or create the account
   const eh = await sha(rec.email);
@@ -343,20 +374,22 @@ async function deleteAccount({ env, cors }, user, sk) {
 }
 
 // ---------- email ----------
-async function sendMail(env, to, link) {
+async function sendMail(env, to, link, code) {
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) return { ok: false, error: 'Sign-in email isn\'t set up on the server yet.' };
-  const text = `Open this link to sign in to Breachpoint:\n${link}\n\nThe link expires in 15 minutes and works once. If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share this link.`;
+  const text = `Your Breachpoint sign-in code: ${code}\n\nType it into the game, or open this link on the same device:\n${link}\n\nThe code and link expire in 15 minutes and work once. If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share the code or link.`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;background:#070a0d;color:#eef2f4;padding:32px">
   <div style="max-width:440px;margin:0 auto">
     <div style="font-weight:700;letter-spacing:6px;font-size:22px;margin-bottom:24px"><span style="display:inline-block;width:10px;height:10px;background:#f7941d;margin-right:10px"></span>BREACHPOINT</div>
-    <p style="color:#9fabb4;margin:0 0 18px">Tap the button to sign in. It works once, for 15 minutes.</p>
+    <p style="color:#9fabb4;margin:0 0 10px">Your sign-in code:</p>
+    <div style="font-family:'Courier New',monospace;font-weight:700;font-size:36px;letter-spacing:10px;color:#ffffff;background:#11161b;border:1px solid #2a323a;padding:14px 18px;display:inline-block;margin-bottom:22px">${code}</div>
+    <p style="color:#9fabb4;margin:0 0 18px">Type it into the game, or tap the button on the same device. Both work once, for 15 minutes.</p>
     <a href="${link}" style="display:inline-block;background:#f7941d;color:#0e1114;text-decoration:none;font-weight:700;letter-spacing:3px;padding:14px 22px">SIGN IN TO BREACHPOINT</a>
-    <p style="color:#9fabb4;font-size:13px;line-height:1.5;margin:28px 0 0">If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share or forward this link.</p>
+    <p style="color:#9fabb4;font-size:13px;line-height:1.5;margin:28px 0 0">If you didn't ask to sign in, ignore this email: nobody can sign in without it. Never share the code or forward this email.</p>
   </div></div>`;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: 'Your Breachpoint sign-in link', text, html }),
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: 'Your Breachpoint sign-in code', text, html }),
   });
   if (!res.ok) return { ok: false, error: 'Couldn\'t send the email. Try again in a moment.' };
   return { ok: true };

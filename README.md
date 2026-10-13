@@ -73,7 +73,7 @@ The game opens on a title screen (**press Enter / A / tap to start**), then **Of
 
 ### Accounts (passwordless email sign-in)
 
-There are no passwords. You enter your email and get a **sign-in link** (links only, no codes). Open it on the same device and you're in. Tick **Remember me** to stay signed in on that device for 60 days; the game warns you to use it only on your own device. Without it the session ends when the browser closes (and after a day at most on the server).
+There are no passwords. You enter your email and get a **6-digit code** and a **sign-in link**. Type the code into the game (handy when the email is on your phone), or open the link on the same device. Either works once, and using one cancels the other. Tick **Remember me** to stay signed in on that device for 60 days; the game warns you to use it only on your own device. Without it the session ends when the browser closes (and after a day at most on the server).
 
 - **Name Tag**: what everyone sees in matches. Name Tags aren't unique (anyone can pick any tag that passes the filter), and you can change yours **once a day**. Friends can see your previous Name Tags.
 - **Display name**: optional, and only your friends see it.
@@ -82,7 +82,7 @@ There are no passwords. You enter your email and get a **sign-in link** (links o
 - *Options → Account* has Sign out and Delete account (which also removes you from friends' lists).
 
 Why it's safe:
-- Sign-in links expire after 15 minutes and work once. Only hashes of links and sessions are stored, so a leaked database can't sign anyone in.
+- Sign-in codes and links expire after 15 minutes and work once. A code only works in the browser that asked for it, and five wrong tries cancel it. The code is never in the email's subject line, so it doesn't show on a locked phone. Only hashes of codes, links and sessions are stored, so a leaked database can't sign anyone in.
 - The link token sits in the URL fragment (`#login=…`), which browsers never send to a server, and the game wipes it from the address bar immediately. The page sends no referrer.
 - Sign-in emails and friend requests are rate-limited, and the server gives the same answer whether or not an email has an account.
 - **Nobody can see anyone's email.** The server never returns an email to other players or friends; you see your own only masked (`c•••••@example.com`).
