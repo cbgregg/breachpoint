@@ -106,6 +106,9 @@ Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a d
 
 ### Matches
 
+- **Terms of use**: signing in shows the terms (rules, what's stored, every safety measure). Players must scroll to the end and agree before playing online; the account server refuses match passes until they have. Offline play needs no account. When the terms change, bump `TERMS_VERSION` in both `js/account.js` and the Worker and everyone accepts again.
+- **Mute, block, report, vote to kick**: pause → Scoreboard → Players. Mute hides a player's chat this session; block also mutes them for good and refuses them from lobbies you host; reports go to the Worker (stored in KV under `rep:` and emailed to `FEEDBACK_TO`); a vote to kick removes a player when 60% of the other players agree (the host kicks directly). To ban an account, add `"banned": true` to its `user:` record in KV.
+- **Map vote** in public lobbies: after a match everyone votes on the next map; a 15-second countdown starts once most players are back in the lobby (or after a minute).
 - **Text chat** in lobbies, the pause menu and during matches: press **T** or **Enter** to type (touch: the CHAT button). The host relays every line and filters it: offensive words become `***`, links are removed, and each player is limited to 5 lines per 8 seconds. Turn it off in *Options → Online*.
 - **Private match settings**: the host picks mode, map, size and friendly fire on the Play tab, and can switch **Fill empty slots with bots** off for a players-only match (each team needs at least one player). Guests see the settings while they wait. Friends skip the host's approval.
 

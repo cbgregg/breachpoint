@@ -36,6 +36,7 @@
 const LOGIN_TTL = 15 * 60;              // sign-in links
 const SESSION_LONG = 60 * 24 * 3600;    // "remember me": 60 days, renewed while you play
 const SESSION_SHORT = 24 * 3600;        // otherwise a day
+const TERMS_VERSION = '2026-10-12';     // bump when the terms change: everyone accepts again
 const TICKET_TTL = 3 * 3600;            // match passes
 const TAG_EVERY = 24 * 3600;            // Name Tag changes
 const HIST_KEEP = 10;                   // previous Name Tags kept for friends
@@ -86,6 +87,8 @@ export default {
         case '/friends/cancel': return await withUser(ctx, (u) => friendDrop(ctx, u, 'cancel'));
         case '/friends/remove': return await withUser(ctx, (u) => friendDrop(ctx, u, 'remove'));
         case '/feedback': return await feedback(ctx);
+        case '/terms': return await withUser(ctx, (u) => acceptTerms(ctx, u));
+        case '/report': return await withUser(ctx, (u) => report(ctx, u));
         case '/logout': return await logout(ctx);
         case '/delete': return await withUser(ctx, (u, s) => deleteAccount(ctx, u, s));
         default: return json({ error: 'not found' }, 404, cors);
@@ -192,7 +195,7 @@ const saveUser = (env, u) => env.ACCOUNTS.put(`user:${u.id}`, JSON.stringify(u))
 async function self(env, u) {
   if (await ensureCode(env, u)) await saveUser(env, u);
   return {
-    id: u.id, tag: u.tag || null, disp: u.disp || '', code: fmtCode(u.code), email: maskEmail(u.email),
+    id: u.id, tag: u.tag || null, disp: u.disp || '', code: fmtCode(u.code), email: maskEmail(u.email), terms: u.terms || '',
     hist: (u.hist || []).map(h => h.t), nextTagAt: u.tag && u.tagAt ? u.tagAt + TAG_EVERY : 0,
   };
 }
@@ -236,6 +239,8 @@ async function setDisplay({ env, body, cors }, user) {
 }
 
 async function ticket({ env, body, cors }, user) {
+  if (user.terms !== TERMS_VERSION) return json({ error: 'Accept the terms to play online.', terms: true }, 403, cors);
+  if (user.banned) return json({ error: 'This account can\'t play online.' }, 403, cors);
   if (!user.tag) return json({ error: 'Choose a Name Tag first.' }, 400, cors);
   const room = String(body.room || '');
   if (!/^[A-Za-z0-9:_-]{1,40}$/.test(room)) return json({ error: 'bad match code' }, 400, cors);
@@ -328,6 +333,42 @@ async function friendDrop({ env, body, cors }, user, kind) {
   else if (kind === 'cancel') { delete me.o[them]; delete other.i[user.id]; }
   else { delete me.f[them]; delete other.f[user.id]; }
   await frPut(env, user.id, me); await frPut(env, them, other);
+  return json({ ok: true }, 200, cors);
+}
+
+// ---------- terms ----------
+async function acceptTerms({ env, body, cors }, user) {
+  if (body.version !== TERMS_VERSION) return json({ error: 'The terms were updated. Reload the page and read them again.' }, 409, cors);
+  user.terms = TERMS_VERSION;
+  user.termsAt = now();
+  await saveUser(env, user);
+  return json({ user: await self(env, user) }, 200, cors);
+}
+
+// ---------- player reports (signed in only; the reported player's email is never involved) ----------
+const REPORT_REASONS = { cheating: 'Cheating / hacking', abuse: 'Abusive or hateful chat', name: 'Offensive Name Tag', grief: 'Griefing / team killing', other: 'Other' };
+async function report({ env, body, request, cors }, user) {
+  const reason = REPORT_REASONS[body.reason] ? body.reason : 'other';
+  const target = typeof body.id === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(body.id) ? body.id : '';
+  const tname = String(body.name || '').slice(0, 24);
+  if (!target && !tname) return json({ error: 'Pick a player to report.' }, 400, cors);
+  if (target === user.id) return json({ error: 'You can\'t report yourself.' }, 400, cors);
+  if (!await allow(env, `rl:rep:${user.id}`, 20, 86400)) return json({ error: 'You\'ve sent a lot of reports today. Thanks, we\'re on it.' }, 429, cors);
+  const details = String(body.details || '').replace(/\r/g, '').trim().slice(0, 800);
+  const meta = {};
+  for (const k of ['mode', 'map', 'code']) if (typeof body[k] === 'string') meta[k] = body[k].slice(0, 20);
+  const tuser = target ? await getUser(env, target) : null;
+  const rec = { reason, target, targetTag: tuser ? tuser.tag : tname, targetHist: tuser ? (tuser.hist || []).map(h => h.t).slice(0, 5) : [], by: user.id, byTag: user.tag, details, meta, at: new Date().toISOString() };
+  await env.ACCOUNTS.put(`rep:${rec.at}:${rand(4)}`, JSON.stringify(rec), { expirationTtl: 365 * 86400 });
+  if (target) await allow(env, `repc:${target}`, 1e9, 30 * 86400); // running count per reported account (30 days)
+  if (env.FEEDBACK_TO && env.RESEND_API_KEY && env.MAIL_FROM) {
+    const count = target ? parseInt(await env.ACCOUNTS.get(`repc:${target}`) || '1', 10) : 1;
+    const text = [`Report: ${REPORT_REASONS[reason]}`, `Player: ${rec.targetTag || '?'} (${target || 'no account id'})${rec.targetHist.length ? ` · previously ${rec.targetHist.join(', ')}` : ''}`, `Reports on this account in 30 days: ${count}`, `From: ${user.tag || '?'} (${user.id})`, `Match: ${Object.entries(meta).map(([k, v]) => `${k}=${v}`).join(' · ')}`, '', details || '(no details)', '', `To ban: in KV, edit user:${target} and add "banned": true`].join('\n');
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.MAIL_FROM, to: [env.FEEDBACK_TO], subject: `[Breachpoint] Report: ${REPORT_REASONS[reason]} · ${rec.targetTag || '?'}`, text }),
+    }).catch(() => {});
+  }
   return json({ ok: true }, 200, cors);
 }
 

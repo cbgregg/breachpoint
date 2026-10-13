@@ -9,6 +9,7 @@
 // Other players never see your email; the server only ever returns it to you, masked.
 import { AUTH_ENDPOINT } from './config.js';
 
+export const TERMS_VERSION = '2026-10-12'; // must match the account Worker
 const KEY = 'breachpoint.account.v1';
 const PENDING = 'breachpoint.signin.v1';   // { remember, at } while a sign-in link is on its way
 const PUBKEY = 'breachpoint.authkey.v1';
@@ -57,7 +58,8 @@ export class Account {
 
   get enabled() { return !!this.endpoint; }
   get signedIn() { return !!(this.session && this.user); }
-  get ready() { return !this.enabled || (this.signedIn && !!this.user.tag); }
+  get ready() { return !this.enabled || (this.signedIn && !!this.user.tag && this.termsOk); }
+  get termsOk() { return !this.enabled || (this.signedIn && this.user.terms === TERMS_VERSION); }
   get tag() { return this.signedIn ? this.user.tag || '' : ''; }
   isFriend(uid) { return !!uid && this.friendIds.has(uid); }
   changed() { if (this.onChange) this.onChange(); }
@@ -145,6 +147,14 @@ export class Account {
     this.setFriends({ friends: [], incoming: [], outgoing: [] });
     if (this.bc) this.bc.postMessage({ t: 'out' });
   }
+
+  async acceptTerms() {
+    this.user = (await this.call('/terms', { version: TERMS_VERSION }, true)).user;
+    this.persist();
+    return this.user;
+  }
+  // report a player (account id from the match, or just their Name Tag)
+  async report(data) { return this.call('/report', data, true); }
 
   // ---------- Name Tag (public) and display name (friends only) ----------
   async setTag(name) {

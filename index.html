@@ -3,8 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Breachpoint</title>
-  <meta name="description" content="Breachpoint: a browser first-person shooter with team deathmatch, AI bots and controller support. Built with Three.js.">
+  <title>Breachpoint | PRE-ALPHA</title>
+  <meta name="description" content="Breachpoint: a free browser first-person shooter. Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends. Controller support. Pre-alpha.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Breachpoint">
+  <meta property="og:title" content="Breachpoint | PRE-ALPHA">
+  <meta property="og:description" content="Free browser FPS: Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends. No download.">
+  <meta property="og:url" content="https://breach-point.net/">
+  <meta property="og:image" content="https://breach-point.net/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="First-person view in Breachpoint: a rifle with a reflex sight aimed down a sunlit market street at an enemy soldier.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Breachpoint | PRE-ALPHA">
+  <meta name="twitter:description" content="Free browser FPS: Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends.">
+  <meta name="twitter:image" content="https://breach-point.net/assets/og.jpg">
+  <meta name="theme-color" content="#0b0d0e">
   <meta name="theme-color" content="#0b0d0e">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0d0e'/%3E%3Cpath d='M32 8v14M32 42v14M8 32h14M42 32h14' stroke='%23e8e4da' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23ff4d4d'/%3E%3C/svg%3E">
@@ -151,6 +165,74 @@
         <p class="si-lead dim">Nothing yet? Check your spam folder, or send it again.</p>
         <div class="si-row"><button id="si-resend" class="menu-btn small" data-nav>SEND AGAIN</button><button id="si-other" class="menu-btn small" data-nav>USE A DIFFERENT EMAIL</button></div>
       </div>
+      <div class="si-step" id="si-terms">
+        <p class="si-lead">Please read these terms. Scroll to the bottom to accept.</p>
+        <div class="terms" id="terms-box" tabindex="0" data-nav>
+          <h3>Breachpoint terms of use and safety</h3>
+          <p class="t-meta">Version 2026-10-12 · Breachpoint is in pre-alpha</p>
+
+          <h4>1. Who can play online</h4>
+          <p>You must be at least 13 years old to make an account and play online. If the law where you live sets a higher age for using online services without a parent's permission, you need that permission. Offline play against bots needs no account.</p>
+
+          <h4>2. Your account</h4>
+          <ul>
+            <li><b>No passwords.</b> You sign in with a one-time code or link sent to your email. Codes and links expire after 15 minutes, work once, and a code stops working after 5 wrong tries.</li>
+            <li><b>Your email is private.</b> It is used only to sign you in and is never shown to other players, not even your friends. You see your own address only partly hidden.</li>
+            <li><b>Remember me</b> keeps you signed in on that device for 60 days. Only use it on your own device. Without it you are signed out when the browser closes.</li>
+            <li>Never share your sign-in code or link. Nobody from Breachpoint will ever ask for it.</li>
+            <li>You can sign out or <b>delete your account</b> at any time in Options. Deleting removes your account, Name Tag, display name and friends.</li>
+          </ul>
+
+          <h4>3. What is stored, and what is not</h4>
+          <ul>
+            <li>Stored: your email address, your Name Tag and up to 10 previous Name Tags, your optional display name, your friend code, friends and friend requests, and the date you accepted these terms.</li>
+            <li>For a few minutes only: whether you are online and which match you are in, shown only to accepted friends.</li>
+            <li>Sign-in codes, links and sessions are stored only as one-way hashes, so a leak of the account database could not be used to sign in as you.</li>
+            <li>Feedback and player reports you send are kept for up to a year so they can be reviewed.</li>
+            <li>Your data is never sold or used for advertising. It is processed by Cloudflare (hosting, accounts, relay) and Resend (sign-in emails).</li>
+            <li>Chat messages are not stored anywhere. They exist only in the match.</li>
+          </ul>
+
+          <h4>4. How the game keeps you safe</h4>
+          <ul>
+            <li><b>Verified players.</b> Every player in an online match carries a signed match pass from the account server. Nobody can join without an account or pretend to be someone else, and a kicked player cannot rejoin from a new tab.</li>
+            <li><b>Cheat checks.</b> The host's game checks everything other players send: speed, health, ammo and hits are decided by the host, not by each player's computer. Players are only sent what they could plausibly see.</li>
+            <li><b>Encrypted connections.</b> Game traffic between players is encrypted, and the site and account server only use secure HTTPS connections.</li>
+            <li><b>Your IP address.</b> In public matches your connection goes through Cloudflare's relay, so other players cannot see your IP address. In private matches with friends the connection can be direct, which lets the other players' computers see your IP address; turn on <i>Hide my IP in private matches</i> in Options to always use the relay.</li>
+            <li><b>Chat filter.</b> Offensive words are replaced with *** and links are removed before anyone sees them. Chat is rate-limited and you can turn it off completely.</li>
+            <li><b>Name Tag filter.</b> Offensive Name Tags are rejected or replaced. Name Tags can change once a day, and friends can see previous ones, so nobody can hide behind a new name.</li>
+            <li><b>Your controls.</b> From the scoreboard in the pause menu you can <b>mute</b>, <b>block</b> or <b>report</b> any player, and start a <b>vote to kick</b>: a player is removed when 60% of the other players vote yes. Hosts can also approve, kick and ban players in their lobbies, and friends' presence is only visible to accepted friends.</li>
+            <li><b>Rate limits</b> on sign-in emails, friend requests, chat, reports and feedback stop spam and abuse.</li>
+          </ul>
+
+          <h4>5. Rules</h4>
+          <p>When you play online you agree not to:</p>
+          <ul>
+            <li>cheat, hack, use bots, modify the game to gain an advantage, or exploit bugs on purpose;</li>
+            <li>harass, threaten, bully or abuse other players, or post hateful, sexual or violent content;</li>
+            <li>share anyone's personal information, including your own, or ask other players for theirs;</li>
+            <li>impersonate other players or the developer, or pick an offensive Name Tag;</li>
+            <li>spam, advertise, or try to trick other players into visiting links or giving away sign-in codes;</li>
+            <li>attack, overload or try to break into the game's servers, or other players' connections.</li>
+          </ul>
+
+          <h4>6. Enforcement</h4>
+          <p>Reports are reviewed. Players who break the rules can be removed from matches, have their account restricted, or have their account suspended or deleted, without warning in serious cases.</p>
+
+          <h4>7. Pre-alpha</h4>
+          <p>Breachpoint is an early, free test version made by one developer. Features can change, progress or accounts may be reset, and things will break. The game is provided "as is", without warranties, and the developer is not liable for any loss from using it, to the extent the law allows.</p>
+
+          <h4>8. Ownership</h4>
+          <p>Breachpoint, its name, logo and original content are made by cbgregg. Artificial intelligence was used to assist with development. Third-party assets are credited in the project's documentation.</p>
+
+          <h4>9. Changes and contact</h4>
+          <p>If these terms change, you will be asked to read and accept them again before playing online. Questions, problems or requests to delete your data: use <i>Options → About → Send feedback</i>.</p>
+          <p class="t-end">End of terms.</p>
+        </div>
+        <label class="si-remember"><input type="checkbox" id="terms-ok" disabled data-nav><span>I'm 13 or older and I agree to the terms and rules above</span></label>
+        <button id="terms-accept" class="cta" disabled data-nav><span>ACCEPT AND CONTINUE</span><span class="glyph" data-act="accept"></span></button>
+        <p class="si-lead dim" id="terms-hint">Scroll to the bottom of the terms to continue.</p>
+      </div>
       <div class="si-step" id="si-name">
         <p class="si-lead">Choose your <b>Name Tag</b>. It's what everyone sees in matches. You can change it once a day, and friends can see your previous Name Tags.</p>
         <input id="si-name-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav>
@@ -179,6 +261,25 @@
       <button id="fb-send" class="cta" data-nav><span>SEND</span><span class="glyph" data-act="accept"></span></button>
       <div class="join-status" id="fb-status"></div>
       <button id="fb-back" class="menu-btn" data-nav>BACK</button>
+    </div>
+  </div>
+
+  <!-- ============ Report a player ============ -->
+  <div id="report" class="screen">
+    <div class="mw narrow signin fbw">
+      <header class="mw-head"><div class="bo-title"><b>REPORT</b><small id="rp-who">PLAYER</small></div></header>
+      <div class="rp-reasons" role="radiogroup" aria-label="Reason">
+        <button class="mp on" data-rp="cheating" data-nav><b>CHEATING</b><small>Hacks, aimbot, exploits</small></button>
+        <button class="mp" data-rp="abuse" data-nav><b>ABUSE</b><small>Harassment, hate in chat</small></button>
+        <button class="mp" data-rp="name" data-nav><b>NAME TAG</b><small>Offensive name</small></button>
+        <button class="mp" data-rp="grief" data-nav><b>GRIEFING</b><small>Team killing, trolling</small></button>
+        <button class="mp" data-rp="other" data-nav><b>OTHER</b><small>Anything else</small></button>
+      </div>
+      <textarea id="rp-text" maxlength="800" rows="4" placeholder="What happened? (optional)" data-nav></textarea>
+      <p class="pane-note si-fine">Reports go to the developer with the match details. The player isn't told who reported them. You can also mute or block them, or start a vote to kick.</p>
+      <button id="rp-send" class="cta" data-nav><span>SEND REPORT</span><span class="glyph" data-act="accept"></span></button>
+      <div class="join-status" id="rp-status"></div>
+      <button id="rp-back" class="menu-btn" data-nav>BACK</button>
     </div>
   </div>
 
@@ -363,6 +464,7 @@
             </div>
             <div class="pm-me" id="pm-me"></div>
             <div class="pm-board" id="pause-board"></div>
+            <div class="pm-players online-only" id="pm-players-wrap"><div class="group">PLAYERS · MUTE · BLOCK · REPORT · VOTE TO KICK</div><div id="pm-players" class="plist"></div></div>
           </div>
           <div class="psec-pane" id="psec-loadout"></div>
           <div class="psec-pane" id="psec-options"></div>
@@ -387,6 +489,7 @@
         </div>
         <div class="row"><label for="opt-approve">Approve each player before they join<small>Friends always get straight in</small></label><input type="checkbox" id="opt-approve" data-nav checked></div>
         <div class="row" id="fillbots-row"><label for="opt-fillbots">Fill empty slots with bots<small>Off: only real players. Each team needs at least one player.</small></label><input type="checkbox" id="opt-fillbots" data-nav checked></div>
+        <div class="mapvote" id="mv-host"></div>
         <div id="pending-wrap" class="lobby-block">
           <div class="group">JOIN REQUESTS</div>
           <div id="pending-list" class="plist"></div>
@@ -420,6 +523,7 @@
         </div>
         <div class="join-status" id="join-status"></div>
         <div class="join-info" id="join-info"></div>
+        <div class="mapvote" id="mv-join"></div>
         <div class="lobby-block" id="join-players-wrap">
           <div class="group">PLAYERS</div>
           <div id="join-players" class="plist"></div>
@@ -440,6 +544,7 @@
       <div id="end-score"></div>
       <div id="end-mvp"></div>
       <div id="end-board"></div>
+      <div class="mapvote" id="mv-end"></div>
       <div class="end-actions">
         <button id="again" class="cta" data-nav><span>PLAY AGAIN</span></button>
         <button id="menu-btn" class="menu-btn" data-nav>MAIN MENU</button>

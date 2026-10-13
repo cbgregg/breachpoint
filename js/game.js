@@ -160,6 +160,7 @@ export class Game {
     const N = this.gm && this.gm.cfg.teamSize ? this.gm.cfg.teamSize : Math.max(1, Math.min(8, settings.teamSize | 0));
     const myTeam = this.mode === 'host' ? online.lobby.hostTeam : 0;
     this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: loadoutFromSettings(settings) });
+    this.player.uid = online && online.lobby ? online.lobby.myUid : '';
     this.characters = [this.player];
     if (this.mode === 'host') {
       this.session = new HostSession(this, online.lobby);
@@ -230,6 +231,7 @@ export class Game {
       if (e[0] === start.you) {
         const [id, name, team, primary] = e;
         this.player = new Character(this, { id, name: String(name).slice(0, 16), team: team === 1 ? 1 : 0, isBot: false, primary: typeof primary === 'string' ? primary : 'rifle' });
+        this.player.uid = this.lobby ? this.lobby.myUid : '';
         this.characters.push(this.player);
       } else this.session.addPuppet(e);
     }

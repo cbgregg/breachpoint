@@ -67,6 +67,12 @@ export class Lobby {
     this.info = null;          // host: match settings shown to guests { m, map, n, b }; guest: received copy
     this.onChat = null;        // chat line for the UI: { n, tm, x, me, sys }
     this.chatRate = new Map(); // host: peerId -> recent message times
+    this.blocked = new Set();  // account ids this player blocked (main.js keeps it): refused when we host
+    this.kickVotes = new Map(); // host: target character id -> { yes: Set(voter key), until, name }
+    this.onVote = null;        // vote-kick progress for the UI
+    this.mapVote = null;       // public lobbies between matches: { o: [map ids], v: [counts], cd, rd, n, my }
+    this.onMapVote = null;     // UI refresh
+    this.onMapVoteDone = null; // host: (mapId) start the next match
     this.net.on('msg', (m, id) => this.receive(m, id));
     this.net.on('peerJoin', (id) => this.peerJoin(id));
     this.net.on('peerLeave', (id) => this.peerLeave(id));
@@ -75,6 +81,7 @@ export class Lobby {
   }
 
   get active() { return !!this.role; }
+  get myUid() { return this.account && this.account.enabled && this.account.user ? this.account.user.id : ''; }
   get inMatch() { return this.game.mode === this.role && this.game.state !== 'menu'; }
   changed() { if (this.onUpdate) this.onUpdate(); }
   toast(s) { if (this.onToast) this.onToast(s); }
@@ -191,20 +198,105 @@ export class Lobby {
     else return false;
     return true;
   }
-  hostChat(peerId, raw) {
+  hostChat(peerId, raw, sys = false) {
     if (typeof raw !== 'string') return;
     const x = cleanChat(raw);
     if (!x) return;
+    if (sys) {
+      const msg = { t: 'chat', n: 'MATCH', tm: 0, x, sys: 1 };
+      for (const id of this.players.keys()) this.net.send(msg, id);
+      if (this.onChat) this.onChat({ n: 'MATCH', tm: 0, x, sys: true });
+      return;
+    }
     // at most 5 lines per 8 seconds per player
     const now = Date.now(), key = peerId || 'host';
     const times = (this.chatRate.get(key) || []).filter(t => now - t < 8000);
     if (times.length >= 5) { if (peerId) this.net.send({ t: 'chat', n: 'SERVER', tm: 0, x: 'Slow down: too many messages.', sys: 1 }, peerId); return; }
     times.push(now); this.chatRate.set(key, times);
     const p = peerId ? this.players.get(peerId) : null;
-    const n = p ? p.name : this.hostName, tm = p ? p.team : this.hostTeam;
-    const msg = { t: 'chat', n, tm, x };
+    const n = p ? p.name : this.hostName, tm = p ? p.team : this.hostTeam, u = p ? p.uid || '' : this.myUid;
+    const msg = { t: 'chat', n, tm, x, u };
     for (const id of this.players.keys()) this.net.send(msg, id);
-    if (this.onChat) this.onChat({ n: cleanName(n), tm, x, me: !peerId });
+    if (this.onChat) this.onChat({ n: cleanName(n), tm, x, u, me: !peerId });
+  }
+
+  // ---------- map vote between public matches ----------
+  // Everyone gets a vote; the countdown starts once most players are back in the lobby (voted or
+  // pressed Back to lobby), or after a minute regardless.
+  startMapVote(options) {
+    if (this.role !== 'host') return;
+    clearInterval(this.mvTimer);
+    const now = Date.now();
+    this.mv = { o: options.slice(0, 4), votes: new Map(), ready: new Set(['host']), cdEnd: 0, hard: now + 60000 };
+    this.mapVote = { o: this.mv.o, v: this.mv.o.map(() => 0), cd: -1, rd: 1, n: 1 + this.players.size, my: -1 };
+    this.mvTimer = setInterval(() => this.mapVoteTick(), 500);
+    this.mapVoteTick();
+  }
+  mapVoteIn(peerId, m) {
+    if (!this.mv) return;
+    this.mv.ready.add(peerId);
+    if (Number.isInteger(m.p) && m.p >= 0 && m.p < this.mv.o.length) this.mv.votes.set(peerId, m.p);
+    this.mapVoteTick();
+  }
+  voteMap(idx) {
+    if (this.role === 'guest') { if (this.hostId) this.net.send({ t: 'mv', p: idx }, this.hostId); if (this.mapVote) { this.mapVote.my = idx; if (this.onMapVote) this.onMapVote(); } return; }
+    if (!this.mv) return;
+    this.mv.votes.set('host', idx);
+    this.mapVote.my = idx;
+    this.mapVoteTick();
+  }
+  mapReady() { if (this.role === 'guest' && this.hostId && this.mapVote) this.net.send({ t: 'mv', r: 1 }, this.hostId); }
+  mapVoteTick() {
+    const mv = this.mv;
+    if (!mv || this.role !== 'host') return;
+    const now = Date.now();
+    for (const k of mv.ready) if (k !== 'host' && !this.players.has(k)) mv.ready.delete(k);
+    for (const k of mv.votes.keys()) if (k !== 'host' && !this.players.has(k)) mv.votes.delete(k);
+    const n = 1 + this.players.size, rd = mv.ready.size;
+    if (!mv.cdEnd && (rd * 2 > n || now > mv.hard)) mv.cdEnd = now + 15000;
+    const counts = mv.o.map((_, i) => [...mv.votes.values()].filter(v => v === i).length);
+    const cd = mv.cdEnd ? Math.max(0, Math.ceil((mv.cdEnd - now) / 1000)) : -1;
+    const done = mv.cdEnd && now >= mv.cdEnd;
+    const msg = { t: 'mv', o: mv.o, v: counts, cd, rd, n, end: done ? 1 : 0 };
+    for (const id of this.players.keys()) this.net.send(msg, id);
+    this.mapVote = { o: mv.o, v: counts, cd, rd, n, my: this.mapVote ? this.mapVote.my : -1 };
+    if (done) {
+      clearInterval(this.mvTimer);
+      const top = Math.max(...counts), best = mv.o.filter((_, i) => counts[i] === top);
+      const pick = best[(Math.random() * best.length) | 0];
+      this.mv = null; this.mapVote = null;
+      if (this.onMapVote) this.onMapVote();
+      if (this.onMapVoteDone) this.onMapVoteDone(pick);
+      return;
+    }
+    if (this.onMapVote) this.onMapVote();
+  }
+
+  // ---------- vote to kick (60% of the other human players; the host can't be voted out) ----------
+  // voter: null = the host itself, else the voter's peer id
+  voteKick(targetId, voter = null) {
+    if (this.role === 'guest') { if (this.hostId) this.net.send({ t: 'vk', id: targetId }, this.hostId); return; }
+    if (this.role !== 'host') return;
+    const g = this.game, target = g.charById && g.charById(targetId);
+    if (!target || target.isBot || target === g.player || !g.session) return;
+    const r = g.session.byChar.get(target);
+    if (!r) return;
+    if (voter && voter === r.peerId) return; // can't vote for yourself
+    const now = Date.now();
+    let v = this.kickVotes.get(targetId);
+    if (!v || v.until < now) { v = { yes: new Set(), until: now + 45000, name: target.name }; this.kickVotes.set(targetId, v); }
+    v.yes.add(voter || 'host');
+    const humans = g.characters.filter(c => !c.isBot && c !== target).length; // everyone else who is a person
+    const need = Math.max(1, Math.ceil(humans * 0.6));
+    const done = v.yes.size >= need;
+    const msg = { t: 'vks', id: targetId, n: target.name, yes: v.yes.size, need, left: Math.ceil((v.until - now) / 1000), done: done ? 1 : 0 };
+    for (const pid of this.players.keys()) this.net.send(msg, pid);
+    if (this.onVote) this.onVote({ id: targetId, name: target.name, yes: v.yes.size, need, left: msg.left, done: msg.done, mine: !voter });
+    if (done) {
+      this.kickVotes.delete(targetId);
+      this.kick(r.peerId); // also bans the account from this lobby
+      this.hostChat(null, `${target.name} was removed by vote.`, true);
+    }
   }
 
   // ---------- guest ----------
@@ -339,6 +431,8 @@ export class Lobby {
 
   hostReceive(m, id) {
     if (m.t === 'chat') { if (this.players.has(id)) this.hostChat(id, m.x); return; }
+    if (m.t === 'vk') { if (this.players.has(id) && Number.isInteger(m.id)) this.voteKick(m.id, id); return; }
+    if (m.t === 'mv') { if (this.players.has(id)) this.mapVoteIn(id, m); return; }
     switch (m.t) {
       case 'hello': {
         if (this.banned.has(id)) { this.net.send({ t: 'lobby', st: 'denied' }, id); return; }
@@ -355,7 +449,7 @@ export class Lobby {
             this.checking.delete(id);
             if (this.role !== 'host' || this.code !== code || this.players.has(id) || this.pending.has(id)) return;
             if (!who) { this.net.send({ t: 'lobby', st: 'signin' }, id); return; }
-            if (this.banned.has('u:' + who.id)) { this.net.send({ t: 'lobby', st: 'denied' }, id); return; }
+            if (this.banned.has('u:' + who.id) || this.blocked.has(who.id)) { this.net.send({ t: 'lobby', st: 'denied' }, id); return; }
             const dupe = (this.account.user && who.id === this.account.user.id) || [...this.players.values(), ...this.pending.values()].some(q => q.uid === who.id);
             if (dupe) { this.net.send({ t: 'lobby', st: 'dupe' }, id); return; }
             this.admit(id, { ...p, name: cleanName(who.name), uid: who.id });
@@ -415,11 +509,23 @@ export class Lobby {
         this.changed();
         break;
       }
+      case 'mv': // map vote state from the host
+        if (Array.isArray(m.o) && Array.isArray(m.v)) {
+          const my = this.mapVote ? this.mapVote.my : -1;
+          this.mapVote = { o: m.o.slice(0, 4).map(x => String(x).slice(0, 12)), v: m.v.slice(0, 4).map(x => x | 0), cd: m.cd | 0, rd: m.rd | 0, n: m.n | 0, my: m.end ? -1 : my, end: !!m.end };
+          if (m.end) this.mapVote = null;
+          if (this.onMapVote) this.onMapVote();
+        }
+        break;
+      case 'vks': // vote-kick progress from the host
+        if (this.onVote && Number.isInteger(m.id)) this.onVote({ id: m.id, name: cleanName(m.n), yes: m.yes | 0, need: m.need | 0, left: m.left | 0, done: m.done | 0 });
+        break;
       case 'chat':
-        if (typeof m.x === 'string' && this.onChat) this.onChat({ n: cleanName(m.n), tm: m.tm === 1 ? 1 : 0, x: cleanChat(m.x), sys: !!m.sys });
+        if (typeof m.x === 'string' && this.onChat) this.onChat({ n: cleanName(m.n), tm: m.tm === 1 ? 1 : 0, x: cleanChat(m.x), sys: !!m.sys, u: typeof m.u === 'string' ? m.u.slice(0, 40) : '', me: !!m.u && m.u === this.myUid });
         break;
       case 'start':
         this.status = 'ingame';
+        this.mapVote = null;
         if (this.onStart) this.onStart(m);
         break;
       default:
@@ -460,6 +566,7 @@ export class Lobby {
     this.checking.clear();
     this.chatRate.clear();
     if (this.role !== 'host') this.info = null;
+    clearInterval(this.mvTimer); this.mv = null; this.mapVote = null;
   }
 }
 
@@ -483,6 +590,7 @@ export class HostSession {
   // called by game.startMatch for each accepted player
   createRemote(p) {
     const c = new Character(this.game, { name: p.name, team: p.team, isBot: false, primary: p.primary, remote: true });
+    c.uid = p.uid || '';
     this.bind(p.peerId, c);
     return c;
   }
@@ -530,7 +638,7 @@ export class HostSession {
     if (r && r.c && !r.c.alive && g.time - r.c.deathT >= PLAYER.respawnMin) r.c.respawnT = Math.min(r.c.respawnT, 0);
   }
 
-  rosterEntry(c) { return [c.id, c.name, c.team, c.loadout, c.isBot ? 1 : 0, c.remote ? 1 : 0]; }
+  rosterEntry(c) { return [c.id, c.name, c.team, c.loadout, c.isBot ? 1 : 0, c.remote ? 1 : 0, c.uid || '']; }
 
   sendStart(r) {
     const g = this.game, s = g.settings, c = r.c;
@@ -834,6 +942,7 @@ export class GuestSession {
     if (!Array.isArray(e) || !Number.isInteger(e[0]) || g.charById(e[0])) return null;
     const [id, name, team, primary, bot] = e;
     const c = new Character(g, { id, name: cleanName(name), team: team === 1 ? 1 : 0, isBot: !!bot, primary: typeof primary === 'string' ? primary : 'rifle', puppet: true });
+    c.uid = typeof e[6] === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(e[6]) ? e[6] : '';
     c.hidden = true;
     c.alive = false;
     c.netSeen = -9;

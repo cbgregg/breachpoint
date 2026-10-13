@@ -324,6 +324,7 @@ function renderPauseMatch() {
   $('pm-me').innerHTML = [['SCORE', p.score], ['KILLS', p.kills], ['DEATHS', p.deaths], ['ASSISTS', p.assists], ['K/D', kd], ['STREAK', p.streak]]
     .map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('') + `<p class="pm-build">${esc(build)}</p>`;
   g.hud.renderScoreboard($('pause-board'));
+  renderPausePlayers();
 }
 document.querySelectorAll('.psec').forEach(b => b.addEventListener('click', () => { setPauseSec(b.dataset.sec); game.audio.play('ui', null, { ui: true }); }));
 // destructive buttons need a second press
@@ -381,17 +382,15 @@ game.onEnd = (r) => {
   $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
   setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
   if (lobby.public && lobby.role === 'host') {
+    // public lobbies vote on the next map; the countdown starts once most players are back
     clearTimeout(nextMatchT);
-    nextMatchT = setTimeout(() => {
-      if (!lobby.public || lobby.role !== 'host' || game.state !== 'ended') return;
-      launch(publicSettings(), { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
-    }, 15000);
-    game.hud.toast('NEXT PUBLIC MATCH IN 15 SECONDS');
+    lobby.startMapVote(shuffleArr(Object.keys(MAPS)).slice(0, 3));
   }
 };
+const shuffleArr = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 let nextMatchT = 0;
 $('again').addEventListener('click', () => {
-  if (lobby.active) { openLobby(); return; }
+  if (lobby.active) { lobby.mapReady(); openLobby(); return; }
   launch(settings);
 });
 $('menu-btn').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
@@ -405,6 +404,20 @@ if (window.BREACHPOINT_OFFLINE) {
 const lobby = new Lobby(game);
 lobby.account = account;
 window.__lobby = lobby;
+lobby.onMapVoteDone = (mapId) => {
+  if (!lobby.public || lobby.role !== 'host') return;
+  lobby.nextMap = mapId;
+  clearTimeout(nextMatchT);
+  launch(publicSettings(), { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
+};
+function renderMapVote() {
+  const mv = lobby.mapVote;
+  const html = !mv ? '' : `<div class="mv-head"><b>VOTE FOR THE NEXT MAP</b><span>${mv.cd >= 0 ? `NEXT MATCH IN <i>${mv.cd}</i>` : `WAITING FOR PLAYERS · ${mv.rd}/${mv.n} IN THE LOBBY`}</span></div>
+    <div class="mv-opts">${mv.o.map((id, i) => `<button class="mv-opt ${mv.my === i ? 'on' : ''}" data-mv="${i}" data-nav><b>${esc(MAPS[id] ? MAPS[id].name : id)}</b><small>${esc(MAPS[id] && MAPS[id].blurb || '')}</small><span>${mv.v[i] || 0} ${mv.v[i] === 1 ? 'VOTE' : 'VOTES'}</span></button>`).join('')}</div>`;
+  for (const id of ['mv-end', 'mv-join', 'mv-host']) setHTML(id, html);
+}
+lobby.onMapVote = () => renderMapVote();
+for (const id of ['mv-end', 'mv-join', 'mv-host']) $(id).addEventListener('click', (e) => { const b = e.target.closest('[data-mv]'); if (b) { lobby.voteMap(+b.dataset.mv); game.audio.play('ui', null, { ui: true }); } });
 let joinCode = '';
 let joinError = '';
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -553,7 +566,7 @@ $('quick-btn').addEventListener('click', () => {
 });
 $('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, '1'); } catch (_) { /* ignore */ } startQuick(); });
 // public matches use fixed rules, but in the game mode you picked (players are matched by mode)
-const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || settings.mode || 'tdm' });
+const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || settings.mode || 'tdm', map: lobby.nextMap && MAPS[lobby.nextMap] ? lobby.nextMap : PUBLIC_MATCH.map });
 lobby.onQuickHost = () => {
   setMapHint();
   launch(publicSettings(), { mode: 'host', lobby }).then(() => {
@@ -717,7 +730,7 @@ function focusFirst() {
   const items = navItems();
   const pref = sideOpen ? (account.signedIn ? ($('sd-req').querySelector('[data-nav]') || $('sd-friends').querySelector('[data-nav]') || $('sd-add-in')) : $('sd-email'))
     : screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
-    : screen === 'signin' ? document.querySelector('#signin .si-step.on input')
+    : screen === 'signin' ? document.querySelector('#signin .si-step.on .terms, #signin .si-step.on input')
     : screen === 'feedback' ? document.querySelector('[data-fb].on')
     : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
     : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
@@ -776,6 +789,11 @@ game.input.onNav = (dir) => {
   const tick = () => game.audio.play('ui', null, { ui: true, freq: 2600 });
   const go = (d) => {
     if (!el) { focusFirst(); return; }
+    // long text boxes scroll with up / down before focus moves on
+    if (el.classList.contains('terms') && (d === 'up' || d === 'down')) {
+      const atEnd = d === 'down' ? el.scrollTop + el.clientHeight >= el.scrollHeight - 4 : el.scrollTop <= 0;
+      if (!atEnd) { el.scrollBy({ top: d === 'down' ? 140 : -140 }); return; }
+    }
     let to = spatial(el, items, d);
     if (!to && (d === 'up' || d === 'down')) { const i = items.indexOf(el); to = items[i + (d === 'down' ? 1 : -1)] || null; }
     if (to) { focusEl(to); tick(); }
@@ -808,6 +826,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'mode') { showScreen('title'); }
       else if (screen === 'signin') $('si-back').click();
       else if (screen === 'feedback') closeFeedback();
+      else if (screen === 'report') closeReport();
       else if (screen === 'end') $('menu-btn').click();
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
@@ -965,8 +984,9 @@ let siCur = 'email', afterSignin = null;
 function siStep(st) {
   siCur = st;
   document.querySelectorAll('.si-step').forEach(el => el.classList.toggle('on', el.id === `si-${st}`));
-  $('si-title').textContent = st === 'name' ? 'YOUR NAME TAG' : st === 'sent' ? 'CHECK YOUR EMAIL' : 'SIGN IN';
-  $('si-back').textContent = st === 'name' ? 'SIGN OUT' : 'BACK';
+  $('si-title').textContent = st === 'name' ? 'YOUR NAME TAG' : st === 'sent' ? 'CHECK YOUR EMAIL' : st === 'terms' ? 'TERMS OF USE' : 'SIGN IN';
+  $('si-back').textContent = st === 'name' ? 'SIGN OUT' : st === 'terms' ? 'DECLINE AND SIGN OUT' : 'BACK';
+  if (st === 'terms') { $('terms-box').scrollTop = 0; termsRead = false; syncTerms(); }
   siStatus('');
   const inp = document.querySelector(`#si-${st} input`);
   if (st === 'name') inp.value = account.tag || (settings.name !== 'Operator' ? settings.name : '');
@@ -979,9 +999,10 @@ function siBusy(b) { siBusyNow = b; document.querySelectorAll('#signin .cta, #si
 function openSignin() {
   if (sideOpen) closeSide();
   showScreen('signin');
-  siStep(account.signedIn && !account.tag ? 'name' : 'email');
+  siStep(account.signedIn && !account.termsOk ? 'terms' : account.signedIn && !account.tag ? 'name' : 'email');
 }
 function signedIn() {
+  if (!account.termsOk) { if (screen !== 'signin') showScreen('signin'); siStep('terms'); return; }
   if (!account.tag) { if (screen !== 'signin') showScreen('signin'); siStep('name'); return; }
   game.hud.toast(`SIGNED IN AS ${account.tag.toUpperCase()}`);
   const next = afterSignin;
@@ -1030,6 +1051,7 @@ async function codeSignIn(inp, status, done) {
 const siVerify = () => codeSignIn($('si-code-in'), siStatus, (expired) => { if (expired) setTimeout(() => siStep('email'), 1800); else if (screen === 'signin' && siCur !== 'name') signedIn(); });
 const sdVerify = () => codeSignIn($('sd-code-in'), sdStatus, (expired) => {
   if (expired) { $('sd-codebox').classList.remove('on'); return; }
+  if (!account.termsOk || !account.tag) { setPlayMode('online'); openSignin(); return; }
   game.hud.toast(account.tag ? `SIGNED IN AS ${account.tag.toUpperCase()}` : 'SIGNED IN · CHOOSE A NAME TAG');
 });
 for (const [inp, fn] of [['si-code-in', siVerify], ['sd-code-in', sdVerify]]) {
@@ -1039,11 +1061,30 @@ for (const [inp, fn] of [['si-code-in', siVerify], ['sd-code-in', sdVerify]]) {
 $('si-verify').addEventListener('click', siVerify);
 $('sd-verify').addEventListener('click', sdVerify);
 $('si-send').addEventListener('click', siSend);
+// terms: the box must be scrolled to the end before the checkbox and the button unlock
+let termsRead = false;
+function syncTerms() {
+  const box = $('terms-box');
+  if (box.scrollTop + box.clientHeight >= box.scrollHeight - 8) termsRead = true;
+  $('terms-ok').disabled = !termsRead;
+  if (!termsRead) $('terms-ok').checked = false;
+  $('terms-accept').disabled = !(termsRead && $('terms-ok').checked);
+  $('terms-hint').textContent = !termsRead ? 'Scroll to the bottom of the terms to continue.' : !$('terms-ok').checked ? 'Tick the box to agree.' : '';
+}
+$('terms-box').addEventListener('scroll', syncTerms, { passive: true });
+$('terms-ok').addEventListener('change', syncTerms);
+$('terms-accept').addEventListener('click', async () => {
+  if ($('terms-accept').disabled || siBusyNow) return;
+  siBusy(true);
+  siStatus('<span class="spin"></span>Saving…');
+  try { await account.acceptTerms(); siBusy(false); signedIn(); }
+  catch (e) { siBusy(false); syncTerms(); siStatus(esc(e.message), 'bad'); }
+});
 $('si-name-save').addEventListener('click', siName);
 $('si-resend').addEventListener('click', () => { $('si-email-in').value = account.email; siSend(); });
 $('si-other').addEventListener('click', () => siStep('email'));
 $('si-back').addEventListener('click', () => {
-  if (siCur === 'name') account.signOut();
+  if (siCur === 'name' || siCur === 'terms') account.signOut();
   afterSignin = null;
   openMode();
 });
@@ -1060,6 +1101,7 @@ for (const [cb, warn] of [['si-remember', 'si-warn'], ['sd-remember', 'sd-warn']
 // ---------- social sidebar (Y on a controller, F on a keyboard): account, Name Tag, friends ----------
 function openSide() {
   if (sideOpen || !sideAllowed()) return;
+  if (account.signedIn && !account.termsOk) { setPlayMode('online'); openSignin(); return; }
   sideOpen = true;
   sideFocusBack = document.querySelector('.pad-focus');
   document.body.classList.add('side-open');
@@ -1225,6 +1267,98 @@ function renderRecent(d) {
   }).join('') : '<div class="sd-empty">Players you meet in online matches show up here, so you can add them.</div>');
 }
 
+// ---------- mute / block / report / vote to kick ----------
+const BLOCK_KEY = 'breachpoint.blocked.v1';
+let blocked = (() => { try { return JSON.parse(localStorage.getItem(BLOCK_KEY) || '[]').filter(b => b && b.u); } catch (_) { return []; } })();
+const muted = new Set(); // this session only: account ids, or "n:<name>" for players without one
+const saveBlocked = () => { try { localStorage.setItem(BLOCK_KEY, JSON.stringify(blocked.slice(0, 200))); } catch (_) { /* ignore */ } lobby.blocked = new Set(blocked.map(b => b.u)); };
+lobby.blocked = new Set(blocked.map(b => b.u));
+const isBlocked = (u) => !!u && blocked.some(b => b.u === u);
+const muteKey = (u, n) => (u ? u : `n:${n}`);
+const isMuted = (u, n) => muted.has(muteKey(u, n)) || isBlocked(u);
+const votes = new Map(); // character id -> { yes, need, until, voted }
+lobby.onVote = (v) => {
+  const old = votes.get(v.id) || {};
+  votes.set(v.id, { yes: v.yes, need: v.need, until: Date.now() + v.left * 1000, voted: old.voted || !!v.mine });
+  if (v.done) { votes.delete(v.id); game.hud.toast(`${v.name.toUpperCase()} WAS VOTED OUT`); }
+  else addChat({ sys: true, x: `Vote to kick ${v.name}: ${v.yes}/${v.need}. Pause → Players to vote.` });
+  if (screen === 'pause') renderPausePlayers();
+};
+function renderPausePlayers() {
+  const wrap = $('pm-players-wrap');
+  const g = game, online = lobby.active && g.mode !== 'local';
+  wrap.style.display = online ? '' : 'none';
+  if (!online) return;
+  const host = lobby.role === 'host';
+  const people = g.characters.filter(c => !c.isBot && c !== g.player);
+  const now = Date.now();
+  setHTML('pm-players', people.length ? people.map(c => {
+    const v = votes.get(c.id), live = v && v.until > now;
+    const mutedNow = isMuted(c.uid, c.name), bl = isBlocked(c.uid);
+    const kick = host ? `<button class="warn" data-mkick="${c.id}" data-nav>KICK</button>`
+      : `<button class="warn" data-vk="${c.id}" data-nav ${live && v.voted ? 'disabled' : ''}>${live ? `VOTE KICK ${v.yes}/${v.need}` : 'VOTE KICK'}</button>`;
+    return `<div class="prow t${c.team === g.player.team ? 0 : 1}"><span class="pn">${esc(c.name)}${account.isFriend(c.uid) ? ' <span class="pt">FRIEND</span>' : ''}</span>
+      <button data-mute="${c.id}" data-nav>${mutedNow && !bl ? 'UNMUTE' : 'MUTE'}</button>
+      ${c.uid ? `<button data-block="${c.id}" data-nav>${bl ? 'UNBLOCK' : 'BLOCK'}</button>` : ''}
+      <button data-report="${c.id}" data-nav>REPORT</button>${kick}</div>`;
+  }).join('') : '<div class="empty">No other players right now.</div>');
+}
+$('pm-players').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const id = +(b.dataset.mute || b.dataset.block || b.dataset.report || b.dataset.vk || b.dataset.mkick);
+  const c = game.charById ? game.charById(id) : null;
+  if (!c) return;
+  if (b.dataset.mute) {
+    const k = muteKey(c.uid, c.name);
+    if (muted.has(k)) muted.delete(k); else muted.add(k);
+    game.hud.toast(muted.has(k) ? `${c.name.toUpperCase()} MUTED` : `${c.name.toUpperCase()} UNMUTED`);
+  } else if (b.dataset.block) {
+    if (isBlocked(c.uid)) { blocked = blocked.filter(x => x.u !== c.uid); game.hud.toast(`${c.name.toUpperCase()} UNBLOCKED`); }
+    else { blocked.unshift({ u: c.uid, n: c.name, at: Date.now() }); game.hud.toast(`${c.name.toUpperCase()} BLOCKED · MUTED AND CAN'T JOIN YOUR LOBBIES`); }
+    saveBlocked();
+  } else if (b.dataset.report) openReport(c);
+  else if (b.dataset.vk) {
+    const v = votes.get(c.id) || { yes: 0, need: 0, until: 0 };
+    v.voted = true; votes.set(c.id, v);
+    lobby.voteKick(c.id);
+    game.hud.toast(`VOTE TO KICK ${c.name.toUpperCase()} SENT`);
+  } else if (b.dataset.mkick) {
+    const r = game.session && game.session.byChar ? game.session.byChar.get(c) : null;
+    if (r) lobby.kick(r.peerId);
+  }
+  renderPausePlayers();
+});
+// report screen
+let rpFrom = 'pause', rpTarget = null, rpReason = 'cheating', rpBusy = false;
+function openReport(c) {
+  rpFrom = screen || 'pause';
+  rpTarget = { id: c.uid || '', name: c.name };
+  $('rp-who').textContent = `PLAYER · ${c.name.toUpperCase()}`;
+  $('rp-text').value = '';
+  $('rp-status').innerHTML = ''; $('rp-status').className = 'join-status';
+  $('rp-send').disabled = false;
+  document.querySelectorAll('[data-rp]').forEach(x => x.classList.toggle('on', x.dataset.rp === 'cheating'));
+  rpReason = 'cheating';
+  showScreen('report');
+}
+function closeReport() { showScreen(rpFrom === 'report' ? 'pause' : rpFrom); if (screen === 'pause') setPauseSec('match'); }
+document.querySelectorAll('[data-rp]').forEach(x => x.addEventListener('click', () => { rpReason = x.dataset.rp; document.querySelectorAll('[data-rp]').forEach(y => y.classList.toggle('on', y === x)); }));
+$('rp-back').addEventListener('click', closeReport);
+$('rp-send').addEventListener('click', async () => {
+  if (rpBusy || !rpTarget) return;
+  rpBusy = true; $('rp-send').disabled = true;
+  const st = $('rp-status');
+  st.className = 'join-status'; st.innerHTML = '<span class="spin"></span>Sending…';
+  try {
+    await account.report({ id: rpTarget.id, name: rpTarget.name, reason: rpReason, details: $('rp-text').value.trim(), mode: game.settings ? game.settings.mode : '', map: game.world ? game.world.id : '', code: lobby.public ? 'public' : 'private' });
+    st.className = 'join-status good'; st.textContent = 'Thanks. Your report was sent.';
+    game.hud.toast('REPORT SENT · THANK YOU');
+    setTimeout(() => { if (screen === 'report') closeReport(); }, 1400);
+  } catch (e) { st.className = 'join-status bad'; st.textContent = e.message; $('rp-send').disabled = false; }
+  rpBusy = false;
+});
+
 // ---------- text chat (online lobbies and matches; the host filters and relays every line) ----------
 const chatLines = [];
 let chatOpen = false;
@@ -1247,6 +1381,7 @@ function syncChat() {
 }
 function addChat(line) {
   if (settings.chat === false) return;
+  if (!line.sys && !line.me && isMuted(line.u, line.n)) return; // muted or blocked
   const my = game.state !== 'menu' && game.player ? game.player.team : (lobby.role === 'host' ? lobby.hostTeam : null);
   const cls = line.sys ? 'sys' : my == null ? `t${line.tm}` : line.tm === my ? 'f' : 'e';
   const el = document.createElement('div');
