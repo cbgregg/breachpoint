@@ -176,7 +176,10 @@ export class BotBrain {
       const p = g.nearestPickup('ammo', b.pos, true);
       if (p) { this.setGoal(p.pos, 'ammo'); return; }
     }
-    if (this.target && this.target.alive && g.time - this.lastKnownT < 6) { this.setGoal(this.lastKnown, 'hunt'); return; }
+    if (this.target && this.target.alive && g.time - this.lastKnownT < 6
+      && Math.hypot(this.lastKnown.x - b.pos.x, this.lastKnown.z - b.pos.z) > 2.5) { this.setGoal(this.lastKnown, 'hunt'); return; }
+    // got to the last sighting and found nobody: forget it and move on
+    if (this.goalKind === 'hunt' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5) { this.goal = null; this.lastKnownT = -99; }
     const reached = this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2;
     if (!this.goal || reached || this.goalT <= 0 || this.goalKind === 'hunt' || this.goalKind === 'health' || this.goalKind === 'ammo') {
       const intel = g.intel[b.team];
@@ -285,7 +288,7 @@ export class BotBrain {
     // long runs with nobody in sight: tactical sprint while the charge is high
     const run = sprint && !this.visible;
     if (!run) this.tac = false;
-    else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
+    else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
     b.updateMovement(dt, wish, run, jump, false, run && this.tac);
   }
 

@@ -833,7 +833,7 @@ export class Game {
   // there, and how close friendlies are. The yaw to face comes back in this.spawnYawOut.
   chooseSpawn(team) {
     const flip = !this.gm;
-    const sets = flip ? [team, 1 - team] : [team];
+    const sets = flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
     let best = null, bestScore = -Infinity, bestYaw = this.world.spawnYaw[team];
     this.recentDeaths = (this.recentDeaths || []).filter(d => this.time - d.t < 8);
     for (const set of sets) {

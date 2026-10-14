@@ -4,7 +4,7 @@ import { MAPS } from './world.js';
 import { Game } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
-import { Lobby, MAX_HUMANS } from './online.js';
+import { Lobby, MAX_HUMANS, cleanName } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
 import { GunPreview } from './gunsmith.js';
@@ -29,7 +29,7 @@ const account = new Account();
 const loginToken = takeLoginToken(); // sign-in link opened: read and wipe it before anything else runs
 let playMode = 'offline';            // chosen on the Offline / Online screen
 // online with accounts on, your Name Tag is your account's; offline it's the local one
-const onlineName = () => playMode === 'online' && account.enabled && account.tag;
+const onlineName = () => account.enabled && account.tag; // signed in: your Name Tag, online and offline
 const myName = () => onlineName() || settings.name;
 // social sidebar state (see the sidebar section below)
 let sideOpen = false, sideFocusBack = null;
@@ -245,6 +245,8 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnim
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
 function launch(cfg, online = null) {
   const guestCfg = online && online.start && online.start.cfg;
+  // online, your Name Tag always comes from your account (the host's own character used to fall back to "Operator")
+  if (online) { cfg = { ...cfg, name: myName() || 'Operator' }; if (online.lobby && online.lobby.role === 'host') online.lobby.hostName = cleanName(myName() || 'Operator'); }
   // "Random" is decided here, before the loading screen, so it can name the map
   if (!guestCfg && !MAPS[cfg.map]) { const ids = Object.keys(MAPS); cfg = { ...cfg, map: ids[(Math.random() * ids.length) | 0] }; }
   const gm = MODES[(guestCfg && guestCfg.mode) || cfg.mode] || MODES.tdm;
@@ -607,12 +609,12 @@ function keypad(k) {
   renderLobby();
   if (joinCode.length === 6 && game.input.lastDevice === 'pad') focusEl($('keypad').querySelector('.go'));
 }
-function tryJoin() {
+function tryJoin(withUid = '') {
   if (joinCode.length !== 6) return;
   readAll();
   game.audio.init();
   joinError = '';
-  lobby.join(joinCode, myName(), loadoutFromSettings(settings));
+  lobby.join(joinCode, myName(), loadoutFromSettings(settings), false, typeof withUid === 'string' ? withUid : '');
 }
 lobby.onMapHint = (id) => { if (MAPS[id] && id !== game.world.id) game.loadMap(id); };
 const setMapHint = () => {
@@ -921,6 +923,8 @@ $('mode-chip').addEventListener('click', () => openMode());
 // account state shown around the menus
 function syncAccount() {
   const u = account.signedIn ? account.user : null;
+  // one name everywhere: once you have a Name Tag, offline matches use it too
+  if (u && u.tag && settings.name !== u.tag) { settings.name = u.tag; saveSettings(settings); }
   document.body.classList.toggle('has-account', !!u);
   $('acct-email').textContent = u ? u.email : '';
   $('title-acct').textContent = u && u.tag ? `Signed in as ${u.tag}` : '';
@@ -956,7 +960,7 @@ const untilText = (t) => {
 function syncNameNote() {
   const u = account.signedIn ? account.user : null;
   const wait = u && u.nextTagAt && u.nextTagAt > Date.now() / 1000;
-  $('opt-name-note').textContent = playMode === 'online' && account.enabled && u ? (wait ? `You can change it again in ${untilText(u.nextTagAt)}` : 'Everyone sees this. Changes once a day.') : '';
+  $('opt-name-note').textContent = account.enabled && u ? (wait ? `You can change it again in ${untilText(u.nextTagAt)}` : 'Everyone sees this. Changes once a day.') : '';
 }
 async function changeTag(want, el) {
   want = want.trim();
@@ -1219,7 +1223,7 @@ function renderSide() {
     const canJoin = f.online && f.join && f.join !== myJoin && (f.state === 'lobby' || f.state === 'match');
     return `<div class="sd-row ${f.online ? 'on' : 'off'}"><span class="sd-dot"></span>
       <span class="sd-n"><b>${esc(f.tag)}</b>${f.disp ? `<i>${esc(f.disp)}</i>` : ''}<small>${esc(friendStatus(f))}</small>${f.hist.length ? `<small class="sd-hist">Previously ${esc(f.hist.join(', '))}</small>` : ''}</span>
-      ${canJoin ? `<button class="menu-btn small ok" data-join="${esc(f.join)}" data-nav>JOIN</button>` : ''}
+      ${canJoin ? `<button class="menu-btn small ok" data-join="${esc(f.join)}" data-with="${esc(f.id)}" data-nav>JOIN</button>` : ''}
       <button class="menu-btn small warn" data-fr="remove" data-id="${esc(f.id)}" data-nav title="Remove friend">✕</button></div>`;
   }).join('') : '<div class="sd-empty">No friends yet. Share your friend code, or enter a friend\'s code above.</div>');
   renderRecent(d);
@@ -1481,7 +1485,7 @@ $('sd-out').addEventListener('click', () => { account.signOut(); game.hud.toast(
 $('side').addEventListener('click', async (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  if (b.dataset.join) { joinFriend(b.dataset.join); return; }
+  if (b.dataset.join) { joinFriend(b.dataset.join, b.dataset.with || ''); return; }
   if (b.dataset.addid) {
     b.disabled = true;
     try { const r = await account.addFriendById(b.dataset.addid); game.hud.toast(r.friends ? 'YOU\'RE NOW FRIENDS' : 'FRIEND REQUEST SENT'); }
@@ -1505,7 +1509,7 @@ $('side').addEventListener('click', async (e) => {
 });
 
 // join a friend's match by its code (friends skip the host's approval)
-function joinFriend(code) {
+function joinFriend(code, withUid = '') {
   if (!/^\d{6}$/.test(code)) return;
   closeSide();
   if (lobby.active && lobby.code === code) { openLobby(); return; }
@@ -1518,7 +1522,7 @@ function joinFriend(code) {
   game.audio.init();
   joinError = '';
   openLobby();
-  tryJoin();
+  tryJoin(withUid);
 }
 
 // presence: friends see you online and which match to join

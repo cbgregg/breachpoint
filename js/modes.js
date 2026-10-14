@@ -65,6 +65,10 @@ class RoundMode {
   get noRespawn() { return true; }
   get fixedLoadout() { return !!this.cfg.fixedLoadout; }
   get defend() { return 1 - this.attack; }
+  // Search & Destroy: teams physically swap ends of the map at halftime (like Call of Duty), so the
+  // attacking end and the defended sites stay put while the teams change places.
+  sideOf(t) { return this.id === 'snd' && this.round > this.cfg.halftime ? 1 - t : t; }
+  get defSites() { return this.sites[this.sideOf(this.defend)]; }
 
   // ---------- setup ----------
   buildSpots() {
@@ -182,11 +186,12 @@ class RoundMode {
     // gunfight: a fresh shared loadout every two rounds
     if (this.fixedLoadout && (this.round - 1) % 2 === 0) this.loadout = randomLoadout(PRIMARIES[(Math.random() * PRIMARIES.length) | 0]);
     for (const t of [0, 1]) {
-      const spots = [...g.world.spawns[t]].sort(() => Math.random() - 0.5);
+      const side = this.sideOf(t);
+      const spots = [...g.world.spawns[side]].sort(() => Math.random() - 0.5);
       g.characters.filter(c => c.team === t).forEach((c, i) => {
         c.pendingLoadout = this.fixedLoadout ? null : c.pendingLoadout;
         if (this.fixedLoadout && c.loadout !== this.loadout) { c.setLoadout(this.loadout); g.emit(['lo', c.id, c.loadout]); }
-        c.spawn(spots[i % spots.length], g.world.spawnYaw[t]);
+        c.spawn(spots[i % spots.length], g.world.spawnYaw[side]);
         c.spawnProtect = 0;
         c.respawnT = Infinity;
         c.busy = false; c.useHeld = false;
@@ -331,7 +336,7 @@ class RoundMode {
     if (this.id !== 'snd' || this.phase !== 'live' || !c || !c.alive) return null;
     const b = this.bomb;
     if (b.state === BOMB.carried && b.carrier === c) {
-      for (const s of this.sites[this.defend]) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius && c.pos.y < 1.5) return 'plant';
+      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius && c.pos.y < 1.5) return 'plant';
     }
     if (b.state === BOMB.planted && c.team === this.defend && Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < this.cfg.defuseRadius) return 'defuse';
     return null;
@@ -341,7 +346,7 @@ class RoundMode {
     const b = this.bomb, g = this.g;
     b.state = BOMB.dropped;
     b.carrier = null;
-    b.pos.copy(pos || this.sites[this.defend][0]);
+    b.pos.copy(pos || this.defSites[0]);
     b.pos.y = Math.max(0, b.pos.y);
     // don't leave it out of reach on a ledge: drop to the nearest open floor cell when it's high up
     if (b.pos.y > 2.5) {
@@ -357,7 +362,7 @@ class RoundMode {
     b.carrier = null;
     b.planter = c;
     b.pos.set(c.pos.x, c.pos.y, c.pos.z);
-    const sites = this.sites[this.defend];
+    const sites = this.defSites;
     b.site = sites[0].distanceTo(_v.set(c.pos.x, 0, c.pos.z)) < sites[1].distanceTo(_v) ? 0 : 1;
     g.timeLeft = this.cfg.bombTime;
     c.score += 100;
@@ -422,7 +427,7 @@ class RoundMode {
       return { pos: brain.gmGoal, kind: 'push' };
     }
     const bm = this.bomb, A = this.attack;
-    const sites = this.sites[this.defend];
+    const sites = this.defSites;
     if (b.team === A) {
       if (bm.state === BOMB.carried && bm.carrier === b) return { pos: sites[this.botSite], kind: 'plant' };
       if (bm.state === BOMB.dropped) {
@@ -548,7 +553,7 @@ class RoundMode {
     const snd = this.id === 'snd';
     if (!me.isBot) me.useHeld = me.alive && !g.frozen && g.input.useHeld;
     // site rings on the defending side
-    const sites = snd ? this.sites[this.defend] : [];
+    const sites = snd ? this.defSites : [];
     this.siteMeshes.forEach((m, i) => { m.visible = snd && !!sites[i]; if (sites[i]) m.position.set(sites[i].x, 0.04, sites[i].z); });
     // bomb on the ground or planted
     const showBomb = snd && (b.state === BOMB.planted || (b.state === BOMB.dropped && me.team === this.attack));
@@ -610,7 +615,7 @@ class RoundMode {
     // world markers
     const want = [];
     if (snd) {
-      const sites = this.sites[this.defend];
+      const sites = this.defSites;
       sites.forEach((s, i) => {
         if (b.state === BOMB.planted && b.site !== i) return;
         want.push([`s${i}`, s, i === 0 ? 'A' : 'B', b.state === BOMB.planted ? 'hot' : this.attack === mine ? 'atk' : 'def']);
@@ -627,7 +632,7 @@ class RoundMode {
     if (this.id !== 'snd' || this.phase !== 'live' || !c.alive) return null;
     const b = this.bomb;
     if (b.state === BOMB.carried && b.carrier === c) {
-      for (const s of this.sites[this.defend]) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius) return 'plant';
+      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius) return 'plant';
     }
     if (b.state === BOMB.planted && c.team === this.defend && Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < this.cfg.defuseRadius) return 'defuse';
     return null;

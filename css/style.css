@@ -1036,3 +1036,8 @@ body.chat-menu #pause #chat.docked { flex: none; }
 /* pause: players list */
 .pm-players { margin-top: 12px; }
 .pm-players .prow button:disabled { opacity: 0.5; }
+/* countdown: the pop keeps the centering transform (the generic pop replaced it, so the number jumped) */
+#countdown { font-variant-numeric: tabular-nums; text-align: center; min-width: 2ch; }
+#countdown.on { animation: count-pop .35s ease-out; }
+@keyframes count-pop { from { transform: translate(-50%, -50%) scale(1.35); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+#count-label.on { animation: none; }

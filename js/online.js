@@ -123,13 +123,31 @@ export class Lobby {
     return n;
   }
 
+  // Friends go on their friend's team (taking a bot's place there); everyone else balances the teams.
+  // p.w: the account the player came to join (from Join in the friends list); the host's own friends count too.
+  pickTeam(p) {
+    const n = this.teamCounts();
+    const balanced = n[0] <= n[1] ? 0 : 1;
+    let want = -1;
+    if (p.w) {
+      if (p.w === this.myUid) want = this.hostTeam;
+      else for (const q of this.players.values()) if (q.uid && q.uid === p.w) { want = q.team; break; }
+    }
+    if (want < 0 && p.uid && this.account && this.account.isFriend(p.uid)) want = this.hostTeam;
+    if (want < 0) return balanced;
+    // keep it if that team still has room (a bot to replace, or fewer humans than the team size)
+    const g = this.game, live = g.mode === 'host' && g.live;
+    const size = (g.settings && (g.gm && g.gm.cfg.teamSize ? g.gm.cfg.teamSize : g.settings.teamSize)) || 6;
+    const botThere = live && g.characters.some(c => c.isBot && c.team === want);
+    return botThere || n[want] < size ? want : balanced;
+  }
+
   accept(peerId) {
     const p = this.pending.get(peerId);
     if (!p) return;
     this.pending.delete(peerId);
     if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, peerId); this.changed(); return; }
-    const n = this.teamCounts();
-    p.team = n[0] <= n[1] ? 0 : 1;
+    p.team = this.pickTeam(p);
     p.ping = 0;
     this.players.set(peerId, p);
     this.broadcastLobby();
@@ -356,8 +374,9 @@ export class Lobby {
     this.close(reason);
   }
 
-  join(code, name, primary, quick = false) {
+  join(code, name, primary, quick = false, withUid = '') {
     this.reset();
+    this.joinWith = withUid;
     this.role = 'guest';
     this.code = code;
     this.myName = cleanName(name);
@@ -386,7 +405,7 @@ export class Lobby {
       try { tk = await this.account.ticket(code); } catch (e) { this.lastError = e.message; }
       if (this.role !== 'guest' || this.code !== code || this.hostId) return;
     }
-    this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary, tk }, id);
+    this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary, tk, w: this.joinWith || '' }, id);
   }
 
   peerLeave(id) {
@@ -439,7 +458,7 @@ export class Lobby {
         if (this.players.has(id) || this.pending.has(id)) return;
         if (m.v !== PROTO) { this.net.send({ t: 'lobby', st: 'version' }, id); return; }
         if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, id); return; }
-        const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str };
+        const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str, w: typeof m.w === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(m.w) ? m.w : '' };
         if (this.account && this.account.enabled) {
           // accounts are on: only players with a valid pass for this code get in, under their account Name Tag
           if (this.checking.has(id)) return;
