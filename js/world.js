@@ -239,12 +239,14 @@ const SHURAN_PICKUPS = [
 const PIONEER_CENTER = [
   [0, 0, 20, 16, 0, 0, 'paving'],
   [-1, -3, 11, 4.2, 3.8, 0, 'pergola'],
-  [5.5, 3.5, 0.9, 0.9, 9, 0, 'totem'],
+  [5.5, 3.5, 0.9, 0.9, 9, 0, 'totem'], [5.5, 3.5, 3, 3, 0.9, 0, 'railing', { open: 'w' }],
+  [-3, -7.2, 2.2, 1.6, 2.6, 0, 'kiosk'],
+  [7.6, 5.4, 1.3, 1.3, 0.75, 0, 'planter'], [-8.6, 2.6, 1.3, 1.3, 0.75, 0, 'planter'], [1.5, -9.8, 1.3, 1.3, 0.75, 0, 'planter'], [-1.5, 9.8, 1.3, 1.3, 0.75, 0, 'planter'],
   [-6.5, 4.5, 0, 0, 9, 0, 'tree'], [2, 6.5, 0, 0, 10, 0, 'tree'], [7, -5.5, 0, 0, 9, 0, 'tree'], [-8, -6, 0, 0, 8.5, 0, 'tree'],
   [-4, 1.2, 1.8, 0.6, 0.95, 0, 'bench'], [3, -0.6, 1.8, 0.6, 0.95, 0, 'bench'], [-2.5, 6.6, 1.8, 0.6, 0.95, 0, 'bench'],
   [8.8, 0.5, 0, 0, 0, 0, 'vlamp'], [-8.8, -0.5, 0, 0, 0, 0, 'vlamp'], [0.5, 7.6, 0, 0, 0, 0, 'vlamp'], [-0.5, -7.6, 0, 0, 0, 0, 'vlamp'],
   // one-off cover so the plaza isn't a shooting gallery; each side reads differently
-  [-5, -1.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [4.5, 1.8, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [-5, -1.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [3.5, 0.8, 2.4, 0.9, 0.9, 0, 'stall', 1],
   [0.5, 3.2, 1.6, 1.6, 1.6, 0, 'crate'], [0.6, 3.2, 1.4, 1.4, 1.4, 1.6, 'crate'],
   [8.5, 11.5, 4.4, 2.0, 1.45, 0, 'car', 0], [-8.5, -11.5, 4.4, 2.0, 1.45, 0, 'car', 1],
   [-3, 12, 2, 2.5, 1.8, 0, 'crate'], [3, -12, 0.8, 3, 1.1, 0, 'sand'],
@@ -259,7 +261,7 @@ const PIONEER_CENTER = [
   [4, -20, 6, 8, 3.4, 0, 'house', { n: [['d', 0]], s: [['d', 1]], e: [['d', -1.5]], w: [['w', 1.5]], props: [['crates', 1.4, 2.4], ['shelf', 0, -1.5, 1]] }],
   [-6, -12.5, 1.6, 1.6, 1.6, 0, 'crate'], [6.5, 12.5, 0.62, 0.62, 0.9, 0, 'barrel'],
   // Smith Tower on the skyline to the north
-  [-14, 74, 12, 12, 62, 0, 'tower'],
+  [96, 13, 12, 12, 62, 0, 'tower'],
 ];
 const PIONEER_HALF = [
   // ---- the Pioneer Building, and the Underground beneath it (bomb site A)
@@ -268,7 +270,7 @@ const PIONEER_HALF = [
   [18.25, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: 1 }],
   [35.75, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: -1 }],
   // ---- mid block and the corner tavern (bomb site B), split by a narrow alley
-  [28, 4.5, 12, 7, 14, 0, 'brick'],
+  [28, 4.5, 12, 7, 12, 0, 'garage'],
   [28, -6, 10, 7, 3.6, 0, 'house', { n: [['d', -2.5], ['w', 1.5]], s: [['d', 2], ['w', -2]], e: [['d', 0]], w: [['d', 1], ['w', -1.6]], props: [['table', -2, -1.2], ['table', 2.2, 1.2], ['shelf', 3.4, -2.6, 0]], light: 1 }],
   // ---- south row
   [22, -22, 8, 12, 17, 0, 'brick', { stone: true }],
@@ -282,7 +284,7 @@ const PIONEER_HALF = [
   [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, -14, 6.4, 21.5, -14, 7]],
   [12.5, 0, 0, 0, 0, 0, 'cable', [21.5, 30, 8, 54, 34, 9]],
   [19.8, 15.8, 0, 0, 0, 0, 'vlamp'], [19.8, -9.7, 0, 0, 0, 0, 'vlamp'], [10.2, 26, 0, 0, 0, 0, 'vlamp'], [19.8, 34, 0, 0, 0, 0, 'vlamp'],
-  [17.5, 6, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [17.5, 6, 2.4, 0.9, 0.9, 0, 'stall', 1], [20.9, 2.5, 0.7, 0.5, 1, 0, 'aframe', 1], [20.7, -19, 0.7, 0.5, 1, 0, 'aframe', 3], [34.5, 17.3, 0.7, 0.5, 1, 0, 'aframe', 2],
   [16.5, 30, 1.6, 1.6, 1.6, 0, 'crate'], [16.6, 30, 1.4, 1.4, 1.4, 1.6, 'crate'],
   [17, -8, 0.8, 3, 1.1, 0, 'sand'],
   [17.5, 38.6, 2, 2.5, 1.8, 0, 'crate'],
@@ -330,8 +332,8 @@ const PIONEER_HALF = [
 ];
 // street grid (east half; mirrored): First Avenue with the streetcar line, three cross streets
 const PIONEER_ROADS = [
-  [10, -37.4, 15, 37.4, 'z', { center: false, trees: [1] }],
-  [15, 9, 43, 15, 'x', { center: 'double', bike: 1, trees: [-1, 1] }],          // Yesler Way: bike lane, parked cars
+  [10, -37.4, 15, 37.4, 'z', { center: false, trees: [1], brick: [1] }],
+  [15, 9, 43, 15, 'x', { center: 'double', bike: 1, trees: [-1, 1], brick: [-1, 1] }],          // Yesler Way: bike lane, parked cars
   [15, -15, 43, -10.5, 'x', { center: 'double', trees: [1] }],
   [15, 29.5, 43, 36, 'x', { trees: [-1] }],
   [15, -37, 34, -31, 'x'],
@@ -500,7 +502,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const B = (mat, w, h, d, x, y, z, ry = 0, opts = {}) => put(worldBox(w, h, d, scaleOf(mat)), mat, x, y + h / 2, z, ry, opts);
   const solid = (cx, cz, w, d, h, y0 = 0, surface = 'concrete') => { const b = physics.addBox(new Box(cx - w / 2, y0, cz - d / 2, cx + w / 2, y0 + h, cz + d / 2)); b.surface = surface; return b; };
   const SURFACE = { container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'dirt', hesco: 'dirt', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
-  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower']);
+  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe']);
 
   // ---------- shared decals / glows ----------
   const radial = (stops) => {
@@ -557,24 +559,24 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
   const SOLID_LIDS = HOLES; // building mass over these rects is nav-transparent (a level runs beneath)
   for (const [x0, z0, x1, z1] of rectsMinus([-200, -200, 200, 200], HOLES)) physics.addBox(new Box(x0, -2, z0, x1, 0, z1)).surface = 'ground';
-  const plane = (mat, w, d, x, z, y, ry = 0) => {
+  const plane = (mat, w, d, x, z, y, ry = 0, tint) => {
     if (HOLES.length && !ry) {
       const pieces = rectsMinus([x - w / 2, z - d / 2, x + w / 2, z + d / 2], HOLES);
-      if (pieces.length !== 1) { for (const [a, b, c, e] of pieces) planePiece(mat, c - a, e - b, (a + c) / 2, (b + e) / 2, y); return; }
+      if (pieces.length !== 1) { for (const [a, b, c, e] of pieces) planePiece(mat, c - a, e - b, (a + c) / 2, (b + e) / 2, y, 0, tint); return; }
     }
-    planePiece(mat, w, d, x, z, y, ry);
+    planePiece(mat, w, d, x, z, y, ry, tint);
   };
-  const planePiece = (mat, w, d, x, z, y, ry = 0) => {
+  const planePiece = (mat, w, d, x, z, y, ry = 0, tint) => {
     const g = new THREE.PlaneGeometry(w, d);
     const sc = scaleOf(mat);
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / (sc || 3), uv.getY(i) * d / (sc || 3));
-    put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false });
+    put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false, tint });
   };
   const street = !LAYOUT.build; // custom-built maps (the supermarket) lay their own ground
   // street grid: [x0, z0, x1, z1, axis ('x' | 'z' = direction of travel), opts]; roadsMirror adds the point-mirrored copy
   const ROADS = street && LAYOUT.roads ? (LAYOUT.roadsMirror
-    ? [...LAYOUT.roads, ...LAYOUT.roads.map(([a, b, c, d, ax, o]) => [-c, -d, -a, -b, ax, o && { ...o, bike: o.bike && -o.bike, trees: o.trees && o.trees.map(t => -t) }])] : LAYOUT.roads) : null;
+    ? [...LAYOUT.roads, ...LAYOUT.roads.map(([a, b, c, d, ax, o]) => [-c, -d, -a, -b, ax, o && { ...o, bike: o.bike && -o.bike, trees: o.trees && o.trees.map(t => -t), brick: o.brick && o.brick.map(t => -t) }])] : LAYOUT.roads) : null;
   if (ROADS) {
     // concrete sidewalk slabs: light, slightly mottled, scored every 1.5 m
     const c = document.createElement('canvas'); c.width = c.height = 512;
@@ -657,6 +659,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (const [a, b] of segs) {
           const [cx, cz] = P((a + b) / 2, w + sgn * 0.15);
           B(M.concrete, alongX ? b - a : 0.3, 0.15, alongX ? 0.3 : b - a, cx, 0, cz, 0, { tint: 0xc9c4b8, grime: 0.35, cast: false });
+          // painted curb: red approaching a junction, now and then a yellow loading zone
+          const paint = (p0, p1, tint) => { const [px, pz] = P((p0 + p1) / 2, w + sgn * 0.15); put(flatBox(alongX ? p1 - p0 : 0.32, 0.03, alongX ? 0.32 : p1 - p0, 0), M.paint, px, 0.16, pz, 0, { tint, grime: 0.2, cast: false }); };
+          if (b - a > 6) { if (a > L0 + 0.1) paint(a, a + 3, 0xa83a2c); if (b < L1 - 0.1) paint(b - 3, b, 0xa83a2c); if (b - a > 16 && rnd() < 0.5) { const m = a + 5 + rnd() * (b - a - 16); paint(m, m + 6, 0xd9b23a); } }
           // storm drain grates against the curb now and then
           for (let l = a + 4 + rnd() * 6; l < b - 2; l += 14 + rnd() * 10) { const [gx, gz] = P(l, w - sgn * 0.35); flat(manholeMat, alongX ? 0.9 : 0.45, alongX ? 0.45 : 0.9, gx, gz, 0.02); }
         }
@@ -710,6 +715,48 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           if (physics.boxes.some(b => b.maxy > 0.2 && b.miny < 6 && x > b.minx - 1.6 && x < b.maxx + 1.6 && z > b.minz - 1.6 && z < b.maxz + 1.6)) continue;
           flat(manholeMat, 1.3, 1.3, x, z, 0.022);
           decorate(x, z, 0, 0, 8 + rnd() * 2.5, 0, 'tree');
+        }
+      }
+    } });
+    // brick sidewalks (o.brick = sides), clipped around crossing roads and stairwells
+    for (const r of ROADS) {
+      const [x0, z0, x1, z1, ax] = r, o = r[5] || {};
+      if (!o.brick) continue;
+      const alongX = ax === 'x';
+      for (const sd of o.brick) {
+        const e = sd < 0 ? (alongX ? z0 : x0) : (alongX ? z1 : x1), f = e + sd * 3.4;
+        const strip = alongX ? [x0, Math.min(e, f), x1, Math.max(e, f)] : [Math.min(e, f), z0, Math.max(e, f), z1];
+        const cutR = ROADS.map(q => [q[0], q[1], q[2], q[3]]);
+        for (const [a, b, c, d] of rectsMinus(strip, [...cutR, ...HOLES])) planePiece(M.brick, c - a, d - b, (a + c) / 2, (b + d) / 2, 0.012, 0, 0xc89a80);
+      }
+    }
+    // two-globe lamp posts along every sidewalk, with banners and hanging flower baskets
+    afterLayout.push(() => { for (const r of ROADS) {
+      const [x0, z0, x1, z1, ax] = r;
+      const alongX = ax === 'x', L0 = alongX ? x0 : z0, L1 = alongX ? x1 : z1;
+      for (const sd of [-1, 1]) {
+        const w = (sd < 0 ? (alongX ? z0 : x0) : (alongX ? z1 : x1)) + sd * 0.65;
+        for (let l = L0 + 7 + rnd() * 3; l < L1 - 3; l += 15 + rnd() * 3) {
+          const x = alongX ? l : w, z = alongX ? w : l;
+          if (Math.abs(x) > HX - 11 || Math.abs(z) > HZ - 1) continue;
+          if (ROADS.some(q => x > q[0] - 3 && x < q[2] + 3 && z > q[1] - 3 && z < q[3] + 3 && q !== r)) continue;
+          if (HOLES.some(h => x > h[0] - 1 && x < h[2] + 1 && z > h[1] - 1 && z < h[3] + 1)) continue;
+          if (physics.boxes.some(b => b.maxy > 0.2 && b.miny < 5 && x > b.minx - 1.2 && x < b.maxx + 1.2 && z > b.minz - 1.2 && z < b.maxz + 1.2)) continue;
+          solid(x, z, 0.26, 0.26, 4, 0, 'metal');
+          put(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 10), M.iron, x, 0.25, z, 0, { grime: 0.3 });
+          put(new THREE.CylinderGeometry(0.07, 0.1, 4.0, 10), M.iron, x, 2.2, z, 0, { grime: 0.1 });
+          const ax2 = alongX ? 1 : 0, az2 = alongX ? 0 : 1;
+          put(flatBox(alongX ? 1.0 : 0.05, 0.05, alongX ? 0.05 : 1.0, 0), M.iron, x, 4.15, z, 0, { grime: 0 });
+          for (const k of [-1, 1]) { const gx = x + ax2 * k * 0.45, gz = z + az2 * k * 0.45; put(new THREE.SphereGeometry(0.2, 12, 9), M.bulb, gx, 4.42, gz, 0, { grime: 0, cast: false }); glows.push([gx, 4.42, gz, 1.2]); }
+          if (rnd() < 0.6) { // banner on the street side
+            put(new THREE.PlaneGeometry(0.55, 1.1), M.cloth, x - (alongX ? 0 : sd * 0.32), 3.2, z - (alongX ? sd * 0.32 : 0), alongX ? 0 : Math.PI / 2, { tint: [0x7a2a24, 0x2f5a6a, 0x3d5a3a][(rnd() * 3) | 0], grime: 0, cast: false });
+          }
+          if (rnd() < 0.7) for (const k of [-1, 1]) { // hanging baskets
+            const bx = x + ax2 * k * 0.45, bz = z + az2 * k * 0.45;
+            put(new THREE.SphereGeometry(0.32, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M.iron, bx, 3.75, bz, 0, { grime: 0.1 });
+            put(new THREE.IcosahedronGeometry(0.4, 1), M.leaf, bx, 3.78, bz, rnd() * 6, { grime: 0, tint: 0x6f8a3a, sy: 0.6 });
+            for (let f = 0; f < 6; f++) put(new THREE.SphereGeometry(0.07, 6, 5), M.paint, bx + (rnd() - 0.5) * 0.6, 3.7 + rnd() * 0.3, bz + (rnd() - 0.5) * 0.6, 0, { grime: 0, tint: [0xd8342a, 0xc2448a, 0xf0ece0, 0x7a4ac8][(rnd() * 4) | 0] });
+          }
         }
       }
     } });
@@ -935,6 +982,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const shutterTints = [0x9c9c94, 0x6e7f86, 0x8a7a62, 0x7d8a6a];
   const signTints = [0x2f5a6a, 0x8a2f2a, 0xb08a3a, 0x3d5a3a, 0xd9d2c0];
   const plasterTints = [0xf1e1c2, 0xe4cfac, 0xd8c09b, 0xece3d2, 0xdcbf94, 0xcfb894];
+  let kioskSign = null;
   const decorate = (cx, cz, w, d, h, y0, kind, extra, team) => {
     const x0 = cx - w / 2, z0 = cz - d / 2;
     switch (kind) {
@@ -1317,7 +1365,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
         break;
       }
-      case 'paving': plane(extra === 'brick' ? M.brick : M.cobble, w, d, cx, cz, 0.018); break;
+      case 'paving': plane(extra === 'brick' ? M.brick : M.cobble, w, d, cx, cz, 0.018, 0, extra === 'brick' ? 0xc89a80 : 0x9c948a); break;
       case 'tracks': {
         // streetcar rails set into the street
         const along = d >= w, L = along ? d : w;
@@ -1397,6 +1445,77 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           put(new THREE.SphereGeometry(0.17, 12, 8), M.bulb, bx, ys + 0.12, bz, 0, { grime: 0, cast: false });
           glows.push([bx, ys + 0.12, bz, 1.1]);
         }
+        break;
+      }
+      case 'kiosk': {
+        // the green information kiosk by the pergola: panelled booth, roof with a deep overhang, signboards
+        B(M.paint, w, h, d, cx, 0, cz, 0, { tint: 0x2f5a3c, grime: 0.35 });
+        for (const [nx, nz, L] of [[1, 0, d], [-1, 0, d], [0, 1, w], [0, -1, w]]) {
+          const ry = Math.atan2(nx, nz), n = Math.max(2, Math.round(L / 0.9));
+          for (let i = 0; i < n; i++) { const t = -L / 2 + (i + 0.5) * L / n; put(flatBox(L / n - 0.12, h * 0.55, 0.03, 0), M.paint, cx + nx * (w / 2 + 0.015) - nz * t, h * 0.42, cz + nz * (d / 2 + 0.015) + nx * t, ry, { tint: 0x274d33, grime: 0.2 }); }
+          if (!kioskSign) {
+            const c = document.createElement('canvas'); c.width = 512; c.height = 64; const g = c.getContext('2d');
+            g.fillStyle = '#20402b'; g.fillRect(0, 0, 512, 64); g.fillStyle = '#efe9da'; g.font = 'bold 42px Arial, sans-serif'; g.textAlign = 'center'; g.fillText('INFORMATION', 256, 48);
+            const t2 = new THREE.CanvasTexture(c); t2.colorSpace = THREE.SRGBColorSpace; kioskSign = new THREE.MeshStandardMaterial({ map: t2, roughness: 0.6 });
+          }
+          put(new THREE.PlaneGeometry(Math.min(L - 0.2, 2.4), 0.3), kioskSign, cx + nx * (w / 2 + 0.035), h * 0.85, cz + nz * (d / 2 + 0.035), ry, { grime: 0, cast: false });
+        }
+        B(M.paint, w + 0.9, 0.16, d + 0.9, cx, h, cz, 0, { tint: 0x22402c, grime: 0.1 });
+        B(M.paint, w + 0.3, 0.3, d + 0.3, cx, h + 0.16, cz, 0, { tint: 0x2f5a3c, grime: 0.1 });
+        for (const [bx, bz] of [[w / 2 + 0.9, 0], [-w / 2 - 0.9, 0.6]]) { put(new THREE.CylinderGeometry(0.1, 0.12, 0.9, 10), M.iron, cx + bx, 0.45, cz + bz, 0, { grime: 0.2 }); solid(cx + bx, cz + bz, 0.24, 0.24, 0.9, 0, 'metal'); }
+        break;
+      }
+      case 'planter': {
+        // round concrete planter with flowers spilling over
+        const r = w / 2;
+        put(new THREE.CylinderGeometry(r, r * 0.85, h, 20), M.concrete, cx, h / 2, cz, 0, { tint: 0xc8c0b0, grime: 0.4 });
+        put(new THREE.TorusGeometry(r - 0.04, 0.06, 6, 20), M.concrete, cx, h, cz, 0, { rx: Math.PI / 2, tint: 0xd2cabb, grime: 0.1 });
+        put(new THREE.CircleGeometry(r - 0.08, 18), M.dirt, cx, h - 0.06, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x6a5238 });
+        for (let i = 0; i < 9; i++) {
+          const a = rnd() * 6.28, rr = rnd() * (r - 0.2), g = new THREE.IcosahedronGeometry(0.18 + rnd() * 0.12, 0);
+          put(g, M.leaf, cx + Math.cos(a) * rr, h + 0.12 + rnd() * 0.15, cz + Math.sin(a) * rr, rnd() * 6, { grime: 0, tint: 0x6f8a3a });
+          if (rnd() < 0.7) put(new THREE.SphereGeometry(0.07, 6, 5), M.paint, cx + Math.cos(a) * (rr + 0.12), h + 0.28 + rnd() * 0.12, cz + Math.sin(a) * (rr + 0.12), 0, { grime: 0, tint: [0xd8342a, 0xe8c23a, 0xc2448a, 0xf0ece0][(rnd() * 4) | 0] });
+        }
+        break;
+      }
+      case 'railing': {
+        // low cast-iron fence around a bed (w x d), open on one side if extra.open = 'n'|'s'|'e'|'w'
+        const H = h || 0.9, open = extra && extra.open;
+        for (const [k, nx, nz, L] of [['e', 1, 0, d], ['w', -1, 0, d], ['n', 0, 1, w], ['s', 0, -1, w]]) {
+          if (k === open) continue;
+          const x = cx + nx * w / 2, z = cz + nz * d / 2, alongX = !nx;
+          solid(x, z, alongX ? L : 0.08, alongX ? 0.08 : L, H, 0, 'metal');
+          for (const y of [0.12, H - 0.06]) put(flatBox(alongX ? L : 0.05, 0.05, alongX ? 0.05 : L, 0), M.iron, x, y, z, 0, { grime: 0.1 });
+          const n = Math.round(L / 0.16);
+          for (let i = 0; i <= n; i++) { const t = -L / 2 + i * L / n; put(new THREE.CylinderGeometry(0.014, 0.014, H, 4), M.iron, x + (alongX ? t : 0), H / 2, z + (alongX ? 0 : t), 0, { grime: 0 }); if (i % 4 === 0) put(new THREE.ConeGeometry(0.04, 0.12, 4), M.iron, x + (alongX ? t : 0), H + 0.06, z + (alongX ? 0 : t), 0, { grime: 0 }); }
+        }
+        break;
+      }
+      case 'aframe': {
+        // café sandwich board on the sidewalk
+        for (const s2 of [-1, 1]) put(flatBox(0.6, 0.95, 0.03, 0), M.wood, cx, 0.46, cz + s2 * 0.17, 0, { rx: s2 * 0.2, tint: 0x2b2b2b, grime: 0.1 });
+        for (const s2 of [-1, 1]) put(new THREE.PlaneGeometry(0.48, 0.7), posterMat[(extra || 0) % 5], cx, 0.5, cz + s2 * 0.2, s2 > 0 ? 0 : Math.PI, { rx: s2 * 0.2, grime: 0, cast: false });
+        break;
+      }
+      case 'garage': {
+        // concrete parking garage (the "Sinking Ship"): open decks behind parapets, columns, cars on every level, stair tower
+        const decks = Math.max(2, Math.floor(h / 2.9));
+        B(M.dim, w - 0.6, h - 0.3, d - 0.6, cx, 0, cz, 0, { grime: 0 });
+        for (let k = 0; k <= decks; k++) {
+          const y = k * (h / decks);
+          if (k > 0) B(M.concrete, w, 0.32, d, cx, y - 0.32, cz, 0, { tint: 0xcfc9bd, grime: 0.3, base: y - 1 });
+          if (k < decks) B(M.concrete, w + 0.1, 1.0, d + 0.1, cx, y + (k ? 0 : 0), cz, 0, { tint: 0xd6d0c4, grime: 0.45, base: y });
+          // cars parked against the parapet
+          if (k < decks) for (let i = 0; i < Math.floor(w / 2.8); i++) for (const sz2 of [-1, 1]) if (rnd() < 0.65) {
+            const px = cx - w / 2 + 1.6 + i * 2.8, pz = cz + sz2 * (d / 2 - 2.6);
+            B(M.paint, 1.8, 0.7, 4.2, px, y + 0.25, pz, 0, { tint: [0x8a1c1c, 0x1c2a44, 0xcfcfcf, 0x2b2b2b, 0x5a6a72][(rnd() * 5) | 0], grime: 0.1 });
+            B(M.glass, 1.6, 0.45, 2.2, px, y + 0.95, pz, 0, { grime: 0 });
+          }
+        }
+        for (let i = 0; i <= Math.round(w / 4); i++) for (const sz2 of [-1, 1]) B(M.concrete, 0.45, h, 0.45, cx - w / 2 + i * (w / Math.round(w / 4)), 0, cz + sz2 * (d / 2 - 0.2), 0, { tint: 0xc9c3b6, grime: 0.4 });
+        for (let i = 0; i <= Math.round(d / 4); i++) for (const sx2 of [-1, 1]) B(M.concrete, 0.45, h, 0.45, cx + sx2 * (w / 2 - 0.2), 0, cz - d / 2 + i * (d / Math.round(d / 4)), 0, { tint: 0xc9c3b6, grime: 0.4 });
+        B(M.concrete, 3, h + 2.5, 3, cx + w / 2 - 1.5, 0, cz - d / 2 + 1.5, 0, { tint: 0xbdb6a8, grime: 0.4 });
+        put(flatBox(0.9, 3.2, 0.12, 0), M.paint, cx + w / 2 + 0.07, h - 1.5, cz, Math.PI / 2, { tint: 0x2a62b8, grime: 0 });
         break;
       }
       case 'bench': {
