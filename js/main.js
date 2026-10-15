@@ -88,6 +88,16 @@ const outputs = {
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
+// the map dropdown is built from the map list, so every map shows up in the menu
+const MAP_TAGS = { shuran: '3 lanes', mart: 'indoor', pioneer: 'Underground site' };
+{
+  const sel = $('opt-map');
+  sel.innerHTML = Object.values(MAPS).map(m => `<option value="${m.id}">${m.name}${MAP_TAGS[m.id] ? ` · ${MAP_TAGS[m.id]}` : ''}</option>`).join('') + '<option value="random">Random</option>';
+}
+// loading-screen / menu photos of each map (rendered in-engine); one is picked at random per load
+const mapPhoto = (id) => { const l = MAPS[id] && MAPS[id].photos; return l && l.length ? l[(Math.random() * l.length) | 0] : null; };
+const photoCache = {};
+const loadPhoto = (src) => photoCache[src] || (photoCache[src] = new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
 function writeForm() {
   for (const [id, key, type] of bindings) {
     const el = $(id);
@@ -236,6 +246,12 @@ function showScreen(id) {
 }
 
 // ---------- loading screen (between the menu and a match) ----------
+function setLoadingPhoto(id) {
+  const bg = $('ld-bg'), src = id ? mapPhoto(id) : null;
+  bg.classList.remove('on');
+  if (!src) return;
+  loadPhoto(src).then(im => { if (!im) return; bg.style.backgroundImage = `url("${src}")`; bg.classList.remove('kb'); void bg.offsetWidth; bg.classList.add('on', 'kb'); });
+}
 function drawLoadingMap(id) {
   const c = $('ld-mapc'), wrap = c.parentElement;
   const have = id && game.world.id === id && game.minimap;
@@ -262,6 +278,7 @@ function launch(cfg, online = null) {
   const fill = $('load-fill');
   const step = (pct, text) => { fill.style.width = `${pct}%`; $('load-text').textContent = `${text} · ${pct}%`; };
   fill.style.transition = 'none'; step(0, 'Loading');
+  setLoadingPhoto(map ? mapId : null);
   drawLoadingMap(map ? mapId : null);
   showScreen('loading');
   const t0 = performance.now();
@@ -1628,6 +1645,16 @@ function drawIntel() {
   const want = game.state === 'menu' ? settings.map : game.world.id;
   const shot = mapShots[want];
   g.clearRect(0, 0, c.width, c.height);
+  const ph = want !== 'random' && MAPS[want] && MAPS[want].photos && MAPS[want].photos[0];
+  if (ph) {
+    loadPhoto(ph).then(im => {
+      if (!im || (game.state === 'menu' ? settings.map : game.world.id) !== want) return;
+      const s = Math.max(c.width / im.width, c.height / im.height), w = im.width * s, h = im.height * s;
+      g.clearRect(0, 0, c.width, c.height); g.drawImage(im, (c.width - w) / 2, (c.height - h) / 2, w, h);
+    });
+    $('intel-mapname').textContent = MAPS[want].name.toUpperCase();
+    return;
+  }
   if (shot) {
     g.drawImage(shot, 0, 0);
     g.fillStyle = 'rgba(79,179,255,0.25)'; g.fillRect(0, 0, c.width * 0.13, c.height);

@@ -756,6 +756,16 @@ body.mode-offline .online-cf { display: none; }
     linear-gradient(90deg, rgba(120, 170, 200, 0.05) 1px, transparent 1px) 0 0 / 48px 48px,
     radial-gradient(ellipse 80% 70% at 70% 35%, #18232c 0%, #070a0d 75%); }
 #loading.on { display: flex; }
+/* full-bleed map photo behind the loading screen, slow push-in, darkened toward the text */
+.ld-bg { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+.ld-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 7, 9, 0.55) 0%, rgba(5, 7, 9, 0.05) 30%, rgba(5, 7, 9, 0.35) 58%, rgba(5, 7, 9, 0.92) 100%), linear-gradient(90deg, rgba(5, 7, 9, 0.6) 0%, rgba(5, 7, 9, 0) 55%); }
+.ld-bg.on { opacity: 1; }
+.ld-bg.kb { animation: ld-kb 14s ease-out forwards; }
+@keyframes ld-kb { from { transform: scale(1.0); } to { transform: scale(1.08) translate(-1%, -0.5%); } }
+#loading { overflow: hidden; }
+#loading > .ld-info, #loading > .ld-foot { position: relative; z-index: 1; }
+#loading > .ld-top, #loading > .ld-map { z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .ld-bg.kb { animation: none; } }
 .ld-top { position: absolute; top: clamp(20px, 4vw, 48px); left: clamp(20px, 4vw, 56px); }
 .load-logo { font-size: 26px; letter-spacing: 0.34em; color: #fff; padding-left: 0; display: flex; align-items: center; gap: 12px; }
 .load-logo::before { content: ''; width: 12px; height: 12px; background: var(--bo); box-shadow: 0 0 16px var(--bo); }
