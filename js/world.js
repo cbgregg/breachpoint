@@ -6,7 +6,7 @@ import { Box } from './physics.js';
 import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
-import { PROPS, containerVariants } from './props.js';
+import { PROPS, containerVariants, buildingVariants } from './props.js';
 
 // Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
@@ -963,6 +963,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       put(new THREE.CircleGeometry(0.5, 24), puddleMat, x, 0.022, z, rnd() * Math.PI, { rx: -Math.PI / 2, sx: w, sy: d, grime: 0, cast: false });
       i++;
     }
+    // steel street bins on the sidewalks, between the lamp posts (CC-BY 4.0, "Simple Bin - steel" by Sousinho)
+    if (PROPS.bin) {
+      const bb = PROPS.bin.box, bs = 0.95 / (bb.max.y - bb.min.y);
+      for (const sz of [-1, 1]) for (let x = -(HX - 18) + 6; x <= HX - 14; x += 16) {
+        const z = sz * (HZ - 1.4), xx = x + (rnd() - 0.5) * 2;
+        if (blocked(xx, z, 0.5)) continue;
+        for (const pt of PROPS.bin.parts) put(pt.geo.clone(), pt.mat, xx, -bb.min.y * bs, z, rnd() * 6, { sx: bs, sy: bs, sz: bs, grime: 0 });
+        solid(xx, z, 0.6, 0.6, 0.95, 0, 'metal');
+      }
+    }
     // litter along the walls: bin bags, tyres, cardboard, newspaper
     const bagMat = std({ color: 0x1b1d20, roughness: 0.35, metalness: 0.05 });
     const paperMat = std({ color: 0xd9d2c0, roughness: 0.9, side: THREE.DoubleSide });
@@ -1116,8 +1126,20 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(g, M.cloth, sx * (HX - 1.5) - sx * 0.95, 6.2, 0, Math.PI / 2, { grime: 0, tint: team ? 0x5a2622 : 0x3d4f63 });
   }
 
-  // distant city skyline beyond the perimeter (hazed by fog)
-  for (let i = 0; i < 70; i++) {
+  // distant city skyline beyond the perimeter (hazed by fog): real downtown buildings when the model set is
+  // loaded (CC-BY 4.0, "Downtown Buildings Set - Low Poly model" by Daniel Zhabotinsky), boxes otherwise
+  const BV = buildingVariants();
+  if (BV && BV.length) {
+    const R0 = Math.max(HX, HZ) + 26;
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * Math.PI * 2 + rnd() * 0.08;
+      const v = BV[(i * 7 + Math.floor(rnd() * BV.length)) % BV.length];
+      const r = R0 + Math.max(v.size.x, v.size.z) * 0.5 + rnd() * 50;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r * 0.85;
+      const ry = Math.atan2(-x, -z) + (rnd() - 0.5) * 0.4;      // roughly facing the map
+      for (const pt of v.parts) put(pt.geo.clone(), pt.mat, x, 0, z, ry, { grime: 0, cast: false });
+    }
+  } else for (let i = 0; i < 70; i++) {
     const a = (i / 70) * Math.PI * 2;
     const r = Math.max(HX, HZ) + 28 + rnd() * 70;
     const h = 8 + rnd() * 26;

@@ -37,3 +37,25 @@ export function containerVariants() {
   });
   return P.variants;
 }
+
+// Downtown buildings set: split into individual buildings by name, each centred on x/z with its base at y = 0
+export function buildingVariants() {
+  const P = PROPS.downtown;
+  if (!P) return null;
+  if (P.variants) return P.variants;
+  const groups = new Map();
+  for (const pt of P.parts) {
+    const m = pt.name.match(/^(Downtown_[A-Za-z]+_\d+(?:_B)?)/);
+    if (!m) continue;
+    if (!groups.has(m[1])) groups.set(m[1], []);
+    groups.get(m[1]).push(pt);
+  }
+  P.variants = [...groups.values()].map(list => {
+    const box = new THREE.Box3();
+    for (const { geo } of list) { geo.computeBoundingBox(); box.union(geo.boundingBox); }
+    const c = box.getCenter(new THREE.Vector3());
+    const parts = list.map(({ geo, mat }) => { const g = geo.clone(); g.translate(-c.x, -box.min.y, -c.z); return { geo: g, mat }; });
+    return { parts, size: box.getSize(new THREE.Vector3()) };
+  });
+  return P.variants;
+}
