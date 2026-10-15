@@ -20,6 +20,7 @@ export const MART = {
   id: 'mart',
   name: 'Freshway Market',
   blurb: 'Indoor supermarket: aisles, deli, bakery, upstairs offices; parking lot and loading yard',
+  photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
   spawns2: [
     [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-40, 8]],
     [[37, -20], [37, -12], [36, -3.5], [37, 5], [37, 12], [38, 20], [39, -11.5], [39, 9]],

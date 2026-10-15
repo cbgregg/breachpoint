@@ -765,6 +765,7 @@ body.mode-offline .online-cf { display: none; }
 #loading { overflow: hidden; }
 #loading > .ld-info, #loading > .ld-foot { position: relative; z-index: 1; }
 #loading > .ld-top, #loading > .ld-map { z-index: 1; }
+#loading.has-photo .ld-map { width: min(24vw, 300px); padding: 6px; }
 @media (prefers-reduced-motion: reduce) { .ld-bg.kb { animation: none; } }
 .ld-top { position: absolute; top: clamp(20px, 4vw, 48px); left: clamp(20px, 4vw, 56px); }
 .load-logo { font-size: 26px; letter-spacing: 0.34em; color: #fff; padding-left: 0; display: flex; align-items: center; gap: 12px; }

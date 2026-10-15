@@ -248,9 +248,9 @@ function showScreen(id) {
 // ---------- loading screen (between the menu and a match) ----------
 function setLoadingPhoto(id) {
   const bg = $('ld-bg'), src = id ? mapPhoto(id) : null;
-  bg.classList.remove('on');
+  bg.classList.remove('on'); $('loading').classList.remove('has-photo');
   if (!src) return;
-  loadPhoto(src).then(im => { if (!im) return; bg.style.backgroundImage = `url("${src}")`; bg.classList.remove('kb'); void bg.offsetWidth; bg.classList.add('on', 'kb'); });
+  loadPhoto(src).then(im => { if (!im) return; $('loading').classList.add('has-photo'); bg.style.backgroundImage = `url("${src}")`; bg.classList.remove('kb'); void bg.offsetWidth; bg.classList.add('on', 'kb'); });
 }
 function drawLoadingMap(id) {
   const c = $('ld-mapc'), wrap = c.parentElement;

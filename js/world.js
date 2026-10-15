@@ -343,9 +343,9 @@ const PIONEER_PICKUPS = [
 ];
 
 export const MAPS = {
-  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3 },
-  shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS },
-  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4 },
+  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
+  shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
 };
 export const MAP_IDS = Object.keys(MAPS);
