@@ -9,6 +9,7 @@ import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
 import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef } from './attachments.js';
 import { BotBrain } from './bot.js';
+import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
 import { Effects } from './effects.js';
 import { GameAudio } from './audio.js';
@@ -901,6 +902,20 @@ export class Game {
       a.position.z = b.position.z = 0.157 * s;
       const strap = new THREE.Mesh(new THREE.BoxGeometry(0.46 * s, 0.03 * s, 0.32 * s), new THREE.MeshStandardMaterial({ color: 0x23251f }));
       g.add(bag, p, a, b, strap);
+    } else if (PROPS.mags) {
+      // three rifle magazines lying on their sides (CC-BY 4.0, "Low-Poly AR-15 magazines" by notcplkerry)
+      const mags = new THREE.Group();
+      for (const pt of PROPS.mags.parts) {
+        pt.geo.computeBoundingBox();
+        const c = pt.geo.boundingBox.getCenter(new THREE.Vector3());
+        if (Math.abs(c.x) < 0.05 && c.z > -0.12 && c.z < 0.27) mags.add(new THREE.Mesh(pt.geo, pt.mat));
+      }
+      const b = new THREE.Box3().setFromObject(mags), c = b.getCenter(new THREE.Vector3());
+      mags.children.forEach(m => m.position.sub(c));
+      mags.rotation.z = Math.PI / 2;
+      mags.scale.setScalar(1.6 * s);
+      mags.position.y = 0.05 * s;
+      g.add(mags);
     } else {
       const can = new THREE.Mesh(new THREE.BoxGeometry(0.42 * s, 0.24 * s, 0.18 * s), new THREE.MeshStandardMaterial({ color: 0x4a5236, roughness: 0.55, metalness: 0.4 }));
       const lid = new THREE.Mesh(new THREE.BoxGeometry(0.44 * s, 0.03 * s, 0.2 * s), new THREE.MeshStandardMaterial({ color: 0x3a4029, roughness: 0.5, metalness: 0.5 }));

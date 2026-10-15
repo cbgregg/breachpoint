@@ -6,6 +6,7 @@ import { Box } from './physics.js';
 import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
+import { PROPS, containerVariants } from './props.js';
 
 // Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
@@ -568,6 +569,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const flMat = center ? M.centerFloor : M.houseFloor || M.tile, flS = center ? 3.2 : M.houseFloor ? 2.2 : 1.6;
     const uv = fl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w - 2 * T) / flS, uv.getY(i) * (d - 2 * T) / flS);
     put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
+    // a corkboard of maps and notes on the back wall of the big halls (CC-BY 4.0, "Corkboard" by XIN)
+    if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.04, Math.PI, { grime: 0, cast: false });
     // props
     for (const [k, dx, dz, rot] of spec.props || []) {
       const px = cx + dx, pz = cz + dz;
@@ -708,6 +711,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'stairs':
+        if (PROPS.stairs) {
+          // wooden staircase model (CC-BY 4.0, "Wooden Stairs_5_MB" by Mehdi Shahsavan) over the step boxes:
+          // one flight per stair run, placed on its first step
+          if (extra === 1) {
+            const st = PROPS.stairs.parts[0], dir = Math.sign(cx) || 1;
+            put(st.geo.clone(), st.mat, cx - dir * 2.7, 0, cz, dir > 0 ? Math.PI : 0, { sx: 6.3 / 3.48, sy: 3.5 / 3.42, sz: 3.0 / 1.62, grime: 0 });
+          }
+          break;
+        }
         B(M.concrete, w, h, d, cx, y0, cz, 0, { grime: 0.35 });
         if (extra % 2 === 0) put(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), M.dark, cx, h + 0.5, cz + Math.sign(cz) * (d / 2 - 0.05) * -1, 0, { grime: 0 });
         break;
@@ -778,6 +790,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'container': {
+        const CV = containerVariants();
+        if (CV) {
+          // shipping container model (CC-BY 4.0, "Truck Container Pack Low-poly ASIA" by knitro_builds): pick a
+          // livery from the tint, stretch to the collision box (long side along z in the model)
+          const along = w > d, L = along ? w : d, W = along ? d : w;
+          const v = CV[Math.abs(((extra | 0) >> 3) + Math.round(cx * 7 + cz * 3)) % CV.length];
+          put(v.geo.clone(), v.mat, cx, y0, cz, along ? Math.PI / 2 : 0, { sx: W / v.size.x, sy: h / v.size.y, sz: L / v.size.z, grime: 0 });
+          break;
+        }
         const along = w > d;
         const L = along ? w : d, W = along ? d : w;
         const ry = along ? 0 : Math.PI / 2;

@@ -506,6 +506,22 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     sight(A.optic === 'iron' ? { sightY: 0.122, sightZ: 0.02 } : addOptic(A.optic, p, g, M, forViewmodel, 0.112, 0.04));
     muzzle.position.set(0, 0.0595, -muzF);
     eject.position.set(0.02, 0.06, -0.06);
+  } else if (type === 'shotgun' && GUN_MODELS.r870) {
+    // ---- Remington 870 model (CC-BY 4.0, "Remington 870 Shotgun" by Urpo on Sketchfab) ----
+    // no pistol grip: the right hand wraps the wrist of the stock, just behind the trigger guard
+    addModelParts('r870', g, () => true, !forViewmodel);
+    out.rh = new THREE.Vector3(0.03, -0.03, 0.05);
+    out.magHome = new THREE.Vector3(0, 0.03, -0.1);
+    muzF = Math.max(0.72, muzzleDevice(p, M, A.muzzle, 0.062, 0.72, 0.0105, 0.2));
+    if (A.laser === 'laser') laser = laserModule(p, g, M, 0.03, 0.035, 0.3);
+    if (A.optic === 'iron') {
+      p.add(M.brass, new THREE.SphereGeometry(0.0032, 10, 8), 0, 0.091, -0.705);   // front bead (on a short ramp so it sits on the sight line)
+      p.rbox(M.metal, 0.004, 0.024, 0.016, 0, 0.084, -0.703, 0.001);
+      sight({ sightY: 0.094, sightZ: -0.04, eyeRelief: -0.26 });   // cheek weld on the stock: the eye sits well back from the receiver
+    } else sight(addOptic(A.optic, p, g, M, forViewmodel, 0.085, 0.1));
+    muzzle.position.set(0, 0.062, -muzF);
+    eject.position.set(0.024, 0.07, -0.1);
+    foregrip.position.set(0, 0.004, -0.48);
   } else if (type === 'sniper' && GUN_MODELS.sniper) {
     // ---- sniper rifle model (CC-BY 4.0, "Sniper rifle GameReady Free" by pashtetuser on Sketchfab) ----
     const scopeParts = (k) => k.startsWith('aim');

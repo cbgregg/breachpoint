@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { setGunModel } from './weapons.js';
+import { setProp } from './props.js';
 
 export const ASSETS = { soldier: null, photo: {}, hands: null };
 
@@ -60,11 +61,20 @@ const GUN_FILES = {
   ar15: { file: 'assets/models/ar15.glb', xf: { s: 0.0515, x: 0, y: 0.0056, z: -0.0573 } },
   // TPM SMG: modelled along -x; turned to face -z
   tpm: { file: 'assets/models/tpm.glb', xf: { s: 0.17, ry: -Math.PI / 2, x: 0, y: 0.0238, z: 0.0204 } },
+  // Remington 870: lies at an angle in its file; turned so the barrel points down -z
+  r870: { file: 'assets/models/r870.glb', xf: { s: 0.5, ry: 2.93, x: 0.004, y: 0, z: -0.22 } },
   sniper: { file: 'assets/models/sniper.glb', xf: { s: 0.036, x: 0, y: -0.032, z: -0.227 } },
   // G19: the file is a display (pistol, spare magazine and a suppressor laid out); keep only the pistol
   g19: { file: 'assets/models/g19.glb', xf: { s: 0.95, ry: Math.PI, x: 0, y: 0, z: -0.043,
     keep: (x, y, z, k) => !k.includes('mm1') && z > -0.12 && z < 0.108 && y > -0.08 && y < 0.09 && !(z > 0.088 && y < -0.04) } },
 };
+const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/models/mags.glb', corkboard: 'assets/models/corkboard.glb', stairs: 'assets/models/stairs.glb' };
+async function loadProps() {
+  await Promise.all(Object.entries(PROP_FILES).map(async ([name, file]) => {
+    try { setProp(name, (await new GLTFLoader().loadAsync(file)).scene); }
+    catch (e) { console.warn('Prop model unavailable, using procedural:', name, e); }
+  }));
+}
 async function loadGunModels() {
   await Promise.all(Object.entries(GUN_FILES).map(async ([name, { file, xf }]) => {
     try { const gltf = await new GLTFLoader().loadAsync(file); setGunModel(name, gltf.scene, xf); }
@@ -76,6 +86,7 @@ export async function loadAssets(onProgress, onTexProgress) {
   const textures = loadPhotoTextures(onTexProgress);
   const hands = loadHandsAsset();
   const guns = loadGunModels();
+  const props = loadProps();
   const loader = new GLTFLoader();
   try {
     let gltf;
@@ -105,7 +116,7 @@ export async function loadAssets(onProgress, onTexProgress) {
   } catch (err) {
     console.warn('Soldier model unavailable, using procedural operators.', err);
   }
-  await Promise.all([textures, hands, guns]);
+  await Promise.all([textures, hands, guns, props]);
 }
 
 // Readability (Black Ops 2 style): both kits stay bright, and every soldier gets a soft rim light

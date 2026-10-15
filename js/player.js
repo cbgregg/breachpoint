@@ -534,7 +534,7 @@ export class PlayerController {
     const type = G.type, A = gun.att || {};
     gun.group.getWorldQuaternion(_gq);
     // right hand on the pistol grip, trigger finger in the guard
-    handFrame(_R, _rq, gun.group, _gq, type === 'pistol' ? RH_PISTOL : RH_LONG, GRIP_F, PALM_L);
+    handFrame(_R, _rq, gun.group, _gq, type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG), GRIP_F, PALM_L);
     // left hand where it rests on the gun: support hand on a pistol, vertical grip, or palm up under the handguard / pump
     let lPose;
     if (type === 'pistol') { handFrame(_L, _lq, gun.group, _gq, LH_PISTOL, GRIP_F, PALM_R); lPose = POSES.wrap; }
