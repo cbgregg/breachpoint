@@ -278,7 +278,7 @@ class RoundMode {
     if (b.state === BOMB.dropped) {
       for (const c of g.characters) {
         if (!c.alive || c.team !== A) continue;
-        if (Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < 1.2 && Math.abs(c.pos.y - b.pos.y) < 1.5) {
+        if (Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < 1.5 && Math.abs(c.pos.y - b.pos.y) < 1.5) {
           b.state = BOMB.carried; b.carrier = c;
           this.announce('pickup', c.id);
           break;
@@ -348,8 +348,9 @@ class RoundMode {
     b.carrier = null;
     b.pos.copy(pos || this.defSites[0]);
     b.pos.y = Math.max(0, b.pos.y);
-    // don't leave it out of reach on a ledge: drop to the nearest open floor cell when it's high up
-    if (b.pos.y > 2.5) {
+    // don't leave it out of reach on a ledge or tucked against a wall: drop to the nearest open floor
+    // cell when it's high up or where nobody can stand (bots path to open cells only)
+    if (b.pos.y > 2.5 || !g.world.nav.isOpenAt(b.pos.x, b.pos.z)) {
       const nav = g.world.nav, ij = nav.nearestOpen(nav.ci(b.pos.x), nav.cj(b.pos.z));
       if (ij) b.pos.set(nav.cx(ij[0]), 0, nav.cz(ij[1]));
     }
