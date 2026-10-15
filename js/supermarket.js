@@ -1,4 +1,4 @@
-// Freshway Market: an indoor map. A big neighbourhood supermarket under one roof: neon-lit checkout lanes
+// Freshway: an indoor map. A big neighbourhood supermarket under one roof: neon-lit checkout lanes
 // and customer service along the front windows, grocery aisles 1-6 through the middle with a promo display,
 // the deli and a large bakery with its ovens in the back, the stockroom with the loading bay and receiving
 // doors, an employees-only kitchen and cold storage, and upstairs offices and a break room reached by a
@@ -18,8 +18,10 @@ const X0 = -22, X1 = 22, Z0 = -24, Z1 = 24, H = 6, T = 0.4;
 
 export const MART = {
   id: 'mart',
-  name: 'Freshway Market',
-  blurb: 'Indoor supermarket: aisles, deli, bakery, upstairs offices; parking lot and loading yard',
+  name: 'Freshway',
+  // indoors under fluorescent tubes: a touch less exposure than the street maps, so the floor doesn't glare
+  look: { exposure: 0.8, env: 0.45, hemi: 0.55 },
+  blurb: 'Indoor supermarket: aisles, deli, bakery, upstairs offices; parking lot and loading yard, broken up by walls and vehicles',
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
   spawns2: [
     [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-40, 8]],
@@ -215,14 +217,14 @@ function build(ctx) {
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   // materials for this map (added to M so they're disposed with the map)
   Object.assign(M, {
-    vinyl: std({ map: floorTex(), roughness: 0.32, metalness: 0.0 }),
+    vinyl: std({ map: floorTex(), roughness: 0.7, metalness: 0.0, color: 0xb4afa6 }),
     shelf: std({ color: 0xdedcd6, roughness: 0.45, metalness: 0.55 }),
     steelK: std({ color: 0xa9aeb3, roughness: 0.3, metalness: 0.85 }),
     cardboard: std({ color: 0xa88358, roughness: 0.92 }),
     bread: std({ color: 0xb87a3e, roughness: 0.75 }),
     crust: std({ color: 0x8a4f22, roughness: 0.6 }),
     ovenGlow: new THREE.MeshStandardMaterial({ color: 0x220800, emissive: 0xff7a2a, emissiveIntensity: 3.5 }),
-    coolLight: new THREE.MeshStandardMaterial({ color: 0xe8f2ff, emissive: 0xe8f2ff, emissiveIntensity: 4 }),
+    coolLight: new THREE.MeshStandardMaterial({ color: 0xe8f2ff, emissive: 0xe8f2ff, emissiveIntensity: 2.4 }),
     screen: new THREE.MeshStandardMaterial({ color: 0x0a1420, emissive: 0x5a9ad8, emissiveIntensity: 1.6 }),
     fabric: std({ color: 0x5a6068, roughness: 0.95 }),
     clearGlass: new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xd8e8f0, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.2, depthWrite: false, envMapIntensity: 2 }),
@@ -241,7 +243,7 @@ function build(ctx) {
   ctx.S.vinyl = 1.2; // metres per floor texture (4 x 4 tiles of 30 cm)
   // photo tile sets (uploaded) where available, procedural otherwise
   const T_ = ctx.tex, tile = (k, o = {}) => (T_[k] && T_[k].photo ? ctx.pbr(T_[k], { roughness: 1, ...o }) : null);
-  M.storeFloor = tile('storefloor') || M.vinyl;
+  M.storeFloor = tile('storefloor', { roughness: 1, color: 0xc4bfb6 }) || M.vinyl;
   M.bakeryFloor = tile('terracotta') || M.tile;
   M.subway = tile('subway');
   M.hexblack = tile('hexblack');
@@ -350,7 +352,7 @@ function build(ctx) {
   plane(M.asphalt, 20.4, 61, -32.2, 0, 0.0);                 // parking lot
   plane(M.concrete, 20, 61, 32.4, 0, 0.004);                  // delivery yard
   for (const sz of [-1, 1]) plane(M.concrete, 44.8, 6.6, 0, sz * 27.4, 0.003); // side alleys
-  plane(M.storeFloor, 44, 48, 0, 0, 0.01);                     // sales floor
+  plane(M.storeFloor, 44, 48, 0, 0, 0.01, 0, 0x9c978e);        // sales floor (toned down: it read as blinding white)
   plane(M.bakeryFloor, 11.2, 18, 16.4, -15, 0.014);            // bakery: terracotta diamonds
   if (M.marble) { plane(M.marble, 3.6, 7.2, -20.2, -19, 0.016); plane(M.marble, 3.6, 7.2, -20.2, 18.6, 0.016); } // entrance halls
   if (M.hexblack) plane(M.hexblack, 4.3, 10, 12.85, 0, 0.015);  // behind the deli counter
@@ -436,7 +438,7 @@ function build(ctx) {
   for (const m of [roofMesh, ceilMesh, fixMesh]) { m.userData.noMinimap = true; m.castShadow = m !== fixMesh; m.receiveShadow = true; group.add(m); }
   M.roofMat = roofMesh.material; M.ceilMat = ceilMesh.material;
   // store lights (off on Low, like the other maps' lamps)
-  for (const [x, z, y = H - 1.5, col = 0xf2f6ff, I = 34, R = 20] of [[-14, -11], [-14, 11], [-1, -12], [-1, 12], [15, -15], [16, 15, H - 1.0, 0xfff4e4, 16, 12], [14.5, 16, 2.6, 0xf4f6ff, 10, 10], [19.5, 11.5, 2.6, 0xcfe6ff, 7, 8]]) {
+  for (const [x, z, y = H - 1.5, col = 0xf2f6ff, I = 22, R = 20] of [[-14, -11], [-14, 11], [-1, -12], [-1, 12], [15, -15], [16, 15, H - 1.0, 0xfff4e4, 16, 12], [14.5, 16, 2.6, 0xf4f6ff, 10, 10], [19.5, 11.5, 2.6, 0xcfe6ff, 7, 8]]) {
     const L = new THREE.PointLight(col, I, R, 1.3);
     L.position.set(x, y, z);
     L.userData.mapLight = true;
@@ -556,11 +558,11 @@ function build(ctx) {
   const prodSign = signTex('FRESH PRODUCE', { bg: '#2f6a2a', font: 'bold 64px Arial' });
   signMesh(prodSign, 4, 1, -2, 3.6, 23.9, Math.PI, 0.6, { noMinimap: true });
   // middle of the floor: staggered displays so the centre aisle isn't a straight shot
-  SB(M.cardboard, 2.2, 1.2, 2.2, -8, 0, 0.6, { grime: 0.05 }, 'wood');
+  SB(M.cardboard, 2.2, 1.9, 2.2, -8, 0, 0.6, { grime: 0.05 }, 'wood');
   for (const s of [-1, 1]) face(M.goodsCan, 2.1, 0.5, -8, 0.95, 0.6 + s * 1.11, s > 0 ? 0 : Math.PI, 1);
   SB(M.shelf, 4, 2.0, 1.7, -1.5, 0, -0.8, { tint: 0x2a2c30, grime: 0 }, 'metal'); // cooler island
   for (const s of [-1, 1]) { face(M.goodsBottle, 3.8, 1.5, -1.5, 1.0, -0.8 + s * 0.8, s > 0 ? 0 : Math.PI, 1); face(M.clearGlass, 3.9, 1.7, -1.5, 1.0, -0.8 + s * 0.86, s > 0 ? 0 : Math.PI, 4); }
-  SB(M.cardboard, 1.8, 1.0, 1.8, 4.5, 0, 1.6, { grime: 0.05 }, 'wood');
+  SB(M.cardboard, 1.8, 1.9, 1.8, 4.5, 0, 1.6, { grime: 0.05 }, 'wood');
   face(M.goodsBox, 1.7, 0.6, 4.5, 0.6, 2.51, 0, 1);
   SB(M.cardboard, 1.4, 1.5, 1.4, -13, 0, 2.5, {}, 'wood');
   SB(M.cardboard, 1.4, 1.5, 1.4, -13, 0, 17, {}, 'wood');
@@ -803,7 +805,7 @@ function build(ctx) {
   }
   for (const z of [-21, -13, -9, 9, 13, 21]) { P(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10), M.paint, -24.8, 0.45, z, 0, { tint: 0xe8c020 }); solid(-24.8, z, 0.25, 0.25, 0.9, 0, 'metal'); }
   // store sign
-  const logo = signTex('FRESHWAY MARKET', { bg: null, fg: '#e8402a', font: 'bold 92px Arial', w: 1024, h: 160 });
+  const logo = signTex('FRESHWAY', { bg: null, fg: '#e8402a', font: 'bold 92px Arial', w: 1024, h: 160 });
   signMesh(logo, 12, 1.9, X0 - T - 0.08, 4.65, 0, -Math.PI / 2, 2.2, { transparent: true });
   for (const z of [-19, 19]) signMesh(signTex('ENTRANCE', { bg: '#2f5a3a', font: 'bold 64px Arial', w: 512, h: 128 }), 1.6, 0.4, X0 - T - 0.06, 3.5, z, -Math.PI / 2, 0.8);
   // street beyond the lot, low wall + hedge at the map edge
@@ -837,7 +839,7 @@ function build(ctx) {
     solid(tx, zc, tL, 2.5, 1.2, 0, 'metal');
     B(M.dark, tL - 0.4, 0.25, 2.2, tx, 0.95, zc, 0, { grime: 0 });
     for (const s of [-1, 1]) {
-      const sm = signMesh(signTex(['FRESHWAY MARKET', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.55, zc + s * 1.262, s > 0 ? 0 : Math.PI, 0.05);
+      const sm = signMesh(signTex(['FRESHWAY', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.55, zc + s * 1.262, s > 0 ? 0 : Math.PI, 0.05);
       sm.material.roughness = 0.5;
       for (const dx of [3.6, 4.85]) P(new THREE.CylinderGeometry(0.5, 0.5, 0.32, 18), M.rubber, tx0 + dx, 0.5, zc + s * 1.0, 0, { rx: Math.PI / 2 });
       P(new THREE.BoxGeometry(0.12, 1.0, 0.12), M.dark, tx0 + tL - 2.2, 0.5, zc + s * 0.9);   // landing gear
@@ -990,6 +992,49 @@ function build(ctx) {
   for (let i = 0; i < 40; i++) {
     const a = (i / 40) * Math.PI * 2, d = 75 + r() * 60, h = 6 + r() * 16, w = 10 + r() * 14;
     B(M.plaster, w, h, w, Math.cos(a) * d, 0, Math.sin(a) * d * 0.85, r() * 3, { tint: ctx.plasterTints[i % ctx.plasterTints.length], grime: 0.3, cast: false });
+  }
+
+  // ---------- flow: break up the long lines outside (alleys, lot lanes, yard) and inside (front corridor) ----------
+  const wallSeg = (x, z, w, d, h = 2.6, tint = 0xffffff) => { SB(M.brick, w, h, d, x, 0, z, { tint, grime: 0.45 }, 'brick'); B(M.concrete, w + 0.12, 0.12, d + 0.12, x, h, z, 0, { tint: 0xc8c0b0, grime: 0.1 }); };
+  // side alleys: staggered brick screen walls make a chicane instead of an 80 m corridor
+  wallSeg(-6, 26.4, 0.4, 3.6); wallSeg(16, 28.8, 0.4, 3.6, 2.6, 0xe0c0a8);
+  wallSeg(-2, -26.4, 0.4, 3.6, 2.6, 0xe0c0a8); wallSeg(14, -28.8, 0.4, 3.6);
+  wallSeg(30, 26.0, 0.4, 2.8); wallSeg(28, -27.6, 0.4, 3.0);
+  // lot lanes: cart corral shelters, a box van and an ice / propane merchandiser in the driving lanes
+  const shelter = (x, z) => {
+    SB(M.paint, 2.4, 1.2, 0.08, x, 0, z - 1.6, { tint: 0x2f5a3a, grime: 0.2 }, 'metal');
+    SB(M.paint, 0.08, 1.2, 3.2, x - 1.2, 0, z, { tint: 0x2f5a3a, grime: 0.2 }, 'metal');
+    for (const [dx, dz] of [[-1.15, -1.55], [1.15, -1.55], [-1.15, 1.55], [1.15, 1.55]]) P(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 8), M.dark, x + dx, 1.2, z + dz);
+    B(M.metal, 2.6, 0.08, 3.4, x, 2.4, z, 0, { tint: 0x2f5a3a, grime: 0.15 });
+    for (let i = 0; i < 4; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x + 0.2, 0.75, z - 1.0 + i * 0.4, Math.PI / 2);
+    solid(x + 0.2, z, 1.0, 2.4, 1.05, 0, 'metal');
+  };
+  shelter(-26.2, -4); shelter(-39.6, 8);
+  const boxVan = (x, z, tint) => {
+    SB(M.paint, 2.2, 2.6, 5.4, x, 0.45, z, { tint, grime: 0.15 }, 'metal');
+    solid(x, z, 2.2, 5.4, 0.45, 0, 'metal');
+    SB(M.paint, 2.1, 1.6, 1.8, x, 0.45, z - 3.5, { tint: 0xe8e8e4, grime: 0.15 }, 'metal');
+    P(new THREE.BoxGeometry(1.9, 0.7, 0.04), M.glass, x, 1.75, z - 4.42, 0, { tint: 0xffffff });
+    for (const s2 of [-1, 1]) for (const dz of [-3.4, 1.6]) P(new THREE.CylinderGeometry(0.4, 0.4, 0.26, 14), M.rubber, x + s2 * 1.0, 0.4, z + dz, 0, { rz: Math.PI / 2 });
+  };
+  boxVan(-26.4, 17, 0x2a62b8); boxVan(37.6, -21.5, 0xe8e8e4);
+  for (const z of [-6.5, 7.5]) {
+    SB(M.paint, 1.6, 1.9, 0.8, -23.5, 0, z, { tint: 0xe8eef2, grime: 0.15 }, 'metal');
+    signMesh(signTex('ICE', { bg: '#2f6db0', font: 'bold 96px Arial', w: 256, h: 128 }), 1.0, 0.45, -23.5 - 0.41, 1.55, z, -Math.PI / 2, 0.3);
+  }
+  // planter islands with trees at the ends of the parking rows
+  for (const z of [-28.2, 28.2]) {
+    SB(M.concrete, 10, 0.25, 1.8, -32.5, 0, z, { tint: 0xc8c0b0, grime: 0.3 });
+    for (const x of [-35.5, -29.5]) { P(new THREE.CylinderGeometry(0.15, 0.2, 2.6, 8), M.woodOld, x, 1.3, z, 0, { tint: 0x8a7a5a }); P(new THREE.IcosahedronGeometry(1.6, 1), M.leaf, x, 3.4, z, x, { tint: 0x8aa070 }); solid(x, z, 0.4, 0.4, 2.6, 0, 'wood'); }
+  }
+  // yard: a shipping container along the back fence and a short block wall by the docks
+  SB(M.paint, 2.5, 2.6, 6.1, 38.6, 0, 8.5, { tint: 0x8a3d2c, grime: 0.35 }, 'metal');
+  for (let i = 0; i < 12; i++) B(M.paint, 0.04, 2.4, 0.08, 37.32, 0.1, 5.8 + i * 0.5, 0, { tint: 0x6a2d1c, grime: 0.2 });
+  wallSeg(30.5, -2.8, 3.2, 0.4, 2.4, 0xd8d0c4);
+  // inside: tall seasonal racks along the front corridor, so the checkout side isn't one long lane
+  for (const z of [-8.5, 9.5]) {
+    SB(M.shelf, 1.2, 2.1, 1.2, -13, 0, z, { tint: 0x8a2f2a, grime: 0 }, 'metal');
+    for (const [dx, dz, ry] of [[0.61, 0, Math.PI / 2], [-0.61, 0, -Math.PI / 2], [0, 0.61, 0], [0, -0.61, Math.PI]]) for (const y of [0.5, 1.15]) face(GOODS[(y * 10 | 0) % 4], 1.1, 0.5, -13 + dx, y, z + dz, ry, 1);
   }
 
   // ---------- the smoker ----------

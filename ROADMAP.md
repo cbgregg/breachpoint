@@ -27,4 +27,4 @@ Player feedback, in the order it's planned. Pre-alpha: order and scope can chang
 ## Parked
 
 - 50-player cap with a queue and "skip the queue" through Buy Me a Coffee (needs a payment webhook on the account Worker).
-- Same treatment for Shuran Yard and Freshway Market (Tarsa Market was rebuilt: twice the area, taller blocks, bomb sites inside market halls).
+- Same treatment for Shuran Yard (Freshway got its flow pass; Tarsa Market was rebuilt: twice the area, taller blocks, bomb sites inside market halls).

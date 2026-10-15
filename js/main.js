@@ -47,7 +47,7 @@ const TIPS = [
   'Stick sensitivity, deadzone and aim assist are in Options under Controller.',
   'Dynamic resolution keeps the frame rate smooth. Turn it off in Options for a sharper image.',
   'Health comes back on its own a few seconds after you stop taking damage.',
-  'Upstairs at Freshway Market overlooks the aisles. Bots won\'t follow you up there.',
+  'Upstairs at Freshway overlooks the aisles. Bots won\'t follow you up there.',
 ];
 
 // ---------- game bootstrap ----------
