@@ -96,7 +96,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
       float fHaze = smoothstep(fogNear, fogFar, vFogDepth);
     #endif
     const float FB = 0.32;      // ground layer falloff per metre of height
-    const float FG = 0.0035;    // ground layer density at y = 0
+    float FG = fogDensity * 1.03;  // ground layer density at y = 0 (follows the map's haze)
     float h0 = max(cameraPosition.y, 0.0), dy = fRay.y;
     float integ = abs(dy) > 0.02 ? (exp(-FB * h0) - exp(-FB * (h0 + dy))) / (FB * dy) : exp(-FB * h0);
     float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
@@ -154,21 +154,7 @@ export class Renderer {
     scene.add(sky);
     this.sky = sky;
 
-    // image-based lighting from the same sky
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    const envScene = new THREE.Scene();
-    const envSky = new Sky();
-    envSky.scale.setScalar(100);
-    Object.keys(u).forEach(k => { envSky.material.uniforms[k].value = u[k].value; });
-    envScene.add(envSky);
-    // warm ground bounce in the environment
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: 0x8a7458 }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -2;
-    envScene.add(ground);
-    scene.environment = pmrem.fromScene(envScene, 0.03).texture;
-    scene.environmentIntensity = 1;
-    pmrem.dispose();
+    this.makeEnv(0x8a7458);
 
     scene.fog = new THREE.FogExp2(0xa9b6c2, 0.0034); // light afternoon haze
 
@@ -183,8 +169,79 @@ export class Renderer {
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0xb8cff0, 0x8a7458, 0.75)); // blue sky above, warm sunlit bounce below
+    this.hemi = new THREE.HemisphereLight(0xb8cff0, 0x8a7458, 0.75); // blue sky above, warm sunlit bounce below
+    scene.add(this.hemi);
     scene.environmentIntensity = 0.6;
+    // fair-weather cumulus far overhead (shown on maps with a clear look)
+    const c = document.createElement('canvas'); c.width = c.height = 1024;
+    const g = c.getContext('2d');
+    let seed = 7; const rr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 26; i++) {
+      const cx = rr() * 1024, cy = rr() * 1024, n = 10 + (rr() * 14 | 0), sz = 40 + rr() * 70;
+      for (let k = 0; k < n; k++) {
+        const x = cx + (rr() - 0.5) * sz * 3.2, y = cy + (rr() - 0.5) * sz * 1.1, r = sz * (0.45 + rr() * 0.7);
+        for (const [ox, oy] of [[0, 0], [1024, 0], [-1024, 0], [0, 1024], [0, -1024]]) {
+          const grd = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+          grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.6, 'rgba(250,250,252,0.25)'); grd.addColorStop(1, 'rgba(240,244,250,0)');
+          g.fillStyle = grd; g.beginPath(); g.arc(x + ox, y + oy, r, 0, 6.283); g.fill();
+        }
+      }
+    }
+    const ct = new THREE.CanvasTexture(c); ct.colorSpace = THREE.SRGBColorSpace; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(2, 2);
+    this.clouds = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshBasicMaterial({ map: ct, transparent: true, depthWrite: false, fog: false, opacity: 0.95 }));
+    this.clouds.rotation.x = Math.PI / 2; this.clouds.position.y = 170; this.clouds.visible = false; this.clouds.renderOrder = -1;
+    scene.add(this.clouds);
+    // a plain, deep-blue sky dome for clear-day maps (the physical sky reads milky at this sun height)
+    this.domeMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { top: { value: new THREE.Color(0x2f6fc4) }, mid: { value: new THREE.Color(0x7fb0e2) }, bottom: { value: new THREE.Color(0xd4e3ef) }, sunDir: { value: SUN_DIR.clone().normalize() } },
+      vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }',
+      fragmentShader: `uniform vec3 top, mid, bottom, sunDir; varying vec3 vDir;
+        void main(){ float h = clamp(vDir.y, -0.1, 1.0);
+          vec3 c = mix(bottom, mid, smoothstep(0.0, 0.18, h)); c = mix(c, top, smoothstep(0.18, 0.75, h));
+          float s = max(dot(normalize(vDir), sunDir), 0.0); c += vec3(1.0, 0.95, 0.85) * (pow(s, 600.0) * 18.0 + pow(s, 12.0) * 0.25);
+          gl_FragColor = vec4(c, 1.0); }`,
+    });
+    this.dome = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), this.domeMat);
+    this.dome.visible = false; this.dome.renderOrder = -2;
+    scene.add(this.dome);
+  }
+
+  makeEnv(groundCol) {
+    // image-based lighting from the same sky
+    const u = this.sky.material.uniforms;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envScene = new THREE.Scene();
+    const envSky = new Sky();
+    envSky.scale.setScalar(100);
+    Object.keys(u).forEach(k => { envSky.material.uniforms[k].value = u[k].value; });
+    if (this.dome && this.dome.visible) envScene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 32, 16), this.domeMat)); else envScene.add(envSky);
+    // ground bounce in the environment
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: groundCol }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -2;
+    envScene.add(ground);
+    if (this.scene.environment) this.scene.environment.dispose();
+    this.scene.environment = pmrem.fromScene(envScene, 0.03).texture;
+    pmrem.dispose();
+  }
+
+  // per-map light and weather: the default is the dusty late-afternoon haze; maps can ask for a clear, blue day
+  setLook(look = {}) {
+    const L = { turbidity: 5, rayleigh: 1.4, mie: 0.005, fog: 0.0034, fogColor: 0xa9b6c2, sun: 3.4, sunColor: 0xffe8c8, hemi: 0.75, hemiSky: 0xb8cff0, ground: 0x8a7458, exposure: 0.92, env: 0.6, clouds: false, blueSky: false, ...look };
+    const key = JSON.stringify(L);
+    if (key === this.lookKey) return;
+    this.lookKey = key;
+    const u = this.sky.material.uniforms;
+    u.turbidity.value = L.turbidity; u.rayleigh.value = L.rayleigh; u.mieCoefficient.value = L.mie;
+    this.dome.visible = !!L.blueSky; this.sky.visible = !L.blueSky;
+    this.makeEnv(L.ground);
+    this.scene.fog.density = L.fog; this.scene.fog.color.set(L.fogColor);
+    this.sun.intensity = L.sun; this.sun.color.set(L.sunColor);
+    this.hemi.intensity = L.hemi; this.hemi.color.set(L.hemiSky); this.hemi.groundColor.set(L.ground);
+    this.renderer.toneMappingExposure = L.exposure;
+    this.scene.environmentIntensity = L.env;
+    this.clouds.visible = !!L.clouds;
   }
 
   applyQuality(name) {

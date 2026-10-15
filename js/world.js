@@ -355,7 +355,8 @@ const PIONEER_PICKUPS = [
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
-  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4, roads: PIONEER_ROADS, roadsMirror: true, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS, roadsMirror: true,
+    look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
 };
 export const MAP_IDS = Object.keys(MAPS);
@@ -469,6 +470,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     dim: std({ color: 0x0c0d0e, roughness: 0.95 }),
   };
   M.bag = pbr(tex.bag || tex.fabric);
+  M.bulbHot = M.bulb.clone();
   M.cobble = tex.cobble ? pbr(tex.cobble, { roughness: 1 }) : M.tile;
   M.iron = std({ color: 0x1f2a26, roughness: 0.45, metalness: 0.7 });
   M.stone = pbr(tex.concrete, { color: 0xb8ad9a });
@@ -544,7 +546,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   });
   const streakMat = new THREE.MeshBasicMaterial({ map: streakTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
   const driftMat = new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(176,150,112,0.75)'], [0.6, 'rgba(176,150,112,0.35)'], [1, 'rgba(176,150,112,0)']]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
-  const glows = []; // [x, y, z, size]
+  const glows = [], glowsHot = []; // [x, y, z, size]; glowsHot: lights that stay on in daylight (underground)
   // flat decals go through the batcher too (one draw call per decal material)
   const decal = (mat, w, h, x, y, z, ry, rx = 0) => put(new THREE.PlaneGeometry(w, h), mat, x, y, z, ry, { rx, grime: 0, cast: false });
 
@@ -1329,8 +1331,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           solid(px, pz, 0.3, 0.3, D, floorY, 'wood').navBlock = true;
           put(flatBox(0.3, D, 0.3, 1.2), M.woodOld, px, floorY + D / 2, pz, 0, { tint: 0x7a6650, grime: 0.6, base: floorY });
           const bx = px + (along ? 1.5 : 0), bz = pz + (along ? 0 : 1.5);
-          put(new THREE.SphereGeometry(0.07, 8, 6), M.bulb, bx, y0 - 0.45, bz, 0, { grime: 0, cast: false });
-          glows.push([bx, y0 - 0.45, bz, 0.9]);
+          put(new THREE.SphereGeometry(0.07, 8, 6), M.bulbHot, bx, y0 - 0.45, bz, 0, { grime: 0, cast: false });
+          glowsHot.push([bx, y0 - 0.45, bz, 0.9]);
           if (Math.round(i * 10) % 2 === 0) { const L2 = new THREE.PointLight(0xffd6a0, 6, 8, 1.6); L2.position.set(bx, y0 - 0.6, bz); L2.userData.mapLight = true; group.add(L2); }
         }
         // junk along one wall: broken planks, crates, an old painted sign
@@ -1379,24 +1381,51 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'tree': {
-        // London plane: mottled trunk, a few big limbs, clumped canopy
+        // London plane: pale mottled trunk, limbs reaching up and out, a broad crown of leaf cards (alpha-cut
+        // leaf texture, normals bent outward from the crown so it shades like a mass of foliage, dappled shadows)
         solid(cx, cz, 0.6, 0.6, 3, 0, 'wood');
-        const H = h || 9;
-        put(new THREE.CylinderGeometry(0.22, 0.32, H * 0.45, 9), M.woodOld, cx, H * 0.225, cz, 0, { tint: 0x9a8f7a, grime: 0.2 });
-        const crown = [];
-        for (let i = 0; i < 4; i++) {
-          const a = i * 1.7 + rnd(), len = 2.4 + rnd() * 1.2, tilt = 0.55 + rnd() * 0.25;
-          const ex = cx + Math.cos(a) * Math.sin(tilt) * len, ez = cz + Math.sin(a) * Math.sin(tilt) * len, ey = H * 0.42 + Math.cos(tilt) * len;
-          put(new THREE.CylinderGeometry(0.1, 0.17, len, 7), M.woodOld, (cx + ex) / 2, (H * 0.42 + ey) / 2, (cz + ez) / 2, 0, { rx: Math.sin(a) * tilt, rz: -Math.cos(a) * tilt, tint: 0xa89c86, grime: 0.1 });
-          crown.push([ex, ey, ez]);
+        const H = h || 9, R = H * 0.36;
+        const trunkH = H * 0.42;
+        put(new THREE.CylinderGeometry(0.2, 0.3, trunkH, 10), M.woodOld, cx, trunkH / 2, cz, 0, { tint: 0xb4aa92, grime: 0.15 });
+        for (let k = 0; k < 6; k++) put(new THREE.CylinderGeometry(0.205, 0.215, 0.25 + rnd() * 0.5, 10, 1, true, rnd() * 6, 0.8 + rnd()), M.woodOld, cx, 0.6 + rnd() * (trunkH - 1), cz, 0, { tint: [0xd8d2bc, 0x8f8a6e, 0xc9c09a][k % 3], grime: 0 });
+        const crownY = trunkH + R * 0.75;
+        for (let i = 0; i < 5; i++) {
+          const a = i * 1.26 + rnd() * 0.5, len = R * (0.8 + rnd() * 0.4), tilt = 0.45 + rnd() * 0.35;
+          const ex = cx + Math.cos(a) * Math.sin(tilt) * len, ez = cz + Math.sin(a) * Math.sin(tilt) * len, ey = trunkH - 0.3 + Math.cos(tilt) * len;
+          put(new THREE.CylinderGeometry(0.07, 0.15, len, 7), M.woodOld, (cx + ex) / 2, (trunkH - 0.3 + ey) / 2, (cz + ez) / 2, 0, { rx: Math.sin(a) * tilt, rz: -Math.cos(a) * tilt, tint: 0xb4aa92, grime: 0.05 });
         }
-        crown.push([cx, H * 0.85, cz]);
-        for (const [x, y, z] of crown) for (let j = 0; j < 2; j++) {
-          const g = new THREE.IcosahedronGeometry(1.6 + rnd() * 1.0, 1);
-          const pp = g.attributes.position; for (let v = 0; v < pp.count; v++) pp.setXYZ(v, pp.getX(v) * (0.85 + rnd() * 0.3), pp.getY(v) * (0.7 + rnd() * 0.2), pp.getZ(v) * (0.85 + rnd() * 0.3));
-          g.computeVertexNormals();
-          put(g, M.leaf, x + (rnd() - 0.5) * 1.6, y + (rnd() - 0.3) * 1.2, z + (rnd() - 0.5) * 1.6, rnd() * 6, { grime: 0, tint: [0x7a8c4a, 0x6a7c3e, 0x8a9a52][Math.floor(rnd() * 3)] });
+        if (!M.leafCard) {
+          const c = document.createElement('canvas'); c.width = c.height = 256;
+          const g = c.getContext('2d');
+          const greens = ['#6f9a3c', '#86ad4a', '#5d8a34', '#9cbf5e', '#7aa344', '#4f7a2e'];
+          for (let n = 0; n < 150; n++) {
+            const x = 18 + Math.random() * 220, y = 18 + Math.random() * 220, sz = 9 + Math.random() * 11, rot = Math.random() * 6.28;
+            g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = greens[(Math.random() * greens.length) | 0];
+            g.beginPath();   // five-lobed plane leaf
+            for (let k = 0; k <= 10; k++) { const t = k / 10 * Math.PI * 2, r = sz * (k % 2 ? 0.55 : 1) * (0.85 + 0.15 * Math.cos(t * 2)); g.lineTo(Math.cos(t) * r, Math.sin(t) * r * 0.9); }
+            g.fill(); g.strokeStyle = 'rgba(40,60,20,0.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, 0); g.lineTo(sz * 0.8, 0); g.stroke(); g.restore();
+          }
+          const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+          M.leafCard = new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7, vertexColors: true });
         }
+        const cards = [];
+        const nC = Math.round(12 + R * 3);
+        for (let i = 0; i < nC; i++) {
+          // cluster centres spread through a flattened ellipsoid crown
+          const u = rnd() * 6.283, v = Math.acos(1 - 2 * rnd()) , rr = R * Math.cbrt(0.35 + rnd() * 0.65);
+          const kx = cx + Math.sin(v) * Math.cos(u) * rr, kz = cz + Math.sin(v) * Math.sin(u) * rr, ky = crownY + Math.cos(v) * rr * 0.6;
+          for (let j = 0; j < 7; j++) {
+            const g = new THREE.PlaneGeometry(1.5 + rnd() * 0.8, 1.5 + rnd() * 0.8);
+            _e.set(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28); _q.setFromEuler(_e);
+            _p.set(kx + (rnd() - 0.5) * 1.1, ky + (rnd() - 0.5) * 0.8, kz + (rnd() - 0.5) * 1.1); _s.set(1, 1, 1);
+            g.applyMatrix4(_m.compose(_p, _q, _s));
+            const nx = _p.x - cx, ny = (_p.y - crownY) * 1.6 + R * 0.5, nz = _p.z - cz, nl = Math.hypot(nx, ny, nz) || 1;
+            const nrm = g.attributes.normal; for (let q = 0; q < nrm.count; q++) nrm.setXYZ(q, nx / nl, ny / nl, nz / nl);
+            cards.push(g);
+          }
+        }
+        const merged = mergeGeometries(cards, false); cards.forEach(g => g.dispose());
+        put(merged, M.leafCard, 0, 0, 0, 0, { grime: 0, tint: [0xffffff, 0xeef4dc, 0xdfe8c8][(rnd() * 3) | 0] });
         break;
       }
       case 'pergola': {
@@ -1538,12 +1567,34 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'tower': {
-        // Smith Tower: white terracotta shaft with a window grid and a pyramid top, on the skyline to the north
-        B(M.stone, w, h, d, cx, 0, cz, 0, { tint: 0xeee8dc, grime: 0.15, cast: false });
-        for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let y = 6; y < h - 4; y += 3.3) for (let i = -1; i <= 1; i++) put(flatBox(1.6, 1.9, 0.04, 0), M.dim, cx + nx * (w / 2 + 0.02) + -nz * i * 3.6, y, cz + nz * (d / 2 + 0.02) + nx * i * 3.6, Math.atan2(nx, nz), { grime: 0, cast: false });
-        B(M.stone, w * 0.7, 8, d * 0.7, cx, h, cz, 0, { tint: 0xeee8dc, grime: 0.15, cast: false });
-        put(new THREE.ConeGeometry(w * 0.55, 16, 4), M.stone, cx, h + 16, cz, Math.PI / 4, { tint: 0xe2dccf, grime: 0.1, cast: false });
-        put(new THREE.SphereGeometry(0.6, 10, 8), M.bulb, cx, h + 24.5, cz, 0, { grime: 0, cast: false });
+        // Smith Tower: a wide 12-storey base, the slender white terracotta shaft with its tight grid of paired
+        // windows, a setback crown and the steep pyramid roof with its glass lantern
+        if (!M.terra) {
+          const c = document.createElement('canvas'); c.width = c.height = 256;
+          const g = c.getContext('2d');
+          g.fillStyle = '#ece7dc'; g.fillRect(0, 0, 256, 256);
+          const fl = 4, bays = 6, fh = 256 / fl, bw2 = 256 / bays;
+          for (let r = 0; r < fl; r++) for (let k = 0; k < bays; k++) {
+            const x = k * bw2, y = r * fh;
+            g.fillStyle = '#d9d2c4'; g.fillRect(x, y + fh - 6, bw2, 6);                    // spandrel band
+            for (const o of [0.16, 0.54]) { g.fillStyle = '#2a3440'; g.fillRect(x + bw2 * o, y + fh * 0.18, bw2 * 0.3, fh * 0.62); g.fillStyle = 'rgba(160,190,210,0.35)'; g.fillRect(x + bw2 * o, y + fh * 0.18, bw2 * 0.3, fh * 0.18); }
+            g.fillStyle = '#f4f0e8'; g.fillRect(x, y, 3, fh);                              // piers
+          }
+          const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+          M.terra = std({ map: t, roughness: 0.75 }); S.terra = 12;
+        }
+        const baseH = 20;
+        put(worldBox(w * 1.7, baseH, d * 1.5, 12), M.terra, cx, baseH / 2, cz, 0, { grime: 0.1, cast: false });
+        put(worldBox(w, h, d, 12), M.terra, cx, h / 2, cz, 0, { grime: 0.05, cast: false });
+        for (const [y2, k] of [[baseH, 1.72], [h, 1.04]]) put(flatBox(w * k + 0.4, 0.6, d * (k > 1.5 ? 1.52 : 1.04) + 0.4, 0), M.stone, cx, y2 - 0.3, cz, 0, { tint: 0xf2eee4, grime: 0, cast: false });
+        put(worldBox(w * 0.78, 7, d * 0.78, 12), M.terra, cx, h + 3.5, cz, 0, { grime: 0.05, cast: false });
+        put(new THREE.ConeGeometry(w * 0.6, 20, 4, 1), M.stone, cx, h + 7 + 10, cz, Math.PI / 4, { tint: 0xeeeae0, grime: 0, cast: false });
+        for (let k = 0; k < 3; k++) for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const yy = h + 9 + k * 4.5, inset = w * 0.6 * (1 - (yy - h - 7) / 20) * 0.7;
+          put(flatBox(0.8, 1.6, 0.4, 0), M.dim, cx + nx * inset, yy, cz + nz * inset, Math.atan2(nx, nz), { grime: 0, cast: false });
+        }
+        put(new THREE.CylinderGeometry(0.9, 1.1, 3, 8), M.glass, cx, h + 28, cz, 0, { grime: 0, cast: false });
+        put(new THREE.ConeGeometry(1.0, 2.5, 8), M.stone, cx, h + 30.7, cz, 0, { tint: 0xeeeae0, grime: 0, cast: false });
         break;
       }
       case 'boundary': break; // dressed by perimeter buildings below
@@ -1708,12 +1759,21 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       const bw = Math.min(L - s, 6 + Math.floor(rnd() * 5));
       const floors = (LAYOUT.facadeFloors || 2) + Math.floor(rnd() * 3);
       const H = floors * 3.2 + 0.6;
-      const tint = plasterTints[Math.floor(rnd() * plasterTints.length)];
+      const pio = LAYOUT.facadeStyle === 'brick';
+      const brk = pio ? rnd() < 0.6 : rnd() < 0.2;
+      const tint = pio ? (brk ? [0xffffff, 0xe9c6a8, 0xc08a70, 0xa8705c][Math.floor(rnd() * 4)] : [0xe8dcc4, 0xd8c8a8, 0xcfc2a6][Math.floor(rnd() * 3)]) : plasterTints[Math.floor(rnd() * plasterTints.length)];
       const mx = ox + ax * (s + bw / 2), mz = oz + az * (s + bw / 2);
       const ry = Math.atan2(nx, nz);
       const bx = mx - nx * depth / 2, bz = mz - nz * depth / 2;
-      const mat = rnd() < 0.2 ? M.brick : M.plaster;
-      put(worldBox(bw, H, depth, scaleOf(mat)), mat, bx, H / 2, bz, ry, { tint: mat === M.brick ? 0xffffff : tint, grime: 0.55 });
+      const mat = brk ? M.brick : pio ? M.stone : M.plaster;
+      put(worldBox(bw, H, depth, scaleOf(mat)), mat, bx, H / 2, bz, ry, { tint: mat === M.brick && !pio ? 0xffffff : tint, grime: pio ? 0.35 : 0.55 });
+      if (pio) {
+        // Pioneer Square block: rusticated stone ground floor, string course, heavy cornice, arched top-floor windows
+        put(worldBox(bw + 0.02, 4.2, 0.2, scaleOf(M.stone)), M.stone, mx + nx * 0.1, 2.1, mz + nz * 0.1, ry, { tint: 0xa79d8c, grime: 0.5 });
+        put(worldBox(bw + 0.1, 0.3, 0.4, 3), M.stone, mx + nx * 0.2, 4.3, mz + nz * 0.2, ry, { tint: 0xc9bfae, grime: 0.1, base: 4 });
+        put(worldBox(bw + 0.2, 0.6, 0.8, 3), M.stone, mx + nx * 0.4, H - 0.4, mz + nz * 0.4, ry, { tint: 0xc9bfae, grime: 0.15, base: H - 1 });
+        put(worldBox(bw + 0.1, 0.25, 0.55, 3), M.stone, mx + nx * 0.27, H - 0.85, mz + nz * 0.27, ry, { tint: 0xb9ae9c, grime: 0.1, base: H - 1 });
+      }
       // roof parapet + clutter
       put(worldBox(bw, 0.6, 0.3, 3), M.concrete, mx - nx * 0.09, H + 0.28, mz - nz * 0.09, ry, { tint: 0xd8d2c4, grime: 0.1, base: H });
       if (rnd() < 0.6) put(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 14), M.metal, bx + ax * (rnd() - 0.5) * bw * 0.6, H + 0.65, bz, 0, { tint: 0x3d6b8a, grime: 0.2, base: H });
@@ -1725,7 +1785,11 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       for (let i = 0; i < shops; i++) {
         const t = s + (i + 0.5) * (bw / shops);
         const px = ox + ax * t + nx * 0.03, pz = oz + az * t + nz * 0.03;
-        if (rnd() < 0.7) {
+        if (pio) {
+          put(worldBox(bw / shops - 0.8, 2.9, 0.06, 0), M.glass, px + nx * 0.2, 1.75, pz + nz * 0.2, ry, { grime: 0, tint: rnd() < 0.3 ? 0xd8c9a0 : 0xffffff });
+          put(worldBox(bw / shops - 0.6, 0.12, 0.14, 0), M.frame, px + nx * 0.22, 3.25, pz + nz * 0.22, ry, { grime: 0, tint: 0x1f2622 });
+          put(worldBox(0.1, 3.0, 0.14, 0), M.frame, px + nx * 0.22, 1.7, pz + nz * 0.22, ry, { grime: 0, tint: 0x1f2622 });
+        } else if (rnd() < 0.7) {
           put(worldBox(2.4, 2.3, 0.06, 2.4), M.metal, px, 1.15, pz, ry, { tint: shutterTints[Math.floor(rnd() * 4)], grime: 0.4 });
         } else {
           put(worldBox(1.1, 2.2, 0.06, 0), M.rubber, px, 1.1, pz, ry, { grime: 0 });
@@ -1740,6 +1804,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (let i = 0; i < wins; i++) {
           const t = s + (i + 0.5) * (bw / wins);
           const px = ox + ax * t, pz = oz + az * t, y = f * 3.2 + 1.5;
+          if (pio) {
+            const top = f === floors - 1, ww = 1.1, wh = top ? 1.6 : 1.9;
+            windowDecor(px, pz, nx, nz, y, ww, wh);
+            if (top || f % 2 === 0) put(new THREE.TorusGeometry(ww / 2 + 0.12, 0.12, 5, 14, Math.PI), mat, px + nx * 0.06, y + wh / 2 - 0.05, pz + nz * 0.06, ry, { tint: brk ? 0xc9a080 : 0xd8ccb4, grime: 0.15 });
+            continue;
+          }
           windowDecor(px, pz, nx, nz, y);
           if (rnd() < 0.3) put(worldBox(0.8, 0.5, 0.4, 0), M.paint, px + ax * 0.9 + nx * 0.25, y - 0.9, pz + az * 0.9 + nz * 0.25, ry, { tint: 0xd2d2cc, grime: 0.05, base: y - 2 });
           if (rnd() < 0.15) {
@@ -1804,6 +1874,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   // glow sprites for every bulb (bloom does the rest)
+  if (LAYOUT.daylight) { M.bulb.color.set(0xf2f0ea); M.bulb.emissive.set(0xfff2d8); M.bulb.emissiveIntensity = 0.35; M.bulb.roughness = 0.3; glows.length = 0; }
+  glows.push(...glowsHot);
   if (glows.length) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(glows.flatMap(q => [q[0], q[1], q[2]]), 3));
@@ -1870,6 +1942,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
   world.bounds = { hx: HX, hz: HZ };
+  world.look = LAYOUT.look;
   return world;
 }
 

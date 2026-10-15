@@ -72,6 +72,7 @@ export class Game {
     this.world = buildWorld(this.scene, this.physics, 'tarsa');
     setCharacterDetail(this.world.textures.fabric);
     this.fitShadows();
+    this.renderer.setLook(this.world.look);
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects = new Effects(this.scene, this.physics);
     this.audio = new GameAudio();
@@ -972,6 +973,7 @@ export class Game {
     const sc = this.renderer.sun.shadow.camera;
     if (sc.right !== ext) { sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.far = Math.max(200, ext * 3.2); sc.updateProjectionMatrix(); this.renderer.sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6)); }
     this.fitShadows();
+    this.renderer.setLook(this.world.look);
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects.clear();
     if (this.onMapChange) this.onMapChange(this.world);
