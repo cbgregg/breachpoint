@@ -287,11 +287,11 @@ const PIONEER_HALF = [
   [17, -8, 0.8, 3, 1.1, 0, 'sand'],
   [17.5, 38.6, 2, 2.5, 1.8, 0, 'crate'],
   // ---- side streets: cover every 10-15 m so nothing is watched end to end
-  [24, 12, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [25, 10.15, 4.4, 2.0, 1.45, 0, 'car', 0], [31.5, 10.15, 4.4, 2.0, 1.45, 0, 'car', 1],   // parked along Yesler
   [31, -12.8, 2, 2.5, 1.8, 0, 'crate'],
   [38.5, -12, 0.62, 0.62, 0.9, 0, 'barrel'], [39.2, -11.4, 0.62, 0.62, 0.9, 0, 'barrel', 1],
   [22, -1.2, 0.62, 0.62, 0.9, 0, 'barrel'],
-  [29, 32, 4.4, 2.0, 1.45, 0, 'car', 1],
+  [30, 30.6, 4.4, 2.0, 1.45, 0, 'car', 1], [22.5, 30.6, 4.4, 2.0, 1.45, 0, 'car', 0],
   [40, 30, 0.8, 3, 1.1, 0, 'sand'],
   [23, 37.5, 2.4, 0.9, 0.9, 0, 'stall', 0],
   [18, -36, 2, 2, 1.2, 0, 'pallet'],
@@ -330,10 +330,10 @@ const PIONEER_HALF = [
 ];
 // street grid (east half; mirrored): First Avenue with the streetcar line, three cross streets
 const PIONEER_ROADS = [
-  [10, -37.4, 15, 37.4, 'z', { center: false }],
-  [15, 9.5, 43, 14.5, 'x'],
-  [15, -15, 43, -10.5, 'x'],
-  [15, 29.5, 43, 36, 'x'],
+  [10, -37.4, 15, 37.4, 'z', { center: false, trees: [1] }],
+  [15, 9, 43, 15, 'x', { center: 'double', bike: 1, trees: [-1, 1] }],          // Yesler Way: bike lane, parked cars
+  [15, -15, 43, -10.5, 'x', { center: 'double', trees: [1] }],
+  [15, 29.5, 43, 36, 'x', { trees: [-1] }],
   [15, -37, 34, -31, 'x'],
 ];
 const PIONEER_SPAWNS = [[51, -34], [51, -24], [51, -16], [51, 0], [51, 10], [51, 22], [51, 30], [49, -8], [49, 4], [49, 16]];
@@ -574,7 +574,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const street = !LAYOUT.build; // custom-built maps (the supermarket) lay their own ground
   // street grid: [x0, z0, x1, z1, axis ('x' | 'z' = direction of travel), opts]; roadsMirror adds the point-mirrored copy
   const ROADS = street && LAYOUT.roads ? (LAYOUT.roadsMirror
-    ? [...LAYOUT.roads, ...LAYOUT.roads.map(([a, b, c, d, ax, o]) => [-c, -d, -a, -b, ax, o])] : LAYOUT.roads) : null;
+    ? [...LAYOUT.roads, ...LAYOUT.roads.map(([a, b, c, d, ax, o]) => [-c, -d, -a, -b, ax, o && { ...o, bike: o.bike && -o.bike, trees: o.trees && o.trees.map(t => -t) }])] : LAYOUT.roads) : null;
   if (ROADS) {
     // concrete sidewalk slabs: light, slightly mottled, scored every 1.5 m
     const c = document.createElement('canvas'); c.width = c.height = 512;
@@ -618,6 +618,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // ---------- roads: asphalt, curbs, lane lines, crosswalks, manholes and working traffic lights ----------
   const signalMats = { x: [], z: [] };   // [red, amber, green] per direction of travel; cycled in world.update
   let placeSignals = null;                // after the layout is built, so poles avoid props
+  const afterLayout = [];                 // street trees etc.: placed once the layout exists, around it
   if (ROADS) {
     const rect = (r) => ({ x0: r[0], z0: r[1], x1: r[2], z1: r[3] });
     const inters = [];
@@ -663,19 +664,55 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       // lane lines: solid edge lines, dashed centre (skipped through intersections and their crosswalks)
       let free = [[L0, L1]];
       for (const [a, b] of my) free = cut(free, a - 4.6, b + 4.6);
+      // bike lane (o.bike = -1 low edge / +1 high edge): green, dashed white border, white flexposts
+      const bk = o.bike || 0, bEdge = bk < 0 ? W0 : W1, bIn = bEdge - bk * 1.75;
+      const Wt0 = bk < 0 ? bIn : W0, Wt1 = bk > 0 ? bIn : W1, Wct = (Wt0 + Wt1) / 2;   // the traffic lanes
+      const line = (a, b, w, wd, tint, y = 0.02) => { const [lx, lz] = P((a + b) / 2, w); flat(M.line, alongX ? b - a : wd, alongX ? wd : b - a, lx, lz, y, tint); };
       for (const [a, b] of free) {
-        for (const e of [W0 + 0.45, W1 - 0.45]) { const [lx, lz] = P((a + b) / 2, e); flat(M.line, alongX ? b - a : 0.12, alongX ? 0.12 : b - a, lx, lz, 0.02, 0xd8d2c0); }
-        if (o.center !== false) for (let l = a + 1; l + 3 <= b; l += 6) { const [lx, lz] = P(l + 1.5, Wc); flat(M.line, alongX ? 3 : 0.14, alongX ? 0.14 : 3, lx, lz, 0.02, 0xd9b54a); }
+        for (const [e, sd] of [[W0 + 0.45, -1], [W1 - 0.45, 1]]) if (sd !== bk) line(a, b, e, 0.12, 0xd8d2c0);
+        if (o.center === 'double') for (const d of [-0.11, 0.11]) line(a, b, Wct + d, 0.1, 0xd9b54a);
+        else if (o.center !== false) for (let l = a + 1; l + 3 <= b; l += 6) line(l, l + 3, Wct, 0.14, 0xd9b54a);
+        if (bk) {
+          line(a, b, (bEdge + bIn) / 2 - bk * 0.05, 1.45, 0x4f9e5e, 0.019);
+          for (let l = a + 0.5; l + 1.5 <= b; l += 3) line(l, l + 1.5, bIn, 0.15, 0xe6e0d0, 0.021);
+          for (let l = a + 2; l < b - 1; l += 3) {
+            const [fx, fz] = P(l, bIn + bk * 0.12);
+            put(new THREE.CylinderGeometry(0.045, 0.06, 0.9, 8), M.paint, fx, 0.45, fz, 0, { tint: 0xefefea, grime: 0.15 });
+            put(new THREE.CylinderGeometry(0.047, 0.047, 0.08, 8), M.paint, fx, 0.75, fz, 0, { tint: 0x9aa0a6, grime: 0 });
+          }
+        }
         for (let l = a + 3 + rnd() * 5; l < b - 2; l += 12 + rnd() * 8) { const [mx, mz] = P(l, Wc + (rnd() - 0.5) * Wd * 0.4); put(new THREE.CircleGeometry(0.38, 18), manholeMat, mx, 0.019, mz, rnd() * 6, { rx: -Math.PI / 2, grime: 0, cast: false }); }
       }
       // crosswalks and stop lines on both approaches to each intersection
+      if (bk) for (const [a, b] of my) for (let l = a + 0.3; l + 1 <= b; l += 1.8) {
+        line(l, l + 1, (bEdge + bIn) / 2 - bk * 0.05, 1.45, 0x4f9e5e, 0.019);
+        line(l + 1, l + 1.35, (bEdge + bIn) / 2 - bk * 0.05, 1.45, 0xe6e0d0, 0.019);
+      }
       for (const [a, b] of my) for (const [edge, dir] of [[a, -1], [b, 1]]) {
         if (edge + dir * 4 < L0 || edge + dir * 4 > L1) continue;
-        for (let w = W0 + 0.5; w + 0.5 <= W1 - 0.3; w += 1.0) { const [sx, sz] = P(edge + dir * 1.9, w + 0.25); flat(M.line, alongX ? 2.8 : 0.5, alongX ? 0.5 : 2.8, sx, sz, 0.021, 0xe6e0d0); }
+        // paired bars, like the Pioneer Square crossings
+        for (let w = W0 + 0.45; w + 1.0 <= W1 - 0.2; w += 1.55) for (const d of [0, 0.6]) { const [sx, sz] = P(edge + dir * 1.9, w + d + 0.2); flat(M.line, alongX ? 2.8 : 0.4, alongX ? 0.4 : 2.8, sx, sz, 0.021, 0xe6e0d0); }
         const [tx, tz] = P(edge + dir * 3.9, Wc);
         flat(M.line, alongX ? 0.4 : Wd - 0.6, alongX ? Wd - 0.6 : 0.4, tx, tz, 0.021, 0xe6e0d0);
       }
     }
+    // street trees along the sidewalks (o.trees = [-1, +1] sides), each in an iron tree grate; placed after the layout
+    afterLayout.push(() => { for (const r of ROADS) {
+      const [x0, z0, x1, z1, ax] = r, o = r[5] || {};
+      if (!o.trees) continue;
+      const alongX = ax === 'x', L0 = alongX ? x0 : z0, L1 = alongX ? x1 : z1;
+      for (const sd of o.trees) {
+        const w = (sd < 0 ? (alongX ? z0 : x0) : (alongX ? z1 : x1)) + sd * 1.6;
+        for (let l = L0 + 4 + rnd() * 2; l < L1 - 3; l += 9 + rnd() * 3) {
+          const x = alongX ? l : w, z = alongX ? w : l;
+          if (ROADS.some(q => x > q[0] - 2.5 && x < q[2] + 2.5 && z > q[1] - 2.5 && z < q[3] + 2.5 && q !== r)) continue;
+          if (HOLES.some(h => x > h[0] - 1.5 && x < h[2] + 1.5 && z > h[1] - 1.5 && z < h[3] + 1.5)) continue;
+          if (physics.boxes.some(b => b.maxy > 0.2 && b.miny < 6 && x > b.minx - 1.6 && x < b.maxx + 1.6 && z > b.minz - 1.6 && z < b.maxz + 1.6)) continue;
+          flat(manholeMat, 1.3, 1.3, x, z, 0.022);
+          decorate(x, z, 0, 0, 8 + rnd() * 2.5, 0, 'tree');
+        }
+      }
+    } });
     // signal lenses: one material per lamp colour and direction, so the lights can change
     const LENS = [0xff3a24, 0xffb020, 0x3cff7a];
     for (const d of ['x', 'z']) for (const col of LENS) signalMats[d].push(new THREE.MeshStandardMaterial({ color: 0x111111, emissive: col, emissiveIntensity: 0.05, roughness: 0.3 }));
@@ -1488,6 +1525,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   if (placeSignals) placeSignals();
+  for (const f of afterLayout) f();
 
   // ---------- street dressing: puddles, litter, posters (all batched, no extra draw calls) ----------
   if (street) {
