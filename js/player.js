@@ -475,6 +475,8 @@ export class PlayerController {
       this.sprintT * 0.55 - tilt * 0.04 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
       -tilt * 0.55 + this.sprintT * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
+    // per-gun hip pose (the pistol is held up and turned in, both hands on it, like CoD)
+    if (G.hipRot) { const k = 1 - ae; h.rotation.x += G.hipRot[0] * k; h.rotation.y += G.hipRot[1] * k; h.rotation.z += G.hipRot[2] * k; }
     // tactical sprint: gun swung up beside the face, muzzle high (MW style)
     const tk = this.tacK || 0;
     if (tk > 0.01) {
