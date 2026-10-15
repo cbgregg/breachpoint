@@ -140,6 +140,10 @@
           <span class="mc-d" id="mode-online-d">Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.</span>
         </button>
       </div>
+      <div class="mode-extra">
+        <button class="menu-btn" id="mode-options" data-nav>⚙ OPTIONS <small>GRAPHICS · CONTROLS · AUDIO</small></button>
+        <button class="menu-btn" id="mode-friends" data-nav>FRIENDS <small>SIGN IN · FRIEND CODE</small></button>
+      </div>
       <div class="mode-acct" id="mode-acct"></div>
       <div class="cf-badge mode-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
       <footer class="mw-foot" id="mode-hints"></footer>
@@ -302,12 +306,22 @@
         <section class="pane on" id="pane-play">
           <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
           <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
+          <div class="sec-k mo-on">1 · GAME MODE</div>
           <div class="mode-pick" role="radiogroup" aria-label="Game mode">
             <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
             <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
             <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
           </div>
-          <div class="rows">
+          <div class="sec-k mo-on">2 · QUICK MATCH <small>public · drop in</small></div>
+          <button id="quick-btn" class="menu-btn quick mo-on" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
+          <p class="pane-note mo-on">Joins a public match in the mode above. <b>Maps aren't picked here:</b> players vote on the next map in the lobby between matches.</p>
+          <div class="sec-k mo-on">OR · PRIVATE MATCH <small>play with friends</small></div>
+          <div class="online-row mo-on">
+            <button id="host-btn" class="menu-btn" data-nav>HOST <small>GET A 6-DIGIT CODE</small></button>
+            <button id="join-btn" class="menu-btn" data-nav>JOIN <small>ENTER A FRIEND'S CODE</small></button>
+          </div>
+          <div class="sec-k mo-on sm">PRIVATE MATCH SETTINGS <small>used when you host</small></div>
+          <div class="rows" id="play-rows">
             <div class="row" style="display:none"><label for="opt-mode">Mode</label><select id="opt-mode">
               <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
@@ -324,12 +338,7 @@
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
           <button id="play" class="cta" data-nav><span>START MATCH</span><span class="glyph" data-act="pause"></span></button>
-          <div class="online-row">
-            <button id="quick-btn" class="menu-btn quick" data-nav>QUICK MATCH <small>PUBLIC · DROP IN</small></button>
-            <button id="host-btn" class="menu-btn" data-nav>PRIVATE MATCH <small>HOST · 6-DIGIT CODE</small></button>
-            <button id="join-btn" class="menu-btn" data-nav>JOIN PRIVATE MATCH <small>ENTER CODE</small></button>
-          </div>
-          <p class="pane-note">Online play is peer-to-peer: the host's browser runs the match. Quick match puts you in a public game; host/join use a private 6-digit code. Bots fill empty slots.</p>
+          <p class="pane-note mo-on">Online play is peer-to-peer: the host's browser runs the match. Bots fill empty slots.</p>
           <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
         </section>
 
@@ -602,30 +611,37 @@
           <span class="pc-emb" id="sd-emb"></span>
           <div class="sd-who"><b id="sd-tag"></b><small id="sd-acct"></small></div>
         </div>
+        <nav class="sd-tabs" role="tablist">
+          <button class="sd-tab on" data-sdt="friends" data-nav>FRIENDS <span class="sd-tab-n" id="sd-tab-req"></span></button>
+          <button class="sd-tab" data-sdt="add" data-nav>ADD FRIEND</button>
+          <button class="sd-tab" data-sdt="profile" data-nav>PROFILE</button>
+        </nav>
 
-        <div class="sd-k">NAME TAG <small>everyone sees this</small></div>
-        <div class="sd-line"><input id="sd-tag-in" class="sd-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav><button id="sd-tag-save" class="menu-btn small" data-nav>CHANGE</button></div>
-        <p class="sd-note" id="sd-tag-note"></p>
+        <div class="sd-pane on" data-sdp="friends">
+          <div id="sd-req-wrap"><div class="sd-k">FRIEND REQUESTS</div><div id="sd-req" class="sd-list"></div></div>
+          <div class="sd-k">FRIENDS <small id="sd-fcount"></small></div>
+          <div id="sd-friends" class="sd-list"></div>
+          <div class="sd-k">RECENT PLAYERS <small>from your online matches</small></div>
+          <div id="sd-recent" class="sd-list"></div>
+        </div>
 
-        <div class="sd-k">DISPLAY NAME <small>only friends see this</small></div>
-        <div class="sd-line"><input id="sd-disp-in" class="sd-in" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. your first name" data-nav><button id="sd-disp-save" class="menu-btn small" data-nav>SAVE</button></div>
+        <div class="sd-pane" data-sdp="add">
+          <div class="sd-k">ADD A FRIEND <small>enter their friend code</small></div>
+          <div class="sd-line"><input id="sd-add-in" class="sd-in code" maxlength="9" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" data-nav><button id="sd-add" class="menu-btn small" data-nav>SEND</button></div>
+          <div class="join-status" id="sd-add-status"></div>
+          <div class="sd-k">YOUR FRIEND CODE</div>
+          <div class="sd-line"><div class="sd-code" id="sd-code"></div><button id="sd-code-copy" class="menu-btn small" data-nav>COPY</button></div>
+          <p class="sd-note">Give this code to friends so they can add you. You can also add people from Recent Players.</p>
+        </div>
 
-        <div class="sd-k">YOUR FRIEND CODE</div>
-        <div class="sd-line"><div class="sd-code" id="sd-code"></div><button id="sd-code-copy" class="menu-btn small" data-nav>COPY</button></div>
-        <p class="sd-note">Give this code to friends so they can add you.</p>
-
-        <div class="sd-k">ADD A FRIEND</div>
-        <div class="sd-line"><input id="sd-add-in" class="sd-in code" maxlength="9" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" data-nav><button id="sd-add" class="menu-btn small" data-nav>SEND</button></div>
-        <div class="join-status" id="sd-add-status"></div>
-
-        <div id="sd-req-wrap"><div class="sd-k">FRIEND REQUESTS</div><div id="sd-req" class="sd-list"></div></div>
-        <div class="sd-k">FRIENDS <small id="sd-fcount"></small></div>
-        <div id="sd-friends" class="sd-list"></div>
-
-        <div class="sd-k">RECENT PLAYERS <small>from your online matches</small></div>
-        <div id="sd-recent" class="sd-list"></div>
-
-        <div class="sd-foot"><button id="sd-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
+        <div class="sd-pane" data-sdp="profile">
+          <div class="sd-k">NAME TAG <small>everyone sees this</small></div>
+          <div class="sd-line"><input id="sd-tag-in" class="sd-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav><button id="sd-tag-save" class="menu-btn small" data-nav>CHANGE</button></div>
+          <p class="sd-note" id="sd-tag-note"></p>
+          <div class="sd-k">DISPLAY NAME <small>only friends see this</small></div>
+          <div class="sd-line"><input id="sd-disp-in" class="sd-in" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. your first name" data-nav><button id="sd-disp-save" class="menu-btn small" data-nav>SAVE</button></div>
+          <div class="sd-foot"><button id="sd-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
+        </div>
       </section>
     </div>
   </aside>

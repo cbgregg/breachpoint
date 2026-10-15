@@ -5,9 +5,9 @@ const WEAPON_IDS = Object.keys(WEAPONS);
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
-import { Character, setCharacterDetail } from './character.js';
+import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
-import { loadoutFromSettings, randomLoadout } from './attachments.js';
+import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef } from './attachments.js';
 import { BotBrain } from './bot.js';
 import { PlayerController } from './player.js';
 import { Effects } from './effects.js';
@@ -30,6 +30,21 @@ function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
+// Bots pick from a small pool of loadouts per weapon (built once, during loading) instead of a brand-new
+// random kit every respawn: new kits meant building gun models mid-match, which hitched the frame.
+const BOT_POOL = {};
+function botLoadout(primary) {
+  const pool = BOT_POOL[primary] || (BOT_POOL[primary] = []);
+  if (pool.length < 3) {
+    const lo = randomLoadout(primary);
+    pool.push(lo);
+    try { const p = parseLoadout(lo); prewarmGun(weaponDef(p.primary, p.att)); } catch (_) { /* built on first use instead */ }
+    return lo;
+  }
+  return pool[(Math.random() * pool.length) | 0];
+}
+export function prewarmBotGuns() { for (const id of ['rifle', 'smg', 'shotgun', 'sniper']) for (let i = 0; i < 3; i++) botLoadout(id); }
+
 function pickBotWeapon() {
   const r = Math.random();
   return r < 0.45 ? 'rifle' : r < 0.72 ? 'smg' : r < 0.88 ? 'sniper' : 'shotgun';
@@ -268,7 +283,7 @@ export class Game {
 
   addBot(team) {
     if (!this.botNames || !this.botNames.length) this.botNames = shuffle([...BOT_NAMES]);
-    const b = new Character(this, { name: this.botNames.pop(), team, isBot: true, primary: randomLoadout(pickBotWeapon()) });
+    const b = new Character(this, { name: this.botNames.pop(), team, isBot: true, primary: botLoadout(pickBotWeapon()) });
     this.characters.push(b);
     const brain = new BotBrain(b, this);
     this.brains.set(b, brain);
@@ -819,7 +834,7 @@ export class Game {
 
   respawn(c) {
     const p = this.chooseSpawn(c.team);
-    if (c.isBot && Math.random() < 0.3) c.pendingLoadout = randomLoadout(c.primaryId);
+    if (c.isBot && Math.random() < 0.3) c.pendingLoadout = botLoadout(c.primaryId);
     const before = c.loadout;
     c.spawn(p, this.spawnYawOut);
     if (c.loadout !== before) this.emit(['lo', c.id, c.loadout]);

@@ -200,6 +200,36 @@ export function buildOperator(team, weaponId, name) {
 const POLE_R = new THREE.Vector3(0.7, -1, 0.4), POLE_L = new THREE.Vector3(-0.8, -1, 0.1);
 const SH_R = new THREE.Vector3(0.19, 0.03, 0), SH_L = new THREE.Vector3(-0.19, 0.03, 0);
 
+// Third-person guns are built once per weapon + attachments and cloned after that: a clone shares the
+// template's geometry and materials, so swapping loadouts on respawn costs no rebuild and no new shaders
+// (building one from scratch took ~100 ms and caused a visible hitch when bots changed class).
+const GUN_CACHE = new Map();
+function cachedGun(weaponId, att, key) {
+  const ck = weaponId + '|' + key;
+  let tpl = GUN_CACHE.get(ck);
+  if (!tpl) {
+    const gun = buildGun(weaponId, { att });
+    const nodes = [];
+    gun.group.traverse(o => nodes.push(o));
+    tpl = { gun, index: new Map(nodes.map((o, i) => [o, i])) };
+    GUN_CACHE.set(ck, tpl);
+  }
+  const group = tpl.gun.group.clone(true);
+  const nodes = [];
+  group.traverse(o => nodes.push(o));
+  const out = {};
+  for (const [k, v] of Object.entries(tpl.gun)) {
+    if (v && v.isObject3D) out[k] = tpl.index.has(v) ? nodes[tpl.index.get(v)] : v;
+    else if (v && v.isVector3) out[k] = v.clone();
+    else out[k] = v;
+  }
+  out.group = group;
+  return out;
+}
+
+// build a gun ahead of time (during loading) so it's ready to clone
+export function prewarmGun(wdef) { cachedGun(wdef.id, wdef.att, wdef.attKey); }
+
 export function setOperatorWeapon(model, wdef) {
   const weaponId = typeof wdef === 'string' ? wdef : wdef.id;
   const key = typeof wdef === 'string' ? wdef : wdef.attKey;
@@ -208,13 +238,13 @@ export function setOperatorWeapon(model, wdef) {
   const att = typeof wdef === 'string' ? null : wdef.att;
   if (model.soldier) {
     model.gunHolder.clear();
-    model.gun = buildGun(weaponId, { att });
+    model.gun = cachedGun(weaponId, att, key);
     model.weaponId = weaponId;
     model.gunHolder.add(model.gun.group);
     return;
   }
   model.gunHolder.clear();
-  const gun = buildGun(weaponId, { att });
+  const gun = cachedGun(weaponId, att, key);
   model.gun = gun;
   model.weaponId = weaponId;
   model.gunHolder.add(gun.group);
@@ -595,7 +625,7 @@ export class Character {
 }
 
 // ---------- rigged soldier (Mixamo skeleton) ----------
-const _w1 = new THREE.Vector3(), _w2 = new THREE.Vector3(), _w3 = new THREE.Vector3(), _w4 = new THREE.Vector3();
+const _w1 = new THREE.Vector3(), _w2 = new THREE.Vector3(), _w3 = new THREE.Vector3(), _w4 = new THREE.Vector3(), _rtIK = new THREE.Vector3(), _ltIK = new THREE.Vector3();
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _qAim = new THREE.Quaternion();
 const _eu = new THREE.Euler(0, 0, 0, 'YXZ');
 const UP = new THREE.Vector3(0, 1, 0);
@@ -764,10 +794,11 @@ function animateSoldier(c, dt, showName) {
   // arm IK onto grip and foregrip
   const gun = m.gun;
   gun.group.localToWorld(_w3.set(0.0, -0.035, 0.065));
-  const rt = _w3.clone();
+  _rtIK.copy(_w3);
   (gun.pump || gun.foregrip).getWorldPosition(_w3);
   _w3.add(_w1.set(-0.03, -0.03, 0.05).applyQuaternion(_qAim));
-  ikArms(m, rt, _w3.clone(), _qAim);
+  _ltIK.copy(_w3);
+  ikArms(m, _rtIK, _ltIK, _qAim);
 
   m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
 }
@@ -783,22 +814,26 @@ export function armIK(B, side, target, pole) {
   swingBone(fore, hand, target.clone().sub(E).normalize());
 }
 
+// scratch vectors for the arm IK (it runs for every character every frame: no allocations here)
+const _ikS = new THREE.Vector3(), _ikE = new THREE.Vector3(), _ikD = new THREE.Vector3(), _ikP = new THREE.Vector3(), _ikT = new THREE.Vector3();
 function ikArms(m, rightTarget, leftTarget, aimQ, leftDir = null, leftFree = false) {
   const B = m.bones;
   const solveArm = (sideName, target, pole) => {
     const upper = B[sideName + 'Arm'], fore = B[sideName + 'ForeArm'], hand = B[sideName + 'Hand'];
-    const S = upper.getWorldPosition(new THREE.Vector3());
-    const E = solveElbow(S, target, m.armLen.upper, m.armLen.fore, pole, new THREE.Vector3());
-    swingBone(upper, fore, E.clone().sub(S).normalize());
-    swingBone(fore, hand, target.clone().sub(E).normalize());
+    const S = upper.getWorldPosition(_ikS);
+    const E = solveElbow(S, target, m.armLen.upper, m.armLen.fore, pole, _ikE);
+    swingBone(upper, fore, _ikD.copy(E).sub(S).normalize());
+    swingBone(fore, hand, _ikD.copy(target).sub(E).normalize());
   };
   // first person: the right elbow stays out and down in camera space, so canting the gun for a reload or
   // swinging it up for tactical sprint can't flip the arm across the screen (third person keeps it gun-relative)
-  solveArm('Right', rightTarget, m.fp ? new THREE.Vector3(1, -1.25, 0.35) : new THREE.Vector3(1, -1.2, 0.4).applyQuaternion(aimQ));
+  _ikT.copy(rightTarget);
+  solveArm('Right', _ikT, m.fp ? _ikP.set(1, -1.25, 0.35) : _ikP.set(1, -1.2, 0.4).applyQuaternion(aimQ));
   // a free left hand (reloading, tactical sprint) keeps its elbow down and out in camera space
-  solveArm('Left', leftTarget, leftFree ? new THREE.Vector3(-0.25, -1, 0.12) : new THREE.Vector3(-1, -1.3, 0.1).applyQuaternion(aimQ));
-  swingBone(B.RightHand, B.RightHandMiddle1, new THREE.Vector3(-0.55, -0.45, -0.7).applyQuaternion(aimQ).normalize());
-  swingBone(B.LeftHand, B.LeftHandMiddle1, leftDir ? leftDir.clone().normalize() : new THREE.Vector3(0.55, 0.35, -0.75).applyQuaternion(aimQ).normalize());
+  _ikT.copy(leftTarget);
+  solveArm('Left', _ikT, leftFree ? _ikP.set(-0.25, -1, 0.12) : _ikP.set(-1, -1.3, 0.1).applyQuaternion(aimQ));
+  swingBone(B.RightHand, B.RightHandMiddle1, _ikD.set(-0.55, -0.45, -0.7).applyQuaternion(aimQ).normalize());
+  swingBone(B.LeftHand, B.LeftHandMiddle1, leftDir ? _ikD.copy(leftDir).normalize() : _ikD.set(0.55, 0.35, -0.75).applyQuaternion(aimQ).normalize());
 }
 
 // First-person body: the same rig placed under the camera with the head collapsed, so only

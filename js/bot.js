@@ -183,17 +183,43 @@ export class BotBrain {
     const reached = this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2;
     if (!this.goal || reached || this.goalT <= 0 || this.goalKind === 'hunt' || this.goalKind === 'health' || this.goalKind === 'ammo') {
       const intel = g.intel[b.team];
-      if (g.time - intel.time < 8 && Math.random() < 0.6) {
-        _e.copy(intel.pos).add(_a.set(rand(-4, 4), 0, rand(-4, 4)));
+      // don't all pile onto the same spot: only some answer a callout, and they come at it from different angles
+      if (g.time - intel.time < 8 && Math.random() < 0.4 && this.matesHeading(intel.pos, 8) < 2) {
+        const a = Math.random() * Math.PI * 2, r = rand(4, 9);
+        _e.copy(intel.pos).add(_a.set(Math.cos(a) * r, 0, Math.sin(a) * r));
+        if (!g.world.nav.isOpenAt(_e.x, _e.z)) _e.copy(intel.pos);
         this.goal = null;
         this.setGoal(_e, 'intel');
       } else {
         const side = b.team === 0 ? 1 : -1; // blue pushes +x, red pushes -x
-        const p = g.world.nav.randomOpenPoint(q => q.x * side > -18 && Math.abs(q.x) < 38);
+        // a few candidates; keep the one furthest from where teammates are already going
+        let p = null, best = -1;
+        for (let k = 0; k < 4; k++) {
+          const q = g.world.nav.randomOpenPoint(q => q.x * side > -18 && Math.abs(q.x) < 38);
+          const d = this.mateGoalDist(q);
+          if (d > best) { best = d; p = q; }
+        }
         this.goal = null;
         this.setGoal(p, 'roam');
       }
     }
+  }
+
+  // teammates (bots) whose goal is within r of p
+  matesHeading(p, r) {
+    let n = 0;
+    for (const [c, br] of this.game.brains) if (br !== this && c.team === this.bot.team && c.alive && br.goal && Math.hypot(br.goal.x - p.x, br.goal.z - p.z) < r) n++;
+    return n;
+  }
+  // distance from p to the nearest teammate's goal (or teammate)
+  mateGoalDist(p) {
+    let d = 1e9;
+    for (const c of this.game.characters) {
+      if (c === this.bot || c.team !== this.bot.team || !c.alive) continue;
+      const br = this.game.brains.get(c), q = br && br.goal ? br.goal : c.pos;
+      d = Math.min(d, Math.hypot(q.x - p.x, q.z - p.z));
+    }
+    return d;
   }
 
   followPath(target, dt) {
@@ -258,6 +284,14 @@ export class BotBrain {
         sprint = Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 8;
       } else if (this.goalKind === 'roam' || this.goalKind === 'intel') {
         this.goalT = 0;
+      }
+    }
+    // personal space: ease away from teammates closer than ~2.2 m so squads don't move as one blob
+    if (this.goalKind !== 'engage' && wish.lengthSq() > 0.01) {
+      for (const c of g.characters) {
+        if (c === b || c.team !== b.team || !c.alive) continue;
+        const dx = b.pos.x - c.pos.x, dz = b.pos.z - c.pos.z, d = Math.hypot(dx, dz);
+        if (d > 0.01 && d < 3) wish.addScaledVector(_a.set(dx / d, 0, dz / d), (3 - d) * 0.5);
       }
     }
     if (wish.lengthSq() > 1) wish.normalize();
