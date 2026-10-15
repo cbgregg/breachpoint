@@ -1072,3 +1072,7 @@ body.mode-online #pane-play > * { order: 0 !important; }
 body.mode-online #pane-play .pane-title, body.mode-online #pane-play .pane-sub { display: none; }
 .mode-extra { grid-template-columns: repeat(2, minmax(0, 360px)); gap: 18px; }
 @media (max-width: 700px) { .mode-extra { grid-template-columns: 1fr; } }
+.about-row.credits label small { line-height: 1.6; }
+.about-row.credits a { color: var(--bo, #e8a83a); text-decoration: none; }
+.about-row.credits a:hover { text-decoration: underline; }
+.rows.two .about-row.credits { grid-column: 1 / -1; }

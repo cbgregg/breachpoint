@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { setGunModel } from './weapons.js';
 
 export const ASSETS = { soldier: null, photo: {}, hands: null };
 
@@ -51,9 +52,30 @@ export async function loadHandsAsset() {
   return ASSETS.hands;
 }
 
+// Real gun models (CC-BY, credited in Options > About). xf maps each model into the gun frame used by
+// weapons.js; if a model fails to load, that weapon keeps its procedural build.
+const GUN_FILES = {
+  // red dot optic: modelled in millimetres; base of the mount at y = 0, centred on z = 0
+  reddot: { file: 'assets/models/reddot.glb', xf: { s: 0.0006, x: 0, y: 0.016, z: -0.0057 } },
+  ar15: { file: 'assets/models/ar15.glb', xf: { s: 0.0515, x: 0, y: 0.0056, z: -0.0573 } },
+  // TPM SMG: modelled along -x; turned to face -z
+  tpm: { file: 'assets/models/tpm.glb', xf: { s: 0.17, ry: -Math.PI / 2, x: 0, y: 0.0238, z: 0.0204 } },
+  sniper: { file: 'assets/models/sniper.glb', xf: { s: 0.036, x: 0, y: -0.032, z: -0.227 } },
+  // G19: the file is a display (pistol, spare magazine and a suppressor laid out); keep only the pistol
+  g19: { file: 'assets/models/g19.glb', xf: { s: 0.95, ry: Math.PI, x: 0, y: 0, z: -0.043,
+    keep: (x, y, z, k) => !k.includes('mm1') && z > -0.12 && z < 0.108 && y > -0.08 && y < 0.09 && !(z > 0.088 && y < -0.04) } },
+};
+async function loadGunModels() {
+  await Promise.all(Object.entries(GUN_FILES).map(async ([name, { file, xf }]) => {
+    try { const gltf = await new GLTFLoader().loadAsync(file); setGunModel(name, gltf.scene, xf); }
+    catch (e) { console.warn('Gun model unavailable, using procedural:', name, e); }
+  }));
+}
+
 export async function loadAssets(onProgress, onTexProgress) {
   const textures = loadPhotoTextures(onTexProgress);
   const hands = loadHandsAsset();
+  const guns = loadGunModels();
   const loader = new GLTFLoader();
   try {
     let gltf;
@@ -83,7 +105,7 @@ export async function loadAssets(onProgress, onTexProgress) {
   } catch (err) {
     console.warn('Soldier model unavailable, using procedural operators.', err);
   }
-  await Promise.all([textures, hands]);
+  await Promise.all([textures, hands, guns]);
 }
 
 // Readability (Black Ops 2 style): both kits stay bright, and every soldier gets a soft rim light

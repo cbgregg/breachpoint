@@ -278,6 +278,22 @@ function opticHolo(p, g, M, b, c) {
   return { sightY: hy, sightZ: z };
 }
 function opticReflex(p, g, M, b, c, k = 1) {
+  if (GUN_MODELS.reddot) {
+    // red dot model (CC-BY 4.0, "FPS Red Dot Sight (Game Model)" by Michael Makivic on Sketchfab)
+    const grp = new THREE.Group();
+    addModelParts('reddot', grp, () => true, true);
+    grp.traverse(o => { if (o.isMesh && o.name.includes('08')) { o.material = M.glass; o.renderOrder = 2; } });
+    grp.position.set(0, b, -c);
+    grp.scale.setScalar(k);
+    g.add(grp);
+    const ry = b + 0.0426 * k, z = -c - 0.0357 * k + 0.002;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 12), M.reticle);
+    dot.position.set(0, ry, z);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0022, 16), M.halo);
+    glow.position.set(0, ry, z + 0.0002);
+    g.add(dot, glow);
+    return { sightY: ry, sightZ: z };
+  }
   p.profile(M.poly, [[c - 0.0325 * k, b], [c + 0.0325 * k, b], [c + 0.0325 * k, b + 0.01], [c - 0.0325 * k, b + 0.01]], 0.03 * k, { r: 0.004 });
   const ry = b + 0.026 * k, w = 0.017 * k, i = 0.013 * k;
   p.frontal(M.poly, [[-w, ry - 0.016 * k], [w, ry - 0.016 * k], [w, ry + 0.017 * k], [-w, ry + 0.017 * k]], c + 0.0075 * k, c + 0.0225 * k,
@@ -397,6 +413,47 @@ function laserModule(p, g, M, x, y, f, w = 0.016) {
 }
 let tabMat = null, mask = null;
 
+// Real 3D gun models (loaded by assets.js). Each model is baked once into this file's gun frame (top of the
+// pistol grip at the origin, barrel toward -z, metres): xf = { s: scale, ry: yaw, x, y, z: offset,
+// keep?(x, y, z, partName): keep a triangle (cuts a gun out of a display scene) }.
+const GUN_MODELS = {};
+export function setGunModel(name, scene, xf) {
+  const parts = new Map();
+  scene.updateMatrixWorld(true);
+  const bake = new THREE.Matrix4().compose(new THREE.Vector3(xf.x || 0, xf.y || 0, xf.z || 0),
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), xf.ry || 0), new THREE.Vector3(xf.s, xf.s, xf.s));
+  scene.traverse(o => {
+    if (!o.isMesh) return;
+    let geo = o.geometry.clone();
+    geo.applyMatrix4(o.matrixWorld);       // the model's own node transforms
+    const key = o.name.replace(/_low.*$/i, '').replace(/_LowPoly.*$/i, '').replace(/^LP/, '').toLowerCase();
+    if (xf.keep && geo.index) {
+      const P = geo.attributes.position, I = geo.index.array, kept = [];
+      for (let t = 0; t < I.length; t += 3) {
+        const cx = (P.getX(I[t]) + P.getX(I[t + 1]) + P.getX(I[t + 2])) / 3, cy = (P.getY(I[t]) + P.getY(I[t + 1]) + P.getY(I[t + 2])) / 3, cz = (P.getZ(I[t]) + P.getZ(I[t + 1]) + P.getZ(I[t + 2])) / 3;
+        if (xf.keep(cx, cy, cz, key)) kept.push(I[t], I[t + 1], I[t + 2]);
+      }
+      if (!kept.length) return;
+      geo.setIndex(kept);
+    }
+    geo.applyMatrix4(bake);
+    geo.computeBoundingSphere();
+    if (o.material.map) o.material.map.anisotropy = 8;
+    parts.set(parts.has(key) ? key + parts.size : key, { geo, mat: o.material });
+  });
+  GUN_MODELS[name] = { parts };
+}
+export function hasGunModel(name) { return !!GUN_MODELS[name]; }
+function addModelParts(name, target, filter, cast) {
+  for (const [k, { geo, mat }] of GUN_MODELS[name].parts) {
+    if (!filter(k)) continue;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = cast; mesh.receiveShadow = true;
+    mesh.name = k;
+    target.add(mesh);
+  }
+}
+
 // Builds a gun with the top of its pistol grip at the origin, barrel toward -z.
 // Returns { group, muzzle, eject, foregrip, mag, magHome, sightY, sightZ, pump, bolt }
 export function buildGun(id, { forViewmodel = false, att = null } = {}) {
@@ -413,7 +470,72 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
   const muzzle = new THREE.Object3D(), eject = new THREE.Object3D(), foregrip = new THREE.Object3D();
   let sightY = 0.09, sightZ = -0.05;
 
-  if (type === 'rifle') {
+  if (type === 'rifle' && GUN_MODELS.ar15) {
+    // ---- the AR-15 model (CC-BY 4.0, "AR-15 (game ready)" by IVA on Sketchfab) ----
+    addModelParts('ar15', g, k => k !== 'mag' && k !== 'suppressor', !forViewmodel);
+    addModelParts('ar15', mag, k => k === 'mag', !forViewmodel);
+    out.magHome = new THREE.Vector3();
+    // muzzle devices go on the model's barrel; its own suppressor only shows with the suppressor attachment
+    const tip = 0.501;
+    if (A.muzzle === 'sup') addModelParts('ar15', g, k => k === 'suppressor', !forViewmodel);
+    muzF = A.muzzle === 'sup' ? 0.69 : muzzleDevice(p, M, A.muzzle, 0.045, tip, 0.0085);
+    if (A.under === 'vgrip') {
+      p.lathe(M.poly, [[0, 0], [0.0125, 0], [0.014, 0.012], [0.0145, 0.06], [0.012, 0.075], [0, 0.077]], 0, 0, 16);
+      const vfg = p.by.get(M.poly).pop();
+      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2 + 0.15));
+      vfg.translate(0, 0.012, -0.36);
+      p.by.get(M.poly).push(vfg);
+      foregrip.position.set(0, -0.024, -0.365);
+    } else if (A.under === 'agrip') {
+      p.profile(M.poly, [[0.26, 0.012], [0.365, 0.012], [0.35, -0.002, 0.006], [0.305, -0.018, 0.008], [0.28, -0.016, 0.006]], 0.028, { r: 0.006, bevel: 0.003 });
+      foregrip.position.set(0, -0.008, -0.32);
+    } else foregrip.position.set(0, 0.0, -0.34);
+    if (A.laser === 'laser') laser = laserModule(p, g, M, 0.034, 0.035, 0.42);
+    // sights ride the model's flat-top rail (top at y = 0.082)
+    sight(A.optic === 'iron' ? ironSights(p, M, -0.02, 0.0865, 0.455, 0.0885, 0.018) : addOptic(A.optic, p, g, M, forViewmodel, 0.0858, 0.06));
+    muzzle.position.set(0, 0.045, -muzF);
+    eject.position.set(0.02, 0.04, -0.06);
+  } else if (type === 'smg' && GUN_MODELS.tpm) {
+    // ---- TPM SMG model (CC-BY 4.0, "TPM SMG" by TORI106 on Sketchfab): magazine in the grip, vertical foregrip ----
+    addModelParts('tpm', g, () => true, !forViewmodel);
+    A.under = 'vgrip';                       // the model has its own vertical foregrip: the support hand wraps it
+    foregrip.position.set(0, -0.03, -0.158);
+    out.magHome = new THREE.Vector3();
+    muzF = Math.max(0.235, muzzleDevice(p, M, A.muzzle, 0.0595, 0.233, 0.009, 0.16));
+    if (A.laser === 'laser') laser = laserModule(p, g, M, 0.03, 0.035, 0.2);
+    sight(A.optic === 'iron' ? { sightY: 0.122, sightZ: 0.02 } : addOptic(A.optic, p, g, M, forViewmodel, 0.112, 0.04));
+    muzzle.position.set(0, 0.0595, -muzF);
+    eject.position.set(0.02, 0.06, -0.06);
+  } else if (type === 'sniper' && GUN_MODELS.sniper) {
+    // ---- sniper rifle model (CC-BY 4.0, "Sniper rifle GameReady Free" by pashtetuser on Sketchfab) ----
+    const scopeParts = (k) => k.startsWith('aim');
+    addModelParts('sniper', g, k => k !== 'magazine' && k !== 'gate' && (A.optic === 'scope' || !scopeParts(k)) && !(A.muzzle === 'sup' && (k === 'muzzlebrake' || k === 'nutmuzzle')), !forViewmodel);
+    addModelParts('sniper', mag, k => k === 'magazine', !forViewmodel);
+    out.magHome = new THREE.Vector3();
+    const bolt = new THREE.Group();
+    addModelParts('sniper', bolt, k => k === 'gate', !forViewmodel);
+    g.add(bolt);
+    out.bolt = bolt; out.boltHome = 0;
+    if (A.muzzle === 'sup') muzF = muzzleDevice(p, M, 'sup', 0.055, 0.73, 0.0115, 0.22);
+    else muzF = 0.813;
+    if (A.optic === 'scope') {
+      // the model's own scope: look straight down its tube (the magnified view comes from the camera zoom)
+      sight({ sightY: 0.128, sightZ: 0.057 });
+    } else sight(A.optic === 'iron' ? ironSights(p, M, -0.02, 0.093, 0.22, 0.095, 0.016) : addOptic(A.optic, p, g, M, forViewmodel, 0.0925, 0.12));
+    muzzle.position.set(0, 0.055, -muzF);
+    eject.position.set(0.022, 0.06, -0.04);
+    foregrip.position.set(0, -0.03, -0.3);
+  } else if (type === 'pistol' && GUN_MODELS.g19) {
+    // ---- Glock 19 model (CC-BY 4.0, "G19 Pistol, Game Ready, Free version" by Rotuma on Sketchfab) ----
+    addModelParts('g19', g, () => true, !forViewmodel);
+    out.magHome = new THREE.Vector3();
+    muzF = Math.max(0.142, muzzleDevice(p, M, A.muzzle, 0.047, 0.141, 0.0075, 0.13));
+    if (A.laser === 'laser') laser = laserModule(p, g, M, 0.012, 0.02, 0.1);
+    if (A.optic === 'reflex') sight(opticReflex(p, g, M, 0.0785, 0.035, 0.8));
+    else sight({ sightY: 0.083, sightZ: 0.02 });
+    muzzle.position.set(0, 0.047, -muzF);
+    eject.position.set(0.016, 0.062, -0.05);
+  } else if (type === 'rifle') {
     // ---- lower receiver (forged aluminium): magwell, trigger guard, pins, controls ----
     p.profile(M.metal, [[-0.06, 0.0], [0.175, 0.0], [0.175, -0.014], [0.16, -0.02], [0.158, -0.056, 0.003], [0.084, -0.056, 0.003], [0.08, -0.016], [0.03, -0.012], [-0.03, -0.018], [-0.062, -0.004]], 0.027, { r: 0.004, bevel: 0.0015 });
     p.profile(M.metal, [[0.081, -0.044], [0.159, -0.044], [0.161, -0.058, 0.002], [0.079, -0.058, 0.002]], 0.031, { r: 0.002, bevel: 0.0012 }); // flared magwell lip
