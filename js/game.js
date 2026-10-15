@@ -70,6 +70,7 @@ export class Game {
     this.physics = new Physics();
     this.world = buildWorld(this.scene, this.physics, 'tarsa');
     setCharacterDetail(this.world.textures.fabric);
+    this.fitShadows();
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects = new Effects(this.scene, this.physics);
     this.audio = new GameAudio();
@@ -924,6 +925,16 @@ export class Game {
   }
 
   // swap the map: drop the old geometry, collision and nav grid, then build the new one
+  // sun shadows cover the whole playable area (bigger maps get a wider shadow frustum)
+  fitShadows() {
+    const sb = (this.world && this.world.bounds) || { hx: 42, hz: 30 }, ext = Math.max(52, Math.hypot(sb.hx, sb.hz) * 0.95);
+    const sun = this.renderer.sun, sc = sun.shadow.camera;
+    if (sc.right === ext) return;
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.far = Math.max(200, ext * 3.2);
+    sc.updateProjectionMatrix();
+    sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6));
+  }
+
   loadMap(id) {
     if (!MAPS[id] || (this.world && this.world.id === id)) return;
     if (this.world) {
@@ -941,6 +952,11 @@ export class Game {
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
     this.buildPickups();
+    // sun shadows cover the whole playable area (bigger maps get a wider shadow frustum)
+    const sb = this.world.bounds || { hx: 42, hz: 30 }, ext = Math.max(52, Math.hypot(sb.hx, sb.hz) * 0.95);
+    const sc = this.renderer.sun.shadow.camera;
+    if (sc.right !== ext) { sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.far = Math.max(200, ext * 3.2); sc.updateProjectionMatrix(); this.renderer.sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6)); }
+    this.fitShadows();
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects.clear();
     if (this.onMapChange) this.onMapChange(this.world);

@@ -129,7 +129,7 @@ export class NavGrid {
     this.g[start] = 0; this.stamp[start] = st; this.parent[start] = -1;
     heap.push(start, h(s[0], s[1]));
     let found = false, iterations = 0;
-    while (heap.size && iterations++ < 6000) {
+    while (heap.size && iterations++ < 30000) {
       const cur = heap.pop();
       if (this.closed[cur] === st) continue;
       this.closed[cur] = st;

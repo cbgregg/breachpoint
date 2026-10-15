@@ -195,7 +195,8 @@ export class BotBrain {
         // a few candidates; keep the one furthest from where teammates are already going
         let p = null, best = -1;
         for (let k = 0; k < 4; k++) {
-          const q = g.world.nav.randomOpenPoint(q => q.x * side > -18 && Math.abs(q.x) < 38);
+          const HX = g.world.bounds ? g.world.bounds.hx : 42;
+          const q = g.world.nav.randomOpenPoint(q => q.x * side > -HX * 0.43 && Math.abs(q.x) < HX - 4);
           const d = this.mateGoalDist(q);
           if (d > best) { best = d; p = q; }
         }

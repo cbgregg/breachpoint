@@ -7,7 +7,9 @@ import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 
+// Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
+const DEFAULT_BOUNDS = { hx: 42, hz: 30 };
 
 // Collision layout. [cx, cz, w(x), d(z), h, y0, kind, extra]
 // HALF items are mirrored through the center (x,z) -> (-x,-z) so both teams get the same map.
@@ -15,81 +17,137 @@ export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
 //   (offsets run along +x on the n/s walls and +z on the e/w walls; mirrored copies are rotated for you)
 // Lanes are broken up with staggered buildings and walls so there's no straight line across the map:
 // fights happen around corners, through doorways and windows.
+// Tarsa Market (120 x 84 m): three east-west streets split by rows of houses and tall blocks, cut by
+// alleys. Both bomb sites are inside big market halls (doors on every side, no open-sky plant). The
+// halves are point-mirrored for fairness, but a set of one-off landmarks (TARSA_CENTER) makes each
+// side read differently, and long streets are broken every 10-15 m so nothing is watched end to end.
 const TARSA_CENTER = [
   [0, 0, 8, 8, 3.2, 0, 'house', { n: [['d', -2.6], ['w', 0.9, 1.1]], s: [['d', 2.6], ['w', -0.9, 1.1]], e: [['d', 1.8]], w: [['d', -1.8]], props: [['table', 0, 0], ['shelf', 0, 1.7, 0], ['shelf', 0, -1.7, 0]], light: 1 }],
+  // one-off landmarks (not mirrored): each side of the market looks and plays a little differently
+  [-22, 6, 0.6, 7, 2.4, 0, 'wall', 0],
+  [21.5, -10, 1.6, 1.6, 1.6, 0, 'crate'], [23.3, -10, 1.6, 1.6, 1.6, 0, 'crate'], [22.4, -10, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [-30, 34, 4.4, 2.0, 1.45, 0, 'car', 1],
+  [33, -33, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [-8, 12.6, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [-41, 4, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [42, -2, 2.6, 7, 2.6, 0, 'container', 0x3e5d74],
+  [-35, -3, 5, 6, 13, 0, 'block'],
+  [35.5, 3, 6, 5, 9.5, 0, 'block'],
+  [-17, 38, 2, 2, 1.2, 0, 'pallet'],
+  [18, -38, 0.8, 3, 1.1, 0, 'sand'],
+  // lane breakers (one-off): close the long lines along the side streets and between the rows
+  [-25, 12.8, 7, 2.6, 2.6, 0, 'container', 0x6b7a3a], [-45, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [-45.2, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [26, -12.8, 7, 2.6, 2.6, 0, 'container', 0x7a6a3a], [45, -13.5, 1.6, 1.6, 1.6, 0, 'crate'], [45.2, -13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [-36, 31.5, 0.6, 6, 2.4, 0, 'wall', 1],
+  [36, -31.5, 0.6, 6, 2.4, 0, 'wall', 0],
 ];
 const TARSA_HALF = [
   // centre house roof: parapets, open on the stair side
   [0, 3.95, 8.2, 0.3, 0.6, 3.45, 'parapet'],
   [3.95, 1.6, 0.3, 4.8, 0.6, 3.45, 'parapet'],
-  // north divider (z 6..12): house, tall block, alley, house, gap to spawn
-  [7, 9, 7, 6, 3.2, 0, 'house', { n: [['d', 1.5]], s: [['d', -1.5], ['w', 1.6]], e: [['w', 0]], w: [['d', 0]], props: [['crates', -2, 1.4], ['shelf', 0.2, 0, 0]] }],
-  [14, 9.5, 5, 5, 7, 0, 'block'],
-  [23, 9, 8, 6, 3.2, 0, 'house', { n: [['d', -2]], s: [['d', -2.8]], e: [['w', 0]], w: [['w', 0]], props: [['table', 1.5, 0.5], ['shelf', -1, 0, 0]] }],
-  // south divider (z -12..-6): tall block, house, container wall
-  [5.5, -9.5, 6, 5, 7, 0, 'block'],
-  [13, -9, 7, 6, 3.2, 0, 'house', { n: [['d', 1]], s: [['d', -1]], e: [['d', 0]], w: [['w', 0]], props: [['crates', 2, -1.5], ['shelf', 0, 0.3, 0]] }],
-  [21.5, -7.4, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
-  [21.5, -10, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
-  [21.5, -8.7, 7, 2.6, 2.6, 2.6, 'container', 0x6b7a3a],
-  // mid lane (z -6..6): stalls and crates, a container, then a small house: a chicane, not a corridor
-  [8.6, 4.8, 2.4, 0.9, 0.9, 0, 'stall', 0],
-  [11, 1.6, 1.6, 1.6, 1.6, 0, 'crate'],
-  [11.2, 1.6, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [16, -3.5, 7, 2.6, 2.6, 0, 'container', 0x4d6b54],
-  [16, 4.3, 3, 0.8, 1.1, 0, 'sand'],
-  [23.5, 3, 5, 6, 3.2, 0, 'house', { w: [['d', 0]], e: [['d', 0]], s: [['w', 0]], n: [], props: [['crates', 1.2, 1.5]] }],
-  [28.5, -2.5, 0.62, 4, 1.07, 0, 'jersey'],
-  [28.5, 3.8, 1, 3, 3.5, 0, 'hesco'],
-  // north lane (z 12..30): house in the middle of the street, courtyard wall, burnt car, kiosk stack
-  [12, 22.5, 7, 6, 3.2, 0, 'house', { s: [['d', -1.5]], n: [['d', 2]], e: [['w', 0]], w: [['w', 0]], props: [['table', -1.8, 1], ['shelf', 0.3, 0, 0]] }],
-  [22, 16, 0.6, 8, 2.4, 0, 'wall', 0],
-  [18.5, 26.3, 4.4, 2.0, 1.45, 0, 'car', 1],
-  [4, 27.4, 2.4, 0.9, 0.9, 0, 'stall', 0],
-  [27, 22, 0.8, 3, 1.1, 0, 'sand'],
-  [26.5, 14.5, 1.5, 1.5, 1.5, 0, 'crate'],
-  [3, 18, 2, 2, 1.2, 0, 'pallet'],
-  [16, 28.75, 2, 2.5, 1.8, 0, 'crate'],
-  [6.6, 14.2, 0.62, 0.62, 0.9, 0, 'barrel'],
-  [7.4, 14.0, 0.62, 0.62, 0.9, 0, 'barrel', 1],
-  // south lane (z -30..-12): container yard
-  [8, -17, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
-  [8, -17, 7, 2.6, 2.6, 2.6, 'container', 0x6e7f86],
-  [14, -23.5, 2.6, 7, 2.6, 0, 'container', 0x3e5d74],
-  [20, -16, 2.6, 7, 2.6, 0, 'container', 0x7a6a3a],
-  [26, -22.5, 1.6, 1.6, 1.6, 0, 'crate'],
-  [27.8, -22.5, 1.6, 1.6, 1.6, 0, 'crate'],
-  [4, -24.5, 2, 2, 1.2, 0, 'pallet'],
-  [29, -16, 0.8, 3, 1.1, 0, 'sand'],
-  [10, -28.5, 2, 3, 1.8, 0, 'crate'],
-  // forward base: staggered HESCO so the spawn front isn't one long lateral corridor
-  [29, 9, 3, 1, 3.5, 0, 'hesco'],
-  [29.5, -14, 2, 1, 3.5, 0, 'hesco'],
-  [31.5, 18, 1, 4, 3.5, 0, 'hesco'],
-  [31.5, 0, 1, 4, 3.5, 0, 'hesco'],
-  [31.5, -18, 1, 4, 3.5, 0, 'hesco'],
-  [37, 9, 2, 2, 1.2, 0, 'ammo'],
-  [40, 27.4, 0.5, 0.5, 6, 0, 'palm'],
-  // lights: street lamps on the sidewalks, festoon lights strung across the mid lane, lamps in the yard
-  [10.3, 0, 0, 0, 0, 0, 'lights', [10.3, 5.9, 10.3, -6.9]],
-  [19.5, 0, 0, 0, 0, 0, 'lights', [19.5, 5.9, 19.5, -6.0]],
+  // ---- mid street (z -13..13): houses, a tall block and container stacks: a chicane, not a corridor
+  [10, 8, 7, 6, 3.2, 0, 'house', { n: [['d', 1.5]], s: [['d', -1.5], ['w', 1.6]], e: [['w', 0]], w: [['d', 0]], props: [['crates', -2, 1.4], ['shelf', 0.2, 0, 0]] }],
+  [11, -8, 6, 5, 9, 0, 'block'],
+  [19, 1, 2.6, 7, 2.6, 0, 'container', 0x4d6b54],
+  [19, 1, 2.6, 7, 2.6, 2.6, 'container', 0x6e7f86],
+  [28, -5, 8, 7, 3.2, 0, 'house', { w: [['d', 1]], e: [['d', -1]], n: [['w', 0]], s: [['d', 2]], props: [['shelf', 0, 0, 1], ['crates', 2, -2]] }],
+  [29, 8, 5, 5, 12, 0, 'block'],
+  [14, 3.5, 2.4, 0.9, 0.9, 0, 'stall', 0],
+  [24, 10, 3, 0.8, 1.1, 0, 'sand'],
+  [36, -9, 0.62, 4, 1.07, 0, 'jersey'],
+  // cover across the gaps between the mid street and the dividers (no open lane along z = 13)
+  [21, 13, 1.6, 1.6, 1.6, 0, 'crate'], [21.2, 13, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [40, 12.5, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
+  [9, 13.2, 3, 0.8, 1.1, 0, 'sand'],
+  // ---- north divider (z 15..21): block, house, tall block, house, block, with alleys between
+  [5, 18, 5, 5, 8, 0, 'block'],
+  [14, 18, 8, 6, 3.2, 0, 'house', { n: [['d', -2]], s: [['d', 2]], e: [['w', 0]], w: [['w', 0]], props: [['table', 1.5, 0.5], ['shelf', -1, 0, 0]] }],
+  [23, 17.5, 4, 5, 11, 0, 'block'],
+  [33, 18, 8, 6, 3.2, 0, 'house', { n: [['d', 1.5]], s: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['crates', 2, -1.5], ['shelf', -1, 0.5, 0]] }],
+  [43, 17, 5, 4, 7, 0, 'block'],
+  // ---- north street (z 22..40): bomb site B is the big market hall
+  [22, 29, 12, 9, 4.2, 0, 'house', { n: [['d', -3], ['w', 2]], s: [['d', 3], ['w', -2.5]], e: [['d', 0], ['w', 2.6]], w: [['d', 1], ['w', -2.5]], props: [['shelf', -4.6, 3.2, 0], ['crates', 4.6, -3.2], ['shelf', 4.6, 3.2, 0]], light: 1 }],
+  [8, 31, 7, 6, 3.2, 0, 'house', { s: [['d', -1.5]], n: [['d', 2]], e: [['w', 0]], w: [['d', 0]], props: [['table', -1.8, 1], ['shelf', 0.3, 0, 0]] }],
+  [15, 37, 5, 5, 10, 0, 'block'],
+  [37, 31, 7, 6, 3.2, 0, 'house', { w: [['d', 0]], e: [['d', 1]], s: [['w', 0]], n: [['d', -1.5]], props: [['crates', 1.2, 1.5]] }],
+  [36, 24.5, 0.6, 5, 2.4, 0, 'wall', 0],
+  [46, 30, 0.6, 8, 2.4, 0, 'wall', 1],
+  [3, 25, 2, 2, 1.2, 0, 'pallet'],
+  [31, 38, 2, 2.5, 1.8, 0, 'crate'],
+  [22, 39.5, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [45, 38, 1.5, 1.5, 1.5, 0, 'crate'],
+  [12, 24, 0.62, 0.62, 0.9, 0, 'barrel'],
+  [12.8, 23.8, 0.62, 0.62, 0.9, 0, 'barrel', 1],
+  // ---- south divider (z -21..-15)
+  [7, -18, 7, 6, 3.2, 0, 'house', { n: [['d', 1]], s: [['d', -1]], e: [['d', 0]], w: [['w', 0]], props: [['crates', 2, -1.5], ['shelf', 0, 0.3, 0]] }],
+  [17, -17.5, 5, 5, 11, 0, 'block'],
+  [27, -18, 8, 6, 3.2, 0, 'house', { n: [['d', -2]], s: [['d', 2.5]], e: [['w', 0]], w: [['d', 0]], props: [['table', 0, 0]] }],
+  [38, -17, 6, 5, 8, 0, 'block'],
+  // ---- south yard (z -40..-22): container yard; bomb site A is the second market hall
+  [14, -30, 12, 9, 4.2, 0, 'house', { n: [['d', -3], ['w', 2.5]], s: [['d', 2.5], ['w', -2.5]], e: [['d', -1], ['w', 2.5]], w: [['d', 0]], props: [['shelf', 4.6, -3.2, 0], ['crates', -4.6, 3.2], ['shelf', -4.6, -3.2, 0]], light: 1 }],
+  [3, -24, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [3, -24, 7, 2.6, 2.6, 2.6, 'container', 0x6e7f86],
+  [6, -37, 2.6, 6, 2.6, 0, 'container', 0x3e5d74],
+  [29, -26, 2.6, 7, 2.6, 0, 'container', 0x7a6a3a],
+  [29, -26, 2.6, 7, 2.6, 2.6, 'container', 0x4d6b54],
+  [33, -36.5, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [41, -27, 6, 6, 3.2, 0, 'house', { n: [['d', 0]], w: [['d', 1]], e: [['w', 0]], s: [['w', 0]], props: [['shelf', 0, 0, 1]] }],
+  [24, -38.5, 2, 3, 1.8, 0, 'crate'],
+  [46, -35, 0.8, 3, 1.1, 0, 'sand'],
+  [13, -22, 1.6, 1.6, 1.6, 0, 'crate'],
+  [22, -22.5, 0.62, 0.62, 0.9, 0, 'barrel', 1],
+  // sidewalk clutter: kiosks and crate stacks so the edge of the map isn't a 120 m sightline
+  [5, 40.7, 2, 2.5, 1.8, 0, 'crate'],
+  [26, 40.7, 2, 2.5, 1.8, 0, 'crate'],
+  [41, 40.7, 2, 2.5, 1.8, 0, 'crate'],
+  // gaps between the mid street and the dividers
+  [2.5, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [2.7, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [30, 13.5, 7, 2.6, 2.6, 0, 'container', 0x7a6a3a],
+  [47.5, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [47.7, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  // ---- forward base: staggered HESCO so the spawn front isn't one long lateral corridor
+  [47, 9, 3, 1, 3.5, 0, 'hesco'],
+  [47.5, -12, 2, 1, 3.5, 0, 'hesco'],
+  [50, 22, 1, 4, 3.5, 0, 'hesco'],
+  [50, 1, 1, 4, 3.5, 0, 'hesco'],
+  [50, -24, 1, 4, 3.5, 0, 'hesco'],
+  [50, -36, 1, 3, 3.5, 0, 'hesco'],
+  [55, 15.5, 2, 2, 1.2, 0, 'ammo'],
+  // spawn strip: staggered HESCO across it, so you can't see from one corner of the base to the other
+  [54, -30, 4, 1, 3.5, 0, 'hesco'],
+  [58, -18, 4, 1, 3.5, 0, 'hesco'],
+  [54, -3, 4, 1, 3.5, 0, 'hesco'],
+  [58, 7.5, 4, 1, 3.5, 0, 'hesco'],
+  [54, 21, 4, 1, 3.5, 0, 'hesco'],
+  [58, 30, 4, 1, 3.5, 0, 'hesco'],
+  [51.5, -12, 2, 1, 3.5, 0, 'hesco'],
+  [51.5, 27, 2, 1, 3.5, 0, 'hesco'],
+  [58, 38, 0.5, 0.5, 6, 0, 'palm'],
+  // lights: festoons over the mid street, lamps in the halls and the yard
+  [15.5, 0, 0, 0, 0, 0, 'lights', [15.5, 5.0, 15.5, -5.5]],
+  [33.5, 0, 0, 0, 0, 0, 'lights', [33.5, 14.5, 33.5, -1.5]],
   [12.5, 0, 0, 0, 0, 0, 'light', 3.6],
+  [22, 29, 0, 0, 0, 0, 'light', 3.8],
+  [14, -30, 0, 0, 0, 0, 'light', 3.8],
   // perimeter
-  [0, 30.5, 86, 1, 8, 0, 'boundary'],
-  [42.5, 0, 1, 62, 8, 0, 'boundary'],
+  [0, 42.5, 122, 1, 10, 0, 'boundary'],
+  [60.5, 0, 1, 86, 10, 0, 'boundary'],
 ];
 for (let k = 1; k <= 7; k++) TARSA_HALF.push([4 + (7.5 - k) * 0.9, -2.5, 0.9, 3, k * 0.5, 0, 'stairs', k]);
 
-const TARSA_SPAWNS = [[38, -24], [38, -14], [38, -6], [38, 6], [38, 14], [38, 24], [35, -10], [35, 10]];
+const TARSA_SPAWNS = [[56, -36], [56, -24], [56, -12], [56, 0], [56, 12], [56, 24], [56, 36], [53, -6], [53, 6], [53, 18]];
 
 const TARSA_PICKUPS = [
   { type: 'health', pos: [0, 3.45, 0] },
-  { type: 'health', pos: [13, 0, -9] },
-  { type: 'health', pos: [-13, 0, 9] },
-  { type: 'ammo', pos: [10, 0, 17] },
-  { type: 'ammo', pos: [-10, 0, -17] },
-  { type: 'ammo', pos: [24, 0, -3] },
-  { type: 'ammo', pos: [-24, 0, 3] },
+  { type: 'health', pos: [14, 0, 18] },
+  { type: 'health', pos: [-14, 0, -18] },
+  { type: 'health', pos: [28, 0, -5] },
+  { type: 'health', pos: [-28, 0, 5] },
+  { type: 'ammo', pos: [8, 0, 31] },
+  { type: 'ammo', pos: [-8, 0, -31] },
+  { type: 'ammo', pos: [41, 0, -27] },
+  { type: 'ammo', pos: [-41, 0, 27] },
+  { type: 'ammo', pos: [22, 0, -6] },
+  { type: 'ammo', pos: [-22, 0, 6.5] },
 ];
 
 // Map "Shuran Yard": three lanes. North lane (market street), mid lane (yard), south lane (container
@@ -174,7 +232,7 @@ const SHURAN_PICKUPS = [
 ];
 
 export const MAPS = {
-  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Tight market streets, enterable houses and a central rooftop', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS },
+  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3 },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS },
   mart: MART,
 };
@@ -247,6 +305,8 @@ const flatBox = (w, h, d, scale = 0) => worldBox(w, h, d, scale, 0);
 
 export function buildWorld(scene, physics, mapId = 'tarsa') {
   const LAYOUT = MAPS[mapId] || MAPS.tarsa;
+  const { hx: HX, hz: HZ } = LAYOUT.bounds || DEFAULT_BOUNDS;
+  Object.assign(MAP, { minX: -HX, maxX: HX, minZ: -HZ, maxZ: HZ });
   const tex = makeTextureSets();
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   const pbr = (set, extra = {}) => std({ map: set.map, normalMap: set.normalMap, roughnessMap: set.roughnessMap, roughness: 1, ...extra });
@@ -339,16 +399,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const street = !LAYOUT.build; // custom-built maps (the supermarket) lay their own ground
   if (street) {
   plane(M.dirt, 300, 300, 0, 0, -0.01);
-  plane(M.asphalt, 62, 60, 0, 0, 0.0);
+  plane(M.asphalt, 2 * (HX - 11), 2 * HZ, 0, 0, 0.0);
   plane(M.tile, 26, 18, 0, 0, 0.012);
-  for (const sx of [-1, 1]) plane(M.dirt, 11, 60, sx * 36.5, 0, 0.006); // forward bases on packed dirt
-  for (const sz of [-1, 1]) plane(M.tile, 86, 2.6, 0, sz * 28.7, 0.016); // sidewalks
+  for (const sx of [-1, 1]) plane(M.dirt, 11, 2 * HZ, sx * (HX - 5.5), 0, 0.006); // forward bases on packed dirt
+  for (const sz of [-1, 1]) plane(M.tile, 2 * HX + 2, 2.6, 0, sz * (HZ - 1.3), 0.016); // sidewalks
   // curbs
-  for (const sz of [-1, 1]) B(M.concrete, 62, 0.12, 0.25, 0, 0, sz * 27.3, 0, { grime: 0.2, cast: false });
+  for (const sz of [-1, 1]) B(M.concrete, 2 * (HX - 11), 0.12, 0.25, 0, 0, sz * (HZ - 2.7), 0, { grime: 0.2, cast: false });
   // lane markings
-  for (const sz of [-1, 1]) for (let x = -28; x <= 28; x += 4) {
+  for (const sz of [-1, 1]) for (let x = -(HX - 14); x <= HX - 14; x += 4) {
     if (Math.abs(x) < 6) continue;
-    put(new THREE.PlaneGeometry(0.15, 2), M.line, x, 0.02, sz * 18, Math.PI / 2, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xbab39c });
+    put(new THREE.PlaneGeometry(0.15, 2), M.line, x, 0.02, sz * HZ * 0.6, Math.PI / 2, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xbab39c });
   }
   for (const sx of [-1, 1]) for (let i = 0; i < 7; i++) {
     put(new THREE.PlaneGeometry(0.5, 3), M.line, sx * 13.5, 0.02, -4.5 + i * 1.5, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xcfc7ae });
@@ -827,7 +887,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     let s = 0;
     while (s < L - 0.5) {
       const bw = Math.min(L - s, 6 + Math.floor(rnd() * 5));
-      const floors = 2 + Math.floor(rnd() * 3);
+      const floors = (LAYOUT.facadeFloors || 2) + Math.floor(rnd() * 3);
       const H = floors * 3.2 + 0.6;
       const tint = plasterTints[Math.floor(rnd() * plasterTints.length)];
       const mx = ox + ax * (s + bw / 2), mz = oz + az * (s + bw / 2);
@@ -882,18 +942,18 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
   };
   if (street) {
-    facade(-43, 30, 1, 0, 0, -1, 86, 8);    // north row faces -z
-    facade(43, -30, -1, 0, 0, 1, 86, 8);    // south row faces +z
-    facade(42, 31, 0, -1, -1, 0, 62, 8);    // east row faces -x
-    facade(-42, -31, 0, 1, 1, 0, 62, 8);    // west row faces +x
+    facade(-(HX + 1), HZ, 1, 0, 0, -1, 2 * HX + 2, 8);    // north row faces -z
+    facade(HX + 1, -HZ, -1, 0, 0, 1, 2 * HX + 2, 8);      // south row faces +z
+    facade(HX, HZ + 1, 0, -1, -1, 0, 2 * HZ + 2, 8);      // east row faces -x
+    facade(-HX, -(HZ + 1), 0, 1, 1, 0, 2 * HZ + 2, 8);    // west row faces +x
   }
   // custom maps build themselves with the same helpers
   let custom = null;
   if (!street) custom = LAYOUT.build({ THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
 
   // street lamps and power poles inside the map edge
-  if (street) for (const sz of [-1, 1]) for (let x = -24; x <= 24; x += 16) {
-    const z = sz * 28.2;
+  if (street) for (const sz of [-1, 1]) for (let x = -(HX - 18); x <= HX - 18; x += 16) {
+    const z = sz * (HZ - 1.8);
     put(new THREE.CylinderGeometry(0.06, 0.09, 6, 8), M.dark, x, 3, z, 0, { grime: 0.2 });
     put(worldBox(0.08, 0.08, 1.2, 0), M.dark, x, 5.9, z - sz * 0.6, 0, { grime: 0 });
     put(worldBox(0.34, 0.12, 0.55, 0), M.dark, x, 5.9, z - sz * 1.1, 0, { grime: 0 });
@@ -921,18 +981,18 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // base flags
   if (street) for (const team of [0, 1]) {
     const sx = team === 1 ? 1 : -1;
-    put(new THREE.CylinderGeometry(0.05, 0.06, 7, 8), M.dark, sx * 40.5, 3.5, 0, 0, { grime: 0.2 });
+    put(new THREE.CylinderGeometry(0.05, 0.06, 7, 8), M.dark, sx * (HX - 1.5), 3.5, 0, 0, { grime: 0.2 });
     const g = new THREE.PlaneGeometry(1.8, 1.1, 10, 4);
     const pos = g.attributes.position;
     for (let k = 0; k < pos.count; k++) pos.setZ(k, Math.sin(pos.getX(k) * 2.5) * 0.12);
     g.computeVertexNormals();
-    put(g, M.cloth, sx * 40.5 - sx * 0.95, 6.2, 0, Math.PI / 2, { grime: 0, tint: team ? 0x5a2622 : 0x3d4f63 });
+    put(g, M.cloth, sx * (HX - 1.5) - sx * 0.95, 6.2, 0, Math.PI / 2, { grime: 0, tint: team ? 0x5a2622 : 0x3d4f63 });
   }
 
   // distant city skyline beyond the perimeter (hazed by fog)
   for (let i = 0; i < 70; i++) {
     const a = (i / 70) * Math.PI * 2;
-    const r = 70 + rnd() * 70;
+    const r = Math.max(HX, HZ) + 28 + rnd() * 70;
     const h = 8 + rnd() * 26;
     const w = 8 + rnd() * 14;
     put(worldBox(w, h, w, 3), M.plaster, Math.cos(a) * r, h / 2, Math.sin(a) * r * 0.85, rnd() * 3, { tint: plasterTints[i % plasterTints.length], grime: 0.3, cast: false });
@@ -952,6 +1012,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
+  world.bounds = { hx: HX, hz: HZ };
   return world;
 }
 
@@ -1023,7 +1084,7 @@ function buildMountain() {
 
 // Top-down render of the map for the minimap (needs the renderer, so it runs after the scene is built)
 export function renderMinimap(renderer, scene) {
-  const W = 504, H = 360;
+  const W = 504, H = Math.round(W * (MAP.maxZ - MAP.minZ) / (MAP.maxX - MAP.minX));
   const cam = new THREE.OrthographicCamera(MAP.minX, MAP.maxX, -MAP.minZ, -MAP.maxZ, 1, 200);
   cam.position.set(0, 100, 0);
   cam.up.set(0, 0, -1);
