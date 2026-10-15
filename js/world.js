@@ -281,11 +281,11 @@ const PIONEER_HALF = [
   [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, 14, 6.4, 21.5, 14, 7]],
   [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, -14, 6.4, 21.5, -14, 7]],
   [12.5, 0, 0, 0, 0, 0, 'cable', [21.5, 30, 8, 54, 34, 9]],
-  [19.8, 13.5, 0, 0, 0, 0, 'vlamp'], [19.8, -13.5, 0, 0, 0, 0, 'vlamp'], [10.2, 26, 0, 0, 0, 0, 'vlamp'], [19.8, 34, 0, 0, 0, 0, 'vlamp'],
+  [19.8, 15.8, 0, 0, 0, 0, 'vlamp'], [19.8, -9.7, 0, 0, 0, 0, 'vlamp'], [10.2, 26, 0, 0, 0, 0, 'vlamp'], [19.8, 34, 0, 0, 0, 0, 'vlamp'],
   [17.5, 6, 2.4, 0.9, 0.9, 0, 'stall', 1],
   [16.5, 30, 1.6, 1.6, 1.6, 0, 'crate'], [16.6, 30, 1.4, 1.4, 1.4, 1.6, 'crate'],
   [17, -8, 0.8, 3, 1.1, 0, 'sand'],
-  [16, 37, 2, 2.5, 1.8, 0, 'crate'],
+  [17.5, 38.6, 2, 2.5, 1.8, 0, 'crate'],
   // ---- side streets: cover every 10-15 m so nothing is watched end to end
   [24, 12, 4.4, 2.0, 1.45, 0, 'car', 0],
   [31, -12.8, 2, 2.5, 1.8, 0, 'crate'],
@@ -297,8 +297,8 @@ const PIONEER_HALF = [
   [18, -36, 2, 2, 1.2, 0, 'pallet'],
   [41, -24, 0.8, 3, 1.1, 0, 'sand'],
   // ---- extra breakers on the long lines (side streets, sidewalks, the strip in front of spawn)
-  [33, 15, 1.6, 1.6, 1.6, 0, 'crate'], [33.1, 15, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [16, 14.6, 2, 2.5, 1.8, 0, 'crate'],
+  [36, 15.9, 1.6, 1.6, 1.6, 0, 'crate'], [36.1, 15.9, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [17.5, 17, 2, 2.5, 1.8, 0, 'crate'],
   [42, 15.5, 0.8, 3, 1.1, 0, 'sand'],
   [8, 38.6, 2.4, 0.9, 0.9, 0, 'stall', 1], [30, 38.6, 2, 2.5, 1.8, 0, 'crate'], [44, 38.5, 1.6, 1.6, 1.6, 0, 'crate'],
   [10, 29.5, 0.8, 3, 1.1, 0, 'sand'],
@@ -328,12 +328,20 @@ const PIONEER_HALF = [
   [0, 40.5, 110, 1, 10, 0, 'boundary'],
   [54.5, 0, 1, 82, 10, 0, 'boundary'],
 ];
+// street grid (east half; mirrored): First Avenue with the streetcar line, three cross streets
+const PIONEER_ROADS = [
+  [10, -37.4, 15, 37.4, 'z', { center: false }],
+  [15, 9.5, 43, 14.5, 'x'],
+  [15, -15, 43, -10.5, 'x'],
+  [15, 29.5, 43, 36, 'x'],
+  [15, -37, 34, -31, 'x'],
+];
 const PIONEER_SPAWNS = [[51, -34], [51, -24], [51, -16], [51, 0], [51, 10], [51, 22], [51, 30], [49, -8], [49, 4], [49, 16]];
 const PIONEER_PICKUPS = [
   { type: 'health', pos: [0, 0, 9.5] },
   { type: 'health', pos: [0, 0, -9.5] },
-  { type: 'health', pos: [24, -3.24, 23.6] },
-  { type: 'health', pos: [-24, -3.24, -23.6] },
+  { type: 'health', pos: [25.5, -3.24, 20.8] },
+  { type: 'health', pos: [-25.5, -3.24, -20.8] },
   { type: 'ammo', pos: [28, 0, -6] },
   { type: 'ammo', pos: [-28, 0, 6] },
   { type: 'ammo', pos: [31.5, 0, -21] },
@@ -345,7 +353,7 @@ const PIONEER_PICKUPS = [
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
-  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4, roads: PIONEER_ROADS, roadsMirror: true, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
 };
 export const MAP_IDS = Object.keys(MAPS);
@@ -564,20 +572,37 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false });
   };
   const street = !LAYOUT.build; // custom-built maps (the supermarket) lay their own ground
+  // street grid: [x0, z0, x1, z1, axis ('x' | 'z' = direction of travel), opts]; roadsMirror adds the point-mirrored copy
+  const ROADS = street && LAYOUT.roads ? (LAYOUT.roadsMirror
+    ? [...LAYOUT.roads, ...LAYOUT.roads.map(([a, b, c, d, ax, o]) => [-c, -d, -a, -b, ax, o])] : LAYOUT.roads) : null;
+  if (ROADS) {
+    // concrete sidewalk slabs: light, slightly mottled, scored every 1.5 m
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#8e8b85'; g.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 2600; i++) { const v = 125 + Math.random() * 35 | 0; g.fillStyle = `rgba(${v},${v - 3},${v - 8},0.18)`; g.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 6, 2 + Math.random() * 6); }
+    for (let k = 0; k < 2; k++) for (let j = 0; j < 2; j++) { g.fillStyle = `rgba(${[120, 140, 110, 135][k * 2 + j]},${[118, 136, 108, 130][k * 2 + j]},${[112, 128, 104, 124][k * 2 + j]},0.10)`; g.fillRect(k * 256, j * 256, 256, 256); }
+    g.strokeStyle = 'rgba(60,58,54,0.75)'; g.lineWidth = 3;
+    for (const t of [1.5, 256, 510.5]) { g.beginPath(); g.moveTo(t, 0); g.lineTo(t, 512); g.stroke(); g.beginPath(); g.moveTo(0, t); g.lineTo(512, t); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+    M.pave = std({ map: t, roughness: 0.92, normalMap: tex.concrete && tex.concrete.normalMap, normalScale: new THREE.Vector2(0.5, 0.5) });
+    S.pave = 3;
+  }
   if (street) {
   plane(M.dirt, 300, 300, 0, 0, -0.01);
-  plane(M.asphalt, 2 * (HX - 11), 2 * HZ, 0, 0, 0.0);
-  plane(M.tile, 26, 18, 0, 0, 0.012);
+  // maps with a street grid (LAYOUT.roads): everything between the roads is concrete sidewalk; otherwise one big asphalt yard
+  plane(ROADS ? M.pave : M.asphalt, 2 * (HX - 11), 2 * HZ, 0, 0, 0.0);
+  if (!ROADS) plane(M.tile, 26, 18, 0, 0, 0.012);
   for (const sx of [-1, 1]) plane(M.dirt, 11, 2 * HZ, sx * (HX - 5.5), 0, 0.006); // forward bases on packed dirt
   for (const sz of [-1, 1]) plane(M.tile, 2 * HX + 2, 2.6, 0, sz * (HZ - 1.3), 0.016); // sidewalks
   // curbs
   for (const sz of [-1, 1]) B(M.concrete, 2 * (HX - 11), 0.12, 0.25, 0, 0, sz * (HZ - 2.7), 0, { grime: 0.2, cast: false });
   // lane markings
-  for (const sz of [-1, 1]) for (let x = -(HX - 14); x <= HX - 14; x += 4) {
+  if (!ROADS) for (const sz of [-1, 1]) for (let x = -(HX - 14); x <= HX - 14; x += 4) {
     if (Math.abs(x) < 6) continue;
     put(new THREE.PlaneGeometry(0.15, 2), M.line, x, 0.02, sz * HZ * 0.6, Math.PI / 2, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xbab39c });
   }
-  for (const sx of [-1, 1]) for (let i = 0; i < 7; i++) {
+  if (!ROADS) for (const sx of [-1, 1]) for (let i = 0; i < 7; i++) {
     put(new THREE.PlaneGeometry(0.5, 3), M.line, sx * 13.5, 0.02, -4.5 + i * 1.5, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xcfc7ae });
   }
   // oil stains / scorch marks are in the asphalt texture; add a few scorched patches
@@ -588,6 +613,104 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     m.position.set((rnd() - 0.5) * 50, 0.025, (rnd() - 0.5) * 40);
     group.add(m);
   }
+  }
+
+  // ---------- roads: asphalt, curbs, lane lines, crosswalks, manholes and working traffic lights ----------
+  const signalMats = { x: [], z: [] };   // [red, amber, green] per direction of travel; cycled in world.update
+  let placeSignals = null;                // after the layout is built, so poles avoid props
+  if (ROADS) {
+    const rect = (r) => ({ x0: r[0], z0: r[1], x1: r[2], z1: r[3] });
+    const inters = [];
+    for (let i = 0; i < ROADS.length; i++) for (let j = i + 1; j < ROADS.length; j++) {
+      if (ROADS[i][4] === ROADS[j][4]) continue;
+      // the junction box: the z-road's width by the x-road's width, where the two meet (crossing or T)
+      const zr = rect(ROADS[i][4] === 'z' ? ROADS[i] : ROADS[j]), xr = rect(ROADS[i][4] === 'z' ? ROADS[j] : ROADS[i]);
+      if (xr.x1 < zr.x0 - 0.1 || xr.x0 > zr.x1 + 0.1 || zr.z1 < xr.z0 - 0.1 || zr.z0 > xr.z1 + 0.1) continue;
+      inters.push({ x0: zr.x0, x1: zr.x1, z0: xr.z0, z1: xr.z1 });
+    }
+    const cut = (segs, a, b) => segs.flatMap(([p, q]) => (b <= p || a >= q) ? [[p, q]] : [[p, Math.min(q, a)], [Math.max(p, b), q]].filter(([u, v]) => v - u > 0.05));
+    const flat = (mat, w, d, x, z, y, tint) => put(new THREE.PlaneGeometry(w, d), mat, x, y, z, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint });
+    const manholeMat = std({ color: 0x2a2a28, roughness: 0.55, metalness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 });
+    for (const r of ROADS) {
+      const [x0, z0, x1, z1, ax] = r, o = r[5] || {};
+      const alongX = ax === 'x';
+      const L0 = alongX ? x0 : z0, L1 = alongX ? x1 : z1, W0 = alongX ? z0 : x0, W1 = alongX ? z1 : x1, Wd = W1 - W0, Wc = (W0 + W1) / 2;
+      const P = (l, w) => alongX ? [l, w] : [w, l];      // (along, across) -> (x, z)
+      const box = (l0, l1, w0, w1) => alongX ? [l0, w0, l1, w1] : [w0, l0, w1, l1];
+      plane(M.asphalt, x1 - x0, z1 - z0, (x0 + x1) / 2, (z0 + z1) / 2, 0.008);
+      // spans of this road that are intersections (no curbs, no lines there)
+      const my = inters.filter(I => alongX ? (I.z0 >= z0 - 0.1 && I.z1 <= z1 + 0.1 && I.x1 >= x0 - 0.1 && I.x0 <= x1 + 0.1)
+        : (I.x0 >= x0 - 0.1 && I.x1 <= x1 + 0.1 && I.z1 >= z0 - 0.1 && I.z0 <= z1 + 0.1))
+        .map(I => alongX ? [I.x0, I.x1] : [I.z0, I.z1]);
+      // curbs along both edges, broken where another road crosses and where a stairwell opens
+      for (const [w, sgn] of [[W0, -1], [W1, 1]]) {
+        let segs = [[L0, L1]];
+        for (const q of ROADS) if (q !== r) {
+          const qa = alongX ? q[0] : q[1], qb = alongX ? q[2] : q[3], qw0 = alongX ? q[1] : q[0], qw1 = alongX ? q[3] : q[2];
+          if (w + sgn * 0.4 > qw0 && w + sgn * 0.4 < qw1) segs = cut(segs, qa, qb);
+        }
+        for (const h of HOLES) {
+          const ha = alongX ? h[0] : h[1], hb = alongX ? h[2] : h[3], hw0 = alongX ? h[1] : h[0], hw1 = alongX ? h[3] : h[2];
+          if (w + sgn * 0.6 > hw0 - 0.1 && w - sgn * 0.1 < hw1 + 0.1) segs = cut(segs, ha - 0.1, hb + 0.1);
+        }
+        for (const [a, b] of segs) {
+          const [cx, cz] = P((a + b) / 2, w + sgn * 0.15);
+          B(M.concrete, alongX ? b - a : 0.3, 0.15, alongX ? 0.3 : b - a, cx, 0, cz, 0, { tint: 0xc9c4b8, grime: 0.35, cast: false });
+          // storm drain grates against the curb now and then
+          for (let l = a + 4 + rnd() * 6; l < b - 2; l += 14 + rnd() * 10) { const [gx, gz] = P(l, w - sgn * 0.35); flat(manholeMat, alongX ? 0.9 : 0.45, alongX ? 0.45 : 0.9, gx, gz, 0.02); }
+        }
+      }
+      // lane lines: solid edge lines, dashed centre (skipped through intersections and their crosswalks)
+      let free = [[L0, L1]];
+      for (const [a, b] of my) free = cut(free, a - 4.6, b + 4.6);
+      for (const [a, b] of free) {
+        for (const e of [W0 + 0.45, W1 - 0.45]) { const [lx, lz] = P((a + b) / 2, e); flat(M.line, alongX ? b - a : 0.12, alongX ? 0.12 : b - a, lx, lz, 0.02, 0xd8d2c0); }
+        if (o.center !== false) for (let l = a + 1; l + 3 <= b; l += 6) { const [lx, lz] = P(l + 1.5, Wc); flat(M.line, alongX ? 3 : 0.14, alongX ? 0.14 : 3, lx, lz, 0.02, 0xd9b54a); }
+        for (let l = a + 3 + rnd() * 5; l < b - 2; l += 12 + rnd() * 8) { const [mx, mz] = P(l, Wc + (rnd() - 0.5) * Wd * 0.4); put(new THREE.CircleGeometry(0.38, 18), manholeMat, mx, 0.019, mz, rnd() * 6, { rx: -Math.PI / 2, grime: 0, cast: false }); }
+      }
+      // crosswalks and stop lines on both approaches to each intersection
+      for (const [a, b] of my) for (const [edge, dir] of [[a, -1], [b, 1]]) {
+        if (edge + dir * 4 < L0 || edge + dir * 4 > L1) continue;
+        for (let w = W0 + 0.5; w + 0.5 <= W1 - 0.3; w += 1.0) { const [sx, sz] = P(edge + dir * 1.9, w + 0.25); flat(M.line, alongX ? 2.8 : 0.5, alongX ? 0.5 : 2.8, sx, sz, 0.021, 0xe6e0d0); }
+        const [tx, tz] = P(edge + dir * 3.9, Wc);
+        flat(M.line, alongX ? 0.4 : Wd - 0.6, alongX ? Wd - 0.6 : 0.4, tx, tz, 0.021, 0xe6e0d0);
+      }
+    }
+    // signal lenses: one material per lamp colour and direction, so the lights can change
+    const LENS = [0xff3a24, 0xffb020, 0x3cff7a];
+    for (const d of ['x', 'z']) for (const col of LENS) signalMats[d].push(new THREE.MeshStandardMaterial({ color: 0x111111, emissive: col, emissiveIntensity: 0.05, roughness: 0.3 }));
+    const head = (x, y, z, ry, d) => {
+      put(flatBox(0.36, 1.0, 0.28, 0), M.paint, x, y, z, ry, { tint: 0x2b3a2a, grime: 0.15 });
+      const nx = Math.sin(ry), nz = Math.cos(ry);
+      for (let k = 0; k < 3; k++) {
+        const ly = y + 0.3 - k * 0.3;
+        put(new THREE.CircleGeometry(0.11, 16), signalMats[d][k], x + nx * 0.145, ly, z + nz * 0.145, ry, { grime: 0, cast: false });
+        put(new THREE.CylinderGeometry(0.14, 0.14, 0.16, 12, 1, true, -Math.PI / 2, Math.PI), M.paint, x + nx * 0.2, ly + 0.02, z + nz * 0.2, ry, { rx: Math.PI / 2, tint: 0x2b3a2a, grime: 0 });
+      }
+      put(flatBox(0.56, 1.2, 0.03, 0), M.paint, x - nx * 0.15, y, z - nz * 0.15, ry, { tint: 0x1c1c1c, grime: 0 }); // backplate
+    };
+    const free = (x, z) => !physics.boxes.some(b => b.maxy > 0.2 && b.miny < 3 && x > b.minx - 0.3 && x < b.maxx + 0.3 && z > b.minz - 0.3 && z < b.maxz + 0.3)
+      && !ROADS.some(q => x > q[0] && x < q[2] && z > q[1] && z < q[3]);
+    placeSignals = () => { for (const I of inters) {
+      const D = I.z1 - I.z0;
+      // two diagonal corners; each pole carries a mast arm over one road and a head on the pole for the other
+      for (const [cx, cz, sx, sz] of [[I.x1 + 0.7, I.z1 + 0.7, 1, 1], [I.x0 - 0.7, I.z0 - 0.7, -1, -1]]) {
+        if (!free(cx, cz)) continue;
+        solid(cx, cz, 0.3, 0.3, 4, 0, 'metal');
+        put(new THREE.CylinderGeometry(0.11, 0.14, 6.2, 10), M.paint, cx, 3.1, cz, 0, { tint: 0x3a4a3a, grime: 0.3 });
+        put(new THREE.CylinderGeometry(0.22, 0.26, 0.5, 10), M.paint, cx, 0.25, cz, 0, { tint: 0x3a4a3a, grime: 0.5 });
+        // mast arm across the x-direction road (spans z), signal faces the oncoming x-traffic
+        const armL = D * 0.6;
+        put(new THREE.CylinderGeometry(0.06, 0.08, armL, 8), M.paint, cx, 5.9, cz - sz * armL / 2, 0, { rx: Math.PI / 2, tint: 0x3a4a3a, grime: 0 });
+        head(cx, 5.25, cz - sz * armL * 0.85, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 'x');
+        // pole-mounted head for the z-direction road, facing its oncoming traffic
+        head(cx - sx * 0.3, 3.4, cz, sz > 0 ? 0 : Math.PI, 'z');
+        head(cx + sx * 0.05, 3.4, cz - sz * 0.3, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 'x');
+        // street name sign and a walk button
+        put(flatBox(1.3, 0.28, 0.03, 0), M.paint, cx, 4.6, cz - sz * 0.2, sx > 0 ? 0 : Math.PI, { tint: 0x2f6a3a, grime: 0 });
+        put(flatBox(0.12, 0.18, 0.08, 0), M.paint, cx + sx * 0.14, 1.1, cz, 0, { tint: 0xd9b54a, grime: 0.1 });
+      }
+    } };
   }
 
   // A proper window on a solid facade: recessed dark glass, painted frame with mullions, stone sill and
@@ -1364,6 +1487,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     add(-cx, -cz, w, d, h, y0, kind, mx, 0);
   }
 
+  if (placeSignals) placeSignals();
+
   // ---------- street dressing: puddles, litter, posters (all batched, no extra draw calls) ----------
   if (street) {
     const blocked = (x, z, r) => HOLES.some(h => x > h[0] - r && x < h[2] + r && z > h[1] - r && z < h[3] + r) || physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
@@ -1572,6 +1697,17 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   } else for (const [x, z] of LAYOUT.spawns) {
     world.spawns[1].push(new THREE.Vector3(x, 0, z));
     world.spawns[0].push(new THREE.Vector3(-x, 0, -z));
+  }
+  if (ROADS && signalMats.x.length) {
+    // 22 s cycle: x-roads green 9 s, amber 2 s, all-red 0.5 s; then the z-roads
+    let phase = -1;
+    world.update = (dt, t) => {
+      const c = t % 22, x = c < 9 ? 2 : c < 11 ? 1 : 0, z = c >= 11.5 && c < 20.5 ? 2 : c >= 20.5 ? 1 : 0;
+      const k = x * 3 + z; if (k === phase) return; phase = k;
+      signalMats.x.forEach((m, i) => { m.emissiveIntensity = i === x ? 6 : 0.05; });
+      signalMats.z.forEach((m, i) => { m.emissiveIntensity = i === z ? 6 : 0.05; });
+    };
+    world.update(0, 0);
   }
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
