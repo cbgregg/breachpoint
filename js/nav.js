@@ -40,7 +40,9 @@ class MinHeap {
 const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
 
 export class NavGrid {
-  constructor(physics, bounds, cell = 1, agentR = 0.45) {
+  // opts.floorY: build an upper-level grid (an office floor): a cell is open only where something solid
+  // tops out at floorY under it and nothing blocks head height above it
+  constructor(physics, bounds, cell = 1, agentR = 0.45, opts = {}) {
     this.minX = bounds.minX; this.minZ = bounds.minZ;
     this.cell = cell;
     this.cols = Math.round((bounds.maxX - bounds.minX) / cell);
@@ -57,6 +59,16 @@ export class NavGrid {
     for (let j = 0; j < this.rows; j++) {
       for (let i = 0; i < this.cols; i++) {
         const cx = this.minX + (i + 0.5) * cell, cz = this.minZ + (j + 0.5) * cell;
+        if (opts.floorY !== undefined) {
+          const F = opts.floorY;
+          let floor = false, block = false;
+          for (const b of physics.boxes) {
+            if (b.maxy > F - 0.3 && b.maxy < F + 0.3 && cx > b.minx + 0.05 && cx < b.maxx - 0.05 && cz > b.minz + 0.05 && cz < b.maxz - 0.05) floor = true;
+            if (b.maxy > F + 0.35 && b.miny < F + 1.7 && cx > b.minx - agentR && cx < b.maxx + agentR && cz > b.minz - agentR && cz < b.maxz + agentR) { block = true; break; }
+          }
+          if (!floor || block) this.blocked[j * this.cols + i] = 1;
+          continue;
+        }
         for (const b of physics.boxes) {
           // navIgnore: solid mass over a walkable level below (a building over a tunnel);
           // navBlock: walls of a lower level (tunnels, stairwells) that sit below street height
@@ -119,7 +131,50 @@ export class NavGrid {
     return true;
   }
 
-  findPath(from, to) {
+  // route variety: a smooth per-seed cost field (value noise on a ~7 m lattice) makes each bot prefer
+  // different streets and doorways to the same goal; costs only grow, so A* stays correct
+  routeNoise(i, j, seed) {
+    const S = 7, x = i / S, y = j / S, xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+    const hsh = (a, b) => { let h = (a * 374761393 + b * 668265263 + seed * 2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return (hsh(xi, yi) * (1 - sx) + hsh(xi + 1, yi) * sx) * (1 - sy) + (hsh(xi, yi + 1) * (1 - sx) + hsh(xi + 1, yi + 1) * sx) * sy;
+  }
+  // two-level maps: this (ground) grid can carry an upper floor, { grid, y, portals: [{ bottom, top, rect }] }.
+  // A path between levels goes to a stair, climbs it waypoint by waypoint, and carries on on the other level.
+  findPath(from, to, route = null) {
+    const U = this.upper;
+    if (!U) return this.findPathFlat(from, to, route);
+    const onStair = (p) => U.portals.find(q => p.x > q.rect[0] && p.x < q.rect[2] && p.z > q.rect[1] && p.z < q.rect[3]);
+    const lvl = (p) => (p.y > U.y - 1.0 ? 1 : 0);
+    const fs = onStair(from), fl = fs ? (from.y > U.y * 0.5 ? 1 : 0) : lvl(from), tl = lvl(to);
+    if (fl === tl && !fs) return fl ? U.grid.findPathFlat(from, to) : this.findPathFlat(from, to, route);
+    // pick the stair with the shortest straight-line detour
+    let best = null, bd = Infinity;
+    for (const q of U.portals) {
+      const a = fl ? q.top : q.bottom, b = tl ? q.top : q.bottom;
+      const d = Math.hypot(a.x - from.x, a.z - from.z) + Math.hypot(b.x - to.x, b.z - to.z);
+      if (d < bd) { bd = d; best = q; }
+    }
+    if (!best) return [];
+    const dirUp = fs ? tl === 1 : tl > fl;
+    let climb = (dirUp ? best.climb : [...best.climb].reverse()).map(p => p.clone());
+    let legA = [];
+    if (fs === best) {
+      // already on this stair: carry on from the nearest step, don't walk back to its end
+      let ni = 0, nd = Infinity;
+      climb.forEach((p, i) => { const d = Math.hypot(p.x - from.x, p.z - from.z); if (d < nd) { nd = d; ni = i; } });
+      climb = climb.slice(ni + 1);
+    } else {
+      const entry = dirUp ? best.bottom : best.top;
+      legA = fl ? U.grid.findPathFlat(from, entry) : this.findPathFlat(from, entry, route);
+      if (!legA.length && Math.hypot(from.x - entry.x, from.z - entry.z) > 1.2) return [];
+    }
+    const exit = dirUp ? best.top : best.bottom;
+    const legB = tl ? U.grid.findPathFlat(exit, to) : this.findPathFlat(exit, to, route);
+    return [...legA, ...climb, ...legB];
+  }
+
+  findPathFlat(from, to, route = null) {
     let s = this.nearestOpen(this.ci(from.x), this.cj(from.z));
     let e = this.nearestOpen(this.ci(to.x), this.cj(to.z));
     if (!s || !e) return [];
@@ -144,7 +199,7 @@ export class NavGrid {
         if (di && dj && (!this.isOpen(ci + di, cj) || !this.isOpen(ci, cj + dj))) continue;
         const nk = nj * cols + ni;
         if (this.closed[nk] === st) continue;
-        const ng = this.g[cur] + cost;
+        const ng = this.g[cur] + (route ? cost * (1 + route.w * this.routeNoise(ni, nj, route.seed)) : cost);
         if (this.stamp[nk] !== st || ng < this.g[nk]) {
           this.stamp[nk] = st; this.g[nk] = ng; this.parent[nk] = cur;
           heap.push(nk, ng + h(ni, nj));

@@ -940,6 +940,31 @@ export class Game {
     return root;
   }
 
+  // Warm everything the match will draw, during the loading screen: hidden things (dead / not-yet-seen
+  // soldiers, effects, pickups) are made visible for one frame, every soldier is stood in front of the
+  // camera, all programs (including the shadow and skinning variants) compile and every texture uploads.
+  // Without this the first time you see a bot or a group of bots the game hitches while the GPU catches up.
+  prewarm() {
+    const r = this.renderer.renderer, hidden = [], moved = [], texs = new Set();
+    for (const sc of [this.scene, this.vmScene]) sc.traverse(o => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    this.characters.forEach((c, i) => {
+      const m = c.model && c.model.root; if (!m || c === this.player) return;
+      moved.push([m, m.position.clone()]);
+      m.position.copy(this.camera.position).addScaledVector(fwd, 5 + (i % 5) * 1.5).add(new THREE.Vector3(((i % 3) - 1) * 1.4, -1.6, 0));
+      m.updateMatrixWorld(true);
+    });
+    for (const sc of [this.scene, this.vmScene]) sc.traverse(o => {
+      for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []))
+        for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap']) if (m[k] && m[k].isTexture) texs.add(m[k]);
+    });
+    try { r.compile(this.scene, this.camera); r.compile(this.vmScene, this.vmCamera); } catch (_) { /* best effort */ }
+    for (const t of texs) { try { r.initTexture(t); } catch (_) { /* best effort */ } }
+    try { this.renderer.render(1 / 60, true); } catch (_) { /* best effort */ }
+    for (const [m, p] of moved) { m.position.copy(p); m.updateMatrixWorld(true); }
+    for (const o of hidden) o.visible = false;
+  }
+
   // swap the map: drop the old geometry, collision and nav grid, then build the new one
   // sun shadows cover the whole playable area (bigger maps get a wider shadow frustum)
   fitShadows() {

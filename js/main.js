@@ -47,7 +47,7 @@ const TIPS = [
   'Stick sensitivity, deadzone and aim assist are in Options under Controller.',
   'Dynamic resolution keeps the frame rate smooth. Turn it off in Options for a sharper image.',
   'Health comes back on its own a few seconds after you stop taking damage.',
-  'Upstairs at Freshway overlooks the aisles. Bots won\'t follow you up there.',
+  'Upstairs at Freshway overlooks the aisles. Two stairs lead up: the one by the deli and the fire stair out back.',
 ];
 
 // ---------- game bootstrap ----------
@@ -298,7 +298,7 @@ function launch(cfg, online = null) {
     await wait(200); await nextFrame();
     // build the bots' guns now, not mid-match; then warm up shaders so the first seconds don't stutter
     try { prewarmBotGuns(); } catch (_) { /* optional */ }
-    try { game.renderer.renderer.compile(game.scene, game.camera); } catch (_) { /* optional */ }
+    try { game.prewarm(); } catch (_) { /* optional */ }
     step(100, 'Ready');
     await wait(Math.max(online && online.mode === 'guest' ? 150 : 450, 1300 - (performance.now() - t0)));
     if (screen === 'loading') showScreen(null);

@@ -146,10 +146,14 @@ export class BotBrain {
   setGoal(p, kind) {
     if (!this.goal || this.goal.distanceToSquared(p) > 4 || kind !== this.goalKind) {
       this.goal = p.clone();
-      this.goal.y = 0;
+      const up = this.game.world.nav.upper;
+      this.goal.y = up && p.y > up.y - 1 ? up.y : 0;   // keep the level on two-storey maps
       this.goalKind = kind;
       this.repathT = 0;
       this.goalT = kind === 'roam' || kind === 'intel' ? rand(10, 18) : 12;
+      // a fresh route preference per goal: bots spread over different streets and doorways instead of all
+      // taking the one shortest lane (pickups and hunting stay on the direct way)
+      this.route = (kind === 'health' || kind === 'ammo' || kind === 'hunt') ? null : { seed: (Math.random() * 1e6) | 0, w: 1.2 + Math.random() * 1.6 };
     }
   }
 
@@ -177,10 +181,10 @@ export class BotBrain {
       if (p) { this.setGoal(p.pos, 'ammo'); return; }
     }
     if (this.target && this.target.alive && g.time - this.lastKnownT < 6
-      && Math.hypot(this.lastKnown.x - b.pos.x, this.lastKnown.z - b.pos.z) > 2.5) { this.setGoal(this.lastKnown, 'hunt'); return; }
+      && (Math.hypot(this.lastKnown.x - b.pos.x, this.lastKnown.z - b.pos.z) > 2.5 || Math.abs(this.lastKnown.y - b.pos.y) > 1.6)) { this.setGoal(this.lastKnown, 'hunt'); return; }
     // got to the last sighting and found nobody: forget it and move on
-    if (this.goalKind === 'hunt' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5) { this.goal = null; this.lastKnownT = -99; }
-    const reached = this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2;
+    if (this.goalKind === 'hunt' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5 && Math.abs(this.goal.y - b.pos.y) < 1.6) { this.goal = null; this.lastKnownT = -99; }
+    const reached = this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2 && Math.abs(this.goal.y - b.pos.y) < 1.6;
     if (!this.goal || reached || this.goalT <= 0 || this.goalKind === 'hunt' || this.goalKind === 'health' || this.goalKind === 'ammo') {
       const intel = g.intel[b.team];
       // don't all pile onto the same spot: only some answer a callout, and they come at it from different angles
@@ -200,6 +204,8 @@ export class BotBrain {
           const d = this.mateGoalDist(q);
           if (d > best) { best = d; p = q; }
         }
+        // two-storey maps: now and then go and clear the upstairs
+        if (g.world.upperPoint && Math.random() < 0.18) p = g.world.upperPoint();
         this.goal = null;
         this.setGoal(p, 'roam');
       }
@@ -227,7 +233,7 @@ export class BotBrain {
     const b = this.bot, nav = this.game.world.nav;
     this.repathT -= dt;
     if (this.repathT <= 0 || this.pathIdx >= this.path.length) {
-      this.path = nav.findPath(b.pos, target);
+      this.path = nav.findPath(b.pos, target, this.route && Math.hypot(target.x - b.pos.x, target.z - b.pos.z) > 10 ? this.route : null);
       this.pathIdx = 0;
       this.repathT = rand(0.8, 1.5);
     }

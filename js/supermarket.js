@@ -1046,6 +1046,14 @@ function build(ctx) {
     // S&D: sites each team defends ([x, z]); placed near the middle so both teams get there at about the same time
     sites: [[[-5.5, -16], [-6, 15.5]], [[5, -16], [8.6, 10.6]]],
     flagPos: [-2.5, 4.2],
+    // upstairs offices for the bots: the floor at 3.2 m, the inside stair (deli side) and the outside fire stair
+    upper: {
+      y: 3.2, bounds: { minX: 10, maxX: 24.5, minZ: 7.5, maxZ: 24.5 },
+      portals: [
+        { rect: [10.4, 11.4, 12.1, 16.0], climb: [[11.25, 0, 10.6], [11.25, 0.6, 12.4], [11.25, 1.9, 14.2], [11.25, 3.2, 16.2], [11.25, 3.2, 16.8], [12.6, 3.2, 16.7]] },
+        { rect: [22.4, 3.7, 23.8, 8.3], climb: [[23.1, 0, 2.9], [23.1, 0.6, 4.8], [23.1, 1.9, 6.6], [23.1, 3.2, 8.6], [23.1, 3.2, 9.3], [21.6, 3.2, 9.3]] },
+      ],
+    },
     ambient: { music: 'muzak', inside },
     menuCam(t, cam) {
       cam.position.set(Math.cos(t) * 44 - 4, 13 + Math.sin(t * 0.7) * 2, Math.sin(t) * 38);
@@ -1058,6 +1066,8 @@ function build(ctx) {
 // ---------- the soldier on his smoke break ----------
 // Plays the idle animation, raises the cigarette to his mouth every few seconds and breathes out a
 // puff. He has no collision and no hitbox: nothing in the match touches him.
+let SMOKE_FWD = 0.26, SMOKE_UP = -0.02;
+export function setSmokeTune(f, u) { SMOKE_FWD = f; SMOKE_UP = u; }
 function makeSmoker(group, x, z, yaw) {
   const sol = cloneSoldier(0, { rim: false });
   const root = new THREE.Group();
@@ -1119,15 +1129,18 @@ function makeSmoker(group, x, z, yaw) {
       if (B && B.Head && B.RightHand && B.RightArm) {
         B.Head.getWorldPosition(_m);
         _f.set(-Math.sin(yaw), 0, -Math.cos(yaw)); // the rig faces -z
-        // mouth: a little in front of and below the head bone
-        const mouth = _t.copy(_m).addScaledVector(_f, 0.12).add(new THREE.Vector3(0, 0.1, 0));
+        // the wrist stops in front of the chin (the cigarette between the fingers reaches the lips),
+        // so the hand never goes into the helmet
+        const right0 = new THREE.Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
+        const mouth = _t.copy(_m).addScaledVector(_f, SMOKE_FWD).addScaledVector(right0, -0.02).add(new THREE.Vector3(0, SMOKE_UP, 0));
         // rest: hand at the hip, a bit forward
         B.RightArm.getWorldPosition(_h);
         const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-        const rest = new THREE.Vector3().copy(_h).addScaledVector(right, -0.05).addScaledVector(_f, 0.22).add(new THREE.Vector3(0, -0.42, 0));
+        const rest = new THREE.Vector3().copy(_h).addScaledVector(right, 0.02).addScaledVector(_f, 0.18).add(new THREE.Vector3(0, -0.45, 0));
         const target = rest.lerp(mouth, k);
-        _pole.copy(right).multiplyScalar(-1).add(new THREE.Vector3(0, -1.2, 0)).addScaledVector(_f, -0.3);
+        _pole.copy(right).multiplyScalar(0.6).add(new THREE.Vector3(0, -1.2, 0)).addScaledVector(_f, -0.2);
         armIK(B, 'Right', target, _pole);
+        B.RightHand.updateWorldMatrix(true, true);
       }
       if (cycle > 2.6 && exhaleAt < 0) exhaleAt = time;
       if (cycle < 2.6) exhaleAt = -1;
@@ -1139,7 +1152,7 @@ function makeSmoker(group, x, z, yaw) {
       trickle -= dt;
       if (trickle <= 0) { trickle = 0.12; emit(_h, new THREE.Vector3((Math.random() - 0.5) * 0.04, 0.22, (Math.random() - 0.5) * 0.04), 0.05, 2.2); }
       if (exhaleAt > 0 && time - exhaleAt < 1.2 && B && B.Head) {
-        B.Head.getWorldPosition(_m).addScaledVector(_f.set(-Math.sin(yaw), 0, -Math.cos(yaw)), 0.15); _m.y += 0.1;
+        B.Head.getWorldPosition(_m).addScaledVector(_f.set(-Math.sin(yaw), 0, -Math.cos(yaw)), 0.15); _m.y += 0.05;
         if (Math.random() < 0.6) emit(_m, new THREE.Vector3(-Math.sin(yaw) * 0.5 + (Math.random() - 0.5) * 0.15, 0.12 + Math.random() * 0.1, -Math.cos(yaw) * 0.5 + (Math.random() - 0.5) * 0.15), 0.12, 2.6);
       }
       for (let i = 0; i < N; i++) {

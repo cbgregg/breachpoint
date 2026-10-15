@@ -1941,6 +1941,14 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
+  // an upper floor bots can use (Freshway's offices): its own grid, joined to the ground by stairs
+  if (world.upper) {
+    const u = world.upper;
+    const grid = new NavGrid(physics, u.bounds, 0.5, 0.35, { floorY: u.y });
+    const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+    world.nav.upper = { grid, y: u.y, portals: u.portals.map(q => ({ bottom: V(q.climb[0]), top: V(q.climb[q.climb.length - 1]), climb: q.climb.map(V), rect: q.rect })) };
+    world.upperPoint = () => { const k = grid.openCells[(Math.random() * grid.openCells.length) | 0]; return new THREE.Vector3(grid.cx(k % grid.cols), u.y, grid.cz((k / grid.cols) | 0)); };
+  }
   world.bounds = { hx: HX, hz: HZ };
   world.look = LAYOUT.look;
   return world;
