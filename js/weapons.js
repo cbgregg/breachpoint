@@ -167,9 +167,9 @@ function mats() {
     recess: new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 0.9 }), // slots, ports: read as holes
     brass: new THREE.MeshStandardMaterial({ color: 0xb58a3c, roughness: 0.3, metalness: 1 }),
     glass: new THREE.MeshStandardMaterial({ color: 0xa8dcd4, roughness: 0.03, metalness: 0.4, envMapIntensity: 0.9, transparent: true, opacity: 0.06, depthWrite: false }), // coated lens: a faint teal tint and sky reflections, like a real red dot
-    halo: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.25, 0.18), toneMapped: false, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+    halo: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 0.12, 0.08), toneMapped: false, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
     lens: new THREE.MeshStandardMaterial({ color: 0x0b1620, roughness: 0.04, metalness: 1, envMapIntensity: 2.2 }),
-    reticle: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.5, 0.35), toneMapped: false, side: THREE.DoubleSide }),
+    reticle: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 0.1, 0.06), toneMapped: false, side: THREE.DoubleSide }), // deep red, just over bloom threshold
   };
   return MATS;
 }
@@ -267,12 +267,12 @@ function opticHolo(p, g, M, b, c) {
   p.rbox(M.poly, 0.012, 0.02, 0.03, 0.029, b + 0.026, -(c - 0.035), 0.004);
   p.add(M.glass, new THREE.PlaneGeometry(0.036, 0.036), 0, hy, -(c + 0.015));
   const z = -(c + 0.02);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0055, 0.00045, 4, 32), M.reticle);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0032, 0.00022, 4, 40), M.reticle);
   ring.position.set(0, hy, z);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0007, 8), M.reticle);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00042, 10), M.reticle);
   dot.position.set(0, hy, z);
   // soft emitter glow around the ring so it reads crisply against bright skies
-  const glow = new THREE.Mesh(new THREE.RingGeometry(0.0046, 0.0066, 32), M.halo);
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.0028, 0.0037, 40), M.halo);
   glow.position.set(0, hy, z + 0.0002);
   g.add(ring, dot, glow);
   return { sightY: hy, sightZ: z };
@@ -283,13 +283,13 @@ function opticReflex(p, g, M, b, c, k = 1) {
     const grp = new THREE.Group();
     addModelParts('reddot', grp, () => true, true);
     grp.traverse(o => { if (o.isMesh && o.name.includes('08')) { o.material = M.glass; o.renderOrder = 2; } });
-    grp.position.set(0, b, -c);
+    grp.position.set(0, b - 0.0035 * k, -c);   // the model's base sits 3.5 mm above its origin: seat it on the rail
     grp.scale.setScalar(k);
     g.add(grp);
-    const ry = b + 0.0426 * k, z = -c - 0.0357 * k + 0.002;
-    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 12), M.reticle);
+    const ry = b + (0.0426 - 0.0035) * k, z = -c - 0.0357 * k + 0.002;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00045, 12), M.reticle);
     dot.position.set(0, ry, z);
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0022, 16), M.halo);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 16), M.halo);
     glow.position.set(0, ry, z + 0.0002);
     g.add(dot, glow);
     return { sightY: ry, sightZ: z };
@@ -300,9 +300,9 @@ function opticReflex(p, g, M, b, c, k = 1) {
     [[[-i, ry - 0.012 * k], [i, ry - 0.012 * k], [i, ry + 0.013 * k], [-i, ry + 0.013 * k]]], 0.008 * k);
   p.add(M.glass, new THREE.PlaneGeometry(0.026 * k, 0.026 * k), 0, ry, -(c + 0.0155 * k), -0.12);
   const z = -(c - 0.0075 * k);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 12), M.reticle);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00045, 12), M.reticle);
   dot.position.set(0, ry, z);
-  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0022, 16), M.halo);
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 16), M.halo);
   glow.position.set(0, ry, z + 0.0002);
   g.add(dot, glow);
   return { sightY: ry, sightZ: z };
@@ -503,7 +503,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     out.magHome = new THREE.Vector3();
     muzF = Math.max(0.235, muzzleDevice(p, M, A.muzzle, 0.0595, 0.233, 0.009, 0.16));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.03, 0.035, 0.2);
-    sight(A.optic === 'iron' ? { sightY: 0.122, sightZ: 0.02 } : addOptic(A.optic, p, g, M, forViewmodel, 0.112, 0.04));
+    sight(A.optic === 'iron' ? { sightY: 0.122, sightZ: 0.02 } : addOptic(A.optic, p, g, M, forViewmodel, 0.104, 0.04));
     muzzle.position.set(0, 0.0595, -muzF);
     eject.position.set(0.02, 0.06, -0.06);
   } else if (type === 'shotgun' && GUN_MODELS.r870) {
@@ -515,9 +515,13 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     muzF = Math.max(0.72, muzzleDevice(p, M, A.muzzle, 0.062, 0.72, 0.0105, 0.2));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.03, 0.035, 0.3);
     if (A.optic === 'iron') {
-      p.add(M.brass, new THREE.SphereGeometry(0.0032, 10, 8), 0, 0.091, -0.705);   // front bead (on a short ramp so it sits on the sight line)
-      p.rbox(M.metal, 0.004, 0.024, 0.016, 0, 0.084, -0.703, 0.001);
-      sight({ sightY: 0.094, sightZ: -0.04, eyeRelief: -0.26 });   // cheek weld on the stock: the eye sits well back from the receiver
+      // front bead on a ramp and a notch on the receiver: the eye rides just above the comb, so the stock
+      // stays out of the picture and the bead sits on the centre of the screen
+      p.add(M.brass, new THREE.SphereGeometry(0.0034, 10, 8), 0, 0.1045, -0.705);
+      p.rbox(M.metal, 0.005, 0.03, 0.022, 0, 0.088, -0.701, 0.0012);
+      p.rbox(M.metal, 0.02, 0.012, 0.008, 0, 0.097, -0.03, 0.001);
+      p.rbox(M.recess, 0.005, 0.006, 0.0085, 0, 0.1005, -0.03, 0.0005);
+      sight({ sightY: 0.1045, sightZ: -0.03, eyeRelief: -0.2 });
     } else sight(addOptic(A.optic, p, g, M, forViewmodel, 0.085, 0.1));
     muzzle.position.set(0, 0.062, -muzF);
     eject.position.set(0.024, 0.07, -0.1);
@@ -547,8 +551,9 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     out.magHome = new THREE.Vector3();
     muzF = Math.max(0.142, muzzleDevice(p, M, A.muzzle, 0.047, 0.141, 0.0075, 0.13));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.012, 0.02, 0.1);
-    if (A.optic === 'reflex') sight(opticReflex(p, g, M, 0.0785, 0.035, 0.8));
-    else sight({ sightY: 0.083, sightZ: 0.02 });
+    // aimed at arm's length (not up against the eye like a rifle optic), so both hands show under the sights
+    if (A.optic === 'reflex') sight({ ...opticReflex(p, g, M, 0.0755, 0.035, 0.8), eyeRelief: -0.3 });
+    else sight({ sightY: 0.083, sightZ: 0.02, eyeRelief: -0.32 });
     muzzle.position.set(0, 0.047, -muzF);
     eject.position.set(0.016, 0.062, -0.05);
   } else if (type === 'rifle') {

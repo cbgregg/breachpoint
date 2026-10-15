@@ -101,7 +101,7 @@ export class PlayerController {
         id: w.id, holder, gun, type, magHold,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.088, -0.112, -0.245) : new THREE.Vector3(0.11, -0.145, -0.21),
+          : pistol ? new THREE.Vector3(0.085, -0.1, -0.3) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
       };
     });
