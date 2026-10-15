@@ -515,17 +515,13 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     muzF = Math.max(0.72, muzzleDevice(p, M, A.muzzle, 0.062, 0.72, 0.0105, 0.2));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.03, 0.035, 0.3);
     if (A.optic === 'iron') {
-      // front bead on a ramp and a notch on the receiver: the eye rides just above the comb, so the stock
-      // stays out of the picture and the bead sits on the centre of the screen
-      p.add(M.brass, new THREE.SphereGeometry(0.0034, 10, 8), 0, 0.1045, -0.705);
-      p.rbox(M.metal, 0.005, 0.03, 0.022, 0, 0.088, -0.701, 0.0012);
-      p.rbox(M.metal, 0.02, 0.012, 0.008, 0, 0.097, -0.03, 0.001);
-      p.rbox(M.recess, 0.005, 0.006, 0.0085, 0, 0.1005, -0.03, 0.0005);
-      sight({ sightY: 0.1045, sightZ: -0.03, eyeRelief: -0.2 });
+      // tactical ghost-ring sights: the receiver's hump rises above the barrel, so the sight line has to
+      // run over it — an aperture on the back of the receiver and a protected post on a ramp at the muzzle
+      sight({ ...ironSights(p, M, 0.13, 0.0835, 0.698, 0.058, 0.0165), eyeRelief: -0.12 });
     } else sight(addOptic(A.optic, p, g, M, forViewmodel, 0.085, 0.1));
     muzzle.position.set(0, 0.062, -muzF);
     eject.position.set(0.024, 0.07, -0.1);
-    foregrip.position.set(0, 0.004, -0.48);
+    foregrip.position.set(0, -0.012, -0.48);
   } else if (type === 'sniper' && GUN_MODELS.sniper) {
     // ---- sniper rifle model (CC-BY 4.0, "Sniper rifle GameReady Free" by pashtetuser on Sketchfab) ----
     const scopeParts = (k) => k.startsWith('aim');

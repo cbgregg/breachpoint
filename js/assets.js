@@ -62,7 +62,7 @@ const GUN_FILES = {
   // TPM SMG: modelled along -x; turned to face -z
   tpm: { file: 'assets/models/tpm.glb', xf: { s: 0.17, ry: -Math.PI / 2, x: 0, y: 0.0238, z: 0.0204 } },
   // Remington 870: lies at an angle in its file; turned so the barrel points down -z
-  r870: { file: 'assets/models/r870.glb', xf: { s: 0.5, ry: 2.93, x: 0.004, y: 0, z: -0.22 } },
+  r870: { file: 'assets/models/r870.glb', xf: { s: 0.5, ry: 2.946, x: 0.036, y: 0, z: -0.22 } },   // ry: barrel exactly on the gun's centre line
   sniper: { file: 'assets/models/sniper.glb', xf: { s: 0.036, x: 0, y: -0.032, z: -0.227 } },
   // G19: the file is a display (pistol, spare magazine and a suppressor laid out); keep only the pistol
   g19: { file: 'assets/models/g19.glb', xf: { s: 0.95, ry: Math.PI, x: 0, y: 0, z: -0.043,
