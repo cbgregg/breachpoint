@@ -18,16 +18,17 @@ const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Ve
 const POLE_R = new THREE.Vector3(0.7, -1.4, 0.2), POLE_L = new THREE.Vector3(-0.4, -1, 0.2);
 // where the hands go, in the gun's frame (origin = top of the pistol grip, barrel toward -z)
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const RH_LONG = V3(0.031, -0.052, 0.018), RH_PISTOL = V3(0.031, -0.045, 0.012);
+const RH_LONG = V3(0.031, -0.052, 0.018), RH_PISTOL = V3(0.03, -0.02, 0.016);
 const GRIP_F = V3(0, -0.25, -0.97), PALM_L = V3(-1, 0, 0), PALM_R = V3(1, 0, 0), PALM_UP = V3(0, 1, 0);
-const LH_PISTOL = V3(-0.03, -0.066, 0.018);
+// support hand: thumbs-forward two-hand grip, the left hand wrapping round the front of the grip over the right fingers
+const LH_PISTOL = V3(-0.055, -0.03, 0.005), LH_PISTOL_F = V3(0.45, -0.25, -0.86), LH_PISTOL_P = V3(0.9, -0.1, 0.4);
 const VG_OFF = V3(-0.03, -0.015, 0.036), VG_F = V3(0, -0.12, -1);
 const SUP_OFF = V3(-0.03, -0.02, 0.012), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
 const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
 const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
 const COOK_F = V3(0.25, 0.1, -1);
-export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
+export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
 const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
@@ -101,8 +102,10 @@ export class PlayerController {
         id: w.id, holder, gun, type, magHold,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.085, -0.1, -0.3) : new THREE.Vector3(0.11, -0.145, -0.21),
+          : pistol ? new THREE.Vector3(0.055, -0.07, -0.24) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
+        // the pistol at the hip: up in front, muzzle tipped up and turned in, both hands on it (CoD style)
+        hipRot: pistol && !touch ? [0.08, 0.18, -0.05] : null,
       };
     });
     if (!this.flash) {
@@ -539,7 +542,7 @@ export class PlayerController {
     handFrame(_R, _rq, gun.group, _gq, type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG), GRIP_F, PALM_L);
     // left hand where it rests on the gun: support hand on a pistol, vertical grip, or palm up under the handguard / pump
     let lPose;
-    if (type === 'pistol') { handFrame(_L, _lq, gun.group, _gq, LH_PISTOL, GRIP_F, PALM_R); lPose = POSES.wrap; }
+    if (type === 'pistol') { handFrame(_L, _lq, gun.group, _gq, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P); lPose = POSES.wrap; }
     else if (A.under === 'vgrip') { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF), VG_F, PALM_R); lPose = POSES.wrap; }
     else { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF), SUP_F, PALM_SUP); lPose = POSES.support; }
     let tPose = lPose, lk = 0, leftFree = false;
