@@ -8,6 +8,7 @@ import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose } from '.
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const sm5 = (t) => { t = clamp(t, 0, 1); return t * t * t * (t * (t * 6 - 15) + 10); }; // quintic: no jolt at either end
 const bump = (a, b, x) => smooth(a, a + (b - a) * 0.3, x) * (1 - smooth(b - (b - a) * 0.3, b, x));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _wish = new THREE.Vector3();
@@ -28,6 +29,8 @@ const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
 const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
 const COOK_F = V3(0.25, 0.1, -1);
+// gun pose at the height of a magazine change (offsets added to the hip pose)
+export const RELOAD_POSE = { x: -0.07, y: 0.075, z: 0.02, rx: 0.06, ry: -0.04, rz: -0.55 };
 export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
@@ -102,7 +105,7 @@ export class PlayerController {
         id: w.id, holder, gun, type, magHold,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.055, -0.07, -0.24) : new THREE.Vector3(0.11, -0.145, -0.21),
+          : pistol ? new THREE.Vector3(0.06, -0.094, -0.25) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
         // the pistol at the hip: up in front, muzzle tipped up and turned in, both hands on it (CoD style)
         hipRot: pistol && !touch ? [0.08, 0.18, -0.05] : null,
@@ -444,6 +447,11 @@ export class PlayerController {
     this.vmRoot.visible = !scoped;
 
     this.sprintT = clamp(this.sprintT + (c.sprinting ? dt : -dt) * 6, 0, 1);
+    const spr = sm5(this.sprintT);   // eased, so going in and out of a sprint never snaps
+    this.slideK = lerp(this.slideK || 0, c.slideT > 0 ? 1 : 0, Math.min(1, dt * 10));
+    // spring on the gun: reload beats (mag out, mag seated, slap) and landings give it a little jolt that settles
+    const J = this.jolt || (this.jolt = { y: 0, vy: 0, r: 0, vr: 0, z: 0, vz: 0, prevRp: 0, prevRel: false });
+    for (const [k, v] of [['y', 'vy'], ['r', 'vr'], ['z', 'vz']]) { J[v] += (-260 * J[k] - 22 * J[v]) * dt; J[k] += J[v] * dt; }
     this.kick *= Math.exp(-dt * 18);
     this.kickRot *= Math.exp(-dt * 11);
     this.swayX = lerp(this.swayX, clamp(-mdx * 0.0006, -0.035, 0.035), Math.min(1, dt * 9));
@@ -453,7 +461,7 @@ export class PlayerController {
     const ae = a * a * (3 - 2 * a);
     const bobAmt = Math.min(1, hs / 6) * (1 - 0.9 * a) * (c.onGround ? 1 : 0.2) * (c.slideT > 0 ? 0 : 1);
     const rp = w.reloadProgress;
-    const sw = c.switchT > 0 ? c.switchT / 0.4 : 0;
+    const sw = c.switchT > 0 ? sm5(c.switchT / 0.4) : 0;
     const gren0 = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / 0.9, 0, 1) * Math.PI) : 0;
     this.cookBlend = lerp(this.cookBlend, this.cookT !== null ? 1 : 0, Math.min(1, dt * 12));
     const gren = Math.max(gren0, this.cookBlend * 0.75);
@@ -463,20 +471,27 @@ export class PlayerController {
     const s2 = this.inspectT > 0 ? smooth(0.42, 0.56, ip) * (1 - smooth(0.82, 0.98, ip)) : 0;
     const mel = c.meleeT > 0 ? Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) : 0;
     const idle = Math.sin(this.breathT * 1.6) * 0.002 * (1 - a);
-    const tilt = w.reloading ? bump(0.0, 1.0, rp) : 0;
-    const slide = c.slideT > 0 ? 1 : 0;
+    const tilt = w.reloading ? sm5(rp / 0.22) * (1 - sm5((rp - 0.8) / 0.2)) : 0;
+    const slide = this.slideK;
+    if (w.reloading && G.magHold) {
+      const hit = (t) => J.prevRp < t && rp >= t;
+      if (hit(0.16)) { J.vy -= 0.18; J.vr += 0.9; }       // mag pulled free
+      if (hit(0.68)) { J.vy += 0.28; J.vr -= 1.4; }       // fresh mag seated
+      if (hit(0.76)) { J.vy += 0.22; J.vz -= 0.12; J.vr -= 1.0; } // palm slap
+    }
+    J.prevRp = w.reloading ? rp : 0;
     const bx = Math.sin(this.bobT) * 0.01 * bobAmt, by = -Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;
 
     h.position.set(
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
-      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) - tilt * 0.07 - this.sprintT * 0.06 - mel * 0.08 + slide * -0.04,
-      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * 0.075 - sw * 0.25 - gren * 0.22 - this.sprintT * 0.02 - this.landDip * 0.025 + slide * -0.02,
-      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * 0.02 - mel * 0.12,
+      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) + tilt * RELOAD_POSE.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
+      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RELOAD_POSE.y - sw * 0.25 - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
+      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RELOAD_POSE.z - mel * 0.12 + J.z,
     );
     h.rotation.set(
-      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * 0.06 - this.sprintT * 0.25 + this.swayY * 0.8 + mel * 0.2,
-      this.sprintT * 0.55 - tilt * 0.04 + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
-      -tilt * 0.55 + this.sprintT * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
+      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RELOAD_POSE.rx - spr * 0.25 + this.swayY * 0.8 + mel * 0.2 + J.r,
+      spr * 0.55 + tilt * RELOAD_POSE.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
+      tilt * RELOAD_POSE.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
     // per-gun hip pose (the pistol is held up and turned in, both hands on it, like CoD)
     if (G.hipRot) { const k = 1 - ae; h.rotation.x += G.hipRot[0] * k; h.rotation.y += G.hipRot[1] * k; h.rotation.z += G.hipRot[2] * k; }
@@ -484,12 +499,12 @@ export class PlayerController {
     const tk = this.tacK || 0;
     if (tk > 0.01) {
       // undo most of the normal sprint pose, then swing the muzzle up, held off to the right
-      h.position.x += (0.07 + this.sprintT * 0.06) * tk;
-      h.position.y += (-0.07 + this.sprintT * 0.02) * tk + by * 0.8;
+      h.position.x += (0.07 + spr * 0.06) * tk;
+      h.position.y += (-0.07 + spr * 0.02) * tk + by * 0.8;
       h.position.z += -0.12 * tk;
-      h.rotation.x += (0.85 + this.sprintT * 0.25) * tk;
-      h.rotation.y += (-0.35 - this.sprintT * 0.55) * tk;
-      h.rotation.z += (0.15 - this.sprintT * 0.55) * tk + bx * 4;
+      h.rotation.x += (0.85 + spr * 0.25) * tk;
+      h.rotation.y += (-0.35 - spr * 0.55) * tk;
+      h.rotation.z += (0.15 - spr * 0.55) * tk + bx * 4;
     }
     if (s1 + s2 > 0) {
       const w2 = Math.sin(ip * Math.PI * 3) * 0.04; // a little life in the hands
@@ -559,16 +574,28 @@ export class PlayerController {
       handFrame(_m0, _mq, gun.group, _gq, MH.pos, MH.f, MH.p);                 // M0: holding the seated mag
       _m1.copy(_m0).add(_a.set(0.01, -0.15, 0.05));                           // M1: pulled clear
       _pp.copy(_m0).add(_a.set(-0.06, -0.42, 0.06));                          // P: down, out of view
-      const seg = (a, b) => smooth(a, b, rp);
+      // one continuous, time-parametrised spline through the beats (no stop-start between them):
+      // grip -> mag -> pulled -> down out of view -> back up -> seated -> slap -> grip
       _gl.copy(_L); _lq2.copy(_lq);                                            // the resting grip
-      let attach = true, k = 1;
-      if (rp < 0.1) { k = seg(0, 0.1); _L.lerpVectors(_gl, _m0, k); attach = false; }
-      else if (rp < 0.24) _L.lerpVectors(_m0, _m1, seg(0.1, 0.24));
-      else if (rp < 0.4) _L.lerpVectors(_m1, _pp, seg(0.24, 0.4));
-      else if (rp < 0.56) _L.lerpVectors(_pp, _m1, seg(0.4, 0.56));
-      else if (rp < 0.7) _L.lerpVectors(_m1, _m0, seg(0.56, 0.7));
-      else if (rp < 0.78) { _L.copy(_m0); _L.y += 0.025 * bump(0.7, 0.78, rp); attach = rp < 0.72; }
-      else { k = 1 - seg(0.78, 0.92); _L.lerpVectors(_gl, _m0, k); attach = false; }
+      const KP = this.reloadKeys || (this.reloadKeys = Array.from({ length: 8 }, () => new THREE.Vector3()));
+      KP[0].copy(_gl); KP[1].copy(_m0); KP[2].copy(_m1); KP[3].copy(_pp);
+      KP[4].copy(_m1).add(_a.set(-0.015, -0.02, 0.01)); KP[5].copy(_m0); KP[6].copy(_m0).add(_a.set(0, 0.022, 0)); KP[7].copy(_gl);
+      const KT = [0, 0.1, 0.22, 0.4, 0.56, 0.68, 0.76, 0.9];
+      if (rp >= KT[7]) _L.copy(KP[7]);
+      else {
+        let i = 0; while (i < 6 && rp >= KT[i + 1]) i++;
+        const t0 = KT[i], t1 = KT[i + 1], d = t1 - t0, u = (rp - t0) / d;
+        const tan = (j, out) => (j <= 0 || j >= 7) ? out.set(0, 0, 0) : out.subVectors(KP[j + 1], KP[j - 1]).divideScalar(KT[j + 1] - KT[j - 1]);
+        const u2 = u * u, u3 = u2 * u;
+        tan(i, _v1); tan(i + 1, _tp);
+        _L.copy(KP[i]).multiplyScalar(2 * u3 - 3 * u2 + 1)
+          .addScaledVector(_v1, (u3 - 2 * u2 + u) * d)
+          .addScaledVector(KP[i + 1], -2 * u3 + 3 * u2)
+          .addScaledVector(_tp, (u3 - u2) * d);
+      }
+      // the hand turns from its grip to the mag hold and back, eased with no jolt
+      const k = sm5(rp / 0.1) * (1 - sm5((rp - 0.78) / 0.12));
+      const attach = rp > 0.1 && rp < 0.68;
       _lq.copy(_lq2).slerp(_mq, k);
       tPose = MH.pose; lk = k;
       if (attach) {
