@@ -100,7 +100,7 @@ export function applyDynamics(mo, c, B, rotateBoneWorld, dt) {
   const vF = mo.vel.dot(fwdV);
 
   // lean: into acceleration and with speed (sprinters lean forward), bank into turns
-  const leanF = mo.leanF.step(clamp(accF * 0.022 + (c.tacSprinting ? 0.22 : c.sprinting ? 0.14 : clamp(vF * 0.02, -0.05, 0.06)), -0.28, 0.32), dt);
+  const leanF = mo.leanF.step(clamp(accF * 0.022 + (c.tacSprinting ? 0.17 : c.sprinting ? 0.14 : clamp(vF * 0.02, -0.05, 0.06)), -0.28, 0.32), dt);
   const leanS = mo.leanS.step(clamp(-accS * 0.018 - mo.yawRate * hs * 0.012, -0.26, 0.26), dt);
   // landing / airborne
   const ground = c.onGround !== false;

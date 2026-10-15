@@ -21,8 +21,8 @@ import { parseLoadout } from './attachments.js';
 
 export const MAX_HUMANS = 8;
 const PROTO = 1;
-const SNAP_HZ = 20;
-const INTERP = 0.1;           // guests render others this far in the past (seconds)
+const SNAP_HZ = 30;
+const INTERP = 0.12;          // guests render others this far in the past (seconds)
 const MAX_REWIND = 0.5;       // lag compensation window
 const ACTIONS = ['reload', 'grenade', 'melee', 'swap', 'slot1', 'slot2'];
 
@@ -1229,7 +1229,9 @@ export class GuestSession {
       let k = B.tm > A.tm ? clamp((rt - A.tm) / (B.tm - A.tm), 0, 1) : 0;
       if (rt >= B.tm) { A = B; k = 0; }
       const alive = !!(A.fl & 1);
-      const x = lerp(A.x, B.x, k), y = lerp(A.y, B.y, k), z = lerp(A.z, B.z, k);
+      let x = lerp(A.x, B.x, k), y = lerp(A.y, B.y, k), z = lerp(A.z, B.z, k);
+      // the next snapshot is late: keep coasting on the last velocity for a moment instead of freezing
+      if (rt > B.tm && (B.fl & 1)) { const over = Math.min(rt - B.tm, 0.12); x += B.vx * over; z += B.vz * over; }
       if (alive && !c.alive) {
         if (A.tm <= (c.deathTm ?? -1)) continue; // still showing the moments before their death
         c.spawn(_v1.set(x, y, z), A.yaw); // (re)spawned

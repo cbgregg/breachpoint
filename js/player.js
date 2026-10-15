@@ -22,7 +22,7 @@ const RH_LONG = V3(0.031, -0.052, 0.018), RH_PISTOL = V3(0.031, -0.045, 0.012);
 const GRIP_F = V3(0, -0.25, -0.97), PALM_L = V3(-1, 0, 0), PALM_R = V3(1, 0, 0), PALM_UP = V3(0, 1, 0);
 const LH_PISTOL = V3(-0.03, -0.066, 0.018);
 const VG_OFF = V3(-0.03, -0.015, 0.036), VG_F = V3(0, -0.12, -1);
-const SUP_OFF = V3(-0.022, -0.012, 0.01), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
+const SUP_OFF = V3(-0.04, -0.004, 0.012), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
 const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
 const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);

@@ -742,17 +742,18 @@ function animateSoldier(c, dt, showName) {
 
   // aim: spine pitch, then place the gun in an aim frame in front of the chest
   const tac = c.tacSprinting && c.sprinting;
-  const pitch = tac ? c.pitch * 0.3 + 0.95 : c.pitch - (c.sprinting ? 0.5 : 0);
+  // third person: tactical sprint is the sprint carry (gun low and across the body, both hands on it); the high-ported pose is first person only
+  const pitch = tac ? -0.85 : c.pitch - (c.sprinting ? 0.5 : 0); // tac: muzzle dropped, held down along the body
   rotateBoneWorld(B.Spine1, right, -pitch * 0.3);
   rotateBoneWorld(B.Spine2, right, -pitch * 0.3);
   rotateBoneWorld(B.Head, right, -pitch * 0.25);
   m.kick = Math.max(0, m.kick - dt * 12);
-  _eu.set(pitch, c.yaw + (tac ? 0.3 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
+  _eu.set(pitch, c.yaw + (tac ? 0.35 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
   _qAim.setFromEuler(_eu);
   if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) * 0.7));
   const pistol = m.weaponId === 'pistol';
   B.Spine2.getWorldPosition(_w3);
-  _w1.set(pistol ? 0.04 : 0.13, pistol ? 0.12 : 0.04, (pistol ? -0.42 : -0.26) + m.kick * 0.04).applyQuaternion(_qAim);
+  _w1.set(pistol ? 0.04 : 0.13, pistol ? 0.12 : tac ? -0.02 : 0.04, (pistol ? -0.42 : tac ? -0.2 : -0.26) + m.kick * 0.04).applyQuaternion(_qAim);
   _w3.add(_w1); // grip, world
   m.gunHolder.position.copy(_w3);
   m.gunHolder.parent.worldToLocal(m.gunHolder.position);
