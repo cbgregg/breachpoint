@@ -15,15 +15,15 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     time: { value: 0 },
-    vignette: { value: 0.38 },
+    vignette: { value: 0.26 },
     grain: { value: 0.03 },
     ca: { value: 0.0011 },
     damage: { value: 0 },
     flash: { value: 0 },
     saturation: { value: 1.0 },
-    contrast: { value: 1.06 },
-    lift: { value: new THREE.Vector3(0.018, 0.016, 0.04) },  // blue-violet dusk in the shadows
-    gain: { value: new THREE.Vector3(1.08, 0.97, 0.88) },    // warm highlights
+    contrast: { value: 1.08 },
+    lift: { value: new THREE.Vector3(0.006, 0.008, 0.016) }, // a touch of cool sky in the shadows
+    gain: { value: new THREE.Vector3(1.04, 1.0, 0.95) },     // warm, sunlit highlights
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -58,8 +58,8 @@ const GradeShader = {
     }`,
 };
 
-// dusk: the sun just above the horizon (5°), red-orange and weak; the street lamps carry the scene
-export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 5), THREE.MathUtils.degToRad(222));
+// late afternoon: a warm, strong sun about 32° up, long crisp shadows and a clear sky
+export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 32), THREE.MathUtils.degToRad(222));
 
 // Height fog: distance haze plus a dense layer that hugs the ground and thins with altitude,
 // glowing warm when looking towards the sun. Patched into three's fog chunks so every lit
@@ -96,13 +96,13 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
       float fHaze = smoothstep(fogNear, fogFar, vFogDepth);
     #endif
     const float FB = 0.32;      // ground layer falloff per metre of height
-    const float FG = 0.0085;    // ground layer density at y = 0
+    const float FG = 0.0035;    // ground layer density at y = 0
     float h0 = max(cameraPosition.y, 0.0), dy = fRay.y;
     float integ = abs(dy) > 0.02 ? (exp(-FB * h0) - exp(-FB * (h0 + dy))) / (FB * dy) : exp(-FB * h0);
     float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
     float fogFactor = clamp(fHaze + fGround * (1.0 - fHaze), 0.0, 0.92);
     float fSun = pow(max(dot(fDir, vec3(${fv(_sd.x)}, ${fv(_sd.y)}, ${fv(_sd.z)})), 0.0), 5.0);
-    vec3 fCol = mix(fogColor, fogColor * vec3(1.9, 1.05, 0.55), fSun);
+    vec3 fCol = mix(fogColor, fogColor * vec3(1.15, 1.06, 0.92), fSun);
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fCol, fogFactor);
   }
 #endif`;
@@ -113,7 +113,7 @@ export class Renderer {
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
     r.setSize(window.innerWidth, window.innerHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 0.9;
+    r.toneMappingExposure = 0.92;
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -146,10 +146,10 @@ export class Renderer {
     const sky = new Sky();
     sky.scale.setScalar(450);
     const u = sky.material.uniforms;
-    u.turbidity.value = 12;
-    u.rayleigh.value = 3.2;
-    u.mieCoefficient.value = 0.012;
-    u.mieDirectionalG.value = 0.93;
+    u.turbidity.value = 5;
+    u.rayleigh.value = 1.4;
+    u.mieCoefficient.value = 0.005;
+    u.mieDirectionalG.value = 0.82;
     u.sunPosition.value.copy(SUN_DIR);
     scene.add(sky);
     this.sky = sky;
@@ -162,7 +162,7 @@ export class Renderer {
     Object.keys(u).forEach(k => { envSky.material.uniforms[k].value = u[k].value; });
     envScene.add(envSky);
     // warm ground bounce in the environment
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: 0x5e4030 }));
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: 0x8a7458 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -2;
     envScene.add(ground);
@@ -170,20 +170,20 @@ export class Renderer {
     scene.environmentIntensity = 1;
     pmrem.dispose();
 
-    scene.fog = new THREE.FogExp2(0x7d6a72, 0.0066);
+    scene.fog = new THREE.FogExp2(0xa9b6c2, 0.0034); // light afternoon haze
 
-    const sun = new THREE.DirectionalLight(0xff7a42, 2.6);
+    const sun = new THREE.DirectionalLight(0xffe8c8, 3.4);
     sun.position.copy(SUN_DIR).multiplyScalar(80);
     sun.castShadow = true;
     const sc = sun.shadow.camera;
     sc.left = -52; sc.right = 52; sc.top = 52; sc.bottom = -52; sc.near = 10; sc.far = 200;
     sun.shadow.bias = -0.00015;
-    sun.shadow.normalBias = 0.04; // grazing evening light needs a little more bias
+    sun.shadow.normalBias = 0.03;
     scene.add(sun);
     scene.add(sun.target);
     this.sun = sun;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
-    scene.add(new THREE.HemisphereLight(0x6f7fb8, 0x3a2a26, 0.45)); // blue dusk sky above, dim warm bounce below
+    scene.add(new THREE.HemisphereLight(0xb8cff0, 0x8a7458, 0.75)); // blue sky above, warm sunlit bounce below
     scene.environmentIntensity = 0.6;
   }
 

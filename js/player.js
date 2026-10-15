@@ -32,7 +32,7 @@ const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THRE
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
 const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
 const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
-const EYE_RELIEF = -0.15;
+const EYE_RELIEF = -0.12; // sights sit close to the eye when aiming: a big, clear sight picture
 const INSPECT = 3.0; // seconds
 const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multiplier at full ADS // close to the eye, like CoD: the optic frames the target
 // The FOV setting works like Call of Duty's: degrees across a 4:3 frame (80 = MW default). three.js

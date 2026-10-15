@@ -381,6 +381,23 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
+  // a few market posters and spray tags (canvas textures, shared)
+  const posterMat = [0, 1, 2, 3, 4, 5].map(i => {
+    const c = document.createElement('canvas'); c.width = 96; c.height = 128;
+    const g = c.getContext('2d');
+    const pal = [['#c9a24a', '#2a2622'], ['#7a2a24', '#e8dcc0'], ['#2f5a6a', '#f0e6cc'], ['#e2d6b8', '#3a2a22'], ['#3d5a3a', '#f2e8d0'], ['#1c1c1c', '#d8442e']][i];
+    if (i === 5) { // spray tag
+      g.strokeStyle = pal[1]; g.lineWidth = 7; g.lineCap = 'round';
+      g.beginPath(); for (let k = 0; k < 6; k++) { const x = 10 + k * 15, y = 60 + Math.sin(k * 1.7) * 22; k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+    } else {
+      g.fillStyle = pal[0]; g.fillRect(4, 4, 88, 120);
+      g.fillStyle = pal[1]; g.fillRect(12, 14, 72, 16); g.fillRect(12, 98, 50, 8);
+      g.globalAlpha = 0.6; for (let k = 0; k < 5; k++) g.fillRect(12, 40 + k * 10, 40 + ((k * 37 + i * 13) % 32), 4);
+      g.globalAlpha = 0.25; g.fillStyle = '#000'; g.fillRect(4, 4, 88, 120 * 0.15); // sun-faded / torn top
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshStandardMaterial({ map: t, transparent: i === 5, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: i !== 5 });
+  });
   const streakMat = new THREE.MeshBasicMaterial({ map: streakTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
   const driftMat = new THREE.MeshBasicMaterial({ map: radial([[0, 'rgba(176,150,112,0.75)'], [0.6, 'rgba(176,150,112,0.35)'], [1, 'rgba(176,150,112,0)']]), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
   const glows = []; // [x, y, z, size]
@@ -479,6 +496,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const bw = S.ax ? L : T, bd = S.az ? L : T;
         solid(x, z, bw, bd, y2 - y1, y0 + y1, brick ? 'brick' : 'concrete');
         put(flatBox(bw, y2 - y1, bd, scaleOf(wallMat), 0.012), wallMat, x, y0 + y1 + (y2 - y1) / 2, z, 0, { tint, grime: 0.45, base: y0 });
+        if (y1 === 0 && L > 0.3) {
+          // a darker rendered plinth along the foot of the outside wall
+          const ox = S.nx * (T / 2 + 0.03), oz = S.nz * (T / 2 + 0.03);
+          put(flatBox(S.ax ? L : 0.06, 0.45, S.az ? L : 0.06, scaleOf(M.concrete), 0.005), M.concrete, x + ox, y0 + 0.225, z + oz, 0, { tint: 0xa89e8e, grime: 0.5, base: y0 });
+          // now and then a poster or a spray tag on the outside
+          if (L > 1.3 && rnd() < 0.3) decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7, 1.0, x + S.nx * (T / 2 + 0.02) + S.ax * (rnd() - 0.5) * (L - 1), y0 + 1.5, z + S.nz * (T / 2 + 0.02) + S.az * (rnd() - 0.5) * (L - 1), ry);
+        }
       };
       const ops = (spec[S.k] || []).map(([k, at, wd]) => { const ww = wd || OPEN_W[k]; return { k, a: Math.max(-S.len / 2 + 0.25, at - ww / 2), b: Math.min(S.len / 2 - 0.25, at + ww / 2), at }; }).sort((p, q) => p.a - q.a);
       let cur = -S.len / 2;
@@ -514,6 +538,20 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         cur = o.b;
       }
       seg(cur, S.len / 2, 0, h);
+      // wall fittings: a drainpipe down one corner, an AC unit or a meter box above the openings
+      const wx = (a, o = T / 2) => [S.ox + S.ax * a + S.nx * o, S.oz + S.az * a + S.nz * o];
+      if (rnd() < 0.5) {
+        const [px, pz] = wx((rnd() < 0.5 ? -1 : 1) * (S.len / 2 - 0.2), T / 2 + 0.07);
+        put(new THREE.CylinderGeometry(0.045, 0.045, h, 8), M.metal, px, y0 + h / 2, pz, 0, { tint: 0x8a8f94, grime: 0.4, base: y0 });
+      }
+      if (rnd() < 0.45) {
+        const [px, pz] = wx((rnd() - 0.5) * (S.len - 1.6), T / 2 + 0.2);
+        put(worldBox(0.8, 0.5, 0.36, 0), M.paint, px, y0 + h - 0.62, pz, ry, { tint: 0xd8d6cf, grime: 0.25, base: y0 + h - 1 });
+        put(flatBox(0.62, 0.36, 0.02, 0), M.dim, px + S.nx * 0.19, y0 + h - 0.62, pz + S.nz * 0.19, ry, { grime: 0 });
+      } else if (rnd() < 0.4) {
+        const [px, pz] = wx((rnd() - 0.5) * (S.len - 1.6), T / 2 + 0.08);
+        put(worldBox(0.4, 0.5, 0.16, 0), M.paint, px, y0 + h - 0.75, pz, ry, { tint: 0x9aa39a, grime: 0.3, base: y0 + h - 1.2 });
+      }
       // sand drifted against the outside of the wall
       if (rnd() < 0.6) decal(driftMat, S.len * 0.6, 1.2, S.ox + S.nx * (T / 2 + 0.45) + S.ax * (rnd() - 0.5) * S.len * 0.4, y0 + 0.035, S.oz + S.nz * (T / 2 + 0.45) + S.az * (rnd() - 0.5) * S.len * 0.4, ry, -Math.PI / 2);
     }
@@ -521,6 +559,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     solid(cx, cz, w + 0.2, d + 0.2, 0.25, y0 + h, 'concrete');
     put(flatBox(w + 0.2, 0.25, d + 0.2, scaleOf(M.concrete), 0.02), M.concrete, cx, y0 + h + 0.125, cz, 0, { grime: 0.05, tint: 0xd6d0c4, base: y0 + h });
     put(flatBox(w + 0.34, 0.1, d + 0.34, 3, 0.02), M.concrete, cx, y0 + h - 0.08, cz, 0, { grime: 0, tint: 0xe6e0d4 });
+    // a proper cornice: a deeper moulded band under the roof edge that casts a line of shadow
+    put(flatBox(w + 0.5, 0.16, d + 0.5, 3, 0.02), M.concrete, cx, y0 + h - 0.26, cz, 0, { grime: 0.1, tint: 0xd0c9bc });
     if (rnd() < 0.6 && !spec.light) put(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 14), M.metal, cx + (rnd() - 0.5) * (w - 2), y0 + h + 0.75, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0x3d6b8a, grime: 0.2, base: y0 + h });
     // floor
     const fl = new THREE.PlaneGeometry(w - 2 * T, d - 2 * T);
@@ -626,6 +666,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           }
         }
         if (rnd() < 0.7) put(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 14), M.metal, cx + (rnd() - 0.5) * (w - 2), h + 0.68, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0x3d6b8a, grime: 0.2, base: h });
+        // posters and tags pasted on the ground floor
+        for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (rnd() < 0.45) continue;
+          const L = nx ? d : w, t = (rnd() - 0.5) * (L - 1.6);
+          const px = cx + nx * (w / 2 + 0.015) + -nz * t, pz = cz + nz * (d / 2 + 0.015) + nx * t;
+          decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7 + rnd() * 0.3, 1.0, px, 1.45 + rnd() * 0.3, pz, Math.atan2(nx, nz));
+        }
         break;
       }
       case 'lamp': break;
@@ -879,6 +926,50 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     add(-cx, -cz, w, d, h, y0, kind, mx, 0);
   }
 
+  // ---------- street dressing: puddles, litter, posters (all batched, no extra draw calls) ----------
+  if (street) {
+    const blocked = (x, z, r) => physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
+    const inside = (x, z) => Math.abs(x) < HX - 3 && Math.abs(z) < HZ - 3;
+    // rain puddles: near-black water that mirrors the dusk sky, soft-edged, in the open streets
+    const puddleMat = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.8,
+      alphaMap: radial([[0, 'rgba(255,255,255,1)'], [0.62, 'rgba(255,255,255,0.95)'], [1, 'rgba(255,255,255,0)']]), transparent: true,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+    const nPud = Math.round(HX * HZ / 90);
+    for (let i = 0, tries = 0; i < nPud && tries < nPud * 12; tries++) {
+      const x = (rnd() - 0.5) * 2 * (HX - 12), z = (rnd() - 0.5) * 2 * (HZ - 4);
+      const w = 1.2 + rnd() * 2.6, d = 0.8 + rnd() * 1.8;
+      if (blocked(x, z, Math.max(w, d) * 0.6)) continue;
+      put(new THREE.CircleGeometry(0.5, 24), puddleMat, x, 0.022, z, rnd() * Math.PI, { rx: -Math.PI / 2, sx: w, sy: d, grime: 0, cast: false });
+      i++;
+    }
+    // litter along the walls: bin bags, tyres, cardboard, newspaper
+    const bagMat = std({ color: 0x1b1d20, roughness: 0.35, metalness: 0.05 });
+    const paperMat = std({ color: 0xd9d2c0, roughness: 0.9, side: THREE.DoubleSide });
+    const nLit = Math.round(HX * HZ / 40);
+    for (let i = 0, tries = 0; i < nLit && tries < nLit * 20; tries++) {
+      const x = (rnd() - 0.5) * 2 * (HX - 4), z = (rnd() - 0.5) * 2 * (HZ - 3);
+      if (!inside(x, z) || blocked(x, z, 0.35) || !blocked(x, z, 1.1)) continue; // up against something, never in the way
+      const k = rnd();
+      if (k < 0.4) {
+        const n = 1 + Math.floor(rnd() * 3);
+        for (let j = 0; j < n; j++) {
+          const g = new THREE.SphereGeometry(0.3, 10, 8);
+          const pp = g.attributes.position;
+          for (let v = 0; v < pp.count; v++) { const y = pp.getY(v); pp.setY(v, y < 0 ? y * 0.55 : y * (0.9 + Math.sin(pp.getX(v) * 9) * 0.08)); }
+          g.computeVertexNormals();
+          put(g, bagMat, x + (rnd() - 0.5) * 0.6, 0.17, z + (rnd() - 0.5) * 0.6, rnd() * 6, { sx: 1 + rnd() * 0.3, sz: 0.9 + rnd() * 0.3, grime: 0.2, tint: rnd() < 0.3 ? 0x2d3b2a : 0xffffff });
+        }
+      } else if (k < 0.55) {
+        put(new THREE.TorusGeometry(0.3, 0.11, 8, 16), M.rubber, x, 0.11, z, rnd() * 6, { rx: Math.PI / 2, grime: 0.3 });
+      } else if (k < 0.75) {
+        put(flatBox(0.5 + rnd() * 0.3, 0.3 + rnd() * 0.2, 0.4, 0), M.paint, x, 0.2, z, rnd() * 6, { rz: (rnd() - 0.5) * 0.3, grime: 0.3, tint: 0xb59a6e });
+      } else {
+        for (let j = 0; j < 3; j++) put(new THREE.PlaneGeometry(0.3, 0.42), paperMat, x + (rnd() - 0.5) * 1.2, 0.012 + j * 0.002, z + (rnd() - 0.5) * 1.2, rnd() * 6, { rx: -Math.PI / 2, grime: 0, cast: false });
+      }
+      i++;
+    }
+  }
+
   // ---------- perimeter buildings ----------
   const shutterTints = [0x9c9c94, 0x6e7f86, 0x8a7a62, 0x7d8a6a];
   const signTints = [0x2f5a6a, 0x8a2f2a, 0xb08a3a, 0x3d5a3a, 0xd9d2c0];
@@ -969,6 +1060,21 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     spot.userData.lampLight = true;
     group.add(spot, spot.target);
   }
+  // overhead power lines: sagging cables pole to pole along each sidewalk, and drops from each pole
+  // up to the building fronts behind it (the silhouette overhead that makes a street read as lived-in)
+  if (street) {
+    const cable = (a, b, sag) => {
+      const m = a.clone().lerp(b, 0.5); m.y -= sag;
+      put(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, m, b), 20, 0.014, 4), M.rubber, 0, 0, 0, 0, { grime: 0, cast: false });
+    };
+    for (const sz of [-1, 1]) {
+      const z = sz * (HZ - 1.8);
+      const xs = []; for (let x = -(HX - 18); x <= HX - 18; x += 16) xs.push(x);
+      for (let i = 0; i + 1 < xs.length; i++) for (const dy of [5.95, 5.55]) cable(new THREE.Vector3(xs[i], dy, z), new THREE.Vector3(xs[i + 1], dy, z), 0.9 + rnd() * 0.4);
+      for (const x of xs) cable(new THREE.Vector3(x, 5.9, z), new THREE.Vector3(x + (rnd() - 0.5) * 6, 7.6 + rnd() * 2, sz * (HZ + 0.1)), 0.6);
+    }
+  }
+
   // glow sprites for every bulb (bloom does the rest)
   if (glows.length) {
     const g = new THREE.BufferGeometry();
@@ -1073,7 +1179,7 @@ function buildMountain() {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMy;')
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         float hz = 1.0 - smoothstep(0.0, ${(H * 0.75).toFixed(1)}, vMy);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.5, 0.46, 0.55), 0.22 + 0.6 * hz);`);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.66, 0.72, 0.8), 0.25 + 0.6 * hz);`);
   };
   const m = new THREE.Mesh(g, mat);
   m.position.set(1750, -20, 160);

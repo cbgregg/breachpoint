@@ -166,7 +166,8 @@ function mats() {
     rubber: new THREE.MeshStandardMaterial({ color: 0x141415, roughness: 0.95 }),
     recess: new THREE.MeshStandardMaterial({ color: 0x08090a, roughness: 0.9 }), // slots, ports: read as holes
     brass: new THREE.MeshStandardMaterial({ color: 0xb58a3c, roughness: 0.3, metalness: 1 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x9fc3d8, roughness: 0.04, metalness: 0.9, transparent: true, opacity: 0.14, depthWrite: false }),
+    glass: new THREE.MeshStandardMaterial({ color: 0xa8dcd4, roughness: 0.03, metalness: 0.4, envMapIntensity: 0.9, transparent: true, opacity: 0.06, depthWrite: false }), // coated lens: a faint teal tint and sky reflections, like a real red dot
+    halo: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.25, 0.18), toneMapped: false, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
     lens: new THREE.MeshStandardMaterial({ color: 0x0b1620, roughness: 0.04, metalness: 1, envMapIntensity: 2.2 }),
     reticle: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.5, 0.35), toneMapped: false, side: THREE.DoubleSide }),
   };
@@ -270,7 +271,10 @@ function opticHolo(p, g, M, b, c) {
   ring.position.set(0, hy, z);
   const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0007, 8), M.reticle);
   dot.position.set(0, hy, z);
-  g.add(ring, dot);
+  // soft emitter glow around the ring so it reads crisply against bright skies
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.0046, 0.0066, 32), M.halo);
+  glow.position.set(0, hy, z + 0.0002);
+  g.add(ring, dot, glow);
   return { sightY: hy, sightZ: z };
 }
 function opticReflex(p, g, M, b, c, k = 1) {
@@ -282,7 +286,9 @@ function opticReflex(p, g, M, b, c, k = 1) {
   const z = -(c - 0.0075 * k);
   const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 12), M.reticle);
   dot.position.set(0, ry, z);
-  g.add(dot);
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0022, 16), M.halo);
+  glow.position.set(0, ry, z + 0.0002);
+  g.add(dot, glow);
   return { sightY: ry, sightZ: z };
 }
 // 4x prism scope. The body is single-sided, so looking down the tube its inner walls vanish and the
@@ -511,10 +517,13 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     p.rbox(M.metal, 0.002, 0.012, 0.004, 0, 0.09, -0.44, 0.0008);
     // rear drum sight: the drum sits low and carries a ring aperture centred on the sight line, so
     // aiming looks through the ring at the front post (nothing solid crosses the line of sight)
-    p.add(M.metal, new THREE.CylinderGeometry(0.0085, 0.0085, 0.022, 16), 0, 0.0805, 0.005, 0, 0, Math.PI / 2);
-    p.rbox(M.metal, 0.02, 0.01, 0.012, 0, 0.076, 0.005, 0.002);
-    p.lathe(M.metal, [[0.0068, -0.009], [0.0086, -0.009], [0.0086, -0.001], [0.0068, -0.001], [0.0068, -0.009]], 0.096, 0, 24); // thin ghost ring
-    for (const xs of [-1, 1]) p.rbox(M.metal, 0.003, 0.01, 0.008, xs * 0.0078, 0.0855, 0.005, 0.001); // ring posts
+    // (folded away when an optic is mounted, so it never rings the optic's view)
+    if (A.optic === 'iron') {
+      p.add(M.metal, new THREE.CylinderGeometry(0.0085, 0.0085, 0.022, 16), 0, 0.0805, 0.005, 0, 0, Math.PI / 2);
+      p.rbox(M.metal, 0.02, 0.01, 0.012, 0, 0.076, 0.005, 0.002);
+      p.lathe(M.metal, [[0.0068, -0.009], [0.0086, -0.009], [0.0086, -0.001], [0.0068, -0.001], [0.0068, -0.009]], 0.096, 0, 24); // thin ghost ring
+      for (const xs of [-1, 1]) p.rbox(M.metal, 0.003, 0.01, 0.008, xs * 0.0078, 0.0855, 0.005, 0.001); // ring posts
+    } else p.rbox(M.metal, 0.02, 0.006, 0.012, 0, 0.074, 0.005, 0.002); // folded rear sight
     // slim polymer handguard
     p.profile(M.poly, [[0.24, 0.06], [0.39, 0.056, 0.014], [0.404, 0.032, 0.014], [0.396, -0.006, 0.014], [0.27, -0.01, 0.01], [0.24, 0.004]], 0.044, { bevel: 0.006, r: 0.012 });
     for (let i = 0; i < 5; i++) p.rbox(M.recess, 0.046, 0.0025, 0.006, 0, 0.002, -0.27 - i * 0.026, 0.001);
