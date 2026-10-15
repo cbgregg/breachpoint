@@ -58,7 +58,10 @@ export class NavGrid {
       for (let i = 0; i < this.cols; i++) {
         const cx = this.minX + (i + 0.5) * cell, cz = this.minZ + (j + 0.5) * cell;
         for (const b of physics.boxes) {
-          if (b.maxy > 0.35 && b.miny < 1.7 &&
+          // navIgnore: solid mass over a walkable level below (a building over a tunnel);
+          // navBlock: walls of a lower level (tunnels, stairwells) that sit below street height
+          if (b.navIgnore) continue;
+          if ((b.navBlock || (b.maxy > 0.35 && b.miny < 1.7)) &&
             cx > b.minx - agentR && cx < b.maxx + agentR && cz > b.minz - agentR && cz < b.maxz + agentR) {
             this.blocked[j * this.cols + i] = 1;
             break;

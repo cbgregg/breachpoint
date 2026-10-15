@@ -232,14 +232,120 @@ const SHURAN_PICKUPS = [
   { type: 'ammo', pos: [-11, 0, 9] },
 ];
 
+// Pioneer Square (108 x 80 m): Seattle's 1890s brick district. A cobbled plaza with the iron pergola, totem
+// pole and plane trees in the middle, streetcar avenues either side, Romanesque brick blocks beyond. Bomb site
+// A is down in the Underground (the old street level beneath the Pioneer Building, reached by two stairwells);
+// site B is inside the corner tavern.
+const PIONEER_CENTER = [
+  [0, 0, 20, 16, 0, 0, 'paving'],
+  [-1, -3, 11, 4.2, 3.8, 0, 'pergola'],
+  [5.5, 3.5, 0.9, 0.9, 9, 0, 'totem'],
+  [-6.5, 4.5, 0, 0, 9, 0, 'tree'], [2, 6.5, 0, 0, 10, 0, 'tree'], [7, -5.5, 0, 0, 9, 0, 'tree'], [-8, -6, 0, 0, 8.5, 0, 'tree'],
+  [-4, 1.2, 1.8, 0.6, 0.95, 0, 'bench'], [3, -0.6, 1.8, 0.6, 0.95, 0, 'bench'], [-2.5, 6.6, 1.8, 0.6, 0.95, 0, 'bench'],
+  [8.8, 0.5, 0, 0, 0, 0, 'vlamp'], [-8.8, -0.5, 0, 0, 0, 0, 'vlamp'], [0.5, 7.6, 0, 0, 0, 0, 'vlamp'], [-0.5, -7.6, 0, 0, 0, 0, 'vlamp'],
+  // one-off cover so the plaza isn't a shooting gallery; each side reads differently
+  [-5, -1.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [4.5, 1.8, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [0.5, 3.2, 1.6, 1.6, 1.6, 0, 'crate'], [0.6, 3.2, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [8.5, 11.5, 4.4, 2.0, 1.45, 0, 'car', 0], [-8.5, -11.5, 4.4, 2.0, 1.45, 0, 'car', 1],
+  [-3, 12, 2, 2.5, 1.8, 0, 'crate'], [3, -12, 0.8, 3, 1.1, 0, 'sand'],
+  [-24, 31, 4.4, 2.0, 1.45, 0, 'car', 1], [25, -32, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [-40, -9, 1.6, 1.6, 1.6, 0, 'crate'], [39, 9.5, 2, 2, 1.2, 0, 'pallet'],
+  // Smith Tower on the skyline to the north
+  [-14, 74, 12, 12, 62, 0, 'tower'],
+];
+const PIONEER_HALF = [
+  // ---- the Pioneer Building, and the Underground beneath it (bomb site A)
+  [27, 22, 11, 12, 21, 0, 'brick', { tower: true }],
+  [27, 22, 11, 6, 3.24, 0, 'tunnel', { gaps: [['w', 0, 2.4], ['e', 0, 2.4]] }],
+  [18.25, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: 1 }],
+  [35.75, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: -1 }],
+  // ---- mid block and the corner tavern (bomb site B), split by a narrow alley
+  [28, 4.5, 12, 7, 14, 0, 'brick'],
+  [28, -6, 10, 7, 3.6, 0, 'house', { n: [['d', -2.5], ['w', 1.5]], s: [['d', 2], ['w', -2]], e: [['d', 0]], w: [['d', 1], ['w', -1.6]], props: [['table', -2, -1.2], ['table', 2.2, 1.2], ['shelf', 3.4, -2.6, 0]], light: 1 }],
+  // ---- south row
+  [22, -22, 8, 12, 17, 0, 'brick', { stone: true }],
+  [31.5, -21, 7, 8, 3.4, 0, 'house', { n: [['d', 0]], w: [['d', 1.5]], e: [['d', -1.5]], s: [['w', 0]], props: [['crates', 1.8, 2], ['shelf', -1, -1.5, 1]] }],
+  [9, -33, 8, 7, 12, 0, 'brick'],
+  // ---- the avenue: streetcar tracks, a parked streetcar, wires, lamps, a newsstand
+  [12.5, 0, 1.6, 80, 0, 0, 'tracks'],
+  [12.5, -21, 2.4, 10, 3, 0, 'tram'],
+  [12.5, 0, 0, 0, 0, 0, 'cable', [12.5, -40, 6.2, 12.5, 40, 6.2]],
+  [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, 14, 6.4, 21.5, 14, 7]],
+  [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, -14, 6.4, 21.5, -14, 7]],
+  [12.5, 0, 0, 0, 0, 0, 'cable', [21.5, 30, 8, 54, 34, 9]],
+  [19.8, 13.5, 0, 0, 0, 0, 'vlamp'], [19.8, -13.5, 0, 0, 0, 0, 'vlamp'], [10.2, 26, 0, 0, 0, 0, 'vlamp'], [19.8, 34, 0, 0, 0, 0, 'vlamp'],
+  [17.5, 6, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [16.5, 30, 1.6, 1.6, 1.6, 0, 'crate'], [16.6, 30, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [17, -8, 0.8, 3, 1.1, 0, 'sand'],
+  [16, 37, 2, 2.5, 1.8, 0, 'crate'],
+  // ---- side streets: cover every 10-15 m so nothing is watched end to end
+  [24, 12, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [37, 11, 1.6, 1.6, 1.6, 0, 'crate'], [37.1, 11, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [31, -12.8, 2, 2.5, 1.8, 0, 'crate'],
+  [38.5, -12, 0.62, 0.62, 0.9, 0, 'barrel'], [39.2, -11.4, 0.62, 0.62, 0.9, 0, 'barrel', 1],
+  [22, -1.2, 0.62, 0.62, 0.9, 0, 'barrel'],
+  [29, 32, 4.4, 2.0, 1.45, 0, 'car', 1],
+  [40, 30, 0.8, 3, 1.1, 0, 'sand'],
+  [23, 37.5, 2.4, 0.9, 0.9, 0, 'stall', 0],
+  [36, -33, 1.6, 1.6, 1.6, 0, 'crate'],
+  [18, -36, 2, 2, 1.2, 0, 'pallet'],
+  [41, -24, 0.8, 3, 1.1, 0, 'sand'],
+  // ---- spawn: staggered HESCO
+  [46, 18, 1, 4, 3.5, 0, 'hesco'],
+  [46, -2, 1, 4, 3.5, 0, 'hesco'],
+  [46, -20, 1, 4, 3.5, 0, 'hesco'],
+  [48, 8, 3, 1, 3.5, 0, 'hesco'],
+  [48, -12, 3, 1, 3.5, 0, 'hesco'],
+  [48, 28, 3, 1, 3.5, 0, 'hesco'],
+  [48, -30, 3, 1, 3.5, 0, 'hesco'],
+  [52, -6, 3, 1, 3.5, 0, 'hesco'],
+  [52, 14, 3, 1, 3.5, 0, 'hesco'],
+  [51, 34, 2, 2, 1.2, 0, 'ammo'],
+  // ---- perimeter
+  [0, 40.5, 110, 1, 10, 0, 'boundary'],
+  [54.5, 0, 1, 82, 10, 0, 'boundary'],
+];
+const PIONEER_SPAWNS = [[51, -34], [51, -24], [51, -16], [51, 0], [51, 10], [51, 22], [51, 30], [49, -8], [49, 4], [49, 16]];
+const PIONEER_PICKUPS = [
+  { type: 'health', pos: [0, 0, 9.5] },
+  { type: 'health', pos: [0, 0, -9.5] },
+  { type: 'health', pos: [24, -3.24, 23.6] },
+  { type: 'health', pos: [-24, -3.24, -23.6] },
+  { type: 'ammo', pos: [28, 0, -6] },
+  { type: 'ammo', pos: [-28, 0, 6] },
+  { type: 'ammo', pos: [31.5, 0, -21] },
+  { type: 'ammo', pos: [-31.5, 0, 21] },
+  { type: 'ammo', pos: [17, 0, 18] },
+  { type: 'ammo', pos: [-17, 0, -18] },
+];
+
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3 },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS },
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 4 },
   mart: MART,
 };
 export const MAP_IDS = Object.keys(MAPS);
 
 // ---------- helpers ----------
+// rectangles [x0, z0, x1, z1]: r minus every hole, as a list of rectangles
+function rectsMinus(r, holes) {
+  let out = [r];
+  for (const h of holes) {
+    const next = [];
+    for (const a of out) {
+      if (h[0] >= a[2] || h[2] <= a[0] || h[1] >= a[3] || h[3] <= a[1]) { next.push(a); continue; }
+      if (a[1] < h[1]) next.push([a[0], a[1], a[2], h[1]]);
+      if (h[3] < a[3]) next.push([a[0], h[3], a[2], a[3]]);
+      const z0 = Math.max(a[1], h[1]), z1 = Math.min(a[3], h[3]);
+      if (a[0] < h[0]) next.push([a[0], z0, h[0], z1]);
+      if (h[2] < a[2]) next.push([h[2], z0, a[2], z1]);
+    }
+    out = next;
+  }
+  return out;
+}
+const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1);
@@ -330,6 +436,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     dim: std({ color: 0x0c0d0e, roughness: 0.95 }),
   };
   M.bag = pbr(tex.bag || tex.fabric);
+  M.cobble = tex.cobble ? pbr(tex.cobble, { roughness: 1 }) : M.tile;
+  M.iron = std({ color: 0x1f2a26, roughness: 0.45, metalness: 0.7 });
+  M.stone = pbr(tex.concrete, { color: 0xb8ad9a });
   // patterned cement floor tiles in the houses (centre house gets grey marble)
   if (tex.cement) M.houseFloor = pbr(tex.cement, { roughness: 1 });
   if (tex.marblegrey) M.centerFloor = pbr(tex.marblegrey, { roughness: 1 });
@@ -337,6 +446,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // metres per texture repeat; photo sets are real-world scale, so they tile tighter than the generated ones
   const photo = (k) => !!(tex[k] && tex[k].photo);
   const S = {
+    cobble: 2.2, stone: 2.5,
     plaster: 3, concrete: photo('concrete') ? 2.5 : 3, brick: photo('brick') ? 2.2 : 2, asphalt: photo('asphalt') ? 4 : 7, dirt: photo('dirt') ? 5 : 9,
     tile: photo('tile') ? 2.6 : 2.2, metal: 2.4, wood: photo('wood') ? 1.6 : 1.2, woodOld: 1.6, sand: 1.2, hesco: 1.75, cloth: photo('cloth') ? 1.5 : 1, paint: 1.6, rust: 1.6, rubber: 1,
   };
@@ -359,7 +469,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const B = (mat, w, h, d, x, y, z, ry = 0, opts = {}) => put(worldBox(w, h, d, scaleOf(mat)), mat, x, y + h / 2, z, ry, opts);
   const solid = (cx, cz, w, d, h, y0 = 0, surface = 'concrete') => { const b = physics.addBox(new Box(cx - w / 2, y0, cz - d / 2, cx + w / 2, y0 + h, cz + d / 2)); b.surface = surface; return b; };
   const SURFACE = { container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'dirt', hesco: 'dirt', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
-  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light']);
+  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower']);
 
   // ---------- shared decals / glows ----------
   const radial = (stops) => {
@@ -406,8 +516,24 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const decal = (mat, w, h, x, y, z, ry, rx = 0) => put(new THREE.PlaneGeometry(w, h), mat, x, y, z, ry, { rx, grime: 0, cast: false });
 
   // ---------- ground ----------
-  physics.addBox(new Box(-200, -2, -200, 200, 0, 200)).surface = 'ground';
+  // lower levels (the Underground): tunnels and their stairwells cut holes in the ground, and the buildings
+  // above them leave a nav-transparent "lid" over the tunnel so bots can path underneath
+  const HOLES = [];
+  if (LAYOUT.center && LAYOUT.half) {
+    const scan = (cx, cz, w, d, kind) => { if (kind === 'tunnel' || kind === 'stairdown') HOLES.push([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2]); };
+    for (const it of LAYOUT.center) scan(it[0], it[1], it[2], it[3], it[6]);
+    for (const it of LAYOUT.half) { scan(it[0], it[1], it[2], it[3], it[6]); scan(-it[0], -it[1], it[2], it[3], it[6]); }
+  }
+  const SOLID_LIDS = HOLES; // building mass over these rects is nav-transparent (a level runs beneath)
+  for (const [x0, z0, x1, z1] of rectsMinus([-200, -200, 200, 200], HOLES)) physics.addBox(new Box(x0, -2, z0, x1, 0, z1)).surface = 'ground';
   const plane = (mat, w, d, x, z, y, ry = 0) => {
+    if (HOLES.length && !ry) {
+      const pieces = rectsMinus([x - w / 2, z - d / 2, x + w / 2, z + d / 2], HOLES);
+      if (pieces.length !== 1) { for (const [a, b, c, e] of pieces) planePiece(mat, c - a, e - b, (a + c) / 2, (b + e) / 2, y); return; }
+    }
+    planePiece(mat, w, d, x, z, y, ry);
+  };
+  const planePiece = (mat, w, d, x, z, y, ry = 0) => {
     const g = new THREE.PlaneGeometry(w, d);
     const sc = scaleOf(mat);
     const uv = g.attributes.uv;
@@ -623,6 +749,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   };
 
   // ---------- dressing per collision kind ----------
+  const shutterTints = [0x9c9c94, 0x6e7f86, 0x8a7a62, 0x7d8a6a];
+  const signTints = [0x2f5a6a, 0x8a2f2a, 0xb08a3a, 0x3d5a3a, 0xd9d2c0];
   const plasterTints = [0xf1e1c2, 0xe4cfac, 0xd8c09b, 0xece3d2, 0xdcbf94, 0xcfb894];
   const decorate = (cx, cz, w, d, h, y0, kind, extra, team) => {
     const x0 = cx - w / 2, z0 = cz - d / 2;
@@ -855,6 +983,267 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'palm': buildPalm(cx, cz, rnd); break;
+      case 'brick': {
+        // Romanesque brick block (Pioneer Square): rusticated stone ground floor with shopfronts and awnings,
+        // arched windows in brick pilaster bays, string courses, a heavy cornice; an optional corner tower.
+        const o = extra || {};
+        const fp = [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2];
+        const lids = SOLID_LIDS.filter(r => overlaps(r, fp));
+        for (const [a, b, c, e] of rectsMinus(fp, lids)) solid((a + c) / 2, (b + e) / 2, c - a, e - b, h, y0, 'brick');
+        for (const r of lids) {
+          const a = Math.max(r[0], fp[0]), b = Math.max(r[1], fp[1]), c = Math.min(r[2], fp[2]), e = Math.min(r[3], fp[3]);
+          solid((a + c) / 2, (b + e) / 2, c - a, e - b, h, y0, 'brick').navIgnore = true;
+        }
+        const stoneBody = o.stone || rnd() < 0.25;
+        const wallMat = stoneBody ? M.stone : M.brick;
+        const tint = o.tint ?? (stoneBody ? 0xe0d6c4 : [0xffffff, 0xe9c6a8, 0xf2d9c0, 0xd8a890][Math.floor(rnd() * 4)]);
+        const G = 4.4;                                         // ground floor height
+        B(M.stone, w + 0.12, G, d + 0.12, cx, y0, cz, 0, { tint: 0xa79d8c, grime: 0.55 });
+        B(wallMat, w, h - G, d, cx, y0 + G, cz, 0, { tint, grime: 0.5, base: y0 + G });
+        B(M.stone, w + 0.5, 0.35, d + 0.5, cx, y0 + G - 0.1, cz, 0, { tint: 0xc9bfae, grime: 0.15, base: y0 + G });       // belt course
+        B(M.stone, w + 0.9, 0.55, d + 0.9, cx, y0 + h - 0.55, cz, 0, { tint: 0xc9bfae, grime: 0.2, base: y0 + h - 1 });   // cornice
+        B(M.stone, w + 0.6, 0.25, d + 0.6, cx, y0 + h - 0.85, cz, 0, { tint: 0xb9ae9c, grime: 0.2, base: y0 + h - 1 });
+        B(wallMat, w + 0.2, 0.8, d + 0.2, cx, y0 + h, cz, 0, { tint, grime: 0.3, base: y0 + h });                       // parapet
+        const floors = Math.max(1, Math.floor((h - G - 1.2) / 3.4));
+        for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const L = nx ? d : w, ax = -nz, az = nx, ry = Math.atan2(nx, nz);
+          const bays = Math.max(1, Math.floor(L / 3.2)), bw = L / bays;
+          const fx = (t, off = 0) => cx + nx * (w / 2 + off) + ax * t, fz = (t, off = 0) => cz + nz * (d / 2 + off) + az * t;
+          for (let i = 0; i < bays; i++) {
+            const t = -L / 2 + (i + 0.5) * bw;
+            // pilasters between bays
+            if (i > 0) put(flatBox(0.42, h - G - 0.9, 0.16, scaleOf(wallMat)), wallMat, fx(t - bw / 2, 0.06), y0 + G + (h - G - 0.9) / 2, fz(t - bw / 2, 0.06), ry, { tint, grime: 0.35, base: y0 + G });
+            // ground floor: shopfront glass or a stone-arched entrance, with a striped awning now and then
+            if (i === Math.floor(bays / 2) && L > 9) {
+              put(flatBox(1.8, 3.0, 0.05, 0), M.dim, fx(t, 0.02), y0 + 1.5, fz(t, 0.02), ry, { grime: 0 });
+              put(new THREE.TorusGeometry(1.15, 0.22, 6, 18, Math.PI), M.stone, fx(t, 0.1), y0 + 3.0, fz(t, 0.1), ry, { grime: 0.2, tint: 0xb9ae9c });
+            } else {
+              put(flatBox(bw - 0.9, 2.5, 0.05, 0), M.glass, fx(t, 0.03), y0 + 1.85, fz(t, 0.03), ry, { grime: 0, tint: rnd() < 0.3 ? 0xd8c9a0 : 0xffffff });
+              put(flatBox(bw - 0.7, 0.14, 0.12, 0), M.frame, fx(t, 0.06), y0 + 3.15, fz(t, 0.06), ry, { grime: 0, tint: 0x2f3a33 });
+              put(flatBox(bw - 0.7, 0.5, 0.14, 0), M.paint, fx(t, 0.07), y0 + 3.55, fz(t, 0.07), ry, { grime: 0.1, tint: signTints[Math.floor(rnd() * signTints.length)] });
+              if (rnd() < 0.5) put(new THREE.PlaneGeometry(bw - 0.6, 1.4, 4, 2), M.cloth, fx(t, 0.75), y0 + 3.1, fz(t, 0.75), ry, { rx: -Math.PI / 2 + 0.55, tint: [0x8a2f2a, 0x2f5a3a, 0x9c7a3a, 0x3d4f63][Math.floor(rnd() * 4)], grime: 0 });
+            }
+            // upper floors: tall arched windows (top floor gets the big round arches)
+            for (let f = 0; f < floors; f++) {
+              const y = y0 + G + 0.6 + f * 3.4 + 1.25;
+              const top = f === floors - 1, ww = Math.min(1.25, bw - 1.1), wh = top ? 1.7 : 1.95;
+              windowDecor(fx(t), fz(t), nx, nz, y, ww, wh);
+              put(new THREE.TorusGeometry(ww / 2 + 0.12, 0.13, 5, 14, Math.PI), wallMat, fx(t, 0.06), y + wh / 2 - 0.05, fz(t, 0.06), ry, { tint: 0xc9a080, grime: 0.2 });
+              put(new THREE.CircleGeometry(ww / 2, 14, 0, Math.PI), M.dim, fx(t, 0.015), y + wh / 2 - 0.05, fz(t, 0.015), ry, { grime: 0 });
+            }
+            // string course every floor
+          }
+          for (let f = 1; f < floors; f++) put(flatBox(L + 0.3, 0.16, 0.18, 3), M.stone, fx(0, 0.09), y0 + G + f * 3.4 + 0.2, fz(0, 0.09), ry, { tint: 0xc9bfae, grime: 0.1 });
+          // fire escape on one long side now and then
+          if (rnd() < 0.3 && L > 10) {
+            const t0 = (rnd() - 0.5) * (L - 6);
+            for (let f = 0; f < floors; f++) {
+              const y = y0 + G + 0.55 + f * 3.4;
+              put(flatBox(3.2, 0.06, 1.0, 0), M.iron, fx(t0, 0.55), y, fz(t0, 0.55), ry, { grime: 0.3 });
+              put(flatBox(3.2, 0.9, 0.04, 0), M.iron, fx(t0, 1.03), y + 0.45, fz(t0, 1.03), ry, { grime: 0.3 });
+            }
+          }
+        }
+        // roof: wooden water tank, chimneys
+        if (rnd() < 0.6) {
+          const tx = cx + (rnd() - 0.5) * (w - 4), tz = cz + (rnd() - 0.5) * (d - 4), ty = y0 + h + 0.8;
+          for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(new THREE.CylinderGeometry(0.08, 0.08, 1.6, 6), M.iron, tx + sx * 0.9, ty, tz + sz * 0.9, 0, { grime: 0.3 });
+          put(new THREE.CylinderGeometry(1.3, 1.3, 2.6, 16, 1, true), M.woodOld, tx, ty + 2.1, tz, 0, { grime: 0.3, tint: 0x8a7458 });
+          put(new THREE.ConeGeometry(1.4, 0.9, 16), M.iron, tx, ty + 3.85, tz, 0, { grime: 0.2 });
+        }
+        for (let i = 0; i < 2; i++) B(M.brick, 0.8, 1.8, 0.8, cx + (rnd() - 0.5) * (w - 2), y0 + h, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0xb06048, grime: 0.6, base: y0 + h });
+        if (o.tower) {
+          // corner turret with a pyramid roof, the Pioneer Building's crown
+          const tx = cx + w / 2 - 2, tz = cz - d / 2 + 2;
+          B(wallMat, 4, 7, 4, tx, y0 + h, tz, 0, { tint, grime: 0.3, base: y0 + h });
+          for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) windowDecor(tx + nx * 2, tz + nz * 2, nx, nz, y0 + h + 3.5, 1.0, 1.8);
+          put(new THREE.ConeGeometry(3.2, 6, 4), M.iron, tx, y0 + h + 10, tz, Math.PI / 4, { grime: 0.2, tint: 0x46564f });
+        }
+        break;
+      }
+      case 'tunnel': {
+        // the Seattle Underground: old storefront level below the street. Brick walls, timber posts and beams,
+        // plank ceiling (the sidewalk above), pipes, bare bulbs, junk. Floor at y = -h; walls block nav.
+        const o = extra || {}, D = h, T = 0.4;
+        const floorY = y0 - D;
+        solid(cx, cz, w, d, 0.3, floorY - 0.3, 'concrete');
+        put(new THREE.PlaneGeometry(w, d), M.concrete, cx, floorY + 0.005, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x8a8478 });
+        // walls with gaps: gaps = [[side, offset, width]]
+        const sides = [
+          { k: 'n', ax: 1, az: 0, len: w, ox: cx, oz: cz + d / 2 - T / 2, nx: 0, nz: -1 },
+          { k: 's', ax: 1, az: 0, len: w, ox: cx, oz: cz - d / 2 + T / 2, nx: 0, nz: 1 },
+          { k: 'e', ax: 0, az: 1, len: d, ox: cx + w / 2 - T / 2, oz: cz, nx: -1, nz: 0 },
+          { k: 'w', ax: 0, az: 1, len: d, ox: cx - w / 2 + T / 2, oz: cz, nx: 1, nz: 0 },
+        ];
+        for (const S of sides) {
+          const gaps = (o.gaps || []).filter(g => g[0] === S.k).map(g => [g[1] - g[2] / 2, g[1] + g[2] / 2]).sort((a, b) => a[0] - b[0]);
+          let cur = -S.len / 2;
+          const seg = (a, b) => {
+            if (b - a < 0.05) return;
+            const m = (a + b) / 2, L = b - a, x = S.ox + S.ax * m, z = S.oz + S.az * m;
+            solid(x, z, S.ax ? L : T, S.az ? L : T, D, floorY, 'brick').navBlock = true;
+            put(flatBox(S.ax ? L : T, D, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + D / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
+          };
+          for (const [a, b] of gaps) { seg(cur, a); put(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI), M.brick, S.ox + S.ax * (a + b) / 2, floorY + 2.3, S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
+          seg(cur, S.len / 2);
+        }
+        // ceiling: planks on joists (the underside of the street), with glass prism lights here and there
+        put(new THREE.PlaneGeometry(w, d), M.woodOld, cx, y0 - 0.05, cz, 0, { rx: Math.PI / 2, grime: 0, cast: false, tint: 0x6a5a48 });
+        const along = w >= d, L = along ? w : d, W = along ? d : w;
+        for (let i = -L / 2 + 0.75; i < L / 2; i += 1.5) put(flatBox(along ? 0.2 : W, 0.28, along ? W : 0.2, 1.2), M.woodOld, cx + (along ? i : 0), y0 - 0.2, cz + (along ? 0 : i), 0, { grime: 0, tint: 0x5a4a3a });
+        for (const off of [-W / 2 + 0.6, -W / 2 + 0.9]) put(new THREE.CylinderGeometry(0.06, 0.06, L - 1, 8), M.metal, cx + (along ? 0 : off), y0 - 0.5, cz + (along ? off : 0), 0, { rx: along ? 0 : 0, rz: along ? Math.PI / 2 : 0, ...(along ? {} : { rx: Math.PI / 2 }), tint: 0x3a3a38, grime: 0.4 });
+        // timber posts down the middle (cover), bulbs between them
+        for (let i = -L / 2 + 2.5; i < L / 2 - 1.5; i += 3) {
+          const px = cx + (along ? i : W * 0.12), pz = cz + (along ? W * 0.12 : i);
+          solid(px, pz, 0.3, 0.3, D, floorY, 'wood').navBlock = true;
+          put(flatBox(0.3, D, 0.3, 1.2), M.woodOld, px, floorY + D / 2, pz, 0, { tint: 0x7a6650, grime: 0.6, base: floorY });
+          const bx = px + (along ? 1.5 : 0), bz = pz + (along ? 0 : 1.5);
+          put(new THREE.SphereGeometry(0.07, 8, 6), M.bulb, bx, y0 - 0.45, bz, 0, { grime: 0, cast: false });
+          glows.push([bx, y0 - 0.45, bz, 0.9]);
+          if (Math.round(i * 10) % 2 === 0) { const L2 = new THREE.PointLight(0xffd6a0, 6, 8, 1.6); L2.position.set(bx, y0 - 0.6, bz); L2.userData.mapLight = true; group.add(L2); }
+        }
+        // junk along one wall: broken planks, crates, an old painted sign
+        for (let i = 0; i < Math.floor(L / 3); i++) {
+          const t = -L / 2 + 1.5 + i * 3 + rnd(), side = (i % 2 ? 1 : -1) * (W / 2 - T - 0.45);
+          const jx = cx + (along ? t : side), jz = cz + (along ? side : t);
+          if (rnd() < 0.5) { solid(jx, jz, 0.9, 0.9, 0.9, floorY, 'wood').navBlock = true; B(M.wood, 0.9, 0.9, 0.9, jx, floorY, jz, rnd(), { grime: 0.4, base: floorY }); }
+          else for (let k = 0; k < 4; k++) put(flatBox(0.12, 0.04, 1.6, 1.2), M.woodOld, jx + (rnd() - 0.5) * 0.4, floorY + 0.15 + k * 0.08, jz + (rnd() - 0.5) * 0.4, rnd() * 3, { rz: (rnd() - 0.5) * 0.6, grime: 0.3, tint: 0x8a7458 });
+        }
+        if (posterMat) decal(posterMat[1], 1.6, 1.1, cx + (along ? -L / 4 : W / 2 - T - 0.01), floorY + 1.7, cz + (along ? W / 2 - T - 0.01 : -L / 4), along ? Math.PI : -Math.PI / 2);
+        break;
+      }
+      case 'stairdown': {
+        // stairwell from the street down to the Underground: steps descend along x (dir +1: going +x), retaining
+        // walls with an iron railing on both long sides
+        const dir = (extra && extra.dir) || 1, D = h, n = Math.ceil(D / 0.36), run = w / n, T = 0.25;
+        for (let k = 1; k <= n; k++) {
+          const top = y0 - (k / n) * D;
+          const sx = cx - dir * w / 2 + dir * (k - 0.5) * run;
+          const len = k === n ? run : run;
+          solid(sx, cz, len, d - 2 * T, top - (y0 - D - 0.3), y0 - D - 0.3, 'concrete');
+          put(flatBox(len, 0.06, d - 2 * T, 0), M.concrete, sx, top - 0.03, cz, 0, { tint: 0x9a948a, grime: 0.4 });
+          put(flatBox(0.04, top - (y0 - D), d - 2 * T, 0), M.concrete, sx - dir * len / 2, (top + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });
+        }
+        for (const sz of [-1, 1]) {
+          const z = cz + sz * (d / 2 - T / 2);
+          solid(cx, z, w, T, D + 0.95, y0 - D, 'concrete').navBlock = true;
+          put(flatBox(w, D, T, scaleOf(M.brick)), M.brick, cx, y0 - D / 2, z, 0, { tint: 0xc08a70, grime: 0.6, base: y0 - D });
+          // railing at street level
+          put(flatBox(w, 0.06, 0.06, 0), M.iron, cx, y0 + 0.95, z, 0, { grime: 0.2 });
+          for (let i = 0; i <= Math.floor(w / 0.15); i++) put(new THREE.CylinderGeometry(0.015, 0.015, 0.95, 5), M.iron, cx - w / 2 + i * 0.15, y0 + 0.475, z, 0, { grime: 0 });
+        }
+        break;
+      }
+      case 'paving': plane(extra === 'brick' ? M.brick : M.cobble, w, d, cx, cz, 0.018); break;
+      case 'tracks': {
+        // streetcar rails set into the street
+        const along = d >= w, L = along ? d : w;
+        for (const off of [-0.72, 0.72]) put(flatBox(along ? 0.08 : L, 0.03, along ? L : 0.08, 0), M.metal, cx + (along ? off : 0), 0.02, cz + (along ? 0 : off), 0, { grime: 0, tint: 0x8a8a88, cast: false });
+        break;
+      }
+      case 'cable': {
+        const [x1, z1, y1, x2, z2, y2] = extra;
+        const a = new THREE.Vector3(x1, y1, z1), b = new THREE.Vector3(x2, y2, z2), m = a.clone().lerp(b, 0.5); m.y -= a.distanceTo(b) * 0.04;
+        put(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, m, b), 16, 0.014, 4), M.rubber, 0, 0, 0, 0, { grime: 0, cast: false });
+        break;
+      }
+      case 'tree': {
+        // London plane: mottled trunk, a few big limbs, clumped canopy
+        solid(cx, cz, 0.6, 0.6, 3, 0, 'wood');
+        const H = h || 9;
+        put(new THREE.CylinderGeometry(0.22, 0.32, H * 0.45, 9), M.woodOld, cx, H * 0.225, cz, 0, { tint: 0x9a8f7a, grime: 0.2 });
+        const crown = [];
+        for (let i = 0; i < 4; i++) {
+          const a = i * 1.7 + rnd(), len = 2.4 + rnd() * 1.2, tilt = 0.55 + rnd() * 0.25;
+          const ex = cx + Math.cos(a) * Math.sin(tilt) * len, ez = cz + Math.sin(a) * Math.sin(tilt) * len, ey = H * 0.42 + Math.cos(tilt) * len;
+          put(new THREE.CylinderGeometry(0.1, 0.17, len, 7), M.woodOld, (cx + ex) / 2, (H * 0.42 + ey) / 2, (cz + ez) / 2, 0, { rx: Math.sin(a) * tilt, rz: -Math.cos(a) * tilt, tint: 0xa89c86, grime: 0.1 });
+          crown.push([ex, ey, ez]);
+        }
+        crown.push([cx, H * 0.85, cz]);
+        for (const [x, y, z] of crown) for (let j = 0; j < 2; j++) {
+          const g = new THREE.IcosahedronGeometry(1.6 + rnd() * 1.0, 1);
+          const pp = g.attributes.position; for (let v = 0; v < pp.count; v++) pp.setXYZ(v, pp.getX(v) * (0.85 + rnd() * 0.3), pp.getY(v) * (0.7 + rnd() * 0.2), pp.getZ(v) * (0.85 + rnd() * 0.3));
+          g.computeVertexNormals();
+          put(g, M.leaf, x + (rnd() - 0.5) * 1.6, y + (rnd() - 0.3) * 1.2, z + (rnd() - 0.5) * 1.6, rnd() * 6, { grime: 0, tint: [0x7a8c4a, 0x6a7c3e, 0x8a9a52][Math.floor(rnd() * 3)] });
+        }
+        break;
+      }
+      case 'pergola': {
+        // cast-iron pergola: columns with capitals, arched glass roof on ribs, cresting along the ridge, globe lamps
+        const H = h || 3.8, n = Math.max(3, Math.round(w / 2.2));
+        for (const sz of [-1, 1]) for (let i = 0; i <= n; i++) {
+          const x = cx - w / 2 + i * (w / n), z = cz + sz * (d / 2 - 0.15);
+          solid(x, z, 0.26, 0.26, H, 0, 'metal');
+          put(new THREE.CylinderGeometry(0.09, 0.12, H, 10), M.iron, x, H / 2, z, 0, { grime: 0.1 });
+          put(new THREE.CylinderGeometry(0.22, 0.1, 0.35, 10), M.iron, x, H - 0.1, z, 0, { grime: 0 });
+          put(new THREE.CylinderGeometry(0.2, 0.24, 0.3, 10), M.iron, x, 0.15, z, 0, { grime: 0.2 });
+          if (i % 2 === 0) { put(new THREE.SphereGeometry(0.16, 10, 8), M.bulb, x, H - 0.55, z - sz * 0.35, 0, { grime: 0, cast: false }); glows.push([x, H - 0.55, z - sz * 0.35, 1.0]); }
+        }
+        const glassMat = M.pergolaGlass || (M.pergolaGlass = std({ color: 0x9fbab0, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }));
+        const roof = new THREE.CylinderGeometry(d / 2, d / 2, w, 16, 1, true, -Math.PI / 2, Math.PI);
+        put(roof, glassMat, cx, H + 0.1, cz, 0, { rz: Math.PI / 2, sx: 1, sy: 1, grime: 0, cast: false });
+        for (let i = 0; i <= n; i++) put(new THREE.TorusGeometry(d / 2, 0.05, 5, 16, Math.PI), M.iron, cx - w / 2 + i * (w / n), H + 0.1, cz, Math.PI / 2, { grime: 0 });
+        put(flatBox(w, 0.08, 0.08, 0), M.iron, cx, H + 0.1 + d / 2, cz, 0, { grime: 0 });
+        for (let i = 0; i < Math.round(w / 0.4); i++) put(new THREE.ConeGeometry(0.05, 0.3, 4), M.iron, cx - w / 2 + 0.2 + i * 0.4, H + 0.3 + d / 2, cz, 0, { grime: 0 });
+        for (const sz of [-1, 1]) put(flatBox(w, 0.25, 0.08, 0), M.iron, cx, H + 0.05, cz + sz * (d / 2 - 0.1), 0, { grime: 0 });
+        break;
+      }
+      case 'totem': {
+        // carved cedar pole: stacked figures in red, black and teal, wings near the top
+        const H = h || 9;
+        put(new THREE.CylinderGeometry(0.4, 0.46, H, 12), M.woodOld, cx, H / 2, cz, 0, { tint: 0x9a7a58, grime: 0.2 });
+        for (let i = 0; i < 5; i++) {
+          const y = 1 + i * (H - 2) / 5;
+          put(new THREE.CylinderGeometry(0.47, 0.47, 0.35, 12, 1, true, -0.9, 1.8), M.paint, cx, y + 0.6, cz, 0, { tint: [0x8a2a22, 0x1c1c1c, 0x2f6a6a][i % 3], grime: 0 });
+          for (const sx of [-1, 1]) put(new THREE.SphereGeometry(0.11, 8, 6), M.paint, cx + sx * 0.18, y + 0.95, cz + 0.4, 0, { tint: 0xe8e2d0, grime: 0 });
+          put(flatBox(0.16, 0.2, 0.3, 0), M.paint, cx, y + 0.3, cz + 0.42, 0, { tint: 0x8a2a22, grime: 0 });
+        }
+        for (const sx of [-1, 1]) put(flatBox(1.6, 0.5, 0.08, 0), M.paint, cx + sx * 1.0, H - 1.2, cz, 0, { rz: sx * 0.25, tint: 0x1c1c1c, grime: 0 });
+        break;
+      }
+      case 'vlamp': {
+        // five-globe cast-iron street lamp
+        solid(cx, cz, 0.3, 0.3, 3.8, 0, 'metal');
+        put(new THREE.CylinderGeometry(0.28, 0.34, 0.6, 10), M.iron, cx, 0.3, cz, 0, { grime: 0.2 });
+        put(new THREE.CylinderGeometry(0.08, 0.12, 3.6, 10), M.iron, cx, 2.2, cz, 0, { grime: 0.1 });
+        const ys = 4.05;
+        put(new THREE.SphereGeometry(0.2, 12, 8), M.bulb, cx, ys + 0.35, cz, 0, { grime: 0, cast: false }); glows.push([cx, ys + 0.35, cz, 1.4]);
+        for (let i = 0; i < 4; i++) {
+          const a = i * Math.PI / 2 + Math.PI / 4, bx = cx + Math.cos(a) * 0.42, bz = cz + Math.sin(a) * 0.42;
+          put(flatBox(0.42, 0.04, 0.04, 0), M.iron, (cx + bx) / 2, ys - 0.05, (cz + bz) / 2, -a, { grime: 0 });
+          put(new THREE.SphereGeometry(0.17, 12, 8), M.bulb, bx, ys + 0.12, bz, 0, { grime: 0, cast: false });
+          glows.push([bx, ys + 0.12, bz, 1.1]);
+        }
+        break;
+      }
+      case 'bench': {
+        for (let i = 0; i < 4; i++) put(flatBox(w, 0.04, 0.09, 1.2), M.wood, cx, 0.45, cz - d / 2 + 0.06 + i * 0.12, 0, { grime: 0.2, tint: 0x8a6a48 });
+        for (let i = 0; i < 3; i++) put(flatBox(w, 0.09, 0.04, 1.2), M.wood, cx, 0.65 + i * 0.12, cz + d / 2 - 0.03, 0, { grime: 0.2, tint: 0x8a6a48 });
+        for (const sx of [-1, 1]) put(flatBox(0.06, 0.9, d, 0), M.iron, cx + sx * (w / 2 - 0.1), 0.45, cz, 0, { grime: 0.1 });
+        break;
+      }
+      case 'tram': {
+        // a 1910s streetcar parked on its tracks: varnished body, clerestory roof, trolley pole
+        const along = d >= w, L = along ? d : w, W = along ? w : d, ry = along ? 0 : Math.PI / 2;
+        const P = (a, b) => [cx + (along ? a : b), cz + (along ? b : a)];
+        B(M.paint, along ? W : L, 1.1, along ? L : W, cx, 0.35, cz, 0, { tint: 0x5a2a20, grime: 0.4 });
+        B(M.paint, along ? W - 0.1 : L - 0.4, 1.3, along ? L - 0.4 : W - 0.1, cx, 1.45, cz, 0, { tint: 0x7a3a2a, grime: 0.2 });
+        for (let i = -L / 2 + 0.9; i < L / 2 - 0.6; i += 0.95) for (const s of [-1, 1]) { const [x, z] = P(s * (W / 2 - 0.04), i); put(flatBox(along ? 0.04 : 0.7, 0.8, along ? 0.7 : 0.04, 0), M.glass, x, 2.0, z, 0, { grime: 0 }); }
+        B(M.paint, along ? W + 0.2 : L, 0.18, along ? L : W + 0.2, cx, 2.75, cz, 0, { tint: 0x3a2a22, grime: 0.2 });
+        B(M.paint, along ? W - 1 : L - 2, 0.35, along ? L - 2 : W - 1, cx, 2.93, cz, 0, { tint: 0x5a2a20, grime: 0.2 });
+        put(new THREE.CylinderGeometry(0.03, 0.03, 4.5, 6), M.iron, cx, 4.3, cz, 0, { rx: along ? 0.8 : 0, rz: along ? 0 : 0.8, grime: 0 });
+        for (const s of [-1, 1]) for (const t of [-1, 1]) { const [x, z] = P(s * (W / 2 - 0.3), t * (L / 2 - 1.4)); put(new THREE.CylinderGeometry(0.33, 0.33, 0.12, 14), M.iron, x, 0.33, z, 0, { rz: along ? Math.PI / 2 : 0, rx: along ? 0 : Math.PI / 2, grime: 0.3 }); }
+        break;
+      }
+      case 'tower': {
+        // Smith Tower: white terracotta shaft with a window grid and a pyramid top, on the skyline to the north
+        B(M.stone, w, h, d, cx, 0, cz, 0, { tint: 0xeee8dc, grime: 0.15, cast: false });
+        for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let y = 6; y < h - 4; y += 3.3) for (let i = -1; i <= 1; i++) put(flatBox(1.6, 1.9, 0.04, 0), M.dim, cx + nx * (w / 2 + 0.02) + -nz * i * 3.6, y, cz + nz * (d / 2 + 0.02) + nx * i * 3.6, Math.atan2(nx, nz), { grime: 0, cast: false });
+        B(M.stone, w * 0.7, 8, d * 0.7, cx, h, cz, 0, { tint: 0xeee8dc, grime: 0.15, cast: false });
+        put(new THREE.ConeGeometry(w * 0.55, 16, 4), M.stone, cx, h + 16, cz, Math.PI / 4, { tint: 0xe2dccf, grime: 0.1, cast: false });
+        put(new THREE.SphereGeometry(0.6, 10, 8), M.bulb, cx, h + 24.5, cz, 0, { grime: 0, cast: false });
+        break;
+      }
       case 'boundary': break; // dressed by perimeter buildings below
       default:
         B(M.concrete, w, h, d, cx, y0, cz);
@@ -943,13 +1332,18 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (street) for (const it of LAYOUT.center) add(...it.slice(0, 7), it[7], 0);
   if (street) for (const [cx, cz, w, d, h, y0, kind, extra] of LAYOUT.half) {
     add(cx, cz, w, d, h, y0, kind, extra, 1);
-    const mx = kind === 'house' ? mirrorSpec(extra) : kind === 'lights' ? [-extra[0], -extra[1], -extra[2], -extra[3]] : extra;
+    const flipSide = { n: 's', s: 'n', e: 'w', w: 'e' };
+    const mx = kind === 'house' ? mirrorSpec(extra) : kind === 'lights' ? [-extra[0], -extra[1], -extra[2], -extra[3]]
+      : kind === 'cable' ? [-extra[0], -extra[1], extra[2], -extra[3], -extra[4], extra[5]]
+      : kind === 'stairdown' ? { ...extra, dir: -((extra && extra.dir) || 1) }
+      : kind === 'tunnel' ? { ...extra, gaps: (extra && extra.gaps || []).map(([k, at, wd]) => [flipSide[k], -at, wd]) }
+      : extra;
     add(-cx, -cz, w, d, h, y0, kind, mx, 0);
   }
 
   // ---------- street dressing: puddles, litter, posters (all batched, no extra draw calls) ----------
   if (street) {
-    const blocked = (x, z, r) => physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
+    const blocked = (x, z, r) => HOLES.some(h => x > h[0] - r && x < h[2] + r && z > h[1] - r && z < h[3] + r) || physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
     const inside = (x, z) => Math.abs(x) < HX - 3 && Math.abs(z) < HZ - 3;
     // rain puddles: near-black water that mirrors the dusk sky, soft-edged, in the open streets
     const puddleMat = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.8,
@@ -1002,8 +1396,6 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   // ---------- perimeter buildings ----------
-  const shutterTints = [0x9c9c94, 0x6e7f86, 0x8a7a62, 0x7d8a6a];
-  const signTints = [0x2f5a6a, 0x8a2f2a, 0xb08a3a, 0x3d5a3a, 0xd9d2c0];
   const facade = (ox, oz, ax, az, nx, nz, L, depth) => {
     // ox,oz: start corner on the facade line; (ax,az) along; (nx,nz) normal pointing into the map
     let s = 0;
