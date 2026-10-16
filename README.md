@@ -109,6 +109,10 @@ The account server is `cloudflare/auth-worker.js` (Cloudflare Worker + Workers K
 
 Free-tier capacity: Workers KV allows 1,000 writes a day (about 200 sign-ins a day; sessions last 60 days so returning players don't count), Resend 100 emails a day. The $5/month Workers plan lifts the KV limit.
 
+### Lobby
+
+Lobbies are laid out like a classic console shooter's: the match type and mode as a big title, a menu (Start Match, Create a Class, invite link, join approval, bots, Leave) with a one-line description of the highlighted item, and the map card (or the next-map vote cards in public lobbies) under "The match is about to begin...". On the right is the player list grouped by team: level, rank insignia, Name Tag (you in gold, your team in blue), career score, a star on the host, connection bars, and "Waiting for player..." slots. Create a Class opens the class editor right in the lobby; the class you equip is the one you spawn with. Career score is your total match score on this device; it sets your level (1–55).
+
 ### Matches
 
 - **Terms of use**: signing in shows the terms (rules, what's stored, every safety measure). Players must scroll to the end and agree before playing online; the account server refuses match passes until they have. Offline play needs no account. When the terms change, bump `TERMS_VERSION` in both `js/account.js` and the Worker and everyone accepts again.

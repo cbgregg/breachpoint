@@ -10,6 +10,7 @@ import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHM
 import { GunPreview } from './gunsmith.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
+import { loadCareer, levelOf, emblemSVG, addMatch } from './career.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -325,6 +326,7 @@ function equipClass() {
   applyEquipped();
   saveSettings(settings);
   if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
+  else syncLobbyLoadout();
   game.audio.play('ui', null, { ui: true });
   renderClasses();
 }
@@ -379,7 +381,7 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 let screen = 'menu';
 function showScreen(id) {
   closeDropdown();
-  if (id !== 'pause' && id !== 'lobby' && $('pane-loadout').closest('#pause')) restorePanes();
+  if (id !== 'pause' && id !== 'lobby' && $('pane-loadout').closest('#pause, #cl')) { clEditing = false; restorePanes(); }
   if (id !== 'pause') clearInterval(pauseTimer);
   screen = id;
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
@@ -548,6 +550,9 @@ game.onEnd = (r) => {
   const mvp = r.mvp;
   $('end-mvp').textContent = `MVP  ${mvp.name.toUpperCase()}  ·  ${mvp.score} PTS  ·  ${mvp.kills}/${mvp.deaths}`;
   game.hud.renderScoreboard($('end-board'));
+  // career score and level (shown next to your name in lobbies)
+  const me = game.player;
+  if (me) { const c = addMatch({ score: me.score, kills: me.kills, deaths: me.deaths, won: r.winner === mine }); lobby.myXp = c.xp; if (c.levelUp) game.hud.toast(`LEVEL UP · LEVEL ${c.level}`); }
   $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
   setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
   if (lobby.public && lobby.role === 'host') {
@@ -573,6 +578,7 @@ if (window.BREACHPOINT_OFFLINE) {
 }
 const lobby = new Lobby(game);
 lobby.account = account;
+lobby.myXp = loadCareer().xp;
 window.__lobby = lobby;
 lobby.onMapVoteDone = (mapId) => {
   if (!lobby.public || lobby.role !== 'host') return;
@@ -586,7 +592,7 @@ function renderMapVote() {
     <div class="mv-opts">${mv.o.map((id, i) => `<button class="mv-opt ${mv.my === i ? 'on' : ''}" data-mv="${i}" data-nav><b>${esc(MAPS[id] ? MAPS[id].name : id)}</b><small>${esc(MAPS[id] && MAPS[id].blurb || '')}</small><span>${mv.v[i] || 0} ${mv.v[i] === 1 ? 'VOTE' : 'VOTES'}</span></button>`).join('')}</div>`;
   for (const id of ['mv-end', 'mv-join', 'mv-host']) setHTML(id, html);
 }
-lobby.onMapVote = () => renderMapVote();
+lobby.onMapVote = () => { renderMapVote(); if (screen === 'lobby') renderClassic(); };
 for (const id of ['mv-end', 'mv-join', 'mv-host']) $(id).addEventListener('click', (e) => { const b = e.target.closest('[data-mv]'); if (b) { lobby.voteMap(+b.dataset.mv); game.audio.play('ui', null, { ui: true }); } });
 let joinCode = '';
 let joinError = '';
@@ -660,7 +666,7 @@ function renderLobby() {
   const cn = $('conn-note');
   cn.textContent = !lobby.active || quickIntro ? '' : lobby.net.relayed ? '● Connected through Cloudflare relay: your IP address is hidden' : lobby.net.room ? 'Direct peer-to-peer connection' : '';
   cn.classList.toggle('hidden-ip', !!lobby.net.relayed);
-  if (quickIntro) { $('lobby-leave').textContent = 'BACK'; $('lobby-leave').classList.remove('cancel'); return; }
+  if (quickIntro) { $('lobby-leave').textContent = 'BACK'; $('lobby-leave').classList.remove('cancel'); renderClassic(); return; }
   if (host) {
     $('host-code').textContent = fmtCode(lobby.code);
     $('opt-approve').checked = lobby.approval;
@@ -710,9 +716,141 @@ function renderLobby() {
     $('lobby-leave').classList.toggle('cancel', searching);
     if (lobby.quickMode && !inf) $('join-info').textContent = `Searching: ${(MODES[settings.mode] || MODES.tdm).name} · map voted in the lobby`;
   }
+  renderClassic();
   if (game.input.lastDevice === 'pad' && !document.querySelector('#lobby .pad-focus')) focusFirst();
 }
 lobby.onUpdate = () => { renderLobby(); noteRecent(lobbyPeople()); syncChat(); };
+// ---------- classic lobby (menu + map on the left, players on the right) ----------
+let clDescText = '', clEditing = false;
+const classicOn = () => !quickIntro && (lobby.role === 'host' || lobby.role === 'guest' || !!lobby.quickMode);
+const mapCard = (id, modeName, extra = '') => {
+  const m = MAPS[id], ph = m && m.photos && m.photos[0];
+  return m
+    ? `<div class="cl-map" style="${ph ? `background-image:url('${ph}')` : ''}">${extra}<span class="cl-mn"><b>${esc(m.name.toUpperCase())}</b><small>${esc(modeName)}</small></span></div>`
+    : `<div class="cl-map classified">${extra}<span class="cl-mn"><b>MAP CLASSIFIED</b><small>${esc(modeName)}</small></span></div>`;
+};
+function clPeople() {
+  if (lobby.role === 'host') {
+    const list = [{ n: myName() || 'Operator', tm: lobby.hostTeam, h: 1, x: lobby.myXp | 0, me: 1, id: 'host' }];
+    for (const p of lobby.players.values()) list.push({ n: p.name, tm: p.team, h: 0, x: p.xp | 0, ping: p.ping, id: p.peerId });
+    return list;
+  }
+  const mine = myName();
+  let found = false;
+  const ro = (lobby.roster || []).map(p => { const me = !found && !p.h && p.n === mine; if (me) found = true; return { n: p.n, tm: p.tm, h: p.h, x: p.x | 0, me }; });
+  if (!ro.length) ro.push({ n: mine || 'Operator', tm: 0, h: 0, x: lobby.myXp | 0, me: 1 });
+  return ro;
+}
+function renderClassic() {
+  const on = classicOn();
+  $('lobby').classList.toggle('classic', on);
+  $('lobby').classList.toggle('cl-editing', on && clEditing);
+  if (!on) { if (clEditing) closeClassEditor(); return; }
+  const host = lobby.role === 'host', inMatch = host && game.mode === 'host' && game.live;
+  const pub = !!(lobby.public || lobby.quickMode);
+  const inf = lobby.info || {};
+  const mode = MODES[inf.m] || MODES[settings.mode] || MODES.tdm;
+  $('cl-title').textContent = `${pub ? 'PUBLIC MATCH' : 'PRIVATE MATCH'} / ${mode.name.toUpperCase()}`;
+  setHTML('cl-code', !pub && lobby.code ? `MATCH CODE <b>${fmtCode(lobby.code)}</b>` : '');
+  // menu
+  const items = [];
+  if (host && !inMatch) items.push(['start', 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
+  if (inMatch) items.push(['back', 'BACK TO MATCH', 'Return to the match in progress.']);
+  items.push(['class', 'CREATE A CLASS', 'Pick your class and build your guns. The class you equip is the one you spawn with.']);
+  if (host && !pub) {
+    items.push(['invite', 'COPY INVITE LINK', 'Copy a link your friends can open to join this lobby.']);
+    items.push(['approve', `JOIN APPROVAL: ${lobby.approval ? 'ON' : 'OFF'}`, 'On: you accept each player before they get in. Friends always get straight in.']);
+    items.push(['bots', `FILL WITH BOTS: ${settings.fillBots === false ? 'OFF' : 'ON'}`, 'Off: only real players, and each team needs at least one.']);
+  }
+  const leave = $('lobby-leave').textContent;
+  items.push(['leave', leave, 'Leave this lobby and go back to the menu.']);
+  setHTML('cl-menu', items.map(([a, l, d], i) => `<button class="cl-item${a === 'start' ? ' hot' : ''}${i === items.length - 1 ? ' last' : ''}" data-cl="${a}" data-desc="${esc(d)}" data-nav>${esc(l)}</button>`).join(''));
+  if (!clDescText || !items.some(it => it[2] === clDescText)) clDescText = items[0][2];
+  $('cl-desc').textContent = clDescText;
+  // status line + map cards
+  const mv = lobby.mapVote, people = clPeople();
+  let status;
+  if (mv) status = mv.cd >= 0 ? `The match is about to begin... <i>${mv.cd}</i>` : `Vote for the next map · ${mv.rd}/${mv.n} ready`;
+  else if (inMatch) status = 'Match in progress. Players you let in drop straight into it.';
+  else if (host) status = settings.fillBots === false && !pub && new Set(people.map(p => p.tm)).size < 2 ? 'Need more players to balance teams...' : 'Waiting for you to start the match...';
+  else if (lobby.status === 'pending') status = 'Waiting for the host to let you in...';
+  else if (lobby.status === 'accepted' || lobby.status === 'ingame') status = lobby.hostInGame ? 'Joining the match in progress...' : 'The match is about to begin...';
+  else status = lobby.quickMode ? 'Searching for a match...' : 'Looking for the match...';
+  setHTML('cl-status', status);
+  const mname = mode.name.toUpperCase();
+  setHTML('cl-maps', mv
+    ? mv.o.map((id, i) => `<button class="cl-mvb${mv.my === i ? ' on' : ''}" data-mv="${i}" data-nav>${mapCard(id, mname, `<span class="cl-vote"><b>${mv.v[i] || 0}</b>${mv.my === i ? 'YOUR VOTE' : 'VOTE'}</span>`)}</button>`).join('')
+    : mapCard(host ? (lobby.public ? '' : settings.map) : inf.map, mname));
+  // players
+  const n = inf.n || settings.teamSize || 4;
+  const max = pub ? MAX_HUMANS : Math.min(MAX_HUMANS, 2 * n);
+  $('cl-count').textContent = `${people.length} Player${people.length === 1 ? '' : 's'} (${max} Max)`;
+  const myTeam = (people.find(p => p.me) || people[0]).tm;
+  const rows = [];
+  if (host) for (const p of lobby.pending.values()) rows.push(`<div class="cl-row pend"><span class="cl-lv"></span><span class="cl-emb"></span><span class="cl-nm">${esc(p.name)}<small>WANTS TO JOIN</small></span><span class="cl-act"><button class="ok" data-accept="${esc(p.peerId)}" data-nav>ACCEPT</button><button data-deny="${esc(p.peerId)}" data-nav>DENY</button></span></div>`);
+  const sorted = [...people].sort((a, b) => (a.tm === myTeam ? 0 : 1) - (b.tm === myTeam ? 0 : 1) || b.h - a.h);
+  let lastTm = -1;
+  for (const p of sorted) {
+    if (p.tm !== lastTm) { rows.push(`<div class="cl-sep t${p.tm}">${teamName(p.tm)}${p.tm === myTeam ? ' · YOUR TEAM' : ''}</div>`); lastTm = p.tm; }
+    const lv = levelOf(p.x | 0);
+    const bars = p.ping === undefined ? '' : `<span class="cl-ping q${p.ping < 80 ? 3 : p.ping < 160 ? 2 : 1}" title="${p.ping} ms"><i></i><i></i><i></i></span>`;
+    const acts = host && !p.me ? `<span class="cl-act">${inMatch ? '' : `<button data-swap="${esc(p.id)}" data-nav title="Switch team">⇄</button>`}<button class="warn" data-kick="${esc(p.id)}" data-nav>KICK</button></span>`
+      : host && p.me && !inMatch ? `<span class="cl-act"><button data-swap="host" data-nav title="Switch team">⇄</button></span>` : '';
+    rows.push(`<div class="cl-row t${p.tm}${p.me ? ' me' : p.tm === myTeam ? ' fr' : ' en'}">${bars}<span class="cl-lv">${lv}</span><span class="cl-emb">${emblemSVG(lv)}</span><span class="cl-nm">${esc(p.n)}</span><span class="cl-sc">${(p.x | 0).toLocaleString('en-US')}</span><span class="cl-star">${p.h ? '★' : ''}</span>${acts}</div>`);
+  }
+  const open = Math.min(3, max - people.length);
+  for (let i = 0; i < open; i++) rows.push(`<div class="cl-row empty"><span class="cl-nm">${pub ? 'Searching for player' : 'Waiting for player'}<i class="dots"></i></span><span class="cl-spin"></span></div>`);
+  setHTML('cl-list', rows.join(''));
+  $('cl-note').textContent = [host && !inMatch && !pub ? $('host-note').textContent : '', $('conn-note').textContent].filter(Boolean).join('  ·  ');
+  const d = game.input.lastDevice;
+  setHTML('cl-foot', d === 'touch' ? '' : [`<span>${glyph('accept', d)} Select</span>`, `<span>${glyph('back', d)} Back</span>`, `<span>${glyph('alt', d)} Friends</span>`].join(''));
+}
+function openClassEditor() {
+  clEditing = true;
+  $('cl-editor').appendChild($('pane-loadout'));
+  $('pane-loadout').classList.add('on');
+  if (editKey) renderGunsmith(false); else renderClasses();
+  renderClassic();
+  if (game.input.lastDevice === 'pad') focusFirst();
+}
+function closeClassEditor() {
+  if (!clEditing) return;
+  clEditing = false;
+  if (editKey) closeEditor();
+  restorePanes();
+  $('lobby').classList.remove('cl-editing');
+  syncLobbyLoadout();
+  renderClassic();
+  if (game.input.lastDevice === 'pad') focusEl($('cl-menu').querySelector('[data-cl="class"]'));
+}
+// the class you equip in the lobby is the one you spawn with (guests tell the host)
+function syncLobbyLoadout() {
+  if (!lobby.active || inMatch()) return;
+  const l = loadoutFromSettings(settings);
+  lobby.myPrimary = l;
+  if (lobby.role === 'host') lobby.hostPrimary = l;
+  else if (lobby.role === 'guest' && lobby.hostId) lobby.net.send({ t: 'lo', l }, lobby.hostId);
+}
+$('cl-done').addEventListener('click', () => closeClassEditor());
+$('cl-menu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cl]');
+  if (!b) return;
+  game.audio.play('ui', null, { ui: true });
+  const a = b.dataset.cl;
+  if (a === 'start') $('lobby-start').click();
+  else if (a === 'back') $('lobby-back').click();
+  else if (a === 'leave') $('lobby-leave').click();
+  else if (a === 'invite') $('copy-link').click();
+  else if (a === 'class') openClassEditor();
+  else if (a === 'approve') { const c = $('opt-approve'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); renderClassic(); }
+  else if (a === 'bots') { const c = $('opt-fillbots'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); renderClassic(); }
+});
+const clHover = (e) => { const b = e.target.closest('[data-desc]'); if (b && b.dataset.desc !== clDescText) { clDescText = b.dataset.desc; $('cl-desc').textContent = clDescText; } };
+$('cl-menu').addEventListener('mouseover', clHover);
+$('cl-menu').addEventListener('focusin', clHover);
+$('cl-maps').addEventListener('click', (e) => { const b = e.target.closest('[data-mv]'); if (b) { lobby.voteMap(+b.dataset.mv); game.audio.play('ui', null, { ui: true }); } });
+setInterval(() => { if (screen === 'lobby' && classicOn()) renderClassic(); }, 1000); // pings, countdowns
+
 lobby.onToast = (s) => game.hud.toast(s);
 
 $('host-btn').addEventListener('click', () => {
@@ -920,6 +1058,8 @@ function focusFirst() {
     : screen === 'feedback' ? document.querySelector('[data-fb].on')
     : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
     : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
+    : screen === 'lobby' && clEditing ? document.querySelector('#cl-editor [data-nav]')
+    : screen === 'lobby' && $('lobby').classList.contains('classic') ? $('cl-menu').querySelector('[data-nav]')
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
     : $('again');
   focusEl(items.includes(pref) && pref.offsetParent ? pref : items[0]);
@@ -1020,6 +1160,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'feedback') closeFeedback();
       else if (screen === 'report') closeReport();
       else if (screen === 'end') $('menu-btn').click();
+      else if (screen === 'lobby' && clEditing) { if (!closeEditor()) closeClassEditor(); }
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
         else if (lobby.role !== 'guest' && joinCode.length) keypad('del');
@@ -1577,7 +1718,7 @@ function syncChat() {
   document.body.classList.toggle('chat-open', on && (chatOpen || menuChat));
   // in the lobby and pause menus the chat sits inside the panel; in a match it floats over the HUD
   const chat = $('chat');
-  const dock = !menuChat ? document.body : screen === 'lobby' ? document.querySelector('#lobby .mw') : screen === 'pause' ? document.querySelector('#pause .pause-panel') : document.querySelector('#end .mw') || document.body;
+  const dock = !menuChat ? document.body : screen === 'lobby' ? document.querySelector($('lobby').classList.contains('classic') ? '#cl .cl-right' : '#lobby .mw') : screen === 'pause' ? document.querySelector('#pause .pause-panel') : document.querySelector('#end .mw') || document.body;
   if (dock && chat.parentElement !== dock) {
     if (dock === document.body) document.body.insertBefore(chat, $('chat-btn'));
     else dock.appendChild(chat);
