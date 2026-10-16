@@ -10,7 +10,7 @@ import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHM
 import { GunPreview } from './gunsmith.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
-import { loadCareer, levelOf, emblemSVG, addMatch } from './career.js';
+import { levelOf, emblemSVG } from './career.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -550,9 +550,7 @@ game.onEnd = (r) => {
   const mvp = r.mvp;
   $('end-mvp').textContent = `MVP  ${mvp.name.toUpperCase()}  ·  ${mvp.score} PTS  ·  ${mvp.kills}/${mvp.deaths}`;
   game.hud.renderScoreboard($('end-board'));
-  // career score and level (shown next to your name in lobbies)
-  const me = game.player;
-  if (me) { const c = addMatch({ score: me.score, kills: me.kills, deaths: me.deaths, won: r.winner === mine }); lobby.myXp = c.xp; if (c.levelUp) game.hud.toast(`LEVEL UP · LEVEL ${c.level}`); }
+  reportMatch(r);
   $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
   setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
   if (lobby.public && lobby.role === 'host') {
@@ -578,7 +576,7 @@ if (window.BREACHPOINT_OFFLINE) {
 }
 const lobby = new Lobby(game);
 lobby.account = account;
-lobby.myXp = loadCareer().xp;
+lobby.myXp = 0;   // from the account server (refreshed when you open multiplayer and after each match)
 window.__lobby = lobby;
 lobby.onMapVoteDone = (mapId) => {
   if (!lobby.public || lobby.role !== 'host') return;
@@ -1159,6 +1157,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'signin') $('si-back').click();
       else if (screen === 'feedback') closeFeedback();
       else if (screen === 'report') closeReport();
+      else if (screen === 'notice') $('nt-ok').click();
       else if (screen === 'end') $('menu-btn').click();
       else if (screen === 'lobby' && clEditing) { if (!closeEditor()) closeClassEditor(); }
       else if (screen === 'lobby') {
@@ -1244,11 +1243,65 @@ function enterMenu(m) {
   showScreen('menu');
 }
 $('mode-offline').addEventListener('click', () => enterMenu('offline'));
-$('mode-online').addEventListener('click', () => {
+$('mode-online').addEventListener('click', async () => {
   if (window.BREACHPOINT_OFFLINE) { game.hud.toast('ONLINE PLAY WORKS ON BREACH-POINT.NET'); return; }
   if (!account.ready) { setPlayMode('online'); openSignin(); return; }
-  enterMenu('online');
+  const note = await checkProgress();
+  if (note) showNotice(note, () => enterMenu('online'));
+  else enterMenu('online');
 });
+
+// ---------- progression checkpoint: XP comes from the account server ----------
+// Opening multiplayer asks the server for your XP and any notice about your account (under review, or put
+// back to its last checkpoint after a match result that couldn't be real).
+const NOTICES = {
+  review: ['ACCOUNT UNDER REVIEW', 'Some of your recent match results look unusual, so your account is being reviewed. You can keep playing. XP you earn is held until the review is done, then added if everything checks out.'],
+  reset: ['PROGRESS RESTORED TO CHECKPOINT', 'A match result on your account couldn\'t have happened in a real match, so your XP was put back to your last checkpoint and your account is under review.'],
+  cleared: ['REVIEW COMPLETE', 'Your account checked out. Any XP that was on hold has been added. Thanks for your patience.'],
+};
+async function checkProgress() {
+  if (!account.enabled || !account.signedIn) return null;
+  try {
+    const p = await account.progress();
+    lobby.myXp = p.xp | 0;
+    lobby.underReview = !!p.rev;
+    if (p.note && NOTICES[p.note]) return p.note;
+    let seen = false; try { seen = !!sessionStorage.getItem('bp.revSeen'); sessionStorage.setItem('bp.revSeen', '1'); } catch (_) { /* ignore */ }
+    if (p.rev && !seen) return 'review';
+  } catch (_) { /* offline: keep the last value */ }
+  return null;
+}
+let noticeDone = null;
+function showNotice(kind, then) {
+  const [t, x] = NOTICES[kind];
+  $('nt-title').textContent = t; $('nt-text').textContent = x;
+  $('notice').classList.toggle('bad', kind !== 'cleared');
+  noticeDone = then;
+  showScreen('notice');
+}
+$('nt-ok').addEventListener('click', () => { const f = noticeDone; noticeDone = null; if (f) f(); else showScreen('mode'); });
+// after a match the host reports everyone's result (each guest backed by the pass they joined with);
+// everyone then reads their new XP back from the server
+function reportMatch(r) {
+  if (game.mode === 'local' || !account.enabled || !account.signedIn || !lobby.code) return;
+  const before = lobby.myXp | 0;
+  if (game.mode === 'host') {
+    const byUid = new Map([...lobby.players.values()].filter(p => p.uid).map(p => [p.uid, p]));
+    const players = game.characters.filter(c => !c.isBot).map(c => {
+      const row = { s: c.score | 0, k: c.kills | 0, d: c.deaths | 0, w: c.team === r.winner ? 1 : 0 };
+      if (c === game.player) return { ...row, me: 1 };
+      const p = byUid.get(c.uid);
+      return p && p.tk ? { ...row, tk: p.tk } : null;
+    }).filter(Boolean);
+    account.reportMatch({ room: lobby.code, secs: Math.round(game.time), mode: game.settings.mode || 'tdm', players }).catch(() => {});
+  }
+  setTimeout(async () => {
+    await checkProgress();
+    const lv = levelOf(lobby.myXp), was = levelOf(before);
+    if (lobby.myXp > before) game.hud.toast(lv > was ? `LEVEL UP · LEVEL ${lv}` : `+${(lobby.myXp - before).toLocaleString('en-US')} XP`);
+    if (screen === 'lobby') renderClassic();
+  }, game.mode === 'host' ? 2500 : 6000);
+}
 $('mode-chip').addEventListener('click', () => openMode());
 // settings straight from the first menu (not only from inside a match)
 $('mode-options').addEventListener('click', () => { enterMenu(playMode === 'online' && account.ready ? 'online' : 'offline'); setTab('options'); });

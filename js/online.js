@@ -472,7 +472,7 @@ export class Lobby {
             if (this.banned.has('u:' + who.id) || this.blocked.has(who.id)) { this.net.send({ t: 'lobby', st: 'denied' }, id); return; }
             const dupe = (this.account.user && who.id === this.account.user.id) || [...this.players.values(), ...this.pending.values()].some(q => q.uid === who.id);
             if (dupe) { this.net.send({ t: 'lobby', st: 'dupe' }, id); return; }
-            this.admit(id, { ...p, name: cleanName(who.name), uid: who.id });
+            this.admit(id, { ...p, name: cleanName(who.name), uid: who.id, tk: m.tk });   // the pass also backs their match results
           });
           return;
         }
