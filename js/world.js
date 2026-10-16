@@ -18,137 +18,116 @@ const DEFAULT_BOUNDS = { hx: 42, hz: 30 };
 //   (offsets run along +x on the n/s walls and +z on the e/w walls; mirrored copies are rotated for you)
 // Lanes are broken up with staggered buildings and walls so there's no straight line across the map:
 // fights happen around corners, through doorways and windows.
-// Tarsa Market (120 x 84 m): three east-west streets split by rows of houses and tall blocks, cut by
-// alleys. Both bomb sites are inside big market halls (doors on every side, no open-sky plant). The
-// halves are point-mirrored for fairness, but a set of one-off landmarks (TARSA_CENTER) makes each
-// side read differently, and long streets are broken every 10-15 m so nothing is watched end to end.
+// Tarsa Market (116 x 80 m), a classic three-lane map. Spawns sit at the two short ends (x = +-54); three
+// lanes run between them, each with its own job, split by two rows of buildings with connectors:
+//   North / south lanes (14 m wide): on your side one is MARKET STREET (stalls, parked cars, the market
+//     hall = bomb site B: medium range), the other is THE YARD (containers, pallets, the warehouse = bomb
+//     site A: close quarters). The map is point-mirrored, so each lane is street at one end, yard at the other.
+//   Mid lane: a narrower street into the central plaza, where the two-storey centre house (stairs up the
+//     side, a roof with parapets) is the power position that has to be fought for.
+// Every lane is broken by cover every 10-14 m, alternating sides, so nothing is watched end to end; no
+// spot sees down more than one lane. Connectors between the lanes: a gap at the plaza (both teams the same
+// distance), a walk-through house and two alleys per side, plus a back street behind each spawn for rotating.
+// Everything solid is drawn: no invisible walls, and nothing you can see through blocks bullets.
 const TARSA_CENTER = [
-  [0, 0, 8, 8, 3.2, 0, 'house', { n: [['d', -2.6], ['w', 0.9, 1.1]], s: [['d', 2.6], ['w', -0.9, 1.1]], e: [['d', 1.8]], w: [['d', -1.8]], props: [['table', 0, 0], ['shelf', 0, 1.7, 0], ['shelf', 0, -1.7, 0]], light: 1 }],
-  // one-off landmarks (not mirrored): each side of the market looks and plays a little differently
-  [-22, 6, 0.6, 7, 2.4, 0, 'wall', 0],
-  [21.5, -10, 1.6, 1.6, 1.6, 0, 'crate'], [23.3, -10, 1.6, 1.6, 1.6, 0, 'crate'], [22.4, -10, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [-30, 34, 4.4, 2.0, 1.45, 0, 'car', 1],
-  [33, -33, 4.4, 2.0, 1.45, 0, 'car', 0],
-  [-8, 12.6, 2.4, 0.9, 0.9, 0, 'stall', 1],
-  [-41, 4, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
-  [42, -2, 2.6, 7, 2.6, 0, 'container', 0x3e5d74],
-  [-35, -3, 5, 6, 13, 0, 'block'],
-  [35.5, 3, 6, 5, 9.5, 0, 'block'],
-  [-17, 38, 2, 2, 1.2, 0, 'pallet'],
-  [18, -38, 0.8, 3, 1.1, 0, 'sand'],
-  // lane breakers (one-off): close the long lines along the side streets and between the rows
-  [-25, 12.8, 7, 2.6, 2.6, 0, 'container', 0x6b7a3a], [-45, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [-45.2, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [26, -12.8, 7, 2.6, 2.6, 0, 'container', 0x7a6a3a], [45, -13.5, 1.6, 1.6, 1.6, 0, 'crate'], [45.2, -13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [-36, 31.5, 0.6, 6, 2.4, 0, 'wall', 1],
-  [36, -31.5, 0.6, 6, 2.4, 0, 'wall', 0],
+  // the centre house: doors on all four sides, a window pair facing each lane end, roof reached by the stairs
+  [0, 0, 8, 8, 3.2, 0, 'house', { n: [['d', -2.2], ['w', 1.6, 1.2]], s: [['d', 2.2], ['w', -1.6, 1.2]], e: [['d', 1.6]], w: [['d', -1.6]], props: [['table', 0, 0], ['shelf', 1.5, 2.6, 0], ['shelf', -1.5, -2.6, 0]], light: 1 }],
+  // one-off landmarks out of the way of play: each end of the market reads differently
+  [-56.5, 38.5, 0.5, 0.5, 6, 0, 'palm'],
+  [56.5, -38.5, 0.5, 0.5, 6, 0, 'palm'],
 ];
 const TARSA_HALF = [
   // centre house roof: parapets, open on the stair side
   [0, 3.95, 8.2, 0.3, 0.6, 3.45, 'parapet'],
   [3.95, 1.6, 0.3, 4.8, 0.6, 3.45, 'parapet'],
-  // ---- mid street (z -13..13): houses, a tall block and container stacks: a chicane, not a corridor
-  [10, 8, 7, 6, 3.2, 0, 'house', { n: [['d', 1.5]], s: [['d', -1.5], ['w', 1.6]], e: [['w', 0]], w: [['d', 0]], props: [['crates', -2, 1.4], ['shelf', 0.2, 0, 0]] }],
-  [11, -8, 6, 5, 9, 0, 'block'],
-  [19, 1, 2.6, 7, 2.6, 0, 'container', 0x4d6b54],
-  [19, 1, 2.6, 7, 2.6, 2.6, 'container', 0x6e7f86],
-  [28, -5, 8, 7, 3.2, 0, 'house', { w: [['d', 1]], e: [['d', -1]], n: [['w', 0]], s: [['d', 2]], props: [['shelf', 0, 0, 1], ['crates', 2, -2]] }],
-  [29, 8, 5, 5, 12, 0, 'block'],
-  [14, 3.5, 2.4, 0.9, 0.9, 0, 'stall', 0],
-  [24, 10, 3, 0.8, 1.1, 0, 'sand'],
-  [36, -9, 0.62, 4, 1.07, 0, 'jersey'],
-  // cover across the gaps between the mid street and the dividers (no open lane along z = 13)
-  [21, 13, 1.6, 1.6, 1.6, 0, 'crate'], [21.2, 13, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [40, 12.5, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
-  [9, 13.2, 3, 0.8, 1.1, 0, 'sand'],
-  // ---- north divider (z 15..21): block, house, tall block, house, block, with alleys between
-  [5, 18, 5, 5, 8, 0, 'block'],
-  [14, 18, 8, 6, 3.2, 0, 'house', { n: [['d', -2]], s: [['d', 2]], e: [['w', 0]], w: [['w', 0]], props: [['table', 1.5, 0.5], ['shelf', -1, 0, 0]] }],
-  [23, 17.5, 4, 5, 11, 0, 'block'],
-  [33, 18, 8, 6, 3.2, 0, 'house', { n: [['d', 1.5]], s: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['crates', 2, -1.5], ['shelf', -1, 0.5, 0]] }],
-  [43, 17, 5, 4, 7, 0, 'block'],
-  // ---- north street (z 22..40): bomb site B is the big market hall
-  [22, 29, 12, 9, 4.2, 0, 'house', { n: [['d', -3], ['w', 2]], s: [['d', 3], ['w', -2.5]], e: [['d', 0], ['w', 2.6]], w: [['d', 1], ['w', -2.5]], props: [['shelf', -4.6, 3.2, 0], ['crates', 4.6, -3.2], ['shelf', 4.6, 3.2, 0]], light: 1 }],
-  [8, 31, 7, 6, 3.2, 0, 'house', { s: [['d', -1.5]], n: [['d', 2]], e: [['w', 0]], w: [['d', 0]], props: [['table', -1.8, 1], ['shelf', 0.3, 0, 0]] }],
-  [15, 37, 5, 5, 10, 0, 'block'],
-  [37, 31, 7, 6, 3.2, 0, 'house', { w: [['d', 0]], e: [['d', 1]], s: [['w', 0]], n: [['d', -1.5]], props: [['crates', 1.2, 1.5]] }],
-  [36, 24.5, 0.6, 5, 2.4, 0, 'wall', 0],
-  [46, 30, 0.6, 8, 2.4, 0, 'wall', 1],
-  [3, 25, 2, 2, 1.2, 0, 'pallet'],
-  [31, 38, 2, 2.5, 1.8, 0, 'crate'],
-  [22, 39.5, 2.4, 0.9, 0.9, 0, 'stall', 1],
-  [45, 38, 1.5, 1.5, 1.5, 0, 'crate'],
-  [12, 24, 0.62, 0.62, 0.9, 0, 'barrel'],
-  [12.8, 23.8, 0.62, 0.62, 0.9, 0, 'barrel', 1],
-  // ---- south divider (z -21..-15)
-  [7, -18, 7, 6, 3.2, 0, 'house', { n: [['d', 1]], s: [['d', -1]], e: [['d', 0]], w: [['w', 0]], props: [['crates', 2, -1.5], ['shelf', 0, 0.3, 0]] }],
-  [17, -17.5, 5, 5, 11, 0, 'block'],
-  [27, -18, 8, 6, 3.2, 0, 'house', { n: [['d', -2]], s: [['d', 2.5]], e: [['w', 0]], w: [['d', 0]], props: [['table', 0, 0]] }],
-  [38, -17, 6, 5, 8, 0, 'block'],
-  // ---- south yard (z -40..-22): container yard; bomb site A is the second market hall
-  [14, -30, 12, 9, 4.2, 0, 'house', { n: [['d', -3], ['w', 2.5]], s: [['d', 2.5], ['w', -2.5]], e: [['d', -1], ['w', 2.5]], w: [['d', 0]], props: [['shelf', 4.6, -3.2, 0], ['crates', -4.6, 3.2], ['shelf', -4.6, -3.2, 0]], light: 1 }],
-  [3, -24, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
-  [3, -24, 7, 2.6, 2.6, 2.6, 'container', 0x6e7f86],
-  [6, -37, 2.6, 6, 2.6, 0, 'container', 0x3e5d74],
-  [29, -26, 2.6, 7, 2.6, 0, 'container', 0x7a6a3a],
-  [29, -26, 2.6, 7, 2.6, 2.6, 'container', 0x4d6b54],
-  [33, -36.5, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
-  [41, -27, 6, 6, 3.2, 0, 'house', { n: [['d', 0]], w: [['d', 1]], e: [['w', 0]], s: [['w', 0]], props: [['shelf', 0, 0, 1]] }],
-  [24, -38.5, 2, 3, 1.8, 0, 'crate'],
-  [46, -35, 0.8, 3, 1.1, 0, 'sand'],
-  [13, -22, 1.6, 1.6, 1.6, 0, 'crate'],
-  [22, -22.5, 0.62, 0.62, 0.9, 0, 'barrel', 1],
-  // sidewalk clutter: kiosks and crate stacks so the edge of the map isn't a 120 m sightline
-  [5, 40.7, 2, 2.5, 1.8, 0, 'crate'],
-  [26, 40.7, 2, 2.5, 1.8, 0, 'crate'],
-  [41, 40.7, 2, 2.5, 1.8, 0, 'crate'],
-  // gaps between the mid street and the dividers
-  [2.5, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [2.7, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [30, 13.5, 7, 2.6, 2.6, 0, 'container', 0x7a6a3a],
-  [47.5, 13.5, 1.6, 1.6, 1.6, 0, 'crate'], [47.7, 13.5, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  // ---- forward base: staggered HESCO so the spawn front isn't one long lateral corridor
-  [47, 9, 3, 1, 3.5, 0, 'hesco'],
-  [47.5, -12, 2, 1, 3.5, 0, 'hesco'],
-  [50, 22, 1, 4, 3.5, 0, 'hesco'],
-  [50, 1, 1, 4, 3.5, 0, 'hesco'],
-  [50, -24, 1, 4, 3.5, 0, 'hesco'],
-  [50, -36, 1, 3, 3.5, 0, 'hesco'],
-  [55, 15.5, 2, 2, 1.2, 0, 'ammo'],
-  // spawn strip: staggered HESCO across it, so you can't see from one corner of the base to the other
-  [54, -30, 4, 1, 3.5, 0, 'hesco'],
-  [58, -18, 4, 1, 3.5, 0, 'hesco'],
-  [54, -3, 4, 1, 3.5, 0, 'hesco'],
-  [58, 7.5, 4, 1, 3.5, 0, 'hesco'],
-  [54, 21, 4, 1, 3.5, 0, 'hesco'],
-  [58, 30, 4, 1, 3.5, 0, 'hesco'],
-  [51.5, -12, 2, 1, 3.5, 0, 'hesco'],
-  [51.5, 27, 2, 1, 3.5, 0, 'hesco'],
-  [58, 38, 0.5, 0.5, 6, 0, 'palm'],
-  // lights: festoons over the mid street, lamps in the halls and the yard
-  [15.5, 0, 0, 0, 0, 0, 'lights', [15.5, 5.0, 15.5, -5.5]],
-  [33.5, 0, 0, 0, 0, 0, 'lights', [33.5, 14.5, 33.5, -1.5]],
-  [12.5, 0, 0, 0, 0, 0, 'light', 3.6],
-  [22, 29, 0, 0, 0, 0, 'light', 3.8],
-  [14, -30, 0, 0, 0, 0, 'light', 3.8],
-  // perimeter
-  [0, 42.5, 122, 1, 10, 0, 'boundary'],
-  [60.5, 0, 1, 86, 10, 0, 'boundary'],
+  // ================= mid lane (z -11..11) =================
+  // plaza edge: low walls that give the plaza cover without closing it
+  [9, 7.5, 0.6, 5, 1.1, 0, 'wall', 0],
+  [10, -6.5, 3, 0.8, 1.1, 0, 'sand'],
+  // mid street: low market arcades on alternating sides, so the lane bends instead of running straight
+  [27.5, 9.25, 7, 5.5, 3.2, 0, 'house', { s: [['d', -1.6], ['w', 1.6]], w: [['d', -1.2]], e: [['w', 1.3]], props: [['crates', 2, 0.8]] }],   // against the north divider
+  [15.5, -9.25, 7, 5.5, 3.2, 0, 'house', { n: [['d', 1.6], ['w', -1.6]], e: [['d', 1.2]], w: [['w', -1.3]], props: [['shelf', -1.6, 0, 1]] }], // against the south divider
+  [19, -2.5, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [26, 1.5, 2.6, 6, 2.6, 0, 'container', 0x4d6b54],   // cuts the long diagonals from the spawn corners across mid
+  [37, 2.6, 1.6, 1.6, 1.6, 0, 'crate'], [37.2, 2.6, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [33.5, 5, 4.4, 2.0, 1.45, 0, 'car', 1],
+  // tall breakers: market kiosks and a container, so the mid street is never one long line
+  [16, 4.9, 3, 3.4, 3, 0, 'kiosk'],
+  [22, -5, 3, 3, 3, 0, 'kiosk'],
+  [33.5, -0.5, 3, 6.2, 3, 0, 'kiosk'],
+  [44, -6, 2.6, 5, 2.6, 0, 'container', 0x6b7a3a],
+  [38.5, -7, 2, 2, 2.4, 0, 'pallet'], [30, -6, 2, 2, 2.4, 0, 'pallet'],
+  // ================= north divider (z 12..23): walk-through house, alleys =================
+  [7, 17.5, 8, 11, 9, 0, 'block'],                      // x 3..11; the gap x -3..3 is the plaza connector
+  [18.5, 17.5, 11, 11, 3.4, 0, 'house', { s: [['d', -3]], n: [['d', 3]], w: [['w', 0]], e: [['w', 0]], props: [['shelf', 0, 0, 1], ['crates', 3.6, -2.4]] }], // x 13..24: dog-leg through the house
+  [29, 17.5, 10, 11, 12, 0, 'block'],                   // x 24..34 (tall landmark)
+  [41, 17.5, 8, 10, 7, 0, 'block'],                     // x 37..45; alley x 34..37, back street past x 45
+  [35.5, 14, 1.6, 1.6, 1.6, 0, 'crate'],                // alley cover (breaks the straight look through)
+  // lane edges: cover hard against the divider walls, so nobody can hug a wall and see down a whole lane
+  [29.5, 23.8, 1.6, 1.6, 1.6, 0, 'crate'], [31.1, 23.8, 1.6, 1.6, 1.6, 0, 'crate'], [30.3, 23.8, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  [12, -23.8, 1.6, 1.6, 1.6, 0, 'crate'], [12.2, -23.8, 1.4, 1.4, 1.4, 1.6, 'crate'],
+  // ================= south divider (z -23..-12) =================
+  [6.5, -17.5, 7, 11, 3.4, 0, 'house', { n: [['d', 1.6]], s: [['d', -1.6]], e: [['w', 0]], props: [['table', -1.2, 0]] }], // x 3..10, walk-through
+  [15.5, -17.5, 11, 11, 10, 0, 'block'],                // x 10..21
+  [27.5, -17.5, 9, 11, 8, 0, 'block'],                  // x 23..32; alley x 21..23
+  [40, -17.5, 10, 10, 11, 0, 'block'],                  // x 35..45; alley x 32..35
+  [33.5, -21, 0.8, 3, 1.1, 0, 'sand'],
+  // ================= north lane (z 24..39): market street, bomb site B in the market hall =================
+  [22, 35, 12, 10, 4.2, 0, 'house', { s: [['d', -3], ['d', 3], ['w', 0, 2]], w: [['d', -1]], e: [['d', 1]], props: [['shelf', -3.5, 2.8, 0], ['crates', 4.2, 2.8], ['shelf', 3.5, -2.4, 0]], light: 1 }], // x 16..28, z 30..40
+  [6, 27, 2.4, 0.9, 0.9, 0, 'stall', 1],
+  [10, 35.5, 4.4, 2.0, 1.45, 0, 'car', 1],
+  [36, 30, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [8, 24.3, 3, 2.6, 3, 0, 'kiosk'],                      // against the divider: breaks the wall-hugging line
+  [41, 24.3, 3, 2.6, 3, 0, 'kiosk'],
+  [12, 28.5, 2.5, 3.5, 3, 0, 'kiosk'],
+  [24, 26.5, 3, 2, 3, 0, 'kiosk'],
+  [8, 33, 2, 2, 2.4, 0, 'pallet'],
+  [40, 35.5, 7, 2.6, 2.6, 0, 'container', 0x3e5d74],
+  [14, 25.5, 3, 0.8, 1.1, 0, 'sand'],
+  // ================= south lane (z -39..-24): the yard, bomb site A in the warehouse =================
+  [20, -34.5, 12, 11, 4.2, 0, 'house', { n: [['d', -3.5], ['w', 1, 2]], w: [['d', 1.5]], e: [['d', -1.5], ['w', 2.5]], props: [['crates', -3.6, -2.6], ['shelf', 3, 0.5, 1], ['crates', -0.5, -3]], light: 1 }], // x 14..26, z -38..-28
+  [6, -31, 7, 2.6, 2.6, 0, 'container', 0x8a3d2c],
+  [6, -31, 7, 2.6, 2.6, 2.6, 'container', 0x6e7f86],
+  [5, -26, 2, 2, 2.4, 0, 'pallet'],
+  [26, -24.3, 3, 2.6, 3, 0, 'kiosk'],
+  [31, -28, 2.6, 5, 2.6, 0, 'container', 0x7a6a3a],
+  [36, -35, 7, 2.6, 2.6, 0, 'container', 0x4d6b54],
+  [41.5, -27, 2, 2, 1.2, 0, 'pallet'],
+  [11, -36.5, 0.62, 0.62, 0.9, 0, 'barrel'], [11.8, -36.2, 0.62, 0.62, 0.9, 0, 'barrel', 1],
+  // ================= spawn (x 46..57): lane exits shielded, a back street for rotating =================
+  [48, 31, 1, 4, 3.5, 0, 'hesco'],
+  [48.5, 0, 1, 5, 3.5, 0, 'hesco'],
+  [48, -31, 1, 4, 3.5, 0, 'hesco'],
+  [52.5, 17.5, 6, 1, 3.5, 0, 'hesco'],
+  [52.5, -17.5, 6, 1, 3.5, 0, 'hesco'],
+  [56.5, 8, 3, 1, 3.5, 0, 'hesco'], [56.5, -8, 3, 1, 3.5, 0, 'hesco'],
+  [47.5, 9, 4, 1, 3.5, 0, 'hesco'], [47.5, -9, 4, 1, 3.5, 0, 'hesco'],
+  [55, 25, 2, 2, 1.2, 0, 'ammo'],
+  // lights: festoons over the mid street, lamps in the halls
+  [24, 0, 0, 0, 0, 0, 'lights', [24, 6, 24, -6]],
+  [36, 0, 0, 0, 0, 0, 'lights', [36, 6, 36, -6]],
+  [22, 35, 0, 0, 0, 0, 'light', 3.8],
+  [20, -34.5, 0, 0, 0, 0, 'light', 3.8],
+  // perimeter (dressed by the facades around the map)
+  [0, 40.5, 118, 1, 10, 0, 'boundary'],
+  [58.5, 0, 1, 82, 10, 0, 'boundary'],
 ];
 for (let k = 1; k <= 7; k++) TARSA_HALF.push([4 + (7.5 - k) * 0.9, -2.5, 0.9, 3, k * 0.5, 0, 'stairs', k]);
 
-const TARSA_SPAWNS = [[56, -36], [56, -24], [56, -12], [56, 0], [56, 12], [56, 24], [56, 36], [53, -6], [53, 6], [53, 18]];
+const TARSA_SPAWNS = [[54, -32], [54, -21], [54, -10], [54, 0], [54, 10], [54, 21], [54, 32], [51, -6], [51, 6], [51, 25]];
 
 const TARSA_PICKUPS = [
   { type: 'health', pos: [0, 3.45, 0] },
-  { type: 'health', pos: [14, 0, 18] },
-  { type: 'health', pos: [-14, 0, -18] },
-  { type: 'health', pos: [28, 0, -5] },
-  { type: 'health', pos: [-28, 0, 5] },
-  { type: 'ammo', pos: [8, 0, 31] },
-  { type: 'ammo', pos: [-8, 0, -31] },
-  { type: 'ammo', pos: [41, 0, -27] },
-  { type: 'ammo', pos: [-41, 0, 27] },
-  { type: 'ammo', pos: [22, 0, -6] },
-  { type: 'ammo', pos: [-22, 0, 6.5] },
+  { type: 'health', pos: [18.5, 0, 17.5] },
+  { type: 'health', pos: [-18.5, 0, -17.5] },
+  { type: 'health', pos: [31, 0, -8.5] },
+  { type: 'health', pos: [-31, 0, 8.5] },
+  { type: 'ammo', pos: [6.5, 0, -17.5] },
+  { type: 'ammo', pos: [-6.5, 0, 17.5] },
+  { type: 'ammo', pos: [40, 0, 30] },
+  { type: 'ammo', pos: [-40, 0, -30] },
+  { type: 'ammo', pos: [20, 0, 8.5] },
+  { type: 'ammo', pos: [-20, 0, -8.5] },
 ];
 
 // Map "Shuran Yard": three lanes. North lane (market street), mid lane (yard), south lane (container
@@ -342,7 +321,7 @@ const PIONEER_LOWER = {
 };
 
 export const MAPS = {
-  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
+  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
   pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_LOWER, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
@@ -505,8 +484,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const boxes = [];
     if (maxx - minx < 1.2 && maxz - minz < 1.2) boxes.push(solidAA((minx + maxx) / 2, (minz + maxz) / 2, maxx - minx, maxz - minz, h, y0, surface));
     else {
-      const alongZ = maxz - minz >= maxx - minx, A = alongZ ? 1 : 0, Bx = alongZ ? 0 : 1;
-      const lo = alongZ ? minz : minx, hi = alongZ ? maxz : maxx, n = Math.max(1, Math.ceil((hi - lo) / 0.25)), st = (hi - lo) / n;
+      // slab direction: the one whose walls step least across a slab (slanted walls make a staircase of strip
+      // ends; keep every step under ~8 cm so no strip pokes visibly out of the wall)
+      const slope = (ax) => { let m = 0; for (let k = 0; k < pts.length; k++) { const P = pts[k], Q = pts[(k + 1) % pts.length], da = Math.abs(Q[ax] - P[ax]), db = Math.abs(Q[1 - ax] - P[1 - ax]); if (da > 1e-3 && db > 1e-3) m = Math.max(m, db / da); } return m; };
+      const sx = slope(0), sz = slope(1);
+      const alongZ = Math.abs(sz - sx) < 1e-3 ? maxz - minz >= maxx - minx : sz < sx, A = alongZ ? 1 : 0, Bx = alongZ ? 0 : 1;
+      const step = Math.max(0.05, Math.min(0.25, 0.08 / Math.max(1e-3, alongZ ? sz : sx)));
+      const lo = alongZ ? minz : minx, hi = alongZ ? maxz : maxx, n = Math.max(1, Math.ceil((hi - lo) / step)), st = (hi - lo) / n;
       for (let i = 0; i < n; i++) {
         const a0 = lo + i * st, a1 = a0 + st;
         // clip the polygon to the slab a0..a1 and take its extent across
@@ -521,13 +505,19 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           poly = out; if (!poly.length) break;
         }
         if (poly.length < 2) continue;
-        // extent across at the slab's middle line, so the strips follow a slanted wall instead of jutting out of it
-        const am = (a0 + a1) / 2, xs2 = [];
-        for (let k = 0; k < pts.length; k++) {
-          const P = pts[k], Q = pts[(k + 1) % pts.length];
-          if ((P[A] - am) * (Q[A] - am) <= 0 && P[A] !== Q[A]) { const t = (am - P[A]) / (Q[A] - P[A]); xs2.push(P[Bx] + (Q[Bx] - P[Bx]) * t); }
-        }
-        const b0 = xs2.length >= 2 ? Math.min(...xs2) : Math.min(...poly.map(p => p[Bx])), b1 = xs2.length >= 2 ? Math.max(...xs2) : Math.max(...poly.map(p => p[Bx]));
+        // extent across where the slab is narrowest (both its edges), so a strip never juts out of a slanted
+        // wall: no invisible lips. (At worst a sliver of wall has no collision, which nobody can notice.)
+        const across = (am) => {
+          const xs2 = [];
+          for (let k = 0; k < pts.length; k++) {
+            const P = pts[k], Q = pts[(k + 1) % pts.length];
+            if ((P[A] - am) * (Q[A] - am) <= 0 && P[A] !== Q[A]) { const t = (am - P[A]) / (Q[A] - P[A]); xs2.push(P[Bx] + (Q[Bx] - P[Bx]) * t); }
+          }
+          return xs2.length >= 2 ? [Math.min(...xs2), Math.max(...xs2)] : null;
+        };
+        const e0 = across(a0 + st * 0.02), e1 = across(a1 - st * 0.02), em = across((a0 + a1) / 2);
+        const ex = [e0, e1, em].filter(Boolean);
+        const b0 = ex.length ? Math.max(...ex.map(e => e[0])) : Math.min(...poly.map(p => p[Bx])), b1 = ex.length ? Math.min(...ex.map(e => e[1])) : Math.max(...poly.map(p => p[Bx]));
         if (b1 - b0 < 0.01) continue;
         boxes.push(alongZ ? solidAA((b0 + b1) / 2, (a0 + a1) / 2, b1 - b0, st, h, y0, surface) : solidAA((a0 + a1) / 2, (b0 + b1) / 2, st, b1 - b0, h, y0, surface));
       }
@@ -538,7 +528,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (!XF) return solidAA(cx, cz, w, d, h, y0, surface);
     return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
   };
-  const SURFACE = { container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'dirt', hesco: 'dirt', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
+  const SURFACE = { kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'dirt', hesco: 'dirt', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
   const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- shared decals / glows ----------
@@ -974,7 +964,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     for (const [k, dx, dz, rot] of spec.props || []) {
       const px = cx + dx, pz = cz + dz;
       if (k === 'table') {
-        solid(px, pz, 1.6, 0.9, 0.8, y0, 'wood');
+        solid(px, pz, 1.6, 0.9, 0.12, y0 + 0.7, 'wood');   // only the top: you can shoot (and crawl) under it
         put(flatBox(1.6, 0.06, 0.9, 1.2), M.wood, px, y0 + 0.77, pz, 0, { grime: 0, tint: 0x9a7a52 });
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(flatBox(0.06, 0.74, 0.06, 0), M.wood, px + sx * 0.72, y0 + 0.37, pz + sz * 0.38, 0, { grime: 0, tint: 0x6a5238 });
         put(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), M.paint, px + 0.3, y0 + 0.86, pz, 0, { grime: 0, tint: 0xd8d2c0 });
@@ -984,6 +974,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const sw = along ? 1.8 : 0.5, sd = along ? 0.5 : 1.8;
         solid(px, pz, sw, sd, 2.0, y0, 'metal');
         for (const yy of [0.05, 0.7, 1.35, 1.95]) put(flatBox(sw, 0.04, sd, 0), M.metal, px, y0 + yy, pz, 0, { grime: 0, tint: 0x7a8088 });
+        // solid back and end panels: it blocks bullets, so you can't see through it either
+        put(flatBox(along ? sw : 0.03, 1.96, along ? 0.03 : sd, 1.5), M.metal, px, y0 + 1.0, pz, 0, { grime: 0.1, tint: 0x5e646c });
+        for (const s of [-1, 1]) put(flatBox(along ? 0.03 : sw, 1.96, along ? sd : 0.03, 1.5), M.metal, px + (along ? s * (sw / 2 - 0.015) : 0), y0 + 1.0, pz + (along ? 0 : s * (sd / 2 - 0.015)), 0, { grime: 0.1, tint: 0x5e646c });
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(flatBox(0.04, 2.0, 0.04, 0), M.dark, px + sx * (sw / 2 - 0.02), y0 + 1.0, pz + sz * (sd / 2 - 0.02), 0, { grime: 0 });
         for (const yy of [0.07, 0.72, 1.37]) for (let i = 0; i < 3; i++) {
           const o = (i - 1) * (along ? 0.55 : 0) , q = (i - 1) * (along ? 0 : 0.55);
@@ -1002,7 +995,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
       } else if (k === 'crates') {
         solid(px, pz, 1.2, 1.2, 1.2, y0, 'wood');
-        put(flatBox(1.2, 1.2, 1.2, 1.2), M.wood, px, y0 + 0.6, pz, rnd() * 0.2, { grime: 0.2, tint: 0xcfb08a, base: y0 });
+        put(flatBox(1.2, 1.2, 1.2, 1.2), M.wood, px, y0 + 0.6, pz, 0, { grime: 0.2, tint: 0xcfb08a, base: y0 });
         put(flatBox(0.8, 0.5, 0.6, 0), M.paint, px + 0.1, y0 + 1.45, pz, 0.3, { grime: 0.1, tint: 0x4d5536 });
       }
     }
@@ -1156,6 +1149,21 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
         break;
       }
+      case 'kiosk': {
+        // market kiosk: a plastered booth with a roller shutter on each long side, a striped awning and a sign;
+        // tall enough to break a sightline
+        const tint = plasterTints[(Math.round(cx * 3 + cz) % plasterTints.length + plasterTints.length) % plasterTints.length];
+        B(M.plaster, w, h, d, cx, 0, cz, 0, { tint, grime: 0.45 });
+        B(M.concrete, w + 0.2, 0.18, d + 0.2, cx, h, cz, 0, { grime: 0.1, tint: 0xd8d2c4 });
+        B(M.concrete, w + 0.06, 0.3, d + 0.06, cx, 0, cz, 0, { grime: 0.5, tint: 0xa89e8e });
+        const along = w >= d, L = along ? w : d;
+        for (const s2 of [-1, 1]) {
+          const fx = cx + (along ? 0 : s2 * (w / 2 + 0.02)), fz = cz + (along ? s2 * (d / 2 + 0.02) : 0), ry = along ? (s2 > 0 ? 0 : Math.PI) : (s2 > 0 ? Math.PI / 2 : -Math.PI / 2);
+          put(worldBox(L - 0.6, 1.6, 0.04, 1.6), M.metal, fx, 1.2, fz, ry, { tint: shutterTints[(Math.abs(Math.round(cx + cz)) + (s2 > 0 ? 1 : 0)) % 4], grime: 0.35 });
+          put(new THREE.PlaneGeometry(L + 0.2, 0.8, 6, 2), M.cloth, fx + (along ? 0 : s2 * 0.38), 2.3, fz + (along ? s2 * 0.38 : 0), ry, { rx: -1.25, grime: 0, tint: (Math.round(cx) + (s2 > 0 ? 1 : 0)) % 2 ? 0x2f5a6a : 0x8a2f2a });
+        }
+        break;
+      }
       case 'hutwall':
         B(M.brick, w, h, d, cx, y0, cz, 0, { grime: 0.45 });
         B(M.concrete, w + 0.1, 0.12, d + 0.1, cx, h - 0.09, cz, 0, { grime: 0 });
@@ -1165,7 +1173,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         put(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 14), M.metal, cx + 1.8, y0 + h + 0.55, cz - 1.8, 0, { grime: 0, tint: 0x8a8f94 });
         break;
       case 'crate': {
-        B(M.wood, w, h, d, cx, y0, cz, rnd() * 0.08 - 0.04, { grime: 0.25, base: y0, tint: 0xcfb08a });
+        B(M.wood, w, h, d, cx, y0, cz, 0, { grime: 0.25, base: y0, tint: 0xcfb08a });
         // frame battens
         const t = 0.08;
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(M.wood, t, h, t, cx + sx * (w / 2 - t / 2 + 0.01), y0, cz + sz * (d / 2 - t / 2 + 0.01), 0, { grime: 0.2, base: y0, tint: 0x9a7a52 });
@@ -1174,6 +1182,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       }
       case 'pallet': {
         B(M.woodOld, w, 0.14, d, cx, 0, cz, 0, { grime: 0.2, tint: 0xd8c4a4 });
+        B(M.bag, w - 0.08, h - 0.16, d - 0.08, cx, 0.14, cz, 0, { grime: 0.1, tint: 0xbcb094 });   // the sacks are stacked tight: no see-through gaps
         // shrink-wrapped supply sacks
         const rows = Math.round(h / 0.4);
         for (let r = 0; r < rows; r++) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
@@ -1185,12 +1194,14 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const shape = new THREE.Shape();
         shape.moveTo(-0.31, 0); shape.lineTo(0.31, 0); shape.lineTo(0.31, 0.08); shape.lineTo(0.18, 0.3); shape.lineTo(0.1, 1.07);
         shape.lineTo(-0.1, 1.07); shape.lineTo(-0.18, 0.3); shape.lineTo(-0.31, 0.08); shape.closePath();
-        const n = Math.round(d / 2);
+        // a run of 2 m sections along the barrier's long side (either axis)
+        const along = d >= w, L = along ? d : w, n = Math.max(1, Math.round(L / 2)), sl = L / n;
         for (let i = 0; i < n; i++) {
-          const g = new THREE.ExtrudeGeometry(shape, { depth: 1.9, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 3 });
-          g.translate(0, 0, -0.98);
+          const g = new THREE.ExtrudeGeometry(shape, { depth: sl - 0.1, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 3 });
+          g.translate(0, 0, -(sl - 0.1) / 2);
           const uv = g.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) / 3, uv.getY(k) / 3);
-          put(g, M.concrete, cx, 0, z0 + (i + 0.5) * (d / n), (rnd() - 0.5) * 0.06, { grime: 0.35, tint: i % 2 ? 0xf0ece4 : 0xe0dbd0 });
+          const t = -L / 2 + (i + 0.5) * sl;
+          put(g, M.concrete, cx + (along ? 0 : t), 0, cz + (along ? t : 0), (along ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.04, { grime: 0.35, tint: i % 2 ? 0xf0ece4 : 0xe0dbd0 });
         }
         break;
       }
@@ -1245,15 +1256,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         put(new THREE.PlaneGeometry(0.8, 1.1), M.cloth, cx, 1.8, cz + Math.sign(cz) * -(d / 2 + 0.01), Math.sign(cz) > 0 ? Math.PI : 0, { grime: 0, tint: 0xb9a37a });
         break;
       case 'hesco': {
-        const n = Math.round(d / 1.0), along = d > w;
+        const along = d >= w, L = along ? d : w, n = Math.max(1, Math.round(L / 1.0));
         for (let i = 0; i < n; i++) for (let r = 0; r < 2; r++) {
-          const t = -d / 2 + (i + 0.5) * (d / n);
-          put(worldBox(1.0, 1.72, 0.98, 1.75), M.hesco, cx, r * 1.75 + 0.86, cz + (along ? t : 0), 0, { grime: 0.3, tint: 0xe8dcc2 });
+          const t = -L / 2 + (i + 0.5) * (L / n);
+          put(worldBox(along ? 1.0 : L / n, 1.72, along ? L / n : 1.0, 1.75), M.hesco, cx + (along ? 0 : t), r * 1.75 + 0.86, cz + (along ? t : 0), 0, { grime: 0.3, tint: 0xe8dcc2 });
         }
         break;
       }
       case 'ammo':
-        for (let i = 0; i < 4; i++) put(worldBox(0.9, 0.55, 0.45, 0), M.paint, cx + (i % 2 - 0.5) * 0.95, 0.28 + (i >> 1) * 0.56, cz + ((i * 7) % 3 - 1) * 0.3, 0, { grime: 0.2, tint: 0x4d5536 });
+        for (let i = 0; i < 8; i++) put(worldBox(0.9, 0.55, 0.5, 0), M.paint, cx + (i % 2 - 0.5) * 0.95, 0.28 + ((i >> 1) & 1) * 0.56, cz + ((i >> 2) - 0.5) * 0.52, 0, { grime: 0.2, tint: (i * 5) % 3 ? 0x4d5536 : 0x5a6040 });
         break;
       case 'car': buildCar(cx, cz, w > d ? 0 : Math.PI / 2, extra); break;
       case 'barrel':
@@ -1264,6 +1275,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const ry = 0;
         B(M.wood, w, 0.08, d, cx, 0.82, cz, ry, { grime: 0, tint: 0xa58a62 });
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(M.wood, 0.07, 0.82, 0.07, cx + sx * (w / 2 - 0.1), 0, cz + sz * (d / 2 - 0.1), 0, { grime: 0.2 });
+        // boarded front, back and ends: it's solid cover, so it has to look solid
+        for (const sz of [-1, 1]) B(M.woodOld, w - 0.04, 0.78, 0.03, cx, 0.04, cz + sz * (d / 2 - 0.03), 0, { grime: 0.25, tint: 0xa08060 });
+        for (const sx of [-1, 1]) B(M.woodOld, 0.03, 0.78, d - 0.06, cx + sx * (w / 2 - 0.03), 0.04, cz, 0, { grime: 0.25, tint: 0x8a6c50 });
         // produce crates
         const fruit = [0xb34a22, 0xc89a2a, 0x6f8a2a, 0x9c2e2e];
         for (let i = 0; i < 4; i++) {
@@ -1426,7 +1440,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
         for (const sz of [-1, 1]) {
           const z = cz + sz * (d / 2 - T / 2);
-          solid(cx, z, w, T, D + 0.95, y0 - D, 'concrete').navBlock = true;
+          solid(cx, z, w, T, D, y0 - D, 'concrete').navBlock = true;
+          const rl = solid(cx, z, w, T, 0.95, y0, 'metal'); rl.navBlock = true; rl.pass = true;   // the railing on top
           put(flatBox(w, D, T, scaleOf(M.brick)), M.brick, cx, y0 - D / 2, z, 0, { tint: 0xc08a70, grime: 0.6, base: y0 - D });
           // railing at street level
           put(flatBox(w, 0.06, 0.06, 0), M.iron, cx, y0 + 0.95, z, 0, { grime: 0.2 });
@@ -1450,7 +1465,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       case 'tree': {
         // London plane: pale mottled trunk, limbs reaching up and out, a broad crown of leaf cards (alpha-cut
         // leaf texture, normals bent outward from the crown so it shades like a mass of foliage, dappled shadows)
-        solid(cx, cz, 0.6, 0.6, 3, 0, 'wood');
+        solid(cx, cz, 0.42, 0.42, 3, 0, 'wood');
         const H = h || 9, R = H * 0.36;
         const trunkH = H * 0.42;
         put(new THREE.CylinderGeometry(0.2, 0.3, trunkH, 10), M.woodOld, cx, trunkH / 2, cz, 0, { tint: 0xb4aa92, grime: 0.15 });
@@ -1580,7 +1595,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (const [k, nx, nz, L] of [['e', 1, 0, d], ['w', -1, 0, d], ['n', 0, 1, w], ['s', 0, -1, w]]) {
           if (k === open) continue;
           const x = cx + nx * w / 2, z = cz + nz * d / 2, alongX = !nx;
-          solid(x, z, alongX ? L : 0.08, alongX ? 0.08 : L, H, 0, 'metal');
+          solid(x, z, alongX ? L : 0.08, alongX ? 0.08 : L, H, 0, 'metal').pass = true;   // iron railing: blocks you, not bullets
           for (const y of [0.12, H - 0.06]) put(flatBox(alongX ? L : 0.05, 0.05, alongX ? 0.05 : L, 0), M.iron, x, y, z, 0, { grime: 0.1 });
           const n = Math.round(L / 0.16);
           for (let i = 0; i <= n; i++) { const t = -L / 2 + i * L / n; put(new THREE.CylinderGeometry(0.014, 0.014, H, 4), M.iron, x + (alongX ? t : 0), H / 2, z + (alongX ? 0 : t), 0, { grime: 0 }); if (i % 4 === 0) put(new THREE.ConeGeometry(0.04, 0.12, 4), M.iron, x + (alongX ? t : 0), H + 0.06, z + (alongX ? 0 : t), 0, { grime: 0 }); }
@@ -1796,7 +1811,6 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // following the triangular lot, open between the parapets, columns, cars, a blue P sign at the prow.
         // extra.pts = footprint (world x, z), convex
         const pts = extra.pts, decks = Math.max(2, Math.round(h / 3));
-        solidPoly(pts, h, 0, 'concrete');
         const inset = (P, t) => {
           // offset a convex polygon inward by t (edges moved in, adjacent ones intersected)
           let area = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; area += a[0] * b[1] - b[0] * a[1]; }
@@ -1810,6 +1824,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           put(g, mat, 0, y, 0, 0, { tint, grime: 0.35, base: y });
         };
         const inner = inset(pts, 0.35), core = inset(pts, 1.2);
+        // collision as drawn: the solid core all the way up, and the street-level parapet round the outside
+        // (the decks above it are open: you can see and shoot into them)
+        solidPoly(core, h, 0, 'concrete');
+        solidPoly(pts, 1.05, 0, 'concrete');
         slab(core, null, 0, h - 0.3, M.dim, 0xffffff);
         for (let k = 0; k <= decks; k++) {
           const y = k * (h / decks);
@@ -1947,7 +1965,21 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const g0 = glows.length, h0 = glowsHot.length;
     if (xf) XF = xf;
     const nb = physics.boxes.length;
-    if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
+    // collision that matches what's drawn (no invisible edges): some props are smaller than their layout box
+    if (kind === 'ammo') solid(cx, cz, 1.85, 1.02, 1.12, 0, 'metal');
+    else if (kind === 'palm') solid(cx, cz, 0.32, 0.32, h, y0, 'wood');
+    else if (kind === 'sand') solid(cx, cz, w > d ? w - 0.55 : Math.min(w, 0.62), w > d ? Math.min(d, 0.62) : d - 0.55, h - 0.1, y0, 'dirt');
+    else if (kind === 'car') {   // body, then the narrower, shorter cabin
+      const al = w > d;
+      solid(cx, cz, al ? w - 0.5 : w - 0.25, al ? d - 0.25 : d - 0.5, 0.85, y0, 'metal');
+      solid(cx, cz, al ? w - 1.5 : w - 0.5, al ? d - 0.5 : d - 1.5, h - 0.85, y0 + 0.85, 'metal').pass = true;   // cabin: mostly glass, bullets go through
+    } else if (kind === 'jersey') {   // wide foot, narrow top
+      const al = w > d;
+      solid(cx, cz, al ? w : 0.6, al ? 0.6 : d, 0.3, y0, 'concrete');
+      solid(cx, cz, al ? w : 0.3, al ? 0.3 : d, h - 0.3, y0 + 0.3, 'concrete');
+    } else if (kind === 'bench') solid(cx, cz, w, d, 0.95, y0, 'wood').pass = true;
+    else if (kind === 'stairs' && PROPS.stairs) solid(cx - (extra === 1 ? Math.sign(cx) * 0.2 : 0), cz, w - (extra === 1 ? 0.4 : 0), d, Math.min(h, 0.35), Math.max(0, h - 0.35), 'wood');   // the treads, open underneath like the model
+    else if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
     for (let i = nb; i < physics.boxes.length; i++) if (!physics.boxes[i].src) physics.boxes[i].src = `${kind}@${+cx.toFixed(1)},${+cz.toFixed(1)}`; // for the collision audit
     if (xf) {
@@ -1993,7 +2025,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const z = sz * (HZ - 1.4), xx = x + (rnd() - 0.5) * 2;
         if (blocked(xx, z, 0.5)) continue;
         for (const pt of PROPS.bin.parts) put(pt.geo.clone(), pt.mat, xx, -bb.min.y * bs, z, rnd() * 6, { sx: bs, sy: bs, sz: bs, grime: 0 });
-        solid(xx, z, 0.6, 0.6, 0.95, 0, 'metal');
+        solid(xx, z, 0.5, 0.5, 0.95, 0, 'metal');
       }
     }
     // litter along the walls: bin bags, tyres, cardboard, newspaper

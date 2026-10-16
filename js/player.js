@@ -276,7 +276,7 @@ export class PlayerController {
       else this.crouchToggle = !this.crouchToggle;
     }
     // prone: hold crouch (C / B on a controller) for a moment, or press Z
-    const crouchHeld = inp.down('KeyC') || inp.padHeld('crouch');
+    const crouchHeld = inp.down('KeyC') || inp.padHeld('crouch') || !!inp.touchCrouch;
     this.crouchHeldT = crouchHeld && !c.sprinting && c.slideT <= 0 ? this.crouchHeldT + dt : 0;
     if (this.crouchHeldT > 0.32 && !this.proneOn && this.crouchHeldT - dt <= 0.32) { this.proneOn = true; this.crouchToggle = false; }
     if (inp.action('prone')) { this.proneOn = !this.proneOn; if (!this.proneOn) this.crouchToggle = true; else this.crouchToggle = false; }
