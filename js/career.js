@@ -1,14 +1,6 @@
-// Career: score earned across matches on this device, and the level it gives (shown in lobbies).
+// Levels from career XP (XP is kept by the account server; see progress in cloudflare/auth-worker.js).
 // Level 1-55; each level needs a little more score than the last.
-const KEY = 'breachpoint.career.v1';
 export const MAX_LEVEL = 55;
-
-export function loadCareer() {
-  try {
-    const c = JSON.parse(localStorage.getItem(KEY) || '{}');
-    return { xp: Math.max(0, c.xp | 0), kills: c.kills | 0, deaths: c.deaths | 0, wins: c.wins | 0, matches: c.matches | 0 };
-  } catch (_) { return { xp: 0, kills: 0, deaths: 0, wins: 0, matches: 0 }; }
-}
 
 // score needed to reach a level: 0, 400, 1000, 1800 ... (about 100k for 55)
 export const xpFor = (lv) => 100 * (lv - 1) * (lv + 2) / 2 * 0.8 | 0;
@@ -16,15 +8,6 @@ export function levelOf(xp) {
   let lv = 1;
   while (lv < MAX_LEVEL && xp >= xpFor(lv + 1)) lv++;
   return lv;
-}
-
-export function addMatch({ score = 0, kills = 0, deaths = 0, won = false }) {
-  const c = loadCareer();
-  const before = levelOf(c.xp);
-  c.xp += Math.max(0, Math.min(20000, score | 0));
-  c.kills += kills | 0; c.deaths += deaths | 0; c.wins += won ? 1 : 0; c.matches++;
-  try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (_) { /* private mode */ }
-  return { ...c, level: levelOf(c.xp), levelUp: levelOf(c.xp) > before };
 }
 
 // rank insignia for a level (drawn, no images): chevrons, then bars, then stars in a wreath

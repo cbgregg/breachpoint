@@ -156,6 +156,10 @@ export class Account {
   // report a player (account id from the match, or just their Name Tag)
   async report(data) { return this.call('/report', data, true); }
 
+  // ---------- progression (XP and level are kept on the server) ----------
+  async progress() { return this.call('/progress', {}, true); }
+  async reportMatch(data) { return this.call('/match', data, true); }
+
   // ---------- Name Tag (public) and display name (friends only) ----------
   async setTag(name) {
     this.user = (await this.call('/name', { name }, true)).user;

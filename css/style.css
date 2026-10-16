@@ -1269,3 +1269,9 @@ body.touch .touch-hide { display: none !important; }
   .cl-count, .cl-sep, .cl-note { margin-left: 0; }
   #lobby.classic .cl::before { display: none; }
 }
+
+/* account notice */
+#notice { align-items: center; justify-content: center; background: rgba(6, 7, 7, 0.86); backdrop-filter: blur(6px); padding: 16px; }
+#notice .nt { gap: 14px; display: flex; flex-direction: column; }
+.nt-text { font-size: 17px; line-height: 1.5; color: var(--ink); margin: 0; }
+#notice.bad .bo-title b { color: #ff9a6a; }

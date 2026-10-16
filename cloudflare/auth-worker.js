@@ -68,6 +68,7 @@ export default {
     if (!env.ACCOUNTS) return json({ error: 'Accounts storage (KV binding ACCOUNTS) is not set up.' }, 500, cors);
     try {
       if (request.method === 'GET' && path === '/pubkey') return json({ jwk: (await signingKey(env)).pub }, 200, { ...cors, 'Cache-Control': 'public, max-age=3600' });
+      if (request.method === 'GET' && path === '/admin') return await admin(env, new URL(request.url));
       if (request.method !== 'POST') return json({ error: 'not found' }, 404, cors);
       if (!okOrigin) return json({ error: 'origin not allowed' }, 403, cors);
       const body = await request.json().catch(() => ({}));
@@ -89,6 +90,8 @@ export default {
         case '/feedback': return await feedback(ctx);
         case '/terms': return await withUser(ctx, (u) => acceptTerms(ctx, u));
         case '/report': return await withUser(ctx, (u) => report(ctx, u));
+        case '/progress': return await withUser(ctx, (u) => progress(ctx, u));
+        case '/match': return await withUser(ctx, (u) => matchResult(ctx, u));
         case '/logout': return await logout(ctx);
         case '/delete': return await withUser(ctx, (u, s) => deleteAccount(ctx, u, s));
         default: return json({ error: 'not found' }, 404, cors);
@@ -372,6 +375,156 @@ async function report({ env, body, request, cors }, user) {
   return json({ ok: true }, 200, cors);
 }
 
+
+// ---------- progression: XP and levels live here, not in the browser ----------
+// Matches are peer-to-peer, so the server never sees them. The host reports the result for everyone, each
+// guest backed by the signed match pass they joined with. Every result goes through sanity checks:
+//   obvious cheating (impossible score, kills or match rate)  -> XP goes back to the last checkpoint, the
+//                                                                account goes under review, you get an email
+//   suspicious (very high but possible, twice in a week)       -> account under review, new XP held, email
+// A checkpoint is the XP the account had after a clean day. While under review the player still plays; their
+// XP is held until you clear or reset them with the links in the email.
+const PROG = {
+  minSecs: 120,            // shorter matches earn nothing
+  matchCap: 8000,          // most XP one match can give
+  dayCap: 45000,           // most XP a day
+  hourMatches: 8,          // results counted per hour
+  hardRate: 40,            // score per second that can't be real
+  hardKillRate: 1 / 1.4,   // kills per second that can't be real
+  softRate: 13,            // score per second that is possible but rare
+  softKd: 12,              // kill/death ratio flagged with at least softKdKills kills
+  softKdKills: 25,
+  cleanFor: 86400,         // a day without flags moves the checkpoint up
+};
+const progKey = (id) => `prog:${id}`;
+async function progGet(env, id) {
+  const p = await getJSON(env, progKey(id));
+  return { xp: 0, cp: { xp: 0, at: now() }, rev: 0, held: 0, sus: [], day: { d: '', xp: 0 }, hr: { h: 0, n: 0 }, note: '', ...(p || {}) };
+}
+const progPut = (env, id, p) => env.ACCOUNTS.put(progKey(id), JSON.stringify(p));
+
+async function progress({ env, cors }, user) {
+  const p = await progGet(env, user.id);
+  const out = { xp: p.xp, rev: p.rev ? 1 : 0, held: p.held || 0, note: p.note || '', cp: p.cp.xp };
+  if (p.note) { p.note = ''; await progPut(env, user.id, p); }   // each notice is shown once
+  return json(out, 200, cors);
+}
+
+async function verifyPass(env, tk, room) {
+  if (typeof tk !== 'string' || tk.length > 600) return null;
+  const [payload, sig] = tk.split('.');
+  if (!payload || !sig) return null;
+  try {
+    const key = await signingKey(env);
+    if (!key.pubKey) key.pubKey = await crypto.subtle.importKey('jwk', key.pub, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key.pubKey, unb64u(sig), enc.encode(payload));
+    if (!ok) return null;
+    const t = JSON.parse(new TextDecoder().decode(unb64u(payload)));
+    if (t.r !== room || !(t.e > now() - 6 * 3600)) return null;   // a lobby can run a few matches past the pass
+    return t.u;
+  } catch (_) { return null; }
+}
+
+async function matchResult({ env, body, request, cors }, user) {
+  const room = String(body.room || '');
+  if (!/^[A-Za-z0-9:_-]{1,40}$/.test(room)) return json({ error: 'bad match code' }, 400, cors);
+  if (!await allow(env, `rl:mr:${user.id}`, 12, 3600)) return json({ error: 'Too many results.' }, 429, cors);
+  const secs = Math.max(0, Math.min(3600, Number(body.secs) || 0));
+  const mode = String(body.mode || '').slice(0, 12);
+  const list = Array.isArray(body.players) ? body.players.slice(0, 12) : [];
+  const seen = new Set(), rows = [];
+  for (const r of list) {
+    const uid = r && r.me ? user.id : await verifyPass(env, r && r.tk, room);
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    rows.push({ uid, s: Number(r.s) || 0, k: Number(r.k) || 0, d: Number(r.d) || 0, w: !!r.w });
+  }
+  if (rows.length < 2) return json({ ok: true, counted: 0 }, 200, cors);   // XP needs at least two real players
+  const origin = new URL(request.url).origin;
+  for (const r of rows) await award(env, origin, r, { secs, mode, room, host: user, players: rows.length });
+  return json({ ok: true, counted: rows.length }, 200, cors);
+}
+
+async function award(env, origin, r, m) {
+  const p = await progGet(env, r.uid);
+  const t = now(), day = new Date().toISOString().slice(0, 10), hr = Math.floor(t / 3600);
+  if (p.day.d !== day) p.day = { d: day, xp: 0 };
+  if (p.hr.h !== hr) p.hr = { h: hr, n: 0 };
+  p.hr.n++;
+  p.sus = (p.sus || []).filter(x => t - x.at < 7 * 86400);
+  const rate = m.secs > 0 ? r.s / m.secs : Infinity;
+  const hard = [], soft = [];
+  if (r.s < 0 || r.k < 0 || r.d < 0) hard.push('negative stats');
+  if (m.secs < 30 && r.s > 500) hard.push(`${r.s} score in a ${m.secs}s match`);
+  if (rate > PROG.hardRate) hard.push(`${rate.toFixed(1)} score/second`);
+  if (m.secs > 0 && r.k / m.secs > PROG.hardKillRate) hard.push(`${r.k} kills in ${m.secs}s`);
+  if (r.s > r.k * 260 + 2500) hard.push(`score ${r.s} doesn't fit ${r.k} kills`);
+  if (p.hr.n > PROG.hourMatches * 2) hard.push(`${p.hr.n} matches reported this hour`);
+  if (!hard.length) {
+    if (rate > PROG.softRate) soft.push(`${rate.toFixed(1)} score/second`);
+    if (r.k >= PROG.softKdKills && r.k / Math.max(1, r.d) >= PROG.softKd) soft.push(`${r.k}/${r.d} K/D`);
+    if (p.day.xp > PROG.dayCap * 0.8) soft.push(`${p.day.xp} XP today`);
+  }
+  let gain = m.secs < PROG.minSecs || p.hr.n > PROG.hourMatches ? 0 : Math.max(0, Math.min(r.s, PROG.matchCap, PROG.dayCap - p.day.xp));
+  const before = p.xp;
+  let mail = '';
+  if (hard.length) {
+    p.xp = Math.min(p.xp, p.cp.xp); p.held = 0; p.rev = 1; p.note = 'reset'; gain = 0;
+    p.sus.push({ at: t, why: hard.join('; '), hard: 1 });
+    mail = 'RESET TO CHECKPOINT';
+  } else if (soft.length) {
+    p.sus.push({ at: t, why: soft.join('; ') });
+    if (!p.rev && p.sus.length >= 2) { p.rev = 1; p.note = 'review'; mail = 'UNDER REVIEW'; }
+  }
+  if (gain) { if (p.rev) p.held = (p.held || 0) + gain; else p.xp += gain; p.day.xp += gain; }
+  // checkpoint: the XP after a clean day
+  if (!p.rev && !p.sus.some(x => t - x.at < PROG.cleanFor) && t - (p.cp.at || 0) >= PROG.cleanFor) p.cp = { xp: before, at: t };
+  await progPut(env, r.uid, p);
+  if (mail) await progMail(env, origin, r.uid, p, mail, [...hard, ...soft], r, m);
+}
+
+async function adminSig(env, uid, act) {
+  const k = env.ADMIN_KEY || env.RESEND_API_KEY || '';
+  if (!k) return '';
+  const key = await crypto.subtle.importKey('raw', enc.encode(k), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return b64u(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(`${uid}:${act}`)))).slice(0, 32);
+}
+async function progMail(env, origin, uid, p, what, why, r, m) {
+  if (!env.FEEDBACK_TO || !env.RESEND_API_KEY || !env.MAIL_FROM) return;
+  const u = await getUser(env, uid);
+  const link = async (a) => `${origin}/admin?u=${uid}&a=${a}&s=${await adminSig(env, uid, a)}`;
+  const text = [
+    `Account ${what}: ${u ? u.tag : '?'} (${uid})`, '',
+    `Why: ${why.join('; ')}`,
+    `Match: ${m.mode} · ${m.secs}s · ${m.players} players · code ${m.room} · reported by host ${m.host.tag} (${m.host.id})`,
+    `Their line: score ${r.s} · ${r.k} kills / ${r.d} deaths`,
+    `XP now ${p.xp} · checkpoint ${p.cp.xp} · held ${p.held || 0}`,
+    `Flags this week: ${p.sus.map(x => `${new Date(x.at * 1000).toISOString().slice(0, 16)} ${x.why}`).join(' | ')}`, '',
+    `Clear (looks legit, give back held XP): ${await link('clear')}`,
+    `Reset to checkpoint and close the review: ${await link('reset')}`,
+    `Ban from online play: ${await link('ban')}`,
+  ].join('\n');
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: env.MAIL_FROM, to: [env.FEEDBACK_TO], subject: `[Breachpoint] ${what}: ${u ? u.tag : uid}`, text }),
+  }).catch(() => {});
+}
+// one-click links from the review email
+async function admin(env, url) {
+  const uid = url.searchParams.get('u') || '', a = url.searchParams.get('a') || '', s = url.searchParams.get('s') || '';
+  const page = (msg) => new Response(`<!doctype html><meta name="viewport" content="width=device-width"><body style="font:16px system-ui;background:#111;color:#eee;padding:24px">${msg}</body>`, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(uid) || !['clear', 'reset', 'ban'].includes(a)) return page('Bad link.');
+  const want = await adminSig(env, uid, a);
+  if (!want || s !== want) return page('This link isn\'t valid.');
+  const p = await progGet(env, uid);
+  if (a === 'clear') { p.xp += p.held || 0; p.held = 0; p.rev = 0; p.sus = []; p.note = 'cleared'; p.cp = { xp: p.xp, at: now() }; }
+  if (a === 'reset') { p.xp = Math.min(p.xp, p.cp.xp); p.held = 0; p.rev = 0; p.sus = []; p.note = 'reset'; }
+  if (a === 'ban') { const u = await getUser(env, uid); if (u) { u.banned = true; await saveUser(env, u); } p.held = 0; }
+  await progPut(env, uid, p);
+  const u = await getUser(env, uid);
+  return page(`Done: <b>${a}</b> for ${u ? u.tag : uid}. XP is now ${p.xp}${a === 'ban' ? ' and the account can\'t play online.' : '.'}`);
+}
+
 // ---------- feedback form (no sign-in needed) ----------
 const FB_KINDS = { feature: 'Feature request', bug: 'Bug report', feedback: 'Feedback' };
 async function feedback({ env, body, request, cors }) {
@@ -416,6 +569,7 @@ async function deleteAccount({ env, cors }, user, sk) {
   }
   await env.ACCOUNTS.delete(frKey(user.id));
   await env.ACCOUNTS.delete(`pres:${user.id}`);
+  await env.ACCOUNTS.delete(progKey(user.id));
   if (user.code) await env.ACCOUNTS.delete(`fcode:${user.code}`);
   await env.ACCOUNTS.delete(`email:${await sha(user.email)}`);
   await env.ACCOUNTS.delete(`user:${user.id}`);
@@ -482,6 +636,7 @@ function normEmail(e) {
 function rand(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b64u(b); }
 function randInt() { const b = new Uint32Array(1); crypto.getRandomValues(b); return b[0]; }
 async function sha(s) { return b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(s)))); }
+function unb64u(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 function b64u(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function json(body, status, headers) {
   return new Response(JSON.stringify(body), { status, headers: { 'Cache-Control': 'no-store', ...headers, 'Content-Type': 'application/json' } });
