@@ -588,9 +588,11 @@ body.mode-online #pane-play .rows::before { content: 'PRIVATE MATCH SETTINGS (WH
 body.rounds #death-respawn { display: none; }
 body.rounds.fixed-loadout #death-loadout, body.rounds.fixed-loadout #spawn-hint { display: none !important; }
 @media (max-width: 760px) { .gm-top { top: 70px; } }
+body[data-gmode="gungame"] .row:has(#opt-score) { display: none; }
 body[data-gmode="gunfight"] .tdm-snd, body[data-gmode="gunfight"] .tdm-only, body[data-gmode="snd"] .tdm-only { display: none; }
 /* game mode picker on the Play tab */
-.mode-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mode-pick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 700px) { .mode-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .mode-pick .mp { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 12px 10px; background: var(--panel); border: 1px solid var(--line); border-bottom: 3px solid transparent; cursor: pointer; text-align: left; transition: background .15s, border-color .15s; }
 .mode-pick .mp:hover { background: rgba(236, 233, 225, 0.08); }
 .mode-pick .mp b { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; line-height: 1.05; }

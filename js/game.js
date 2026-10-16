@@ -7,7 +7,7 @@ import { Physics, rayBox } from './physics.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
-import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef } from './attachments.js';
+import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadout } from './attachments.js';
 import { BotBrain } from './bot.js';
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
@@ -19,7 +19,7 @@ import { applySpread } from './weapons.js';
 import { Renderer, SUN_DIR } from './render.js';
 import { HostSession, GuestSession } from './online.js';
 import { Music } from './music.js';
-import { createMode, MODES } from './modes.js';
+import { createMode, MODES, GUN_LADDER } from './modes.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -158,6 +158,11 @@ export class Game {
     if (!MODES[this.settings.mode]) this.settings.mode = 'tdm';
     const modeCfg = MODES[this.settings.mode];
     if (modeCfg.rounds) this.settings.scoreLimit = modeCfg.winRounds;
+    this.gg = !!modeCfg.ladder;   // Gun Game: TDM rules, but the score is the team's best rung of the gun ladder
+    if (this.gg) {
+      this.settings.scoreLimit = GUN_LADDER.length;
+      for (const id of GUN_LADDER) { try { prewarmGun(weaponDef(id, {})); } catch (_) { /* built on first use */ } }
+    }
     // 'random' (or an unknown id) picks one of the maps
     if (!MAPS[this.settings.map]) this.settings.map = MAP_IDS[(Math.random() * MAP_IDS.length) | 0];
     this.applySettings(this.settings);
@@ -199,6 +204,7 @@ export class Game {
       const humans = this.characters.filter(c => c.team === t).length;
       for (let i = humans; fill && i < N; i++) this.addBot(t);
     }
+    if (this.gg) for (const c of this.characters) { c.ggLevel = 0; c.setLoadout(soloLoadout(GUN_LADDER[0])); }
     this.playerCtl = new PlayerController(this, this.player);
 
     this.scores = [0, 0];
@@ -588,7 +594,7 @@ export class Game {
   // change class: right away if you only just spawned and haven't fired (like CoD), otherwise at
   // the next spawn. Guests ask the host, which applies the same rule.
   requestLoadout(l) {
-    if (!this.player || (this.gm && this.gm.fixedLoadout)) return;
+    if (!this.player || this.gg || (this.gm && this.gm.fixedLoadout)) return;
     if (this.mode === 'guest') { this.session?.sendLoadout(l); return; }
     this.applyLoadout(this.player, l);
   }
@@ -616,11 +622,23 @@ export class Game {
     const isPlayer = shooter === this.player;
     const muzzle = isPlayer ? this.playerCtl.muzzleWorld(_m) : shooter.muzzleWorld(_m);
     this.audio.play('shot', isPlayer ? null : shooter.pos, { weapon: def.id, quiet: def.quiet });
-    this.effects.muzzle(muzzle, dir, def.id === 'shotgun' || def.id === 'sniper', def.quiet);
+    this.effects.muzzle(muzzle, dir, ['shotgun', 'sniper', 'launcher'].includes(def.model.type), def.quiet);
     const ej = isPlayer ? this.playerCtl.ejectWorld(_a) : shooter.ejectWorld(_a);
     _r.set(Math.cos(shooter.yaw), 0, -Math.sin(shooter.yaw));
-    if (def.id !== 'sniper' && def.id !== 'shotgun') this.effects.casing(ej, dir, _r);
+    if (def.mode !== 'BOLT' && def.mode !== 'PUMP' && !def.rocket) this.effects.casing(ej, dir, _r);
     const cosmetic = this.mode === 'guest'; // guests draw their own shot instantly; the host decides what it hit
+    if (def.rocket) {
+      // The Monte: a real rocket from the muzzle along the aim (the host flies it; guests get it as an event)
+      if (cosmetic) return;
+      applySpread(dir, spread, _d);
+      const vel = _d.clone().multiplyScalar(def.rocket.speed);
+      const start = muzzle.clone().addScaledVector(_d, 0.2);
+      const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
+      this.spawnRocket(id, start, vel, shooter, def.rocket);
+      this.emit(['rkt', id, +start.x.toFixed(2), +start.y.toFixed(2), +start.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), shooter.id]);
+      if (!def.quiet) this.reportIntel(1 - shooter.team, shooter.pos);
+      return;
+    }
     if (!cosmetic && !def.quiet) this.reportIntel(1 - shooter.team, shooter.pos);
     const rewound = this.session && shooter.remote ? this.session.rewind(shooter) : null;
     const hits = new Map();
@@ -736,9 +754,59 @@ export class Game {
     if (owner !== this.player) this.audio.play('pin', owner ? owner.pos : origin); // our own pin was pulled when cooking began
   }
 
+  spawnRocket(id, origin, vel, owner, spec) {
+    if (!this.rocketGeo) {
+      const body = new THREE.CylinderGeometry(0.045, 0.045, 0.5, 12); body.rotateX(Math.PI / 2);
+      const nose = new THREE.ConeGeometry(0.06, 0.28, 12); nose.rotateX(-Math.PI / 2); nose.translate(0, 0, -0.38);
+      this.rocketGeo = [body, nose];
+      this.rocketMats = [new THREE.MeshStandardMaterial({ color: 0x4a5236, roughness: 0.6, metalness: 0.3 }), new THREE.MeshStandardMaterial({ color: 0x3a3f2a, roughness: 0.5, metalness: 0.2 })];
+      this.flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 2.2, 0.8), transparent: true, opacity: 0.9, toneMapped: false });
+    }
+    const mesh = new THREE.Group();
+    this.rocketGeo.forEach((geo, k) => mesh.add(new THREE.Mesh(geo, this.rocketMats[k])));
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), this.flameMat); flame.position.z = 0.3; flame.scale.set(1, 1, 2.2); mesh.add(flame);
+    mesh.position.copy(origin);
+    mesh.lookAt(_a.copy(origin).sub(vel));          // nose (-z) along the flight
+    this.scene.add(mesh);
+    this.grenades.push({ id, pos: origin, vel, fuse: 6, owner, mesh, rocket: spec });
+    if (this.mode === 'guest' && owner !== this.player) this.audio.play('shot', owner && owner.pos, { weapon: 'monte' }); // the host / shooter already played it
+  }
+
+  updateRocket(g, dt) {
+    // fly in a straight line (a touch of drop), hitting the first wall or player along the way
+    const step = g.vel.length() * dt;
+    _d.copy(g.vel).normalize();
+    let best = step, hit = false, direct = null;
+    const w = this.physics.raycast(g.pos, _d, step + 0.1);
+    if (w) { best = w.t; hit = true; }
+    for (const c of this.characters) {
+      if (!c.alive || c.hidden || (c === g.owner && g.fuse > 5.8)) continue;
+      if (c.pos.distanceToSquared(g.pos) > (step + 3) * (step + 3)) continue;
+      const r = this.rayCharacter(g.pos, _d, c, best);
+      if (r.t < best) { best = r.t; hit = true; direct = c; }
+    }
+    g.pos.addScaledVector(_d, Math.max(0, best - 0.05));
+    g.vel.y -= 1.2 * dt;
+    g.mesh.position.copy(g.pos);
+    g.mesh.lookAt(_a.copy(g.pos).sub(g.vel));
+    if (Math.random() < 0.9) this.effects.smoke.spawn(_a.copy(g.pos).addScaledVector(_d, -0.4), _b.set((Math.random() - 0.5) * 0.4, 0.3, (Math.random() - 0.5) * 0.4), 0xb8b2a6, 0.18, 1.4, { grow: 2.2, alpha: 0.4, drag: 1.5, gravity: -0.15 });
+    return hit ? (direct || true) : null;
+  }
+
   updateGrenades(dt) {
     for (let i = this.grenades.length - 1; i >= 0; i--) {
       const g = this.grenades[i];
+      if (g.rocket) {
+        g.fuse -= dt;
+        const hit = g.stopped ? null : this.updateRocket(g, dt);
+        if (hit && this.mode === 'guest') g.stopped = true;   // wait for the host's explosion
+        if ((hit && this.mode !== 'guest') || g.fuse <= (this.mode === 'guest' ? -1.5 : 0)) {
+          if (this.mode !== 'guest') { g.direct = hit && hit !== true ? hit : null; this.explode(g); }
+          this.scene.remove(g.mesh);
+          this.grenades.splice(i, 1);
+        }
+        continue;
+      }
       for (let s = 0; s < 2; s++) {
         const h = dt / 2;
         g.vel.y -= GRAV * h;
@@ -778,17 +846,19 @@ export class Game {
     this.explosionFx(pos);
     this.emit(['boom', g.id, +pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2)]);
     const src = _a.copy(pos); src.y += 0.25;
+    if (g.rocket) src.addScaledVector(_d.copy(g.vel).normalize(), -0.3);   // just in front of the wall it hit
+    const R = g.rocket ? g.rocket.radius : GRENADE.radius, DMG = g.rocket ? g.rocket.damage : GRENADE.damage, wid = g.rocket ? 'monte' : 'grenade';
     for (const c of this.characters) {
       if (!c.alive) continue;
       const cp = c.chestPos(new THREE.Vector3());
       const d = cp.distanceTo(pos);
-      if (d > GRENADE.radius) continue;
-      if (this.physics.blocked(src, cp) && this.physics.blocked(src, c.headPos(_b))) continue;
-      const dmg = GRENADE.damage * Math.pow(1 - d / GRENADE.radius, 1.3) + 5;
-      c.hitReact(cp, _b.subVectors(cp, pos).setY(Math.max(0.2, cp.y - pos.y)), 1.5 + 2.5 * (1 - d / GRENADE.radius), false, 3 * (1 - d / GRENADE.radius));
+      if (d > R && c !== g.direct) continue;
+      if (c !== g.direct && this.physics.blocked(src, cp) && this.physics.blocked(src, c.headPos(_b))) continue;
+      const dmg = DMG * Math.pow(Math.max(0, 1 - d / R), 1.3) + 5 + (c === g.direct ? g.rocket.direct : 0);
+      c.hitReact(cp, _b.subVectors(cp, pos).setY(Math.max(0.2, cp.y - pos.y)), 1.5 + 2.5 * Math.max(0, 1 - d / R), false, 3 * Math.max(0, 1 - d / R));
       const wasAlive = c.alive;
       const before = c.health;
-      c.takeDamage(dmg, g.owner, 'grenade', false, pos);
+      c.takeDamage(dmg, g.owner, wid, false, pos);
       if (g.owner && c !== g.owner && c.health < before) this.notify(g.owner, 'hit', wasAlive && !c.alive, false);
     }
   }
@@ -817,7 +887,8 @@ export class Game {
       killer.streak++;
       const bonus = (headshot ? SCORE.headshot : 0) + (weaponId === 'melee' ? SCORE.melee : 0);
       killer.score += SCORE.kill + bonus;
-      if (!this.gm) this.scores[killer.team]++; // round modes score rounds, not kills
+      if (this.gg) this.ggPromote(killer, weaponId, victim);
+      else if (!this.gm) this.scores[killer.team]++; // round modes score rounds, not kills
       if (!killer.isBot) {
         this.notify(killer, 'kill');
         this.notify(killer, 'score', 'KILL', SCORE.kill);
@@ -855,13 +926,35 @@ export class Game {
     else if (Math.random() < 0.5) this.dropAmmo(victim.pos);
     if (!this.gm && enemyKill && this.scores[killer.team] >= this.settings.scoreLimit && this.endT <= 0) {
       this.endT = 1.4;
-      this.hud.medal(killer.team === this.player.team ? 'VICTORY' : 'DEFEAT', 'SCORE LIMIT REACHED');
+      this.hud.medal(killer.team === this.player.team ? 'VICTORY' : 'DEFEAT', this.gg ? `${killer.name.toUpperCase()} FINISHED THE LADDER` : 'SCORE LIMIT REACHED');
+    }
+  }
+
+  // Gun Game: a kill moves the killer up a gun (now, mid-life); a knife kill also sends the victim down one
+  ggPromote(killer, weaponId, v) {
+    killer.ggLevel = Math.min(GUN_LADDER.length, (killer.ggLevel || 0) + 1);
+    this.scores[killer.team] = Math.max(this.scores[killer.team], killer.ggLevel);
+    if (killer.ggLevel < GUN_LADDER.length) {
+      const l = soloLoadout(GUN_LADDER[killer.ggLevel]);
+      killer.pendingLoadout = null;
+      killer.setLoadout(l);
+      killer.weapons.forEach(w => w.refill());
+      killer.switchT = 0.4;
+      this.emit(['lo', killer.id, killer.loadout]);
+      if (!killer.isBot) this.notify(killer, 'medal', killer.ggLevel === GUN_LADDER.length - 1 ? 'FINAL WEAPON' : 'NEW WEAPON', WEAPONS[GUN_LADDER[killer.ggLevel]].name.toUpperCase());
+    }
+    if (weaponId === 'melee') {
+      if (v.ggLevel > 0) {
+        v.ggLevel--; v.pendingLoadout = soloLoadout(GUN_LADDER[v.ggLevel]);
+        if (!v.isBot) this.notify(v, 'medal', 'HUMILIATED', 'DOWN ONE WEAPON');
+      }
     }
   }
 
   respawn(c) {
     const p = this.chooseSpawn(c.team);
-    if (c.isBot && Math.random() < 0.3) c.pendingLoadout = botLoadout(c.primaryId);
+    if (this.gg) c.pendingLoadout = soloLoadout(GUN_LADDER[Math.min(c.ggLevel || 0, GUN_LADDER.length - 1)]);
+    else if (c.isBot && Math.random() < 0.3) c.pendingLoadout = botLoadout(c.primaryId);
     const before = c.loadout;
     c.spawn(p, this.spawnYawOut);
     if (c.loadout !== before) this.emit(['lo', c.id, c.loadout]);

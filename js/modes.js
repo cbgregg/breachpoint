@@ -24,7 +24,13 @@ export const MODES = {
     id: 'snd', name: 'Search & Destroy', short: 'S&D', blurb: 'One life. Attackers plant the bomb at A or B, defenders stop them. First to 4 rounds.',
     rounds: true, winRounds: 4, maxRounds: 7, halftime: 3, roundTime: 120, freeze: 5, bombTime: 45, plantTime: 5, defuseTime: 7.5, siteRadius: 2.4, defuseRadius: 1.8,
   },
+  gungame: {
+    id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true,
+    blurb: 'Every kill moves you up to the next gun. A knife kill sends the victim back one. First kill with the last gun wins.',
+  },
 };
+// Gun Game ladder: rifles down to handguns. The team score is its best player's rung.
+export const GUN_LADDER = ['rifle', 'kv47', 'br308', 'smg', 'krv45', 'hx60', 'shotgun', 'sa12', 'mr14', 'sniper', 'monte', 'mp18', 'd50', 'r357', 'pistol'];
 export const MODE_IDS = Object.keys(MODES);
 
 // bomb sites on team 1's side (+x); team 0's are point-mirrored, like the maps themselves

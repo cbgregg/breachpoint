@@ -17,7 +17,8 @@ import { safeName, cleanChat } from './names.js';
 import { PRIMARIES, PLAYER, MELEE, WEAPONS, GRENADE } from './config.js';
 import { Character } from './character.js';
 import { hitPower } from './motion.js';
-import { parseLoadout } from './attachments.js';
+import { parseLoadout, soloLoadout } from './attachments.js';
+import { GUN_LADDER } from './modes.js';
 
 export const MAX_HUMANS = 8;
 const PROTO = 1;
@@ -492,7 +493,7 @@ export class Lobby {
         if (this.players.has(id) && typeof m.l === 'string') {
           const l = parseLoadout(m.l).str;
           this.players.get(id).primary = l;
-          if (this.game.mode === 'host' && this.game.session) this.game.session.setLoadout(id, l);
+          if (this.game.mode === 'host' && this.game.session && !this.game.gg) this.game.session.setLoadout(id, l);
         }
         break;
       case 'bye':
@@ -628,6 +629,7 @@ export class HostSession {
     if (bot) this.rosterRm.push(bot.id), g.removeCharacter(bot);
     const c = this.createRemote(p);
     g.characters.push(c);
+    if (g.gg) { c.ggLevel = 0; c.setLoadout(soloLoadout(GUN_LADDER[0])); }
     c.spawn(g.chooseSpawn(c.team), g.spawnYawOut);
     if (g.gm) g.gm.onJoin(c);
     this.rosterAdd.push(c);
@@ -1100,7 +1102,7 @@ export class GuestSession {
         const muzzle = c.hidden ? _v1.set(ox, oy, oz) : c.muzzleWorld(_v1);
         const wdef = (c.weapons.find(w => w.id === wid) || {}).def || WEAPONS[wid];
         g.audio.play('shot', c.pos, { weapon: wid, quiet: wdef.quiet });
-        g.effects.muzzle(muzzle, dir, wid === 'shotgun' || wid === 'sniper', wdef.quiet);
+        g.effects.muzzle(muzzle, dir, ['shotgun', 'sniper', 'launcher'].includes(wdef.model.type), wdef.quiet);
         if (!c.hidden && wid !== 'sniper' && wid !== 'shotgun') g.effects.casing(c.ejectWorld(_v3), dir, new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)));
         if (!Array.isArray(ends)) return;
         let whiz = false, first = true;
@@ -1146,6 +1148,13 @@ export class GuestSession {
         const [, id, ox, oy, oz, vx, vy, vz, owner, fz] = ev;
         if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
         g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), fin(fz) ? clamp(fz, 0, GRENADE.fuse) : GRENADE.fuse);
+        break;
+      }
+      case 'rkt': {
+        // The Monte's rocket: the host flies it and sends the explosion; we draw it in flight
+        const [, id, ox, oy, oz, vx, vy, vz, owner] = ev;
+        if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
+        g.spawnRocket(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), WEAPONS.monte.rocket);
         break;
       }
       case 'lo': {

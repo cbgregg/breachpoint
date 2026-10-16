@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx } from './config.js';
 import { MAPS } from './world.js';
 import { Game, prewarmBotGuns } from './game.js';
 import { glyph } from './hud.js';
@@ -186,14 +186,16 @@ function statsOf(d) {
 // A class is { name, primary, atts: { rifle: {...}, smg: {...}, ..., pistol: {...} } }. The equipped class is
 // mirrored into settings.primary / settings.attachments, which is what the match and the network read.
 const DEFAULT_CLASSES = [
-  { name: 'ASSAULT', primary: 'rifle', atts: { rifle: { optic: 'holo', muzzle: 'brake', under: 'vgrip', mag: 'std', laser: 'none' } } },
-  { name: 'RUSHER', primary: 'smg', atts: { smg: { optic: 'reflex', muzzle: 'none', under: 'agrip', mag: 'fast', laser: 'laser' } } },
-  { name: 'CLOSE QUARTERS', primary: 'shotgun', atts: { shotgun: { optic: 'iron', muzzle: 'choke', mag: 'std', laser: 'laser' } } },
-  { name: 'MARKSMAN', primary: 'rifle', atts: { rifle: { optic: 'acog', muzzle: 'comp', under: 'vgrip', mag: 'ext', laser: 'none' } } },
-  { name: 'SNIPER', primary: 'sniper', atts: { sniper: { optic: 'scope', muzzle: 'brake', mag: 'std' }, pistol: { optic: 'iron', muzzle: 'sup', mag: 'std', laser: 'none' } } },
+  { name: 'ASSAULT', primary: 'rifle', secondary: 'pistol', atts: { rifle: { optic: 'holo', muzzle: 'brake', under: 'vgrip', mag: 'std', laser: 'none' } } },
+  { name: 'RUSHER', primary: 'krv45', secondary: 'mp18', atts: { krv45: { optic: 'reflex', muzzle: 'none', under: 'agrip', mag: 'fast', laser: 'laser' } } },
+  { name: 'CLOSE QUARTERS', primary: 'sa12', secondary: 'r357', atts: { sa12: { optic: 'iron', muzzle: 'choke', mag: 'std', laser: 'laser' } } },
+  { name: 'MARKSMAN', primary: 'mr14', secondary: 'd50', atts: { mr14: { optic: 'acog', muzzle: 'comp', mag: 'std', laser: 'none' } } },
+  { name: 'SNIPER', primary: 'sniper', secondary: 'pistol', atts: { sniper: { optic: 'scope', muzzle: 'brake', mag: 'std' }, pistol: { optic: 'iron', muzzle: 'sup', mag: 'std', laser: 'none' } } },
+  { name: 'DEMOLITION', primary: 'hx60', secondary: 'monte', atts: { hx60: { optic: 'reflex', muzzle: 'none', mag: 'std', laser: 'none' } } },
+  { name: 'GUERRILLA', primary: 'kv47', secondary: 'd50', atts: { kv47: { optic: 'iron', muzzle: 'comp', under: 'none', mag: 'ext', laser: 'none' } } },
 ];
 const CUSTOM_N = 5;
-const clsCopy = (c, name) => ({ name, primary: PRIMARIES.includes(c.primary) ? c.primary : 'rifle', atts: JSON.parse(JSON.stringify(c.atts || {})) });
+const clsCopy = (c, name) => ({ name, primary: PRIMARIES.includes(c.primary) ? c.primary : 'rifle', secondary: SECONDARIES.includes(c.secondary) ? c.secondary : 'pistol', atts: JSON.parse(JSON.stringify(c.atts || {})) });
 (function migrateClasses() {
   let list = Array.isArray(settings.classes) ? settings.classes.filter(c => c && typeof c === 'object') : [];
   if (!list.length) {
@@ -211,7 +213,8 @@ let clsSel = settings.cls, editKey = null;   // highlighted class in the list; c
 function applyEquipped() {
   const c = clsGet(settings.cls) || DEFAULT_CLASSES[0];
   settings.primary = c.primary;
-  settings.attachments = { [c.primary]: clsAtt(c, c.primary), pistol: clsAtt(c, 'pistol') };
+  settings.secondary = c.secondary || 'pistol';
+  settings.attachments = { [c.primary]: clsAtt(c, c.primary), [settings.secondary]: clsAtt(c, settings.secondary) };
 }
 applyEquipped();
 function attFor(id) { return clsAtt(clsGet(editKey || clsSel), id); }
@@ -247,7 +250,14 @@ function renderGunsmith(rebuildRows = true) {
   if (!editKey) return;
   const c = clsGet(editKey), id = c.primary, d = weaponDef(id, attFor(id));
   $('gs-name').textContent = d.name.toUpperCase();
-  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows('pistol', $('gs-pistol'), 'gp'); }
+  const sec = c.secondary || 'pistol';
+  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows(sec, $('gs-pistol'), 'gp'); }
+  $('gs-sec-name').textContent = `${WEAPONS[sec].name.toUpperCase()} · ATTACHMENTS`;
+  $('weapon-list-sec').querySelectorAll('.wcard').forEach(b => {
+    b.classList.toggle('on', b.dataset.weapon === sec);
+    const s2 = attSummary(b.dataset.weapon, attFor(b.dataset.weapon));
+    b.querySelector('.wa').textContent = s2.length ? s2.join(' · ') : 'STOCK';
+  });
   $('gs-stats').innerHTML = statBars(d) + `<span class="gs-facts">${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
   preview.show(id, attFor(id));
   $('weapon-list').querySelectorAll('.wcard').forEach(b => {
@@ -268,6 +278,17 @@ function renderWeapons() {
     loadoutChanged();
     renderGunsmith();
   }));
+  const sl = $('weapon-list-sec');
+  sl.innerHTML = SECONDARIES.map(id => `<button class="wcard" data-weapon="${id}" data-nav>
+      <span class="wn">${WEAPONS[id].name.toUpperCase()}</span><span class="wt">${WEAPONS[id].mode}</span><span class="wa"></span>
+    </button>`).join('');
+  sl.querySelectorAll('.wcard').forEach(b => b.addEventListener('click', () => {
+    const c = clsGet(editKey);
+    if (!c || editKey[0] !== 'c') return;
+    c.secondary = b.dataset.weapon;
+    loadoutChanged();
+    renderGunsmith();
+  }));
   renderClasses();
 }
 const escHtml = (t) => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
@@ -280,7 +301,7 @@ function renderClasses() {
   // the list is rebuilt: keep the controller / keyboard focus on the same class
   const had = document.querySelector('#cls-list .pad-focus'), keep = had && had.dataset.cls;
   const row = (key, c) => `<button class="cls-row${key === clsSel ? ' sel' : ''}${key === settings.cls ? ' eq' : ''}" data-cls="${key}" data-nav>
-      <span class="cr-n">${escHtml(c.name)}</span><span class="cr-w">${WEAPONS[c.primary].short}</span>${key === settings.cls ? '<span class="cr-eq">EQUIPPED</span>' : ''}</button>`;
+      <span class="cr-n">${escHtml(c.name)}</span><span class="cr-w">${WEAPONS[c.primary].short} · ${WEAPONS[c.secondary || 'pistol'].short}</span>${key === settings.cls ? '<span class="cr-eq">EQUIPPED</span>' : ''}</button>`;
   $('cls-list').innerHTML = `<div class="group">DEFAULT CLASSES</div>${DEFAULT_CLASSES.map((c, i) => row('d' + i, c)).join('')}
     <div class="group">CUSTOM CLASSES</div>${settings.classes.map((c, i) => row('c' + i, c)).join('')}`;
   $('cls-list').querySelectorAll('.cls-row').forEach(b => {
@@ -291,7 +312,7 @@ function renderClasses() {
   $('cls-name').textContent = c.name;
   $('cls-kind').textContent = custom ? 'CUSTOM CLASS' : 'DEFAULT CLASS';
   $('cls-prim').innerHTML = wpnBlock('PRIMARY', c.primary, clsAtt(c, c.primary));
-  $('cls-sec').innerHTML = wpnBlock('SECONDARY', 'pistol', clsAtt(c, 'pistol'));
+  $('cls-sec').innerHTML = wpnBlock('SECONDARY', c.secondary || 'pistol', clsAtt(c, c.secondary || 'pistol'));
   $('cls-equip').querySelector('span').textContent = on ? 'EQUIPPED ✓' : 'EQUIP';
   $('cls-equip').classList.toggle('done', on);
   $('cls-edit').textContent = custom ? 'EDIT CLASS' : 'COPY TO A CUSTOM CLASS';
@@ -467,7 +488,7 @@ function renderPauseMatch() {
   $('pm-limit').textContent = `FIRST TO ${g.settings.scoreLimit}`;
   const kd = p.deaths ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
   const lo = parseLoadout(p.loadout);
-  const build = [WEAPONS[lo.primary].name.toUpperCase(), ...attSummary(lo.primary, lo.att)].join(' · ');
+  const build = [WEAPONS[lo.primary].name.toUpperCase(), ...attSummary(lo.primary, lo.att), '+ ' + WEAPONS[lo.secondary || 'pistol'].name.toUpperCase()].join(' · ');
   $('pm-me').innerHTML = [['SCORE', p.score], ['KILLS', p.kills], ['DEATHS', p.deaths], ['ASSISTS', p.assists], ['K/D', kd], ['STREAK', p.streak]]
     .map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('') + `<p class="pm-build">${esc(build)}</p>`;
   g.hud.renderScoreboard($('pause-board'));

@@ -445,7 +445,7 @@ export class BotBrain {
     // pick the right tool for the range
     const primary = b.weapons[0], pistol = b.weapons[1];
     const pr = primary.def.botRange;
-    if (b.cur === 0 && pistol.mag + pistol.reserve > 0 && ((primary.id === 'shotgun' && dist > 16) || (primary.id === 'sniper' && dist < 6))) { b.switchTo(1); return; }
+    if (b.cur === 0 && pistol.mag + pistol.reserve > 0 && ((primary.def.model.type === 'shotgun' && dist > 16) || (primary.def.model.type === 'sniper' && dist < 6))) { b.switchTo(1); return; }
     if (b.cur === 1 && primary.mag > 0 && dist >= pr[0] && dist <= pr[1] + 2) { b.switchTo(0); return; }
     if (w.mag === 0) {
       if (b.cur === 0 && dist < 15 && b.weapons[1].mag > 0) b.switchTo(1);
@@ -467,7 +467,7 @@ export class BotBrain {
       this.semiT -= dt;
       if (this.semiT <= 0 && w.cooldown <= 0) {
         b.tryFire(eye, fwd);
-        this.semiT = d.semiDelay * rand(0.6, 1.4) + (w.id === 'sniper' ? 0.4 : 0);
+        this.semiT = d.semiDelay * rand(0.6, 1.4) + (w.def.mode === 'BOLT' ? 0.4 : 0);
       }
     }
   }

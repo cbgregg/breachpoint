@@ -261,6 +261,7 @@ function triggerGroup(p, M, f0 = 0.0, width = 0.012) {
 // ---------- attachments ----------
 // f = distance forward along the barrel (z = -f); b = mount height; c = mount centre
 function opticHolo(p, g, M, b, c) {
+  M = mats();
   p.profile(M.poly, [[c - 0.06, b], [c + 0.06, b], [c + 0.06, b + 0.016], [c - 0.06, b + 0.016]], 0.036, { r: 0.005 });
   const hy = b + 0.042;
   p.frontal(M.poly, [[-0.024, hy - 0.028], [0.024, hy - 0.028], [0.024, hy + 0.024], [-0.024, hy + 0.024]], c - 0.02, c + 0.045,
@@ -279,6 +280,7 @@ function opticHolo(p, g, M, b, c) {
   return { sightY: hy, sightZ: z };
 }
 function opticReflex(p, g, M, b, c, k = 1) {
+  M = mats();
   if (GUN_MODELS.reddot) {
     // red dot model (CC-BY 4.0, "FPS Red Dot Sight (Game Model)" by Michael Makivic on Sketchfab)
     const grp = new THREE.Group();
@@ -311,6 +313,7 @@ function opticReflex(p, g, M, b, c, k = 1) {
 // 4x prism scope. The body is single-sided, so looking down the tube its inner walls vanish and the
 // eyepiece rim frames a clear magnified view (the camera zooms); the chevron floats at the front.
 function opticAcog(p, g, M, b, c, vm = false) {
+  M = mats();
   p.profile(M.metal, [[c - 0.045, b], [c + 0.045, b], [c + 0.045, b + 0.012], [c - 0.045, b + 0.012]], 0.03, { r: 0.003 });
   p.rbox(M.metal, 0.012, 0.012, 0.03, 0.018, b + 0.008, -c, 0.002);
   const ay = b + 0.034, r0 = c - 0.06, r1 = c + 0.062;
@@ -348,6 +351,7 @@ function opticAcog(p, g, M, b, c, vm = false) {
   return { sightY: ay, sightZ: -r0, eyeRelief: -0.05 };
 }
 function opticScope(p, M, b, c) {
+  M = mats();
   const sy = b + 0.046;
   p.lathe(M.poly, [[0, -0.19], [0.02, -0.19], [0.0215, -0.175], [0.0215, -0.13], [0.0165, -0.1], [0.0155, -0.09], [0.0155, 0.07], [0.019, 0.1], [0.0265, 0.14], [0.027, 0.2], [0, 0.2]].map(([r, f]) => [r, f + c]), sy, 0, 28);
   p.add(M.poly, new THREE.CylinderGeometry(0.011, 0.011, 0.028, 16), 0, sy + 0.025, -c);
@@ -377,6 +381,7 @@ function addOptic(kind, p, g, M, vm, b, c) {
 }
 // returns the f where the muzzle ends
 function muzzleDevice(p, M, kind, y, f0, br, supLen = 0.18) {
+  M = mats();
   if (kind === 'brake') {
     p.lathe(M.metal, [[0, f0], [br + 0.004, f0], [br + 0.005, f0 + 0.01], [br + 0.005, f0 + 0.056], [br + 0.0025, f0 + 0.062], [br - 0.0025, f0 + 0.062], [0, f0 + 0.062]], y, 0, 16);
     for (let i = 0; i < 3; i++) p.rbox(M.rubber, (br + 0.005) * 2.2, 0.003, 0.006, 0, y + br + 0.004, -(f0 + 0.02 + i * 0.013), 0.001);
@@ -402,6 +407,7 @@ function muzzleDevice(p, M, kind, y, f0, br, supLen = 0.18) {
   return f0;
 }
 function laserModule(p, g, M, x, y, f, w = 0.016) {
+  M = mats();
   p.rbox(M.poly, w, 0.022, 0.05, x, y, -f, 0.003);
   p.rbox(M.poly, w * 0.6, 0.006, 0.012, x, y + 0.013, -(f - 0.012), 0.002);
   const lens = new THREE.CircleGeometry(0.0042, 14); lens.rotateY(Math.PI);
@@ -456,9 +462,57 @@ function addModelParts(name, target, filter, cast) {
 }
 
 // Builds a gun with the top of its pistol grip at the origin, barrel toward -z.
+// Each added gun gets its own look on top of its type's procedural model: tinted furniture and metal, and
+// parts that change the silhouette (curved or box magazines, a drum, a bipod, a longer barrel, a revolver's
+// cylinder). Built at the gun's origin before it's placed anywhere.
+const tintCache = new Map();
+const tinted = (mat, hex) => {
+  const k = mat.uuid + ':' + hex;
+  if (!tintCache.has(k)) { const m = mat.clone(); m.color = new THREE.Color(hex); tintCache.set(k, m); }
+  return tintCache.get(k);
+};
+function dressLook(look, type, g, mag, muzzle, M) {
+  const box = new THREE.Box3().setFromObject(mag);
+  const extra = new Parts(), mx = new Parts();
+  const furn = look.furniture ? tinted(M.poly, look.furniture) : M.poly;
+  if (!box.isEmpty()) {
+    const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    if (look.curved) mx.rbox(furn, sz.x * 0.95, 0.07, sz.z * 0.95, c.x, box.min.y - 0.03, c.z - 0.02, 0.006, -0.35);   // AK banana curve
+    if (look.box) { mx.rbox(M.metal, 0.09, 0.1, 0.12, c.x - 0.02, box.min.y + 0.02, c.z, 0.008); mx.rbox(furn, 0.092, 0.02, 0.122, c.x - 0.02, box.min.y - 0.035, c.z, 0.004); }
+    if (look.drum) mx.lathe(M.metal, [[0, -0.03], [0.072, -0.03], [0.075, 0.0], [0.072, 0.03], [0, 0.03]], box.min.y - 0.05, c.x, 22).add(M.poly, new THREE.CylinderGeometry(0.02, 0.02, 0.07, 10), c.x, box.min.y - 0.05, c.z, 0, 0, Math.PI / 2);
+    if (look.extMag) mx.rbox(furn, sz.x * 0.95, 0.06, sz.z * 0.9, c.x, box.min.y - 0.025, c.z - 0.004, 0.004, 0.24);
+  }
+  if (look.bipod) for (const s of [-1, 1]) extra.rbox(M.metal, 0.008, 0.008, 0.22, s * 0.018, 0.02, muzzle.position.z + 0.28, 0.003, 0.06, 0, s * 0.12);
+  if (look.long) {
+    extra.lathe(M.steel, [[0, 0], [0.0085, 0], [0.0085, look.long], [0, look.long]], muzzle.position.y, 0, 14);
+    extra.by.forEach(arr => arr.forEach(geo => geo.translate(0, 0, muzzle.position.z)));
+    muzzle.position.z -= look.long;
+  }
+  if (look.revolver) { extra.lathe(M.metal, [[0, 0.0], [0.023, 0.0], [0.024, 0.042], [0, 0.042]], 0.045, 0, 14); extra.by.forEach(arr => arr.forEach(geo => geo.translate(0, 0, 0.02))); }
+  if (look.big) extra.rbox(M.steel, 0.033, 0.03, 0.2, 0, 0.046, -0.08, 0.004);
+  // AK-style gas tube over the barrel / heavy barrel shroud: changes the silhouette, not just the colour
+  if (look.gastube) extra.rbox(M.poly, 0.026, 0.024, 0.2, 0, 0.078, -0.36, 0.008);
+  if (look.shroud) extra.rbox(M.metal, 0.05, 0.05, 0.22, 0, 0.045, -0.42, 0.01);
+  if (look.riser) extra.rbox(M.poly, 0.03, 0.035, 0.12, 0, 0.085, 0.25, 0.008);
+  extra.build(g, true); mx.build(mag, true);
+}
+// Body materials for a gun with a look; optics, lasers and muzzle devices keep the stock materials (they use mats())
+function lookMats(base, look) {
+  if (!look) return base;
+  const M = { ...base };
+  if (look.wood) M.poly = base.wood;
+  else if (look.tan) M.poly = base.tan;
+  else if (look.olive) M.poly = base.olive;
+  else if (look.furniture) M.poly = tinted(base.poly, look.furniture);
+  if (look.grip) M.poly = tinted(base.poly, look.grip);
+  if (look.metal) { M.metal = tinted(base.metal, look.metal); M.steel = tinted(base.steel, look.metal); }
+  return M;
+}
+
 // Returns { group, muzzle, eject, foregrip, mag, magHome, sightY, sightZ, pump, bolt }
 export function buildGun(id, { forViewmodel = false, att = null } = {}) {
-  const M = mats();
+  const look = WEAPONS[id].model.look;
+  const M = lookMats(mats(), look);
   const type = WEAPONS[id].model.type;
   const A = cleanAtt(id, att);
   let laser = null, eyeRelief, muzF;
@@ -471,7 +525,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
   const muzzle = new THREE.Object3D(), eject = new THREE.Object3D(), foregrip = new THREE.Object3D();
   let sightY = 0.09, sightZ = -0.05;
 
-  if (type === 'rifle' && GUN_MODELS.ar15) {
+  if (id === 'rifle' && GUN_MODELS.ar15) {
     // ---- the AR-15 model (CC-BY 4.0, "AR-15 (game ready)" by IVA on Sketchfab) ----
     addModelParts('ar15', g, k => k !== 'mag' && k !== 'suppressor', !forViewmodel);
     addModelParts('ar15', mag, k => k === 'mag', !forViewmodel);
@@ -496,7 +550,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     sight(A.optic === 'iron' ? ironSights(p, M, -0.02, 0.0865, 0.455, 0.0885, 0.018) : addOptic(A.optic, p, g, M, forViewmodel, 0.0858, 0.06));
     muzzle.position.set(0, 0.045, -muzF);
     eject.position.set(0.02, 0.04, -0.06);
-  } else if (type === 'smg' && GUN_MODELS.tpm) {
+  } else if (id === 'smg' && GUN_MODELS.tpm) {
     // ---- TPM SMG model (CC-BY 4.0, "TPM SMG" by TORI106 on Sketchfab): magazine in the grip, vertical foregrip ----
     addModelParts('tpm', g, () => true, !forViewmodel);
     A.under = 'vgrip';                       // the model has its own vertical foregrip: the support hand wraps it
@@ -507,7 +561,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     sight(A.optic === 'iron' ? { sightY: 0.122, sightZ: 0.02 } : addOptic(A.optic, p, g, M, forViewmodel, 0.104, 0.04));
     muzzle.position.set(0, 0.0595, -muzF);
     eject.position.set(0.02, 0.06, -0.06);
-  } else if (type === 'shotgun' && GUN_MODELS.r870) {
+  } else if (id === 'shotgun' && GUN_MODELS.r870) {
     // ---- Remington 870 model (CC-BY 4.0, "Remington 870 Shotgun" by Urpo on Sketchfab) ----
     // no pistol grip: the right hand wraps the wrist of the stock, just behind the trigger guard
     addModelParts('r870', g, () => true, !forViewmodel);
@@ -523,7 +577,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     muzzle.position.set(0, 0.062, -muzF);
     eject.position.set(0.024, 0.07, -0.1);
     foregrip.position.set(0, -0.012, -0.48);
-  } else if (type === 'sniper' && GUN_MODELS.sniper) {
+  } else if (id === 'sniper' && GUN_MODELS.sniper) {
     // ---- sniper rifle model (CC-BY 4.0, "Sniper rifle GameReady Free" by pashtetuser on Sketchfab) ----
     const scopeParts = (k) => k.startsWith('aim');
     addModelParts('sniper', g, k => k !== 'magazine' && k !== 'gate' && (A.optic === 'scope' || !scopeParts(k)) && !(A.muzzle === 'sup' && (k === 'muzzlebrake' || k === 'nutmuzzle')), !forViewmodel);
@@ -542,7 +596,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     muzzle.position.set(0, 0.055, -muzF);
     eject.position.set(0.022, 0.06, -0.04);
     foregrip.position.set(0, -0.03, -0.3);
-  } else if (type === 'pistol' && GUN_MODELS.g19) {
+  } else if (id === 'pistol' && GUN_MODELS.g19) {
     // ---- Glock 19 model (CC-BY 4.0, "G19 Pistol, Game Ready, Free version" by Rotuma on Sketchfab) ----
     addModelParts('g19', g, () => true, !forViewmodel);
     out.magHome = new THREE.Vector3();
@@ -550,9 +604,37 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.012, 0.02, 0.1);
     // aimed at arm's length (not up against the eye like a rifle optic), so both hands show under the sights
     if (A.optic === 'reflex') sight({ ...opticReflex(p, g, M, 0.0755, 0.035, 0.8), eyeRelief: -0.3 });
-    else sight({ sightY: 0.083, sightZ: 0.02, eyeRelief: -0.32 });
+    else sight({ sightY: 0.07, sightZ: 0.02, eyeRelief: -0.32 });   // front post on the crosshair
     muzzle.position.set(0, 0.047, -muzF);
     eject.position.set(0.016, 0.062, -0.05);
+  } else if (type === 'launcher') {
+    // ---- "The Monte": a shoulder rocket launcher. Tube with a flared venturi, heat shield, pistol grip and
+    // forward grip, flip-up iron sights; the rocket's warhead sticks out of the front (it's the "magazine")
+    const AX = 0.075;                                                     // tube axis height
+    p.lathe(M.poly, [[0, -0.46], [0.047, -0.46], [0.047, 0.52], [0, 0.52]], AX, 0, 20);                     // tube
+    p.lathe(M.metal, [[0.047, -0.46], [0.075, -0.6], [0.07, -0.62], [0.044, -0.48]], AX, 0, 20);            // venturi flare
+    p.lathe(M.metal, [[0.05, 0.5], [0.053, 0.5], [0.053, 0.56], [0.05, 0.56]], AX, 0, 20);                  // muzzle ring
+    for (const f of [-0.3, 0.05, 0.32]) p.lathe(M.metal, [[0.0475, f], [0.051, f], [0.051, f + 0.03], [0.0475, f + 0.03]], AX, 0, 18); // bands
+    p.rbox(M.poly, 0.085, 0.012, 0.42, 0, AX - 0.05, -0.06, 0.004);                                          // heat shield / rail under the tube
+    p.profile(M.poly, [[-0.005, AX - 0.05], [0.04, AX - 0.05], [0.035, 0.0, 0.006], [0.03, -0.05, 0.008], [0.026, -0.1, 0.01], [-0.02, -0.1, 0.01], [-0.022, -0.04, 0.012], [-0.02, AX - 0.05]], 0.032, { r: 0.008, bevel: 0.004 }); // pistol grip
+    p.profile(M.metal, [[0.04, 0.0], [0.09, 0.0], [0.088, -0.024, 0.004], [0.044, -0.026, 0.004]], 0.008, { r: 0.004, holes: [[[0.048, -0.004], [0.084, -0.004], [0.082, -0.02], [0.05, -0.021]]] }); // trigger guard
+    p.profile(M.poly, [[0.24, AX - 0.05], [0.29, AX - 0.05], [0.29, -0.06, 0.01], [0.25, -0.06, 0.01]], 0.034, { r: 0.01, bevel: 0.004 }); // forward grip
+    p.rbox(M.poly, 0.02, 0.035, 0.08, -0.06, AX + 0.01, 0.18, 0.004);                                        // optic mount block (left side)
+    // flip-up sights: rear aperture and a front post on a tall leaf, on top of the tube
+    const SY = AX + 0.047;
+    p.rbox(M.metal, 0.03, 0.03, 0.006, 0, SY + 0.012, 0.05, 0.002);
+    p.rbox(M.recess, 0.008, 0.008, 0.008, 0, SY + 0.02, 0.05, 0.001);
+    p.rbox(M.metal, 0.004, 0.034, 0.006, 0, SY + 0.016, -0.36, 0.001);
+    p.rbox(M.metal, 0.02, 0.006, 0.01, 0, SY + 0.002, -0.36, 0.001);
+    sight({ sightY: SY + 0.02, sightZ: 0.05, eyeRelief: -0.16 });
+    // the rocket: warhead nose, fins hidden in the tube
+    mp.lathe(M.olive, [[0, 0.52], [0.042, 0.52], [0.06, 0.6], [0.064, 0.66], [0.05, 0.76], [0.02, 0.84], [0, 0.86]], AX, 0, 20);
+    mp.lathe(M.metal, [[0.039, 0.5], [0.044, 0.5], [0.044, 0.53], [0.039, 0.53]], AX, 0, 16);
+    out.magHome = new THREE.Vector3();
+    muzF = 0.86;
+    muzzle.position.set(0, AX, -muzF);
+    eject.position.set(0, AX, 0.6);
+    foregrip.position.set(0, -0.03, -0.27);
   } else if (type === 'rifle') {
     // ---- lower receiver (forged aluminium): magwell, trigger guard, pins, controls ----
     p.profile(M.metal, [[-0.06, 0.0], [0.175, 0.0], [0.175, -0.014], [0.16, -0.02], [0.158, -0.056, 0.003], [0.084, -0.056, 0.003], [0.08, -0.016], [0.03, -0.012], [-0.03, -0.018], [-0.062, -0.004]], 0.027, { r: 0.004, bevel: 0.0015 });
@@ -814,8 +896,8 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     p.rbox(M.metal, 0.0315, 0.004, 0.006, 0, 0.022, -0.075, 0.0015);              // slide stop / takedown lever
     p.rbox(M.metal, 0.004, 0.004, 0.012, -0.0155, 0.032, -0.045, 0.0012);
     p.rbox(M.poly, 0.006, 0.008, 0.01, 0.0158, 0.003, -0.032, 0.002);              // mag release
-    sightY = 0.0695; sightZ = 0.012;
-    if (A.optic === 'reflex') sight(opticReflex(p, g, M, 0.0625, 0.035, 0.8));
+    sightY = 0.0695; sightZ = 0.012; eyeRelief = -0.32;
+    if (A.optic === 'reflex') sight({ ...opticReflex(p, g, M, 0.0625, 0.035, 0.8), eyeRelief: -0.3 });
     muzF = Math.max(0.18, muzzleDevice(p, M, A.muzzle, 0.047, 0.178, 0.0075, 0.13));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0, -0.002, 0.13, 0.02);
     mp.rbox(M.poly, 0.026, 0.014, 0.048, 0, -0.11, 0.004, 0.004, 0.24);
@@ -839,6 +921,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
       mag.add(tab);
     } else if (A.mag === 'ext') mag.scale.y = type === 'sniper' ? 1.25 : 1.2;
   }
+  if (look) dressLook(look, type, g, mag, muzzle, M);
   mag.position.copy(out.magHome);
   g.add(mag);
   g.add(muzzle, eject, foregrip);

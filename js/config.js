@@ -87,9 +87,84 @@ export const WEAPONS = {
     pellets: 1, adsFov: 58, adsTime: 0.14, botRange: [3, 25],
     model: { type: 'pistol', sight: 'iron' },
   },
+  // ---- added weapons (procedural "alpha" models built on the base types, each with its own look) ----
+  kv47: {
+    id: 'kv47', name: 'KV-47', short: 'KV-47', mode: 'AUTO', auto: true, rpm: 600, damage: 30, headMult: 1.5,
+    mag: 30, reserve: 150, reload: 2.4, spread: 0.035, adsSpread: 0.006, moveSpread: 0.035,
+    recoilPitch: 0.015, recoilYaw: 0.009, range: 150, falloffStart: 30, falloffEnd: 75, falloffMin: 0.7,
+    pellets: 1, adsFov: 52, adsTime: 0.24, botRange: [8, 40],
+    model: { type: 'rifle', sight: 'iron', look: { wood: true, metal: 0x3a3a38, curved: true, gastube: true } },
+  },
+  br308: {
+    id: 'br308', name: 'BR-308 Battle Rifle', short: 'BR-308', mode: 'AUTO', auto: true, rpm: 520, damage: 36, headMult: 1.6,
+    mag: 20, reserve: 120, reload: 2.5, spread: 0.038, adsSpread: 0.004, moveSpread: 0.04,
+    recoilPitch: 0.019, recoilYaw: 0.008, range: 180, falloffStart: 45, falloffEnd: 100, falloffMin: 0.75,
+    pellets: 1, adsFov: 48, adsTime: 0.26, botRange: [10, 50],
+    model: { type: 'rifle', sight: 'holo', look: { tan: true, long: 0.1, riser: true } },
+  },
+  hx60: {
+    id: 'hx60', name: 'HX-60 LMG', short: 'HX-60', mode: 'AUTO', auto: true, rpm: 650, damage: 27, headMult: 1.4,
+    mag: 100, reserve: 200, reload: 5.4, spread: 0.048, adsSpread: 0.008, moveSpread: 0.055,
+    recoilPitch: 0.010, recoilYaw: 0.009, range: 160, falloffStart: 35, falloffEnd: 90, falloffMin: 0.7,
+    pellets: 1, adsFov: 50, adsTime: 0.38, botRange: [8, 45],
+    model: { type: 'rifle', sight: 'reflex', look: { olive: true, box: true, bipod: true, long: 0.06, shroud: true } },
+  },
+  krv45: {
+    id: 'krv45', name: 'KRV-45', short: 'KRV-45', mode: 'AUTO', auto: true, rpm: 1100, damage: 17, headMult: 1.35,
+    mag: 25, reserve: 150, reload: 1.7, spread: 0.042, adsSpread: 0.014, moveSpread: 0.012,
+    recoilPitch: 0.008, recoilYaw: 0.01, range: 90, falloffStart: 10, falloffEnd: 30, falloffMin: 0.5,
+    pellets: 1, adsFov: 56, adsTime: 0.15, botRange: [3, 18],
+    model: { type: 'smg', sight: 'reflex', look: { furniture: 0x2f3a46 } },
+  },
+  mr14: {
+    id: 'mr14', name: 'MR-14 DMR', short: 'MR-14', mode: 'SEMI', auto: false, rpm: 300, damage: 48, headMult: 2.0,
+    mag: 15, reserve: 75, reload: 2.5, spread: 0.05, adsSpread: 0.0015, moveSpread: 0.05,
+    recoilPitch: 0.03, recoilYaw: 0.008, range: 220, falloffStart: 60, falloffEnd: 150, falloffMin: 0.8,
+    pellets: 1, adsFov: 32, adsTime: 0.28, botRange: [14, 70],
+    model: { type: 'rifle', sight: 'acog', look: { wood: true, metal: 0x4a4d50, long: 0.14, riser: true } },
+  },
+  sa12: {
+    id: 'sa12', name: 'SA-12 Auto Shotgun', short: 'SA-12', mode: 'AUTO', auto: true, rpm: 260, damage: 11, headMult: 1.25,
+    mag: 10, reserve: 40, reload: 3.2, spread: 0.095, adsSpread: 0.075, moveSpread: 0.02,
+    recoilPitch: 0.04, recoilYaw: 0.014, range: 40, falloffStart: 6, falloffEnd: 18, falloffMin: 0.2,
+    pellets: 8, adsFov: 58, adsTime: 0.22, botRange: [2, 11],
+    model: { type: 'shotgun', sight: 'iron', look: { furniture: 0x2b2d2a, drum: true } },
+  },
+  d50: {
+    id: 'd50', name: 'D-50 Hand Cannon', short: 'D-50', mode: 'SEMI', auto: false, rpm: 220, damage: 55, headMult: 1.8,
+    mag: 7, reserve: 35, reload: 1.9, spread: 0.03, adsSpread: 0.009, moveSpread: 0.02,
+    recoilPitch: 0.05, recoilYaw: 0.012, range: 110, falloffStart: 20, falloffEnd: 50, falloffMin: 0.6,
+    pellets: 1, adsFov: 56, adsTime: 0.17, botRange: [3, 28],
+    model: { type: 'pistol', sight: 'iron', look: { metal: 0xb8b8b4, big: true } },
+  },
+  r357: {
+    id: 'r357', name: 'R-357 Revolver', short: 'R-357', mode: 'SEMI', auto: false, rpm: 160, damage: 62, headMult: 1.7,
+    mag: 6, reserve: 30, reload: 2.6, spread: 0.028, adsSpread: 0.008, moveSpread: 0.02,
+    recoilPitch: 0.055, recoilYaw: 0.01, range: 110, falloffStart: 22, falloffEnd: 50, falloffMin: 0.6,
+    pellets: 1, adsFov: 56, adsTime: 0.17, botRange: [3, 28],
+    model: { type: 'pistol', sight: 'iron', look: { metal: 0x2b2b2e, grip: 0x6a3a1e, revolver: true } },
+  },
+  mp18: {
+    id: 'mp18', name: 'MP-18 Machine Pistol', short: 'MP-18', mode: 'AUTO', auto: true, rpm: 1000, damage: 17, headMult: 1.35,
+    mag: 20, reserve: 100, reload: 1.6, spread: 0.035, adsSpread: 0.016, moveSpread: 0.012,
+    recoilPitch: 0.008, recoilYaw: 0.01, range: 70, falloffStart: 8, falloffEnd: 22, falloffMin: 0.5,
+    pellets: 1, adsFov: 58, adsTime: 0.13, botRange: [2, 14],
+    model: { type: 'pistol', sight: 'iron', look: { metal: 0x3d4a3a, extMag: true } },
+  },
+  monte: {
+    // "The Monte": shoulder rocket launcher. Fires a real rocket that flies and explodes on impact.
+    id: 'monte', name: 'The Monte', short: 'MONTE', mode: 'ROCKET', auto: false, rpm: 40, damage: 0, headMult: 1,
+    mag: 1, reserve: 3, reload: 3.4, spread: 0.02, adsSpread: 0.003, moveSpread: 0.03,
+    recoilPitch: 0.06, recoilYaw: 0.01, range: 200, falloffStart: 200, falloffEnd: 200, falloffMin: 1,
+    pellets: 1, adsFov: 50, adsTime: 0.36, botRange: [10, 50],
+    rocket: { speed: 48, radius: 6.5, damage: 165, direct: 60 },
+    model: { type: 'launcher', sight: 'iron' },
+  },
 };
 
-export const PRIMARIES = ['rifle', 'smg', 'shotgun', 'sniper'];
+export const PRIMARIES = ['rifle', 'kv47', 'br308', 'hx60', 'smg', 'krv45', 'shotgun', 'sa12', 'mr14', 'sniper'];
+export const SECONDARIES = ['pistol', 'd50', 'r357', 'mp18', 'monte'];
+export const typeOf = (id) => (WEAPONS[id] && WEAPONS[id].model.type) || 'rifle';
 
 // fov = half-angle (radians) of the bot's vision cone
 export const DIFFICULTY = {

@@ -311,6 +311,7 @@
             <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
             <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
             <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
+            <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Kill to get the next gun · 15 guns</small></button>
           </div>
           <div class="sec-k mo-on">2 · QUICK MATCH <small>public · drop in</small></div>
           <button id="quick-btn" class="menu-btn quick mo-on" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
@@ -323,7 +324,7 @@
           <div class="sec-k mo-on sm">PRIVATE MATCH SETTINGS <small>used when you host</small></div>
           <div class="rows" id="play-rows">
             <div class="row" style="display:none"><label for="opt-mode">Mode</label><select id="opt-mode">
-              <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option></select></div>
+              <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="pioneer">Pioneer Square</option><option value="mart">Freshway · indoor</option><option value="random">Random</option></select></div>
             <div class="row tdm-snd"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
@@ -367,7 +368,9 @@
               <div class="lo-left">
                 <div class="group">PRIMARY</div>
                 <div id="weapon-list" class="weapons"></div>
-                <div class="group">SECONDARY · P-45 SIDEARM</div>
+                <div class="group">SECONDARY</div>
+                <div id="weapon-list-sec" class="weapons"></div>
+                <div class="group" id="gs-sec-name">SECONDARY ATTACHMENTS</div>
                 <div class="rows" id="gs-pistol"></div>
               </div>
               <div class="gs lo-right" id="gunsmith">
