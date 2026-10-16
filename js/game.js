@@ -22,6 +22,7 @@ import { Music } from './music.js';
 import { createMode, MODES, GUN_LADDER } from './modes.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
+const _gf = new THREE.Vector3(), _gs = new THREE.Vector3(), _gt = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(new THREE.Vector3(), 1.3);
 const ZERO = new THREE.Vector3();
@@ -416,6 +417,7 @@ export class Game {
     _q.copy(this.camera.quaternion).invert();
     this.vmSun.position.copy(SUN_DIR).applyQuaternion(_q).multiplyScalar(5);
     const showVm = (this.state === 'playing' || this.state === 'paused') && !!this.player && this.player.alive && this.playerCtl.vmRoot.visible;
+    if (this.player && this.state !== 'menu') this.updateGlare(dt);
     this.renderer.render(dt, showVm);
     this.input.endFrame();
   }
@@ -534,6 +536,46 @@ export class Game {
     }
   }
 
+  // Sniper glare: a scoped enemy looking your way flashes a lens glint (core + horizontal streak), brighter
+  // the more directly they're aimed at you. Walls hide it; it fades in as they scope in.
+  updateGlare(dt) {
+    const cam = this.camera, me = this.player;
+    if (!this.glares) this.glares = new Map();
+    for (const gl of this.glares.values()) gl.live = false;
+    for (const c of this.characters) {
+      if (c === me || !c.alive || c.hidden || !c.weapon || !c.weapon.def.scope || c.adsT < 0.25 || c.team === me.team) continue;
+      const fwd = c.forward(_gf), scope = c.eyePos(_gs).addScaledVector(fwd, 0.3);
+      const to = _gt.copy(cam.position).sub(scope), d = to.length();
+      if (d < 0.5) continue;
+      to.divideScalar(d);
+      const dot = fwd.dot(to);
+      let gl = this.glares.get(c);
+      if (dot < 0.94 && !gl) continue;
+      if (!gl) {
+        const mk = (col) => new THREE.Sprite(new THREE.SpriteMaterial({ map: this.effects.starTex, color: col, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, fog: false }));
+        gl = { core: mk(new THREE.Color(4, 4, 4.4)), streak: mk(new THREE.Color(2.4, 2.8, 3.4)), k: 0, vis: false, t: 0 };
+        this.scene.add(gl.core, gl.streak);
+        this.glares.set(c, gl);
+      }
+      gl.live = true;
+      let k = Math.max(0, Math.min(1, (dot - 0.94) / 0.055)); k = k * k * (3 - 2 * k);
+      k *= Math.min(1, (c.adsT - 0.25) / 0.5) * Math.min(1, d / 8);   // fades in while scoping; none point-blank
+      if ((gl.t -= dt) <= 0) { gl.t = 0.12; gl.vis = k > 0 && !this.physics.blocked(scope, cam.position); }
+      if (!gl.vis) k = 0;
+      gl.k += (k - gl.k) * Math.min(1, dt * 14);
+      const fl = gl.k * (0.86 + 0.14 * Math.sin(this.time * 21 + c.id * 1.7)), s = d * 0.11 * fl;
+      gl.core.position.copy(scope); gl.streak.position.copy(scope);
+      gl.core.scale.set(s, s, 1); gl.streak.scale.set(s * 5, s * 0.28, 1);
+      gl.core.material.opacity = Math.min(1, fl * 1.2); gl.streak.material.opacity = fl * 0.7;
+      gl.core.visible = gl.streak.visible = gl.k > 0.02;
+    }
+    for (const [c, gl] of this.glares) {
+      if (gl.live && this.characters.includes(c)) continue;
+      gl.k = 0; gl.core.visible = gl.streak.visible = false;
+      if (!this.characters.includes(c)) { this.scene.remove(gl.core, gl.streak); gl.core.material.dispose(); gl.streak.material.dispose(); this.glares.delete(c); }
+    }
+  }
+
   rayCharacter(o, d, c, maxT) {
     const hx = c.pos.x, hy = c.pos.y + c.height - 0.16, hz = c.pos.z;
     let t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, hx - 0.16, hy - 0.16, hz - 0.16, hx + 0.16, hy + 0.16, hz + 0.16, maxT);
@@ -556,7 +598,7 @@ export class Game {
   localNotify(type, ...a) {
     const hud = this.hud, inp = this.input, ctl = this.playerCtl;
     switch (type) {
-      case 'hit': hud.hitmarker(a[0], a[1]); if (!a[0]) this.audio.play(a[1] ? 'headshot' : 'hit', null, { ui: true }); if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
+      case 'hit': hud.hitmarker(a[0], a[1]); if (a[1]) this.audio.play('headshot', null, { ui: true }); else if (!a[0]) this.audio.play('hit', null, { ui: true }); if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
       case 'dmg': if (a[0] !== null) hud.damageFrom({ x: a[0], z: a[1] }); this.audio.play('hurt', null, { ui: true }); ctl && ctl.addShake(0.22); inp.rumble(0.55, 0.3, 160); break;
       case 'kill': this.audio.play('kill', null, { ui: true }); inp.rumble(0.3, 0.6, 120); break;
       case 'score': hud.scoreEvent(a[0], a[1]); break;
