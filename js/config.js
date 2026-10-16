@@ -145,6 +145,7 @@ export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
   fpsCap: 0,           // 0 = unlimited (the display's refresh rate)
+  fullscreen: true,    // desktop matches go fullscreen with the keyboard locked (so Ctrl+W crouches instead of closing the tab)
   fillBots: true, chat: true,
   musicVolume: 0.5,
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)

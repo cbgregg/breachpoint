@@ -74,7 +74,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       this.setDevice('kbm');
       if (!this.enabled || this.chatting) return; // typing in chat never moves or shoots
-      if (GAME_KEYS.has(e.code)) e.preventDefault();
+      if (GAME_KEYS.has(e.code) || ((e.ctrlKey || e.metaKey) && /^(Key|Digit)/.test(e.code))) e.preventDefault();
       if (!this.keys.has(e.code) && KEY_ACTIONS[e.code]) this.actions.add(KEY_ACTIONS[e.code]);
       this.keys.add(e.code);
     });
@@ -140,7 +140,29 @@ export class Input {
       const r = this.canvas.requestPointerLock();
       if (r && r.catch) r.catch(fail);
     } catch (_) { fail(); }
+    this.goFullscreen();
   }
+
+  // Matches run fullscreen with the keyboard locked: browsers only let a page receive shortcuts like Ctrl+W
+  // (crouch + forward = close tab!), Ctrl+T or Ctrl+N while it is fullscreen and has called keyboard.lock().
+  // Short Esc still pauses; holding Esc leaves fullscreen.
+  goFullscreen() {
+    if (this.fullscreen === false || this.isTouch) return;
+    const el = document.documentElement;
+    const keys = () => { try { const k = navigator.keyboard && navigator.keyboard.lock && navigator.keyboard.lock(); if (k && k.catch) k.catch(() => {}); } catch (_) { /* unsupported */ } };
+    if (document.fullscreenElement) { keys(); return; }
+    if (!el.requestFullscreen) return;
+    this.fsT = performance.now();                 // entering fullscreen can drop pointer lock for a moment: don't pause on it
+    try {
+      const p = el.requestFullscreen({ navigationUI: 'hide' });
+      if (p && p.then) p.then(() => {
+        this.fsT = performance.now();
+        keys();
+        if (!document.pointerLockElement && this.enabled) { try { const r = this.canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* ignore */ } }
+      }).catch(() => {});
+    } catch (_) { /* not allowed right now */ }
+  }
+  releaseKeys() { try { if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); } catch (_) { /* ignore */ } }
 
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
