@@ -1,10 +1,10 @@
 // Input: keyboard + mouse (pointer lock), Xbox / standard gamepads, touch.
 // Everything funnels into: analog move/look, held fire/ads, and one-shot "actions".
 
-const GAME_KEYS = new Set(['Space', 'Tab', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const GAME_KEYS = new Set(['Space', 'Tab', 'KeyH', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const KEY_ACTIONS = {
   KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
-  KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause',
+  KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause', KeyH: 'loadout',
 };
 // Standard gamepad mapping (Xbox layout)
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
@@ -12,7 +12,7 @@ export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8
 // are handled separately below. RB (tactical) and the D-pad (killstreaks etc.) have nothing to do here.
 const PAD_ACTIONS = {
   [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap',
-  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect',
+  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect', [PAD.RIGHT]: 'loadout',
 };
 
 // Some browsers (Firefox on Linux/macOS, older Safari) report Xbox pads without the "standard"
@@ -73,7 +73,12 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       this.setDevice('kbm');
+      // browser zoom (Ctrl +/-/0) would resize the game mid-fight
+      if ((e.ctrlKey || e.metaKey) && ['Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract', 'Digit0', 'Numpad0'].includes(e.code)) e.preventDefault();
       if (!this.enabled || this.chatting) return; // typing in chat never moves or shoots
+      // any key in a match (Ctrl included, before W can follow it) takes the game fullscreen with the keyboard
+      // locked, so Ctrl+W crouches instead of closing the tab
+      if (e.isTrusted && !document.fullscreenElement && e.code !== 'Escape') this.goFullscreen();
       if (GAME_KEYS.has(e.code) || ((e.ctrlKey || e.metaKey) && /^(Key|Digit)/.test(e.code))) e.preventDefault();
       if (!this.keys.has(e.code) && KEY_ACTIONS[e.code]) this.actions.add(KEY_ACTIONS[e.code]);
       this.keys.add(e.code);
@@ -83,6 +88,7 @@ export class Input {
     canvas.addEventListener('mousedown', (e) => {
       this.setDevice('kbm');
       if (!this.enabled || this.isTouch || this.chatting) return;
+      if (e.isTrusted && !document.fullscreenElement) this.goFullscreen();
       if (!this.locked && !this.fallback) return;
       if (e.button === 0) this.mouseFire = true;
       if (e.button === 2) { this.mouseAds = true; this.adsPress(); }
@@ -98,7 +104,10 @@ export class Input {
       this.mouseDX += Math.max(-300, Math.min(300, e.movementX || 0));
       this.mouseDY += Math.max(-300, Math.min(300, e.movementY || 0));
     });
-    window.addEventListener('wheel', (e) => { if (this.enabled && (this.locked || this.fallback)) this.wheel += Math.sign(e.deltaY); }, { passive: true });
+    window.addEventListener('wheel', (e) => {
+      if (e.ctrlKey) e.preventDefault();          // Ctrl + wheel (crouched weapon swap) must not zoom the page
+      if (this.enabled && (this.locked || this.fallback)) this.wheel += Math.sign(e.deltaY);
+    }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
       if (this.locked) this.fallback = false;
@@ -151,7 +160,8 @@ export class Input {
     const el = document.documentElement;
     const keys = () => { try { const k = navigator.keyboard && navigator.keyboard.lock && navigator.keyboard.lock(); if (k && k.catch) k.catch(() => {}); } catch (_) { /* unsupported */ } };
     if (document.fullscreenElement) { keys(); return; }
-    if (!el.requestFullscreen) return;
+    if (!el.requestFullscreen || this.fsPending) return;
+    this.fsPending = true; setTimeout(() => { this.fsPending = false; }, 400);
     this.fsT = performance.now();                 // entering fullscreen can drop pointer lock for a moment: don't pause on it
     try {
       const p = el.requestFullscreen({ navigationUI: 'hide' });

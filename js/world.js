@@ -506,7 +506,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (maxx - minx < 1.2 && maxz - minz < 1.2) boxes.push(solidAA((minx + maxx) / 2, (minz + maxz) / 2, maxx - minx, maxz - minz, h, y0, surface));
     else {
       const alongZ = maxz - minz >= maxx - minx, A = alongZ ? 1 : 0, Bx = alongZ ? 0 : 1;
-      const lo = alongZ ? minz : minx, hi = alongZ ? maxz : maxx, n = Math.max(1, Math.ceil((hi - lo) / 0.4)), st = (hi - lo) / n;
+      const lo = alongZ ? minz : minx, hi = alongZ ? maxz : maxx, n = Math.max(1, Math.ceil((hi - lo) / 0.25)), st = (hi - lo) / n;
       for (let i = 0; i < n; i++) {
         const a0 = lo + i * st, a1 = a0 + st;
         // clip the polygon to the slab a0..a1 and take its extent across
@@ -521,7 +521,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           poly = out; if (!poly.length) break;
         }
         if (poly.length < 2) continue;
-        const b0 = Math.min(...poly.map(p => p[Bx])), b1 = Math.max(...poly.map(p => p[Bx]));
+        // extent across at the slab's middle line, so the strips follow a slanted wall instead of jutting out of it
+        const am = (a0 + a1) / 2, xs2 = [];
+        for (let k = 0; k < pts.length; k++) {
+          const P = pts[k], Q = pts[(k + 1) % pts.length];
+          if ((P[A] - am) * (Q[A] - am) <= 0 && P[A] !== Q[A]) { const t = (am - P[A]) / (Q[A] - P[A]); xs2.push(P[Bx] + (Q[Bx] - P[Bx]) * t); }
+        }
+        const b0 = xs2.length >= 2 ? Math.min(...xs2) : Math.min(...poly.map(p => p[Bx])), b1 = xs2.length >= 2 ? Math.max(...xs2) : Math.max(...poly.map(p => p[Bx]));
         if (b1 - b0 < 0.01) continue;
         boxes.push(alongZ ? solidAA((b0 + b1) / 2, (a0 + a1) / 2, b1 - b0, st, h, y0, surface) : solidAA((a0 + a1) / 2, (b0 + b1) / 2, st, b1 - b0, h, y0, surface));
       }

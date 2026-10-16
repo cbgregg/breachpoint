@@ -46,6 +46,7 @@ Developed by cbgregg. Artificial intelligence was used to assist with developmen
 | Swap weapon | `Q`, `1` `2`, wheel | Y | SWAP |
 | Frag grenade (hold to cook, release to throw) | `G` | LB | FRAG |
 | Inspect weapon | `I` | D-pad down | — |
+| Change class (applies on next spawn) | `H` (or `Esc`) | D-pad right | — |
 | Respawn early (while dead) | `R` / `Space` / click | X / A | RESPAWN |
 | Melee | `V` | R3 | MELEE |
 | Scoreboard | `Tab` (hold) | View (hold) | TAB |
@@ -54,7 +55,7 @@ Developed by cbgregg. Artificial intelligence was used to assist with developmen
 
 Desktop matches run **fullscreen with the keyboard locked** (Options → Fullscreen in matches, on by default): browsers only let a page receive Ctrl+W, Ctrl+T and Ctrl+N while it's fullscreen, so Ctrl-crouch while moving forward no longer closes the tab. A short Esc pauses; hold Esc to leave fullscreen. If the tab is about to close mid-match anyway, the browser asks first.
 
-The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and the rest of the D-pad (killstreaks) are unused because the game has neither; D-pad down inspects your weapon.
+The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and D-pad up / left (killstreaks) are unused because the game has neither; D-pad down inspects your weapon and D-pad right opens Change Class.
 
 Browsers only expose a controller after you press a button on it, so press any button once the page is open. Xbox controllers that a browser reports without the standard layout (common in Firefox on macOS and Linux) are remapped automatically.
 
