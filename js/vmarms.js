@@ -252,6 +252,7 @@ function makeRig(asset, mat, mirror) {
     fScale: fore.getWorldScale(new THREE.Vector3()), hScale: hand.getWorldScale(new THREE.Vector3()),
     fingers: FINGER_BONES.map(f => [1, 2, 3].map(j => { const b = bone(`finger_${f}0${j}R`); return { b, rest: b.quaternion.clone() }; })),
     thumb: [1, 2, 3].map(j => { const b = bone(`thumb0${j}R`); return { b, rest: b.quaternion.clone() }; }),
+    ends: FINGER_BONES.map(f => bone(`finger_${f}03R_end`)), thumbEnd: bone('thumb03R_end'),
   };
   if (mirror) root.scale.x = -1;
   return R;
@@ -342,4 +343,129 @@ export function poseArm(arm, shoulder, pos, q, pose, pole) {
   arm.upper.position.copy(shoulder);
   orient(arm.upper, _d.subVectors(_e, shoulder).normalize(), _hx);
   arm.upper.scale.y = shoulder.distanceTo(_e) / UPPER;
+}
+
+// ---------- grip fitting: close each finger until it touches the gun ----------
+// The gun's surface is sampled into a point cloud (gun frame). Each finger then closes joint by joint
+// (knuckle, middle, tip), the way a hand closes round an object, and stops at first contact, so fingers
+// wrap the grip, handguard or magazine they hold instead of passing through it or hanging in the air.
+// The palm is pushed back off the surface first if it starts inside. Runs once per gun when it's built.
+const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tc = new THREE.Vector3(), _tm = new THREE.Matrix4();
+export function surfaceCloud(root, step = 0.0035) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const cell = 0.012, grid = new Map(), pts = [];
+  const push = (v) => {
+    const k = `${Math.floor(v.x / cell)},${Math.floor(v.y / cell)},${Math.floor(v.z / cell)}`;
+    let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(v.x, v.y, v.z); pts.push(1);
+  };
+  const area2 = step * step;
+  root.traverse(o => {
+    if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+    for (let p = o; p && p !== root; p = p.parent) if (!p.visible) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.every(m => m.transparent || m.blending === THREE.AdditiveBlending)) return;
+    _tm.multiplyMatrices(inv, o.matrixWorld);
+    const pos = o.geometry.attributes.position, idx = o.geometry.index;
+    const n = idx ? idx.count : pos.count;
+    if (n > 600000) return;
+    for (let i = 0; i < n; i += 3) {
+      const ia = idx ? idx.getX(i) : i, ib = idx ? idx.getX(i + 1) : i + 1, ic = idx ? idx.getX(i + 2) : i + 2;
+      _ta.fromBufferAttribute(pos, ia).applyMatrix4(_tm); _tb.fromBufferAttribute(pos, ib).applyMatrix4(_tm); _tc.fromBufferAttribute(pos, ic).applyMatrix4(_tm);
+      const ab = _tb.clone().sub(_ta), ac = _tc.clone().sub(_ta);
+      const area = ab.clone().cross(ac).length() / 2;
+      const k = Math.min(400, Math.ceil(area / area2));
+      push(_ta.clone());
+      for (let j = 0; j < k; j++) {
+        let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+        push(_ta.clone().addScaledVector(ab, u).addScaledVector(ac, v));
+      }
+    }
+  });
+  return { grid, cell, n: pts.length };
+}
+function hits(cloud, p, r) {
+  const c = cloud.cell, x0 = Math.floor((p.x - r) / c), x1 = Math.floor((p.x + r) / c), y0 = Math.floor((p.y - r) / c), y1 = Math.floor((p.y + r) / c), z0 = Math.floor((p.z - r) / c), z1 = Math.floor((p.z + r) / c);
+  const r2 = r * r;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+    const a = cloud.grid.get(`${x},${y},${z}`); if (!a) continue;
+    for (let i = 0; i < a.length; i += 3) { const dx = a[i] - p.x, dy = a[i + 1] - p.y, dz = a[i + 2] - p.z; if (dx * dx + dy * dy + dz * dz < r2) return true; }
+  }
+  return false;
+}
+const _fw = new THREE.Vector3(), _fl = new THREE.Vector3(), _fp = new THREE.Vector3(), _fn = new THREE.Vector3(), _fq3 = new THREE.Quaternion();
+// arm: from createVmArms; frame: the gun group; pos: palm centre (gun frame); q: hand orientation (world);
+// pose: the starting grip. opts.keep: finger indices left as posed (0 = index, e.g. on the trigger).
+// Returns { pose, push } with push the palm offset (gun frame) to apply to pos.
+export function fitGrip(arm, frame, cloud, pos, q, pose, shoulder, pole, opts = {}) {
+  const out = clonePose(pose), push = new THREE.Vector3();
+  const R = arm.rig;
+  if (!R || !cloud) return { pose: out, push };
+  frame.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(frame.matrixWorld).invert();
+  const local = (o) => o.getWorldPosition(_fw).applyMatrix4(inv);
+  // palm: pull it back off the surface (toward the back of the hand) until it rests on it
+  _fn.set(0, 1, 0).applyQuaternion(q).transformDirection(inv);           // back of the hand, gun frame
+  const palmPts = [[0, 0], [0.026, -0.026], [-0.026, -0.026], [0.026, 0.02], [-0.026, 0.02], [0, -0.035]];
+  const palmHit = () => palmPts.some(([x, z]) => {
+    _fp.set(x, -0.004, z).applyQuaternion(q);                             // hand frame -> world offset
+    frame.localToWorld(_fl.copy(pos).add(push)).add(_fp).applyMatrix4(inv);
+    return hits(cloud, _fl, 0.006);
+  });
+  for (let i = 0; i < 14 && palmHit(); i++) push.addScaledVector(_fn, 0.002);
+  frame.localToWorld(_fl.copy(pos).add(push));
+  poseArm(arm, shoulder, _fl, q, out, pole);
+  const setF = (i, a, sp) => {
+    R.fingers[i].forEach(({ b, rest }, j) => {
+      b.quaternion.copy(rest);
+      if (j === 0) b.quaternion.multiply(_fq3.setFromAxisAngle(_az, sp));
+      b.quaternion.multiply(_fq3.setFromAxisAngle(_ax, a[j]));
+    });
+    R.fingers[i][0].b.updateMatrixWorld(true);
+  };
+  const touches = (chain, end, rad) => {
+    let prev = null;
+    for (const o of [...chain, end]) {
+      const p = local(o).clone();
+      if (hits(cloud, p, rad)) return true;
+      if (prev && hits(cloud, _tc.copy(prev).lerp(p, 0.5), rad)) return true;
+      prev = p;
+    }
+    return false;
+  };
+  const keep = opts.keep || [];
+  const MAX = [1.75, 1.8, 1.35];
+  for (let i = 0; i < 4; i++) {
+    if (keep.includes(i)) continue;
+    const chain = R.fingers[i].map(x => x.b), end = R.ends[i], rad = 0.0078;
+    const a = [0.12, 0.12, 0.08];
+    setF(i, a, out.spread[i]);
+    if (touches(chain, end, rad)) continue;                                // starts inside: leave the authored pose
+    // knuckle, then middle joint, then fingertip: each closes until the finger meets the gun
+    for (let j = 0; j < 3; j++) {
+      while (a[j] < MAX[j]) {
+        a[j] += 0.04; if (j === 1) a[2] = Math.max(a[2], a[1] * 0.45);
+        setF(i, a, out.spread[i]);
+        if (touches(chain, end, rad)) { a[j] -= 0.04; if (j === 1) a[2] = Math.max(0.08, a[2] - 0.02); break; }
+      }
+    }
+    setF(i, a, out.spread[i]);
+    out.f[i] = a.slice();
+  }
+  // thumb: swing it in toward the gun from its base pose until it touches
+  if (!opts.keepThumb) {
+    const T = R.thumb, rt = out.rt.slice(), chain = T.map(x => x.b);
+    const setT = (k) => {
+      T[0].b.quaternion.copy(T[0].rest).multiply(_fq3.setFromAxisAngle(_az, rt[0])).multiply(_fq.setFromAxisAngle(_ax, rt[1] * k));
+      T[1].b.quaternion.copy(T[1].rest).multiply(_fq3.setFromAxisAngle(_ax, rt[2] * k));
+      T[2].b.quaternion.copy(T[2].rest).multiply(_fq3.setFromAxisAngle(_ax, rt[3] * k));
+      T[0].b.updateMatrixWorld(true);
+    };
+    let k = 0.2; setT(k);
+    if (!touches(chain, R.thumbEnd, 0.0085)) {
+      while (k < 1.6) { k += 0.05; setT(k); if (touches(chain, R.thumbEnd, 0.0085)) { k -= 0.05; break; } }
+      out.rt[1] = rt[1] * k; out.rt[2] = rt[2] * k; out.rt[3] = rt[3] * k;
+    }
+  }
+  return { pose: out, push };
 }

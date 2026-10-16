@@ -288,7 +288,7 @@
   </div>
 
   <!-- ============ Main menu ============ -->
-  <div id="menu" class="screen">
+  <div id="menu" class="screen" data-tab="play">
     <div class="mw">
       <header class="mw-head">
         <div class="bo-title"><b id="menu-title">COMBAT TRAINING</b><small id="menu-subtitle">OFFLINE · VERSUS BOTS</small></div>
@@ -337,7 +337,6 @@
               <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
-          <button id="play" class="cta" data-nav><span>START MATCH</span><span class="glyph" data-act="pause"></span></button>
           <p class="pane-note mo-on">Online play is peer-to-peer: the host's browser runs the match. Bots fill empty slots.</p>
           <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
         </section>
@@ -345,21 +344,38 @@
         <section class="pane" id="pane-loadout">
           <h2 class="pane-title">CREATE A CLASS</h2>
           <p class="notice in-match-only">Changes apply the next time you spawn.</p>
-          <div class="lo-grid">
-            <div class="lo-left">
-              <div class="rows">
-                <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+          <div class="cls-view on" id="cls-pick">
+            <div class="cls-list" id="cls-list"></div>
+            <div class="cls-card" id="cls-card">
+              <div class="cls-head"><span class="cls-name" id="cls-name"></span><span class="cls-kind" id="cls-kind"></span></div>
+              <div class="cls-slot" id="cls-viewslot"></div>
+              <div class="cls-wpn" id="cls-prim"></div>
+              <div class="cls-wpn" id="cls-sec"></div>
+              <div class="cls-actions">
+                <button id="cls-equip" class="cta cls-cta" data-nav><span>EQUIP</span></button>
+                <button id="cls-edit" class="menu-btn" data-nav>EDIT CLASS</button>
               </div>
-              <div class="group">PRIMARY</div>
-              <div id="weapon-list" class="weapons"></div>
-              <div class="group">SECONDARY · P-45 SIDEARM</div>
-              <div class="rows" id="gs-pistol"></div>
+              <p class="pane-note" id="cls-note"></p>
             </div>
-            <div class="gs lo-right" id="gunsmith">
-              <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
-              <div class="gs-view"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
-              <div class="rows" id="gs-slots"></div>
-              <div class="gs-stats" id="gs-stats"></div>
+          </div>
+          <div class="cls-view" id="cls-editor">
+            <div class="cls-ebar">
+              <button id="cls-back" class="menu-btn small" data-nav>‹ ALL CLASSES</button>
+              <label class="cls-rn"><span>CLASS NAME</span><input id="cls-rename" maxlength="18" autocomplete="off" spellcheck="false" data-nav></label>
+            </div>
+            <div class="lo-grid">
+              <div class="lo-left">
+                <div class="group">PRIMARY</div>
+                <div id="weapon-list" class="weapons"></div>
+                <div class="group">SECONDARY · P-45 SIDEARM</div>
+                <div class="rows" id="gs-pistol"></div>
+              </div>
+              <div class="gs lo-right" id="gunsmith">
+                <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
+                <div class="gs-view" id="gs-viewbox"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
+                <div class="rows" id="gs-slots"></div>
+                <div class="gs-stats" id="gs-stats"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -367,6 +383,8 @@
         <section class="pane" id="pane-options">
           <h2 class="pane-title">OPTIONS</h2>
           <div class="rows two">
+            <div class="group">PROFILE</div>
+            <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
             <div class="group">GRAPHICS</div>
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
@@ -453,6 +471,7 @@
           <div class="intel-k">INPUT</div><div class="intel-v" id="intel-input">KEYBOARD &amp; MOUSE</div>
         </aside>
       </div>
+      <div class="menu-cta"><button id="play" class="cta" data-nav><span>START MATCH</span><span class="glyph" data-act="pause"></span></button></div>
 
       <footer class="mw-foot" id="menu-hints"></footer>
     </div>
@@ -601,7 +620,7 @@
     <div class="sd-body">
       <!-- accounts not switched on for this server -->
       <section class="sd-sec" id="sd-off">
-        <p class="sd-note">Online accounts aren't switched on for this server yet, so friends and sign-in are unavailable. Your Name Tag is saved on this device (Create a Class).</p>
+        <p class="sd-note">Online accounts aren't switched on for this server yet, so friends and sign-in are unavailable. Your Name Tag is saved on this device (Options).</p>
       </section>
 
       <!-- signed out -->

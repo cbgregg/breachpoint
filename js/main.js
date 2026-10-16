@@ -165,8 +165,41 @@ function statsOf(d) {
     ['AIM SPEED', clamp01(1 - d.adsTime / 0.42)],
   ];
 }
-function attFor(id) { return cleanAtt(id, settings.attachments[id]); }
+// ---------- classes (CoD style: default classes you equip, custom classes you build) ----------
+// A class is { name, primary, atts: { rifle: {...}, smg: {...}, ..., pistol: {...} } }. The equipped class is
+// mirrored into settings.primary / settings.attachments, which is what the match and the network read.
+const DEFAULT_CLASSES = [
+  { name: 'ASSAULT', primary: 'rifle', atts: { rifle: { optic: 'holo', muzzle: 'brake', under: 'vgrip', mag: 'std', laser: 'none' } } },
+  { name: 'RUSHER', primary: 'smg', atts: { smg: { optic: 'reflex', muzzle: 'none', under: 'agrip', mag: 'fast', laser: 'laser' } } },
+  { name: 'CLOSE QUARTERS', primary: 'shotgun', atts: { shotgun: { optic: 'iron', muzzle: 'choke', mag: 'std', laser: 'laser' } } },
+  { name: 'MARKSMAN', primary: 'rifle', atts: { rifle: { optic: 'acog', muzzle: 'comp', under: 'vgrip', mag: 'ext', laser: 'none' } } },
+  { name: 'SNIPER', primary: 'sniper', atts: { sniper: { optic: 'scope', muzzle: 'brake', mag: 'std' }, pistol: { optic: 'iron', muzzle: 'sup', mag: 'std', laser: 'none' } } },
+];
+const CUSTOM_N = 5;
+const clsCopy = (c, name) => ({ name, primary: PRIMARIES.includes(c.primary) ? c.primary : 'rifle', atts: JSON.parse(JSON.stringify(c.atts || {})) });
+(function migrateClasses() {
+  let list = Array.isArray(settings.classes) ? settings.classes.filter(c => c && typeof c === 'object') : [];
+  if (!list.length) {
+    // first run: custom class 1 keeps the build the player already had; the rest start as copies of the defaults
+    list.push({ name: 'CUSTOM CLASS 1', primary: PRIMARIES.includes(settings.primary) ? settings.primary : 'rifle', atts: JSON.parse(JSON.stringify(settings.attachments || {})) });
+    if (!settings.cls) settings.cls = 'c0';
+  }
+  for (let i = list.length; i < CUSTOM_N; i++) list.push(clsCopy(DEFAULT_CLASSES[i % DEFAULT_CLASSES.length], `CUSTOM CLASS ${i + 1}`));
+  settings.classes = list.slice(0, CUSTOM_N).map((c, i) => ({ ...clsCopy(c, typeof c.name === 'string' && c.name.trim() ? c.name.slice(0, 18) : `CUSTOM CLASS ${i + 1}`) }));
+  if (!/^[dc]\d$/.test(settings.cls || '')) settings.cls = 'c0';
+})();
+const clsGet = (key) => key[0] === 'd' ? DEFAULT_CLASSES[+key.slice(1)] : settings.classes[+key.slice(1)];
+const clsAtt = (c, id) => cleanAtt(id, c.atts[id]);
+let clsSel = settings.cls, editKey = null;   // highlighted class in the list; class open in the editor
+function applyEquipped() {
+  const c = clsGet(settings.cls) || DEFAULT_CLASSES[0];
+  settings.primary = c.primary;
+  settings.attachments = { [c.primary]: clsAtt(c, c.primary), pistol: clsAtt(c, 'pistol') };
+}
+applyEquipped();
+function attFor(id) { return clsAtt(clsGet(editKey || clsSel), id); }
 function loadoutChanged() {
+  if (editKey && editKey === settings.cls) applyEquipped();
   saveSettings(settings);
   if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
 }
@@ -178,44 +211,115 @@ function slotRows(id, host, prefix) {
       <select id="${prefix}-${sl}" data-slot="${sl}" data-nav>${g[sl].map(k => `<option value="${k}"${k === a[sl] ? ' selected' : ''}>${ATTACHMENTS[sl][k].name}</option>`).join('')}</select></div>`;
   }).join('');
   host.querySelectorAll('select').forEach(el => el.addEventListener('change', () => {
-    settings.attachments[id] = { ...attFor(id), [el.dataset.slot]: el.value };
+    const c = clsGet(editKey);
+    if (!c || editKey[0] !== 'c') return;
+    c.atts[id] = { ...attFor(id), [el.dataset.slot]: el.value };
     el.closest('.row').querySelector('small').textContent = ATTACHMENTS[el.dataset.slot][el.value].desc;
     loadoutChanged();
     renderGunsmith(false);
   }));
 }
-function renderGunsmith(rebuildRows = true) {
-  const id = settings.primary, d = weaponDef(id, attFor(id)), base = WEAPONS[id];
-  $('gs-name').textContent = d.name.toUpperCase();
-  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows('pistol', $('gs-pistol'), 'gp'); }
-  const now = statsOf(d), was = statsOf(weaponDef(id, null));
-  $('gs-stats').innerHTML = now.map(([k, v], i) => {
+function statBars(d) {
+  const now = statsOf(d), was = statsOf(weaponDef(d.id, null));
+  return now.map(([k, v], i) => {
     const w = was[i][1], lo = Math.min(v, w), diff = v - w;
     return `<span class="stat">${k}<i><b style="width:${Math.round(lo * 100)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${Math.round(lo * 100)}%;width:${Math.round(Math.abs(diff) * 100)}%"></em>` : ''}</i></span>`;
-  }).join('') + `<span class="gs-facts">${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}${d.mag !== base.mag ? '' : ''}</span>`;
+  }).join('');
+}
+function renderGunsmith(rebuildRows = true) {
+  if (!editKey) return;
+  const c = clsGet(editKey), id = c.primary, d = weaponDef(id, attFor(id));
+  $('gs-name').textContent = d.name.toUpperCase();
+  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows('pistol', $('gs-pistol'), 'gp'); }
+  $('gs-stats').innerHTML = statBars(d) + `<span class="gs-facts">${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
   preview.show(id, attFor(id));
-  // cards show the build summary
   $('weapon-list').querySelectorAll('.wcard').forEach(b => {
+    b.classList.toggle('on', b.dataset.weapon === id);
     const s2 = attSummary(b.dataset.weapon, attFor(b.dataset.weapon));
     b.querySelector('.wa').textContent = s2.length ? s2.join(' · ') : 'STOCK';
   });
 }
 function renderWeapons() {
   const list = $('weapon-list');
-  list.innerHTML = PRIMARIES.map(id => {
-    const d = WEAPONS[id];
-    return `<button class="wcard ${settings.primary === id ? 'on' : ''}" data-weapon="${id}" data-nav>
-      <span class="wn">${d.name.toUpperCase()}</span><span class="wt">${d.mode}</span><span class="wa"></span>
-    </button>`;
-  }).join('');
+  list.innerHTML = PRIMARIES.map(id => `<button class="wcard" data-weapon="${id}" data-nav>
+      <span class="wn">${WEAPONS[id].name.toUpperCase()}</span><span class="wt">${WEAPONS[id].mode}</span><span class="wa"></span>
+    </button>`).join('');
   list.querySelectorAll('.wcard').forEach(b => b.addEventListener('click', () => {
-    settings.primary = b.dataset.weapon;
-    list.querySelectorAll('.wcard').forEach(x => x.classList.toggle('on', x === b));
+    const c = clsGet(editKey);
+    if (!c || editKey[0] !== 'c') return;
+    c.primary = b.dataset.weapon;
     loadoutChanged();
     renderGunsmith();
   }));
-  renderGunsmith();
+  renderClasses();
 }
+const escHtml = (t) => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function wpnBlock(label, id, att) {
+  const d = weaponDef(id, att), sum = attSummary(id, att);
+  return `<div class="cw-k">${label}</div><div class="cw-n">${d.name.toUpperCase()}<small>${d.mode}</small></div>
+    <div class="cw-a">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<span class="${sum.includes(ATTACHMENTS[s][att[s]].name) ? 'mod' : ''}">${ATTACHMENTS[s][att[s]].name}</span>`).join('')}</div>`;
+}
+function renderClasses() {
+  const row = (key, c) => `<button class="cls-row${key === clsSel ? ' sel' : ''}${key === settings.cls ? ' eq' : ''}" data-cls="${key}" data-nav>
+      <span class="cr-n">${escHtml(c.name)}</span><span class="cr-w">${WEAPONS[c.primary].short}</span>${key === settings.cls ? '<span class="cr-eq">EQUIPPED</span>' : ''}</button>`;
+  $('cls-list').innerHTML = `<div class="group">DEFAULT CLASSES</div>${DEFAULT_CLASSES.map((c, i) => row('d' + i, c)).join('')}
+    <div class="group">CUSTOM CLASSES</div>${settings.classes.map((c, i) => row('c' + i, c)).join('')}`;
+  $('cls-list').querySelectorAll('.cls-row').forEach(b => {
+    b.addEventListener('click', () => { if (clsSel === b.dataset.cls) { equipClass(); return; } clsSel = b.dataset.cls; renderClasses(); });
+    b.addEventListener('dblclick', () => { clsSel = b.dataset.cls; equipClass(); });
+  });
+  const c = clsGet(clsSel), custom = clsSel[0] === 'c', on = clsSel === settings.cls;
+  $('cls-name').textContent = c.name;
+  $('cls-kind').textContent = custom ? 'CUSTOM CLASS' : 'DEFAULT CLASS';
+  $('cls-prim').innerHTML = wpnBlock('PRIMARY', c.primary, clsAtt(c, c.primary));
+  $('cls-sec').innerHTML = wpnBlock('SECONDARY', 'pistol', clsAtt(c, 'pistol'));
+  $('cls-equip').querySelector('span').textContent = on ? 'EQUIPPED ✓' : 'EQUIP';
+  $('cls-equip').classList.toggle('done', on);
+  $('cls-edit').textContent = custom ? 'EDIT CLASS' : 'COPY TO A CUSTOM CLASS';
+  $('cls-note').textContent = custom ? 'Pick a primary and attachments in the editor. Changes save automatically.' : 'Default classes can\'t be changed. Copy one into a custom slot to tweak it.';
+  if (!editKey) { $('cls-viewslot').appendChild($('gs-viewbox')); preview.show(c.primary, clsAtt(c, c.primary)); }
+}
+function equipClass() {
+  settings.cls = clsSel;
+  applyEquipped();
+  saveSettings(settings);
+  if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
+  game.audio.play('ui', null, { ui: true });
+  renderClasses();
+}
+function openEditor(key) {
+  editKey = key;
+  $('cls-pick').classList.remove('on'); $('cls-editor').classList.add('on');
+  $('cls-rename').value = clsGet(key).name;
+  $('gunsmith').insertBefore($('gs-viewbox'), $('gs-slots'));
+  renderGunsmith();
+  if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('weapon-list').querySelector('.wcard.on')), 0);
+}
+function closeEditor() {
+  if (!editKey) return false;
+  clsSel = editKey; editKey = null;
+  $('cls-editor').classList.remove('on'); $('cls-pick').classList.add('on');
+  renderClasses();
+  if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('cls-list').querySelector('.cls-row.sel')), 0);
+  return true;
+}
+$('cls-equip').addEventListener('click', equipClass);
+$('cls-edit').addEventListener('click', () => {
+  if (clsSel[0] === 'c') { openEditor(clsSel); return; }
+  // copy a default into the equipped custom slot if one is equipped, else the first custom slot
+  const i = settings.cls[0] === 'c' ? +settings.cls.slice(1) : 0;
+  const src = clsGet(clsSel);
+  settings.classes[i] = clsCopy(src, `${src.name} (C${i + 1})`.slice(0, 18));
+  saveSettings(settings);
+  openEditor('c' + i);
+});
+$('cls-back').addEventListener('click', closeEditor);
+$('cls-rename').addEventListener('input', () => {
+  const c = clsGet(editKey); if (!c || editKey[0] !== 'c') return;
+  c.name = $('cls-rename').value.replace(/[<>]/g, '').slice(0, 18) || `CUSTOM CLASS ${+editKey.slice(1) + 1}`;
+  saveSettings(settings);
+});
+$('cls-rename').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.stopPropagation(); e.target.blur(); } });
 
 // ---------- tabs ----------
 const TABS = ['play', 'loadout', 'options'];
@@ -225,7 +329,8 @@ function setTab(t) {
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('#menu .pane').forEach(p => p.classList.toggle('on', p.id === `pane-${t}`));
   game.audio.play('ui', null, { ui: true });
-  if (t === 'loadout') renderGunsmith(false);
+  document.getElementById('menu').dataset.tab = t;
+  if (t === 'loadout') { if (editKey) renderGunsmith(false); else renderClasses(); }
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
@@ -326,7 +431,7 @@ function setPauseSec(sec) {
   pauseSec = sec;
   document.querySelectorAll('.psec').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
   document.querySelectorAll('.psec-pane').forEach(p => p.classList.toggle('on', p.id === `psec-${sec}`));
-  if (sec === 'loadout') { $('psec-loadout').appendChild($('pane-loadout')); $('pane-loadout').classList.add('on'); renderGunsmith(false); }
+  if (sec === 'loadout') { $('psec-loadout').appendChild($('pane-loadout')); $('pane-loadout').classList.add('on'); if (editKey) renderGunsmith(false); else renderClasses(); }
   if (sec === 'options') { $('psec-options').appendChild($('pane-options')); $('pane-options').classList.add('on'); writeForm(); }
   if (sec === 'match') renderPauseMatch();
 }
@@ -851,6 +956,7 @@ game.input.onNav = (dir) => {
       game.audio.play('ui', null, { ui: true });
       break;
     case 'back':
+      if (((screen === 'menu' && tab === 'loadout') || (screen === 'pause' && pauseSec === 'loadout')) && closeEditor()) break;
       if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
       else if (screen === 'pause') game.resume();
       else if (screen === 'menu' && tab !== 'play') { setTab('play'); focusFirst(); }
