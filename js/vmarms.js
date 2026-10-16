@@ -171,7 +171,7 @@ export function createVmArms(team) {
   if (HA) {
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d');
-    const base = glove.clone().multiplyScalar(0.85);
+    const base = glove.clone().multiplyScalar(0.55);
     g.fillStyle = '#' + base.getHexString(); g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 4000; i++) { const v = Math.random() * 30 - 15; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 400})`; g.fillRect(Math.random() * 256, Math.random() * 256, 2, 1); }
     for (let y = 0; y < 256; y += 3) { g.fillStyle = 'rgba(0,0,0,0.05)'; g.fillRect(0, y, 256, 1); }
