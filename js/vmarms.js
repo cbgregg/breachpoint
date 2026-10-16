@@ -166,7 +166,18 @@ export function createVmArms(team) {
   };
   const root = new THREE.Group();
   const HA = ASSETS.hands;
-  if (HA) M.skin = new THREE.MeshStandardMaterial({ map: HA.map, normalMap: HA.normalMap, roughnessMap: HA.roughnessMap, roughness: 1, metalness: 0 });
+  // tactical gloves over the hand model: the team's glove colour, the hand's own normal detail (knuckles,
+  // creases) for shape, and a canvas weave with darker reinforced patches
+  if (HA) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const base = glove.clone().multiplyScalar(0.85);
+    g.fillStyle = '#' + base.getHexString(); g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 4000; i++) { const v = Math.random() * 30 - 15; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 400})`; g.fillRect(Math.random() * 256, Math.random() * 256, 2, 1); }
+    for (let y = 0; y < 256; y += 3) { g.fillStyle = 'rgba(0,0,0,0.05)'; g.fillRect(0, y, 256, 1); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    M.skin = new THREE.MeshStandardMaterial({ map: t, normalMap: HA.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.78, metalness: 0.02 });
+  }
   const mkArm = (side) => {
     const hand = buildHand(side, M);
     let rig = null;

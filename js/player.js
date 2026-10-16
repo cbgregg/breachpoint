@@ -40,6 +40,9 @@ const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THRE
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
 const MAG_BOTTOM = { rifle: -0.21, smg: -0.17, pistol: -0.11, sniper: -0.09 };
 const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _qd = new THREE.Quaternion(), _qe = new THREE.Quaternion();
+const _ch = new THREE.Vector3(), _cz = new THREE.Vector3(), _cq = new THREE.Quaternion();
+// support hand on the charging handle / slide: palm down over the top, fingers across to the right
+const CH_F = new THREE.Vector3(0.85, -0.35, -0.4), CH_P = new THREE.Vector3(0.1, -1, 0.15);
 const EYE_RELIEF = -0.12; // sights sit close to the eye when aiming: a big, clear sight picture
 const INSPECT = 3.0; // seconds
 const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multiplier at full ADS // close to the eye, like CoD: the optic frames the target
@@ -480,9 +483,11 @@ export class PlayerController {
     const slide = this.slideK;
     if (w.reloading && G.magHold) {
       const hit = (t) => J.prevRp < t && rp >= t;
-      if (hit(0.16)) { J.vy -= 0.18; J.vr += 0.9; }       // mag pulled free
-      if (hit(0.68)) { J.vy += 0.28; J.vr -= 1.4; }       // fresh mag seated
-      if (hit(0.76)) { J.vy += 0.22; J.vz -= 0.12; J.vr -= 1.0; } // palm slap
+      const e = !!w.emptyReload && G.type !== 'shotgun' && G.type !== 'sniper';
+      if (hit(e ? 0.12 : 0.16)) { J.vy -= 0.18; J.vr += 0.9; }          // mag pulled free
+      if (hit(e ? 0.58 : 0.68)) { J.vy += 0.28; J.vr -= 1.4; }          // fresh mag seated
+      if (hit(e ? 0.64 : 0.76)) { J.vy += 0.22; J.vz -= 0.12; J.vr -= 1.0; } // palm slap
+      if (e && hit(0.84)) { J.vz += 0.28; J.vr += 1.2; J.vy -= 0.08; }  // charging handle / slide released
     }
     J.prevRp = w.reloading ? rp : 0;
     const bx = Math.sin(this.bobT) * 0.01 * bobAmt, by = -Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;
@@ -490,7 +495,7 @@ export class PlayerController {
     h.position.set(
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
       lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) + tilt * RP_.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
-      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RP_.y - sw * 0.25 - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
+      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RP_.y - sw * (G.type === 'pistol' ? 0.16 : 0.2) - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
       lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RP_.z - mel * 0.12 + J.z,
     );
     h.rotation.set(
@@ -498,6 +503,16 @@ export class PlayerController {
       spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
+    // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
+    if (sw > 0) {
+      const pis = G.type === 'pistol';
+      h.position.x += sw * 0.04;
+      h.rotation.x -= sw * (pis ? 0.95 : 0.7);
+      h.rotation.y += sw * (pis ? 0.25 : 0.3);
+      h.rotation.z += sw * (pis ? 0.55 : 0.4);
+    }
+    if (this.prevSw > 0.02 && sw <= 0.02) { J.vy += 0.12; J.vr -= 0.7; }  // settle as it arrives
+    this.prevSw = sw;
     // per-gun hip pose (the pistol is held up and turned in, both hands on it, like CoD)
     if (G.hipRot) { const k = 1 - ae; h.rotation.x += G.hipRot[0] * k; h.rotation.y += G.hipRot[1] * k; h.rotation.z += G.hipRot[2] * k; }
     // tactical sprint: gun swung up beside the face, muzzle high (MW style)
@@ -580,17 +595,26 @@ export class PlayerController {
       _m1.copy(_m0).add(_a.set(0.01, -0.11, 0.04));                           // M1: pulled clear
       _pp.copy(_m0).add(_a.set(-0.07, -0.32, 0.08));                          // P: down to the pouch
       // one continuous, time-parametrised spline through the beats (no stop-start between them):
-      // grip -> mag -> pulled -> down out of view -> back up -> seated -> slap -> grip
+      // grip -> mag -> pulled -> down to the pouch -> back up -> seated -> slap -> grip. From empty there's
+      // one more beat: the hand goes to the charging handle (or over the slide), racks it and returns.
       _gl.copy(_L); _lq2.copy(_lq);                                            // the resting grip
-      const KP = this.reloadKeys || (this.reloadKeys = Array.from({ length: 8 }, () => new THREE.Vector3()));
+      const empty = !!w.emptyReload && type !== 'shotgun' && type !== 'sniper';
+      const KP = this.reloadKeys || (this.reloadKeys = Array.from({ length: 10 }, () => new THREE.Vector3()));
       KP[0].copy(_gl); KP[1].copy(_m0); KP[2].copy(_m1); KP[3].copy(_pp);
-      KP[4].copy(_m1).add(_a.set(-0.015, -0.02, 0.01)); KP[5].copy(_m0); KP[6].copy(_m0).add(_a.set(0, 0.022, 0)); KP[7].copy(_gl);
-      const KT = [0, 0.1, 0.22, 0.4, 0.56, 0.68, 0.76, 0.9];
-      if (rp >= KT[7]) _L.copy(KP[7]);
+      KP[4].copy(_m1).add(_a.set(-0.015, -0.02, 0.01)); KP[5].copy(_m0); KP[6].copy(_m0).add(_a.set(0, 0.022, 0));
+      let KT, n;
+      if (empty) {
+        // the charge point: AR / SMG charging handle at the back of the upper, the pistol's slide serrations
+        const chg = type === 'pistol' ? _a.set(-0.012, 0.072, 0.045) : _a.set(-0.02, 0.07, 0.07);
+        handFrame(_ch, _cq, gun.group, _gq, chg, CH_F, CH_P);
+        KP[7].copy(_ch); KP[8].copy(_ch).addScaledVector(_cz.set(0, 0, 1).applyQuaternion(_gq), 0.055); KP[9].copy(_gl);
+        KT = [0, 0.08, 0.18, 0.33, 0.47, 0.58, 0.64, 0.76, 0.83, 0.95]; n = 10;
+      } else { KP[7].copy(_gl); KT = [0, 0.1, 0.22, 0.4, 0.56, 0.68, 0.76, 0.9]; n = 8; }
+      if (rp >= KT[n - 1]) _L.copy(KP[n - 1]);
       else {
-        let i = 0; while (i < 6 && rp >= KT[i + 1]) i++;
+        let i = 0; while (i < n - 2 && rp >= KT[i + 1]) i++;
         const t0 = KT[i], t1 = KT[i + 1], d = t1 - t0, u = (rp - t0) / d;
-        const tan = (j, out) => (j <= 0 || j >= 7) ? out.set(0, 0, 0) : out.subVectors(KP[j + 1], KP[j - 1]).divideScalar(KT[j + 1] - KT[j - 1]);
+        const tan = (j, out) => (j <= 0 || j >= n - 1 || (empty && j === 8)) ? out.set(0, 0, 0) : out.subVectors(KP[j + 1], KP[j - 1]).divideScalar(KT[j + 1] - KT[j - 1]);
         const u2 = u * u, u3 = u2 * u;
         tan(i, _v1); tan(i + 1, _tp);
         _L.copy(KP[i]).multiplyScalar(2 * u3 - 3 * u2 + 1)
@@ -598,10 +622,18 @@ export class PlayerController {
           .addScaledVector(KP[i + 1], -2 * u3 + 3 * u2)
           .addScaledVector(_tp, (u3 - u2) * d);
       }
-      // the hand turns from its grip to the mag hold and back, eased with no jolt
-      const k = sm5(rp / 0.1) * (1 - sm5((rp - 0.78) / 0.12));
-      const attach = rp > 0.1 && rp < 0.68;
-      _lq.copy(_lq2).slerp(_mq, k);
+      // the hand turns from its grip to the mag hold (and on to the charging handle) and back, eased with no jolt
+      let k;
+      if (empty) {
+        k = sm5(rp / 0.08) * (1 - sm5((rp - 0.84) / 0.11));
+        if (rp < 0.66) _lq.copy(_lq2).slerp(_mq, sm5(rp / 0.08));
+        else if (rp < 0.84) _lq.copy(_mq).slerp(_cq, sm5((rp - 0.66) / 0.1));
+        else _lq.copy(_cq).slerp(_lq2, sm5((rp - 0.84) / 0.11));
+      } else {
+        k = sm5(rp / 0.1) * (1 - sm5((rp - 0.78) / 0.12));
+        _lq.copy(_lq2).slerp(_mq, k);
+      }
+      const attach = rp > KT[1] && rp < KT[5];
       tPose = MH.pose; lk = k;
       if (attach) {
         gun.group.worldToLocal(_a.copy(_L));

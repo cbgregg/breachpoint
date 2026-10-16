@@ -28,6 +28,7 @@ export class WeaponState {
   startReload() {
     if (this.reloading || this.mag >= this.def.mag || this.reserve <= 0) return false;
     this.reloading = true;
+    this.emptyReload = this.mag === 0;   // empty: there's a charging handle / slide to work at the end
     // tactical reload (round chambered) is faster than an empty reload
     this.reloadTotal = this.def.reload * (this.mag > 0 ? 0.85 : 1);
     this.reloadT = this.reloadTotal;
