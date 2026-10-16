@@ -280,7 +280,7 @@ export class Effects {
     for (const k of ['position', 'color', 'alpha', 'size', 'rot']) D.geo.attributes[k].needsUpdate = true;
   }
 
-  setQuality(name) { this.motes.setCount({ low: 0, medium: 140, high: 220, ultra: 300 }[name] ?? 200); }
+  setQuality(q) { this.motes.setCount(typeof q === 'string' ? ({ low: 0, medium: 140, high: 220, ultra: 300 }[q] ?? 200) : (q.motes ?? 200)); }
 
   // footfalls / slides kick up a little dust
   kickDust(pos, speed, slide = false) {

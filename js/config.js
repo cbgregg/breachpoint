@@ -99,11 +99,33 @@ export const DIFFICULTY = {
 };
 
 export const QUALITY = {
-  low: { label: 'Low', pixelRatio: 0.75, shadows: 1024, softShadows: false, ao: false, bloom: true, aa: false },
-  medium: { label: 'Medium', pixelRatio: 1, shadows: 2048, ao: false, bloom: true, aa: true },
-  high: { label: 'High', pixelRatio: 1.25, shadows: 4096, ao: true, bloom: true, aa: true },
-  ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, ao: true, bloom: true, aa: true },
+  low: { label: 'Low', pixelRatio: 0.75, shadows: 1024, softShadows: false, shadowEvery: 2, ao: false, bloom: true, aa: false, lights: false, motes: 0, aniso: 4 },
+  medium: { label: 'Medium', pixelRatio: 1, shadows: 2048, softShadows: true, shadowEvery: 2, ao: false, bloom: true, aa: true, lights: true, motes: 140, aniso: 8 },
+  high: { label: 'High', pixelRatio: 1.25, shadows: 4096, softShadows: true, shadowEvery: 2, ao: true, bloom: true, aa: true, lights: true, motes: 220, aniso: 8 },
+  ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, softShadows: true, shadowEvery: 1, ao: true, bloom: true, aa: true, lights: true, motes: 300, aniso: 16 },
 };
+// Custom graphics: each preset written out as the individual settings (render resolution is % of the
+// screen's native pixels, so it means the same thing on every display), and the reverse for 'custom'.
+const dprNow = () => (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+const isTouch = () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+export function presetGfx(name) {
+  const q = QUALITY[name] || QUALITY.high, dpr = dprNow();
+  const pr = Math.min(dpr, isTouch() ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
+  return {
+    gfxRes: Math.round(pr / dpr * 20) * 5, gfxShadows: String(q.shadows), gfxSoftShadows: q.softShadows !== false,
+    gfxShadowRate: q.shadowEvery === 1 ? 'full' : 'half', gfxAO: q.ao, gfxBloom: q.bloom, gfxAA: q.aa, gfxLights: q.lights,
+    gfxDust: String(q.motes), gfxAniso: String(q.aniso),
+  };
+}
+export function qualityFrom(s) {
+  if (s.quality !== 'custom') { const q = QUALITY[s.quality] || QUALITY.high, dpr = dprNow(); return { ...q, pr: Math.min(dpr, isTouch() ? Math.max(1.25, q.pixelRatio) : q.pixelRatio) }; }
+  const d = presetGfx('high'), v = (k) => s[k] ?? d[k];
+  return {
+    label: 'Custom', pr: Math.max(0.25, dprNow() * Math.min(200, Math.max(50, +v('gfxRes'))) / 100),
+    shadows: +v('gfxShadows') || 0, softShadows: !!v('gfxSoftShadows'), shadowEvery: v('gfxShadowRate') === 'full' ? 1 : 2,
+    ao: !!v('gfxAO'), bloom: !!v('gfxBloom'), aa: !!v('gfxAA'), lights: !!v('gfxLights'), motes: +v('gfxDust') || 0, aniso: +v('gfxAniso') || 1,
+  };
+}
 
 const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
@@ -122,6 +144,7 @@ export const PUBLIC_MATCH = { fillBots: true, mode: 'tdm', teamSize: 6, difficul
 export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
+  fpsCap: 0,           // 0 = unlimited (the display's refresh rate)
   fillBots: true, chat: true,
   musicVolume: 0.5,
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
