@@ -1,6 +1,6 @@
 // Match orchestration: scene + renderer, combat resolution, spawning, scoring, pickups, grenades, melee
 import * as THREE from 'three';
-import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS } from './config.js';
+import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom } from './config.js';
 const WEAPON_IDS = Object.keys(WEAPONS);
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
@@ -122,7 +122,9 @@ export class Game {
   get live() { return this.state === 'playing' || (this.state === 'paused' && this.mode !== 'local'); }
 
   applySettings(s) {
-    if (s.quality !== this.appliedQuality) { this.appliedQuality = s.quality; this.renderer.applyQuality(s.quality); this.effects?.setQuality(s.quality); }
+    const q = qualityFrom(s), qk = JSON.stringify(q);
+    if (qk !== this.appliedQuality) { this.appliedQuality = qk; this.renderer.applyQuality(q); this.effects?.setQuality(q); }
+    this.fpsCap = +s.fpsCap || 0;
     const dyn = s.dynamicRes !== false;
     if (this.renderer.dynamic !== dyn) { this.renderer.dynamic = dyn; if (!dyn) { this.renderer.drs.scale = 1; this.renderer.applyPR(); this.renderer.setSize(); } }
     document.documentElement.style.setProperty('--tb-zoom', String({ small: 0.7, medium: 0.85, large: 1 }[s.touchSize] || 0.7));
@@ -371,6 +373,12 @@ export class Game {
   // ---------- frame ----------
   frame(background = false) {
     const now = performance.now();
+    // frame-rate cap: skip display refreshes until the next frame is due (keeps the average at the cap)
+    if (!background && this.fpsCap > 0) {
+      const iv = 1000 / this.fpsCap;
+      if (now < (this.nextFrameT || 0) - 1) return;
+      this.nextFrameT = Math.max((this.nextFrameT || 0) + iv, now - iv);
+    }
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (background) { this.update(dt); this.input.endFrame(); return; }
@@ -987,9 +995,10 @@ export class Game {
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
     setCharacterDetail(this.world.textures.fabric);
-    const lit = !this.renderer.quality || this.renderer.quality.label !== 'Low';
-    const lamps = !!this.renderer.quality && this.renderer.quality.label !== 'Low';
+    const lit = !this.renderer.quality || this.renderer.quality.lights !== false;
+    const lamps = !!this.renderer.quality && this.renderer.quality.lights !== false;
     this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; if (o.userData.lampLight) o.visible = lamps; });
+    this.renderer.applyAniso();
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];
     this.buildPickups();

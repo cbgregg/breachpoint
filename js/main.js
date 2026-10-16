@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx } from './config.js';
 import { MAPS } from './world.js';
 import { Game, prewarmBotGuns } from './game.js';
 import { glyph } from './hud.js';
@@ -79,12 +79,15 @@ game.applySettings(settings);
 const bindings = [
   ['opt-name', 'name', 'text'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
-  ['opt-quality', 'quality', 'str'], ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
+  ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
+  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
+  ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
+  'opt-gfxres': ['out-gfxres', v => `${v}%`],
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
@@ -98,6 +101,17 @@ const MAP_TAGS = { shuran: '3 lanes', mart: 'indoor', pioneer: 'Underground site
 const mapPhoto = (id) => { const l = MAPS[id] && MAPS[id].photos; return l && l.length ? l[(Math.random() * l.length) | 0] : null; };
 const photoCache = {};
 const loadPhoto = (src) => photoCache[src] || (photoCache[src] = new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
+// the detail rows always show what's in effect: the preset's values, or the player's custom ones
+if (settings.quality !== 'custom') Object.assign(settings, presetGfx(settings.quality));
+else Object.assign(settings, { ...presetGfx('high'), ...Object.fromEntries(Object.entries(settings).filter(([k, v]) => k.startsWith('gfx') && v !== undefined)) });
+function writeGfx() {
+  for (const [id, key, type] of bindings) {
+    if (!key.startsWith('gfx')) continue;
+    const el = $(id);
+    if (type === 'bool') el.checked = !!settings[key]; else el.value = String(settings[key]);
+    if (outputs[id]) $(outputs[id][0]).textContent = outputs[id][1](el.value);
+  }
+}
 function writeForm() {
   for (const [id, key, type] of bindings) {
     const el = $(id);
@@ -123,6 +137,9 @@ for (const [id, key, type] of bindings) {
   const ev = el.type === 'range' || el.tagName === 'INPUT' && type === 'text' ? 'input' : 'change';
   el.addEventListener(ev, () => {
     readField(id, key, type);
+    // graphics: a preset fills in every detail setting; changing any detail makes the preset Custom (like CoD)
+    if (key === 'quality' && settings.quality !== 'custom') { Object.assign(settings, presetGfx(settings.quality)); writeGfx(); }
+    else if (key.startsWith('gfx') && settings.quality !== 'custom') { settings.quality = 'custom'; $('opt-quality').value = 'custom'; }
     if (outputs[id]) $(outputs[id][0]).textContent = outputs[id][1](el.value);
     saveSettings(settings);
     game.applySettings(settings);

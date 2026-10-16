@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { QUALITY } from './config.js';
+import { QUALITY, qualityFrom } from './config.js';
 
 const GradeShader = {
   uniforms: {
@@ -138,7 +138,7 @@ export class Renderer {
     this.smaaPass = new SMAAPass(w, h);
     [this.worldPass, this.aoPass, this.vmPass, this.bloomPass, this.outputPass, this.gradePass, this.smaaPass].forEach(p => this.composer.addPass(p));
     this.grade = this.gradePass.uniforms;
-    this.applyQuality('high');
+    this.applyQuality(qualityFrom({ quality: 'high' }));
   }
 
   buildAtmosphere() {
@@ -244,12 +244,11 @@ export class Renderer {
     this.clouds.visible = !!L.clouds;
   }
 
-  applyQuality(name) {
-    const q = QUALITY[name] || QUALITY.high;
+  // q: a resolved quality (qualityFrom in config.js): a preset or the player's custom settings
+  applyQuality(q) {
+    if (typeof q === 'string') q = qualityFrom({ quality: q });
     this.quality = q;
-    // phones: never render below 1.25× CSS pixels, or distant players blur into the background
-    const touch = window.matchMedia('(pointer: coarse)').matches;
-    this.basePR = Math.min(window.devicePixelRatio || 1, touch ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
+    this.basePR = q.pr;
     this.drs = { scale: 1, slow: 0, fast: 0, ema: 1 / 60, last: 0, ceil: 1, grace: 3 };
     this.applyPR();
     this.renderer.shadowMap.enabled = q.shadows > 0;
@@ -259,14 +258,27 @@ export class Renderer {
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
     this.scene.traverse(o => {
-      if (o.isPointLight && o.userData.mapLight) o.visible = q.label !== 'Low';
-      if (o.userData.lampLight) o.visible = q.label !== 'Low';
+      if (o.isPointLight && o.userData.mapLight) o.visible = q.lights;
+      if (o.userData.lampLight) o.visible = q.lights;
     });
+    this.applyAniso();
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao;
     this.bloomPass.enabled = q.bloom;
     this.smaaPass.enabled = q.aa;
     this.setSize();
+  }
+
+  // texture filtering: anisotropy on every texture in the scene (sharper floors and walls at a glancing angle)
+  applyAniso() {
+    const a = Math.max(1, Math.min(this.renderer.capabilities.getMaxAnisotropy(), (this.quality && this.quality.aniso) || 8));
+    const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'bumpMap'];
+    this.scene.traverse(o => {
+      if (!o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) for (const k of KEYS) {
+        const t = m[k]; if (t && t.isTexture && t.anisotropy !== a) { t.anisotropy = a; t.needsUpdate = true; }
+      }
+    });
   }
 
   // dynamic resolution: when frames run long the render resolution drops in steps (down to 55%), and
@@ -309,7 +321,7 @@ export class Renderer {
     // the sun's shadow map is the single biggest pass: below Ultra it refreshes every other frame
     const sm = this.renderer.shadowMap;
     if (sm.enabled) {
-      const every = this.quality && this.quality.label === 'Ultra' ? 1 : 2;
+      const every = (this.quality && this.quality.shadowEvery) || 2;
       sm.autoUpdate = false;
       this.shadowTick = ((this.shadowTick || 0) + 1) % every;
       if (this.shadowTick === 0) sm.needsUpdate = true;
