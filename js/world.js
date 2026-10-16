@@ -1946,8 +1946,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const xf = extra && extra.xf;
     const g0 = glows.length, h0 = glowsHot.length;
     if (xf) XF = xf;
+    const nb = physics.boxes.length;
     if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
+    for (let i = nb; i < physics.boxes.length; i++) if (!physics.boxes[i].src) physics.boxes[i].src = `${kind}@${+cx.toFixed(1)},${+cz.toFixed(1)}`; // for the collision audit
     if (xf) {
       for (const arr of [[glows, g0], [glowsHot, h0]]) for (let i = arr[1]; i < arr[0].length; i++) { const q = arr[0][i]; [q[0], q[2]] = xfPt(q[0], q[2]); }
       XF = null;

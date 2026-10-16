@@ -726,7 +726,7 @@ export class HostSession {
     r.prevSp = cmd.sp;
     if (canAct && spEdge && f > 0.4 && !cmd.ads && !cmd.f && c.weapon.reloading) c.weapon.cancelReload();
     const sprint = canAct && cmd.sp && f > 0.4 && !cmd.ads && !cmd.f && !c.weapon.reloading;
-    c.wantCrouch = cmd.cr;
+    c.wantCrouch = cmd.cr; c.wantProne = !!cmd.pr;
     c.updateMovement(cmd.dt, _wish, sprint, canAct && cmd.j, canAct && cmd.sl, sprint && cmd.tac);
     if (!c.alive) return;
     if (canAct && cmd.a) {
@@ -844,14 +844,14 @@ export class HostSession {
     const w0 = c.weapons[0], w1 = c.weapons[1];
     const me = [r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r2(c.vel.x), r2(c.vel.y), r2(c.vel.z),
       (c.onGround ? 1 : 0) | (c.sprinting ? 2 : 0) | (c.alive ? 4 : 0) | (c.spawnProtect > 0 ? 8 : 0) | (c.tacSprinting ? 16 : 0),
-      r3(c.crouchT), r3(c.slideT), Math.round(c.health), c.cur, w0.mag, w0.reserve, w1.mag, w1.reserve, c.grenades, r3(c.slideDir.x), r3(c.slideDir.z)];
+      r3(c.crouchT), r3(c.slideT), Math.round(c.health), c.cur, w0.mag, w0.reserve, w1.mag, w1.reserve, c.grenades, r3(c.slideDir.x), r3(c.slideDir.z), r3(c.proneT)];
     const ch = [];
     for (const o of g.characters) {
       if (o === c || !this.visible(r, o)) continue;
       const w = o.weapon;
       const fl = (o.alive ? 1 : 0) | (o.sprinting ? 2 : 0) | (o.onGround ? 4 : 0) | (o.slideT > 0 ? 8 : 0) | (o.tacSprinting ? 16 : 0) | (o.adsT > 0.5 ? 32 : 0);
       ch.push([o.id, r2(o.pos.x), r2(o.pos.y), r2(o.pos.z), r3(o.yaw), r3(o.pitch), r2(o.vel.x), r2(o.vel.y), r2(o.vel.z), fl,
-        r2(o.crouchT), o.cur, w.reloading ? r2(w.reloadProgress) : 0, Math.round(o.health)]);
+        r2(o.crouchT), o.cur, w.reloading ? r2(w.reloadProgress) : 0, Math.round(o.health), r2(o.proneT)]);
     }
     const msg = { t: 's', tm: r3(g.time), ack: r.ack, sc: [...g.scores], tl: r2(g.timeLeft), cd: r2(Math.max(0, g.countdownT)), me, ch, pk };
     if (g.gm) msg.gm = g.gm.netState();
@@ -881,7 +881,7 @@ function sanitize(a) {
   const cmd = {
     s, dt: clamp(dt, 0.001, 0.05), mx: clamp(mx, -1, 1), my: clamp(my, -1, 1),
     y: ((y % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI, p: clamp(p, -1.5, 1.5),
-    sp: !!(bits & 1), cr: !!(bits & 2), j: !!(bits & 4), sl: !!(bits & 8), f: !!(bits & 16), ads: !!(bits & 32), tac: !!(bits & 64), u: !!(bits & 128),
+    sp: !!(bits & 1), cr: !!(bits & 2), j: !!(bits & 4), sl: !!(bits & 8), f: !!(bits & 16), ads: !!(bits & 32), tac: !!(bits & 64), u: !!(bits & 128), pr: !!(bits & 256),
     a: null, v: fin(v) ? v : null, gk: fin(gk) ? clamp(gk, 0, GRENADE.fuse) : 0,
   };
   if (Array.isArray(acts)) cmd.a = acts.slice(0, 4).filter(x => ACTIONS.includes(x));
@@ -923,7 +923,7 @@ export class GuestSession {
       cmd.s = ++this.seq;
       this.pending.push({ cmd, adsT: c.adsT });
       if (this.pending.length > 120) this.pending.shift();
-      const bits = (cmd.sp ? 1 : 0) | (cmd.cr ? 2 : 0) | (cmd.j ? 4 : 0) | (cmd.sl ? 8 : 0) | (cmd.f ? 16 : 0) | (cmd.ads ? 32 : 0) | (cmd.tac ? 64 : 0) | (cmd.u ? 128 : 0);
+      const bits = (cmd.sp ? 1 : 0) | (cmd.cr ? 2 : 0) | (cmd.j ? 4 : 0) | (cmd.sl ? 8 : 0) | (cmd.f ? 16 : 0) | (cmd.ads ? 32 : 0) | (cmd.tac ? 64 : 0) | (cmd.u ? 128 : 0) | (cmd.pr ? 256 : 0);
       this.outbox.push([cmd.s, r3(cmd.dt), r3(cmd.mx), r3(cmd.my), r3(cmd.y), r3(cmd.p), bits, cmd.a || 0, r3(this.viewTime()), cmd.gk ? r2(cmd.gk) : 0]);
     }
     this.sendT -= dt;
@@ -999,7 +999,7 @@ export class GuestSession {
         let b = this.buf.get(p.id);
         if (!b) this.buf.set(p.id, b = []);
         if (b.length && b[b.length - 1].tm >= m.tm) continue;
-        b.push({ tm: m.tm, x: e[1], y: e[2], z: e[3], yaw: e[4], pitch: e[5], vx: e[6], vy: e[7], vz: e[8], fl: e[9], cr: e[10], cur: e[11] ? 1 : 0, rp: e[12], hp: e[13] });
+        b.push({ tm: m.tm, x: e[1], y: e[2], z: e[3], yaw: e[4], pitch: e[5], vx: e[6], vy: e[7], vz: e[8], fl: e[9], cr: e[10], cur: e[11] ? 1 : 0, rp: e[12], hp: e[13], pr: +e[14] || 0 });
         if (b.length > 30) b.shift();
         p.netSeen = t;
       }
@@ -1026,7 +1026,7 @@ export class GuestSession {
 
   reconcile(me, ack) {
     const g = this.game, c = g.player, ctl = g.playerCtl;
-    const [x, y, z, vx, vy, vz, fl, cr, sl, hp, cur, m0, r0, m1, r1, gr, sdx, sdz] = me;
+    const [x, y, z, vx, vy, vz, fl, cr, sl, hp, cur, m0, r0, m1, r1, gr, sdx, sdz, pr] = me;
     const alive = !!(fl & 4);
     while (this.pending.length && this.pending[0].cmd.s <= ack) this.pending.shift();
     c.health = clamp(hp, 0, PLAYER.maxHealth);
@@ -1044,7 +1044,7 @@ export class GuestSession {
 
     // rewind to the host's state, then re-apply the inputs it hasn't seen yet
     const oldX = c.pos.x, oldY = c.pos.y, oldZ = c.pos.z;
-    const keepAds = c.adsT, keepCrouch = c.wantCrouch, keepSprint = c.sprinting;
+    const keepAds = c.adsT, keepCrouch = c.wantCrouch, keepProne = c.wantProne, keepSprint = c.sprinting;
     const keepFuel = c.tacFuel, keepIdle = c.tacIdle, keepTac = c.tacSprinting; // our own charge is predicted locally
     const keepStep = c.stepOff || 0; // the replay mustn't stack stair-camera easing
     c.pos.set(x, y, z);
@@ -1052,7 +1052,8 @@ export class GuestSession {
     c.onGround = !!(fl & 1);
     c.sprinting = !!(fl & 2);
     c.crouchT = cr;
-    c.height = lerp(PLAYER.height, PLAYER.crouchHeight, cr);
+    c.proneT = +pr || 0;
+    c.height = lerp(lerp(PLAYER.height, PLAYER.crouchHeight, cr), PLAYER.proneHeight, c.proneT);
     c.slideT = sl;
     if (sl > 0) c.slideDir.set(sdx, 0, sdz);
     g.audio.muted = true;
@@ -1061,13 +1062,13 @@ export class GuestSession {
       const sy = Math.sin(cmd.y), cy = Math.cos(cmd.y);
       _wish.set(-sy * cmd.my + cy * cmd.mx, 0, -cy * cmd.my - sy * cmd.mx);
       if (_wish.lengthSq() > 1) _wish.normalize();
-      c.wantCrouch = cmd.cr;
+      c.wantCrouch = cmd.cr; c.wantProne = !!cmd.pr;
       c.adsT = p.adsT;
       c.updateMovement(cmd.dt, _wish, !!cmd.sp, !!cmd.j, !!cmd.sl, !!cmd.tac);
     }
     c.tacFuel = keepFuel; c.tacIdle = keepIdle; c.tacSprinting = keepTac; c.stepOff = keepStep;
     g.audio.muted = false;
-    c.adsT = keepAds; c.wantCrouch = keepCrouch;
+    c.adsT = keepAds; c.wantCrouch = keepCrouch; c.wantProne = keepProne;
     if (!this.pending.length) c.sprinting = keepSprint && c.sprinting;
     const dx = oldX - c.pos.x, dy = oldY - c.pos.y, dz = oldZ - c.pos.z;
     if (dx * dx + dy * dy + dz * dz < 9) ctl.correction.add(_v1.set(dx, dy, dz));
@@ -1255,7 +1256,8 @@ export class GuestSession {
       c.yaw = angLerp(A.yaw, B.yaw, k);
       c.pitch = lerp(A.pitch, B.pitch, k);
       c.crouchT = lerp(A.cr, B.cr, k);
-      c.height = lerp(PLAYER.height, PLAYER.crouchHeight, c.crouchT);
+      c.proneT = lerp(A.pr, B.pr, k);
+      c.height = lerp(lerp(PLAYER.height, PLAYER.crouchHeight, c.crouchT), PLAYER.proneHeight, c.proneT);
       c.sprinting = !!(A.fl & 2);
       c.tacSprinting = !!(A.fl & 16);
       c.onGround = !!(A.fl & 4);

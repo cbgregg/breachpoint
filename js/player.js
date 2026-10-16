@@ -79,7 +79,7 @@ export class PlayerController {
     this.flashT = 0; this.shake = 0; this.landDip = 0; this.wasGround = true;
     this.recoilDebt = 0; this.lastShotT = -9;
     this.breathT = 0; this.prevSwayYaw = 0; this.prevSwayPitch = 0;
-    this.crouchToggle = false; this.padSprint = false;
+    this.crouchToggle = false; this.padSprint = false; this.proneOn = false; this.crouchHeldT = 0;
     this.assist = { target: null, yaw: 0, pitch: 0, snapT: 0, wasAds: false };
     this.cycleT = 0; // bolt / pump cycle after a shot
     this.correction = new THREE.Vector3(); // smooths network position corrections (camera only)
@@ -271,15 +271,25 @@ export class PlayerController {
     let slideReq = false;
     const crouchPress = inp.action('crouch'), slidePress = inp.action('slide');
     if ((crouchPress || slidePress) && c.sprinting && c.onGround) slideReq = true;
-    else if (crouchPress) this.crouchToggle = !this.crouchToggle;
-    if (sprint && !c.sprinting) this.crouchToggle = false;
+    else if (crouchPress) {
+      if (this.proneOn) { this.proneOn = false; this.crouchToggle = true; }   // prone -> crouch
+      else this.crouchToggle = !this.crouchToggle;
+    }
+    // prone: hold crouch (C / B on a controller) for a moment, or press Z
+    const crouchHeld = inp.down('KeyC') || inp.padHeld('crouch');
+    this.crouchHeldT = crouchHeld && !c.sprinting && c.slideT <= 0 ? this.crouchHeldT + dt : 0;
+    if (this.crouchHeldT > 0.32 && !this.proneOn && this.crouchHeldT - dt <= 0.32) { this.proneOn = true; this.crouchToggle = false; }
+    if (inp.action('prone')) { this.proneOn = !this.proneOn; if (!this.proneOn) this.crouchToggle = true; else this.crouchToggle = false; }
+    if (sprint && !c.sprinting) { this.crouchToggle = false; if (this.proneOn && f > 0.4) this.proneOn = false; }   // sprint gets you up
     c.wantCrouch = this.crouchToggle || inp.down('ControlLeft');
-    const jump = canAct && (inp.down('Space') || inp.action('jump'));
+    c.wantProne = this.proneOn && c.alive;
+    let jump = canAct && (inp.down('Space') || inp.action('jump'));
+    if (jump && this.proneOn) { this.proneOn = false; this.crouchToggle = true; c.wantProne = false; c.wantCrouch = true; jump = false; }
     if (jump) this.crouchToggle = false;
     c.updateMovement(dt, _wish, sprint, jump, slideReq && canAct, tac);
     // the exact command that produced this frame's movement (sent to the host when playing online)
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
-    this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, tac: tac ? 1 : 0, cr: c.wantCrouch ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
+    this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, tac: tac ? 1 : 0, cr: c.wantCrouch ? 1 : 0, pr: c.wantProne ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
     if (!this.wasGround && c.onGround) this.landDip = 1;
     this.wasGround = c.onGround;
 
@@ -428,7 +438,7 @@ export class PlayerController {
     this.kickRot = 1;
     this.flashT = 0.045;
     this.lastShotT = this.game.time;
-    const rm = (1 - 0.35 * c.adsT) * (c.crouchT > 0.5 ? 0.75 : 1);
+    const rm = (1 - 0.35 * c.adsT) * (c.proneT > 0.6 ? 0.6 : c.crouchT > 0.5 ? 0.75 : 1);
     const climb = def.recoilPitch * rm * (0.85 + Math.random() * 0.3);
     c.pitch += climb;
     this.recoilDebt = Math.min(0.25, this.recoilDebt + climb * 0.65);
