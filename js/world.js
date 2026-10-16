@@ -282,12 +282,12 @@ const PIONEER_CENTER = [
   // ---- the Sinking Ship garage on the wedge between James St and Yesler
   [0, 0, 0, 0, 12, 0, 'flatiron', { pts: PS_GARAGE, prow: 0 }],
   // ---- west of 1st Ave: the Mutual Life Building on the corner, more brick blocks, an alley, a café
-  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8 }],
-  [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true }],
+  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8, shop: { e: [['d', -3.5], ['w', 1], ['d', 4.5]], n: [['d', -4.5], ['w', 0.5], ['d', 5]], w: [['d', 2]], s: [['w', 3]], props: [['table', -3, -2], ['table', 3, 2.5], ['bar', -3.5, -5.2, 0], ['crates', 5.5, 5], ['shelf', 1, -5, 1]], light: 1 } }],   // Mutual Life Building: a café on the ground floor
+  [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true, shop: { e: [['d', -6], ['w', 0], ['d', 6]], n: [['d', 0]], w: [['d', 4]], props: [['shelf', -3, -5, 0], ['shelf', 3, -1, 0], ['shelf', -3, 3, 0], ['crates', 4.5, 6.5], ['table', 2, -7]], light: 1 } }],   // a bookshop: rows of shelves
   [-31, -15, 9, 5, 3.6, 0, 'house', { s: [['d', 1.5]], n: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['table', 0, 0], ['shelf', 3, 1.5, 0]], light: 1 }],
-  [-34.5, 33.5, 17, 13, 15, 0, 'brick'],
+  [-34.5, 33.5, 17, 13, 15, 0, 'brick', { shop: { s: [['d', -4.5], ['w', 0], ['d', 4.5]], e: [['d', 0]], w: [['d', -2]], props: [['table', -3, 1.5], ['table', 3, 2], ['bar', 0, 4.5, 0], ['crates', -6, -3.5]], light: 1 } }],   // a saloon
   // ---- south of Yesler: the corner block, the tavern (bomb site B), Occidental's pedestrian mall, one more block
-  [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890 }],
+  [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890, shop: { s: [['d', -3.5], ['w', 1], ['d', 4.5]], w: [['d', -2.5], ['w', 2.5]], e: [['d', 2]], props: [['shelf', -2, 1, 0], ['table', 3, 3.5], ['crates', -5, 4.5], ['shelf', 4, -2, 1]], light: 1 } }],
   [18, 33.5, 10, 11, 3.8, 0, 'house', { n: [['d', -2], ['w', 2.2]], e: [['d', 1.5]], w: [['d', 0]], s: [['w', 0]], props: [['table', -2, 1.5], ['table', 2, 2.5], ['shelf', 3.4, -3.2, 0]], light: 1 }],
   [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 29.5, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
   [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
@@ -870,9 +870,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   };
   const buildHouse = (cx, cz, w, d, h, y0, spec, team) => {
     const T = 0.3;
-    const brick = rnd() < 0.3;
-    const wallMat = brick ? M.brick : M.plaster;
-    const tint = brick ? 0xf2e6dc : plasterTints[Math.floor(rnd() * plasterTints.length)];
+    const brick = spec.stone ? true : rnd() < 0.3;
+    const wallMat = spec.stone ? M.stone : brick ? M.brick : M.plaster;
+    const tint = spec.stone ? 0xa79d8c : brick ? 0xf2e6dc : plasterTints[Math.floor(rnd() * plasterTints.length)];
     const inner = 0xece6da;
     const sides = [
       { k: 'n', ax: 1, az: 0, nx: 0, nz: 1, len: w, ox: cx, oz: cz + d / 2 - T / 2 },
@@ -889,6 +889,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const bw = S.ax ? L : T, bd = S.az ? L : T;
         solid(x, z, bw, bd, y2 - y1, y0 + y1, brick ? 'brick' : 'concrete');
         put(flatBox(bw, y2 - y1, bd, scaleOf(wallMat), 0.012), wallMat, x, y0 + y1 + (y2 - y1) / 2, z, 0, { tint, grime: 0.45, base: y0 });
+        if (spec.stone) put(flatBox(S.ax ? L : 0.02, y2 - y1, S.az ? L : 0.02, scaleOf(M.brick)), M.brick, x - S.nx * (T / 2 + 0.012), y0 + y1 + (y2 - y1) / 2, z - S.nz * (T / 2 + 0.012), 0, { tint: 0xe8a888, grime: 0.15, base: y0 });
         if (y1 === 0 && L > 0.3) {
           // a darker rendered plinth along the foot of the outside wall
           const ox = S.nx * (T / 2 + 0.03), oz = S.nz * (T / 2 + 0.03);
@@ -958,9 +959,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     // floor
     const fl = new THREE.PlaneGeometry(w - 2 * T, d - 2 * T);
     const center = cx === 0 && cz === 0 && M.centerFloor;
-    const flMat = center ? M.centerFloor : M.houseFloor || M.tile, flS = center ? 3.2 : M.houseFloor ? 2.2 : 1.6;
+    const flMat = spec.stone ? M.wood : center ? M.centerFloor : M.houseFloor || M.tile, flS = spec.stone ? 1.4 : center ? 3.2 : M.houseFloor ? 2.2 : 1.6;
     const uv = fl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w - 2 * T) / flS, uv.getY(i) * (d - 2 * T) / flS);
-    put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
+    put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: spec.stone ? 0xd2a070 : flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
     // a corkboard of maps and notes on the back wall of the big halls (CC-BY 4.0, "Corkboard" by XIN)
     if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.04, Math.PI, { grime: 0, cast: false });
     // props
@@ -982,6 +983,17 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const o = (i - 1) * (along ? 0.55 : 0) , q = (i - 1) * (along ? 0 : 0.55);
           put(flatBox(along ? 0.45 : 0.4, 0.42 + rnd() * 0.15, along ? 0.4 : 0.45, 0), M.paint, px + o, y0 + yy + 0.25, pz + q, 0, { grime: 0.1, tint: [0xb8a27a, 0x8a7458, 0x4d5536, 0xd8d0b8][Math.floor(rnd() * 4)] });
         }
+      } else if (k === 'bar') {
+        // a long wooden bar with a brass foot rail, bottles on the back shelf and stools
+        const along = !rot, L = 4.2, bw2 = along ? L : 0.7, bd2 = along ? 0.7 : L;
+        solid(px, pz, bw2, bd2, 1.1, y0, 'wood');
+        put(flatBox(bw2, 1.05, bd2, 1.2), M.wood, px, y0 + 0.525, pz, 0, { grime: 0.1, tint: 0x6a4a30 });
+        put(flatBox(bw2 + 0.1, 0.06, bd2 + 0.15, 1.2), M.wood, px, y0 + 1.08, pz, 0, { grime: 0, tint: 0x8a6440 });
+        for (let i = 0; i < 9; i++) {
+          const t = -L / 2 + 0.3 + i * (L - 0.6) / 8;
+          put(new THREE.CylinderGeometry(0.035, 0.04, 0.28, 8), M.glass, px + (along ? t : 0.12), y0 + 1.25, pz + (along ? 0.12 : t), 0, { grime: 0, tint: [0x5a8a4a, 0xa86a2a, 0xd8d2c0][i % 3] });
+          if (i % 2 === 0) { const sx = px + (along ? t : -0.75), sz = pz + (along ? -0.75 : t); put(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), M.wood, sx, y0 + 0.75, sz, 0, { grime: 0, tint: 0x5a3a24 }); put(new THREE.CylinderGeometry(0.03, 0.03, 0.72, 6), M.metal, sx, y0 + 0.36, sz, 0, { grime: 0 }); }
+        }
       } else if (k === 'crates') {
         solid(px, pz, 1.2, 1.2, 1.2, y0, 'wood');
         put(flatBox(1.2, 1.2, 1.2, 1.2), M.wood, px, y0 + 0.6, pz, rnd() * 0.2, { grime: 0.2, tint: 0xcfb08a, base: y0 });
@@ -992,7 +1004,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4), M.dark, cx, y0 + h - 0.3, cz, 0, { grime: 0, cast: false });
     put(new THREE.SphereGeometry(0.06, 10, 8), M.bulb, cx, y0 + h - 0.65, cz, 0, { grime: 0, cast: false });
     glows.push([cx, y0 + h - 0.65, cz, 0.45]);
-    if (spec.light) { const L = new THREE.PointLight(0xffc68a, 5, 9, 1.6); L.position.set(cx, y0 + h - 0.8, cz); L.userData.mapLight = true; group.add(L); }
+    if (spec.light) { const L = new THREE.PointLight(0xffc68a, spec.stone ? 9 : 5, spec.stone ? 12 : 9, 1.6); L.position.set(cx, y0 + h - 0.8, cz); L.userData.mapLight = true; group.add(L); }
+    if (spec.stone) for (const [fx2, fz2] of [[-0.3, -0.3], [0.3, 0.3], [-0.3, 0.3], [0.3, -0.3]]) {
+      // shop pendants: green enamel shades over warm bulbs
+      const lx = cx + fx2 * w, lz = cz + fz2 * d;
+      put(new THREE.CylinderGeometry(0.006, 0.006, 0.8, 4), M.dark, lx, y0 + h - 0.4, lz, 0, { grime: 0, cast: false });
+      put(new THREE.ConeGeometry(0.28, 0.22, 14, 1, true), M.paint, lx, y0 + h - 0.85, lz, 0, { tint: 0x2f5a3a, grime: 0 });
+      put(new THREE.SphereGeometry(0.07, 10, 8), M.bulb, lx, y0 + h - 0.95, lz, 0, { grime: 0, cast: false });
+      glows.push([lx, y0 + h - 0.95, lz, 0.5]);
+    }
   };
 
   // sandbag: a pillowy bag that pinches at the ends, so rows nest into each other
@@ -1256,6 +1276,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const o = extra || {};
         const fp = [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2];
         const lids = SOLID_LIDS.filter(r => overlaps(r, fp));
+        const G = 4.4;                                         // ground floor height
+        if (o.shop) {
+          // enterable ground floor: stone walls with doorways and open windows, a shop inside; solid floors above
+          buildHouse(cx, cz, w, d, G, y0, { ...o.shop, stone: true }, team);
+          solid(cx, cz, w, d, h - G - 0.25, y0 + G + 0.25, 'brick');
+        } else
         for (const [a, b, c, e] of rectsMinus(fp, lids)) solid((a + c) / 2, (b + e) / 2, c - a, e - b, h, y0, 'brick');
         for (const r of lids) {
           const a = Math.max(r[0], fp[0]), b = Math.max(r[1], fp[1]), c = Math.min(r[2], fp[2]), e = Math.min(r[3], fp[3]);
@@ -1264,8 +1290,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const stoneBody = o.stone || rnd() < 0.25;
         const wallMat = stoneBody ? M.stone : M.brick;
         const tint = o.tint ?? (stoneBody ? 0xe0d6c4 : [0xffffff, 0xe9c6a8, 0xf2d9c0, 0xd8a890][Math.floor(rnd() * 4)]);
-        const G = 4.4;                                         // ground floor height
-        B(M.stone, w + 0.12, G, d + 0.12, cx, y0, cz, 0, { tint: 0xa79d8c, grime: 0.55 });
+        if (!o.shop) B(M.stone, w + 0.12, G, d + 0.12, cx, y0, cz, 0, { tint: 0xa79d8c, grime: 0.55 });
         B(wallMat, w, h - G, d, cx, y0 + G, cz, 0, { tint, grime: 0.5, base: y0 + G });
         B(M.stone, w + 0.5, 0.35, d + 0.5, cx, y0 + G - 0.1, cz, 0, { tint: 0xc9bfae, grime: 0.15, base: y0 + G });       // belt course
         B(M.stone, w + 0.9, 0.55, d + 0.9, cx, y0 + h - 0.55, cz, 0, { tint: 0xc9bfae, grime: 0.2, base: y0 + h - 1 });   // cornice
@@ -1281,7 +1306,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             // pilasters between bays
             if (i > 0) put(flatBox(0.42, h - G - 0.9, 0.16, scaleOf(wallMat)), wallMat, fx(t - bw / 2, 0.06), y0 + G + (h - G - 0.9) / 2, fz(t - bw / 2, 0.06), ry, { tint, grime: 0.35, base: y0 + G });
             // ground floor: shopfront glass or a stone-arched entrance, with a striped awning now and then
-            if (i === Math.floor(bays / 2) && L > 9) {
+            if (o.shop) {
+              if (rnd() < 0.5) put(new THREE.PlaneGeometry(bw - 0.6, 1.4, 4, 2), M.cloth, fx(t, 0.75), y0 + 3.4, fz(t, 0.75), ry, { rx: -Math.PI / 2 + 0.55, tint: [0x8a2f2a, 0x2f5a3a, 0x9c7a3a, 0x3d4f63][Math.floor(rnd() * 4)], grime: 0 });
+            } else if (i === Math.floor(bays / 2) && L > 9) {
               put(flatBox(1.8, 3.0, 0.05, 0), M.dim, fx(t, 0.02), y0 + 1.5, fz(t, 0.02), ry, { grime: 0 });
               put(new THREE.TorusGeometry(1.15, 0.22, 6, 18, Math.PI), M.stone, fx(t, 0.1), y0 + 3.0, fz(t, 0.1), ry, { grime: 0.2, tint: 0xb9ae9c });
             } else {
