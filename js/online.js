@@ -198,8 +198,8 @@ export class Lobby {
   // u: account id (signed matches only), so players can add each other from Recent Players
   lobbyList() {
     const me = this.account && this.account.enabled && this.account.user ? this.account.user.id : '';
-    const list = [{ n: this.hostName, tm: this.hostTeam, h: 1, u: me }];
-    for (const p of this.players.values()) list.push({ n: p.name, tm: p.team, h: 0, u: p.uid || '' });
+    const list = [{ n: this.hostName, tm: this.hostTeam, h: 1, u: me, x: this.myXp | 0 }];
+    for (const p of this.players.values()) list.push({ n: p.name, tm: p.team, h: 0, u: p.uid || '', x: p.xp | 0 });
     return list;
   }
 
@@ -406,7 +406,7 @@ export class Lobby {
       try { tk = await this.account.ticket(code); } catch (e) { this.lastError = e.message; }
       if (this.role !== 'guest' || this.code !== code || this.hostId) return;
     }
-    this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary, tk, w: this.joinWith || '' }, id);
+    this.net.send({ t: 'hello', v: PROTO, name: this.myName, primary: this.myPrimary, x: this.myXp | 0, tk, w: this.joinWith || '' }, id);
   }
 
   peerLeave(id) {
@@ -459,7 +459,7 @@ export class Lobby {
         if (this.players.has(id) || this.pending.has(id)) return;
         if (m.v !== PROTO) { this.net.send({ t: 'lobby', st: 'version' }, id); return; }
         if (this.players.size + 1 >= MAX_HUMANS) { this.net.send({ t: 'lobby', st: 'full' }, id); return; }
-        const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str, w: typeof m.w === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(m.w) ? m.w : '' };
+        const p = { peerId: id, name: cleanName(m.name), primary: parseLoadout(m.primary).str, xp: Math.max(0, Math.min(1e7, m.x | 0)), w: typeof m.w === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(m.w) ? m.w : '' };
         if (this.account && this.account.enabled) {
           // accounts are on: only players with a valid pass for this code get in, under their account Name Tag
           if (this.checking.has(id)) return;
@@ -513,7 +513,7 @@ export class Lobby {
         else if (st === 'accepted') {
           this.status = this.game.mode === 'guest' && this.game.live ? 'ingame' : 'accepted';
           if (this.quickMode && !this.public) { this.public = true; this.board.close(); clearTimeout(this.quickTimer); }
-          if (Array.isArray(m.ps)) this.roster = m.ps.slice(0, MAX_HUMANS).map(p => ({ n: cleanName(p && p.n), tm: p && p.tm === 1 ? 1 : 0, h: p && p.h ? 1 : 0, u: p && typeof p.u === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(p.u) ? p.u : '' }));
+          if (Array.isArray(m.ps)) this.roster = m.ps.slice(0, MAX_HUMANS).map(p => ({ n: cleanName(p && p.n), tm: p && p.tm === 1 ? 1 : 0, h: p && p.h ? 1 : 0, x: Math.max(0, Math.min(1e7, (p && p.x) | 0)), u: p && typeof p.u === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(p.u) ? p.u : '' }));
           const inf = m.info;
           this.info = inf && typeof inf === 'object' ? { m: String(inf.m || '').slice(0, 12), map: String(inf.map || '').slice(0, 12), n: Math.max(1, Math.min(8, inf.n | 0)), b: inf.b !== 0, ff: !!inf.ff } : null;
           this.hostInGame = !!m.ig;
