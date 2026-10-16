@@ -236,126 +236,115 @@ const SHURAN_PICKUPS = [
 // pole and plane trees in the middle, streetcar avenues either side, Romanesque brick blocks beyond. Bomb site
 // A is down in the Underground (the old street level beneath the Pioneer Building, reached by two stairwells);
 // site B is inside the corner tavern.
+// ---------- Pioneer Square, on the real street plan ----------
+// Game axes: +x east, +z south. 1st Avenue runs north-south (x -22..-8 curb to curb), Yesler Way east-west
+// (z 8..22). Pioneer Place is the triangle east of 1st Ave and north of Yesler; its east side is the old street
+// in front of the Pioneer Building, which stands at the downtown grid's angle (32 degrees) on the NE corner of
+// 1st & James. James St leaves the plaza's south-east corner at the same angle, uphill to the ENE, between the
+// Pioneer Building and the "Sinking Ship" garage on the old Seattle Hotel's wedge. The pergola stands at the
+// plaza's south end over the stairs down to the Underground, which runs beneath the sidewalk (bomb site A).
+// Smith Tower rises up Yesler to the east.
+const PS_A = 32 * Math.PI / 180;
+const PS_D = [Math.cos(PS_A), -Math.sin(PS_A)];            // along James St (ENE)
+const PS_U = [-Math.sin(PS_A), -Math.cos(PS_A)];           // along the Pioneer Building's plaza front (NNW)
+const PS_V = [20, 4];                                       // plaza's south-east corner: James St's south curb meets Yesler's sidewalk
+const psAt = (s, t, o = PS_V) => [o[0] + PS_U[0] * s + PS_D[0] * t, o[1] + PS_U[1] * s + PS_D[1] * t];
+const PS_B0 = psAt(14, 2);                                  // Pioneer Building's plaza / James corner (3 m sidewalk, 2 m forecourt)
+const PS_JAMES = psAt(5.5, 0);                              // James St centre line where it meets the plaza
+const PS_XF = (o) => ({ x: o[0], z: o[1], a: PS_A });
+// garage wedge: James St's south sidewalk line (3 m off the curb) down to Yesler's sidewalk, east to the map edge
+const PS_SW = [PS_V[0] - PS_U[0] * 3, PS_V[1] - PS_U[1] * 3];
+const psSouthWalk = (x) => PS_SW[1] - (x - PS_SW[0]) * Math.tan(PS_A);
+const PS_GARAGE = [[PS_SW[0] + (PS_SW[1] - 4) / Math.tan(PS_A), 4], [42, 4], [42, psSouthWalk(42)]];
+const psHyp = (z) => PS_V[0] + (z - PS_V[1]) * Math.tan(PS_A); // the plaza's east edge (x) at a given z
 const PIONEER_CENTER = [
-  [0, 0, 20, 16, 0, 0, 'paving'],
-  [-1, -3, 11, 4.2, 3.8, 0, 'pergola'],
-  [5.5, 3.5, 0.9, 0.9, 9, 0, 'totem'], [5.5, 3.5, 3, 3, 0.9, 0, 'railing', { open: 'w' }],
-  [-3, -7.2, 2.2, 1.6, 2.6, 0, 'kiosk'],
-  [7.6, 5.4, 1.3, 1.3, 0.75, 0, 'planter'], [-8.6, 2.6, 1.3, 1.3, 0.75, 0, 'planter'], [1.5, -9.8, 1.3, 1.3, 0.75, 0, 'planter'], [-1.5, 9.8, 1.3, 1.3, 0.75, 0, 'planter'],
-  [-6.5, 4.5, 0, 0, 9, 0, 'tree'], [2, 6.5, 0, 0, 10, 0, 'tree'], [7, -5.5, 0, 0, 9, 0, 'tree'], [-8, -6, 0, 0, 8.5, 0, 'tree'],
-  [-4, 1.2, 1.8, 0.6, 0.95, 0, 'bench'], [3, -0.6, 1.8, 0.6, 0.95, 0, 'bench'], [-2.5, 6.6, 1.8, 0.6, 0.95, 0, 'bench'],
-  [8.8, 0.5, 0, 0, 0, 0, 'vlamp'], [-8.8, -0.5, 0, 0, 0, 0, 'vlamp'], [0.5, 7.6, 0, 0, 0, 0, 'vlamp'], [-0.5, -7.6, 0, 0, 0, 0, 'vlamp'],
-  // one-off cover so the plaza isn't a shooting gallery; each side reads differently
-  [-5, -1.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [3.5, 0.8, 2.4, 0.9, 0.9, 0, 'stall', 1],
-  [0.5, 3.2, 1.6, 1.6, 1.6, 0, 'crate'], [0.6, 3.2, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [8.5, 11.5, 4.4, 2.0, 1.45, 0, 'car', 0], [-8.5, -11.5, 4.4, 2.0, 1.45, 0, 'car', 1],
-  [-3, 12, 2, 2.5, 1.8, 0, 'crate'], [3, -12, 0.8, 3, 1.1, 0, 'sand'],
-  [-24, 31, 4.4, 2.0, 1.45, 0, 'car', 1], [25, -32, 4.4, 2.0, 1.45, 0, 'car', 0],
-  [-40, -9, 1.6, 1.6, 1.6, 0, 'crate'], [39, 9.5, 2, 2, 1.2, 0, 'pallet'],
-  [-4, 15, 2.4, 0.9, 0.9, 0, 'stall', 0], [5, -15, 2.4, 0.9, 0.9, 0, 'stall', 1],
-  [-7.5, 25, 1.6, 1.6, 1.6, 0, 'crate'], [7.5, -25, 2, 2, 1.2, 0, 'pallet'],
-  [3, 30, 4.4, 2.0, 1.45, 0, 'car', 0], [-3, -28, 0.8, 3, 1.1, 0, 'sand'],
-  [-9, 9.5, 0.8, 3, 1.1, 0, 'sand'], [9.5, -9.5, 1.6, 1.6, 1.6, 0, 'crate'],
-  // the old comfort station and a cigar store either side of the plaza (one-off)
-  [-2, 21, 8, 6, 3.4, 0, 'house', { s: [['d', 1.5], ['w', -2]], n: [['d', -1.5]], e: [['w', 0]], w: [['d', 0]], props: [['table', 0.5, 0], ['shelf', -2.5, 1.6, 0]], light: 1 }],
-  [4, -20, 6, 8, 3.4, 0, 'house', { n: [['d', 0]], s: [['d', 1]], e: [['d', -1.5]], w: [['w', 1.5]], props: [['crates', 1.4, 2.4], ['shelf', 0, -1.5, 1]] }],
-  [-6, -12.5, 1.6, 1.6, 1.6, 0, 'crate'], [6.5, 12.5, 0.62, 0.62, 0.9, 0, 'barrel'],
-  // Smith Tower on the skyline to the north
-  [96, 13, 12, 12, 62, 0, 'tower'],
-];
-const PIONEER_HALF = [
-  // ---- the Pioneer Building, and the Underground beneath it (bomb site A)
-  [27, 22, 11, 12, 21, 0, 'brick', { tower: true }],
-  [27, 22, 11, 6, 3.24, 0, 'tunnel', { gaps: [['w', 0, 2.4], ['e', 0, 2.4]] }],
-  [18.25, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: 1 }],
-  [35.75, 22, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: -1 }],
-  // ---- mid block and the corner tavern (bomb site B), split by a narrow alley
-  [28, 4.5, 12, 7, 12, 0, 'garage'],
-  [28, -6, 10, 7, 3.6, 0, 'house', { n: [['d', -2.5], ['w', 1.5]], s: [['d', 2], ['w', -2]], e: [['d', 0]], w: [['d', 1], ['w', -1.6]], props: [['table', -2, -1.2], ['table', 2.2, 1.2], ['shelf', 3.4, -2.6, 0]], light: 1 }],
-  // ---- south row
-  [22, -22, 8, 12, 17, 0, 'brick', { stone: true }],
-  [31.5, -21, 7, 8, 3.4, 0, 'house', { n: [['d', 0]], w: [['d', 1.5]], e: [['d', -1.5]], s: [['w', 0]], props: [['crates', 1.8, 2], ['shelf', -1, -1.5, 1]] }],
-  [3.5, -34, 7, 8, 12, 0, 'brick'],
-  // ---- the avenue: streetcar tracks, a parked streetcar, wires, lamps, a newsstand
-  [12.5, 0, 1.6, 80, 0, 0, 'tracks'],
-  [12.5, -21, 2.4, 10, 3, 0, 'tram'],
-  [12.5, 0, 0, 0, 0, 0, 'cable', [12.5, -40, 6.2, 12.5, 40, 6.2]],
-  [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, 14, 6.4, 21.5, 14, 7]],
-  [12.5, 0, 0, 0, 0, 0, 'cable', [9.5, -14, 6.4, 21.5, -14, 7]],
-  [12.5, 0, 0, 0, 0, 0, 'cable', [21.5, 30, 8, 54, 34, 9]],
-  [19.8, 15.8, 0, 0, 0, 0, 'vlamp'], [19.8, -9.7, 0, 0, 0, 0, 'vlamp'], [10.2, 26, 0, 0, 0, 0, 'vlamp'], [19.8, 34, 0, 0, 0, 0, 'vlamp'],
-  [17.5, 6, 2.4, 0.9, 0.9, 0, 'stall', 1], [20.9, 2.5, 0.7, 0.5, 1, 0, 'aframe', 1], [20.7, -19, 0.7, 0.5, 1, 0, 'aframe', 3], [34.5, 17.3, 0.7, 0.5, 1, 0, 'aframe', 2],
-  [16.5, 30, 1.6, 1.6, 1.6, 0, 'crate'], [16.6, 30, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [17, -8, 0.8, 3, 1.1, 0, 'sand'],
-  [17.5, 38.6, 2, 2.5, 1.8, 0, 'crate'],
-  // ---- side streets: cover every 10-15 m so nothing is watched end to end
-  [25, 10.15, 4.4, 2.0, 1.45, 0, 'car', 0], [31.5, 10.15, 4.4, 2.0, 1.45, 0, 'car', 1],   // parked along Yesler
-  [31, -12.8, 2, 2.5, 1.8, 0, 'crate'],
-  [38.5, -12, 0.62, 0.62, 0.9, 0, 'barrel'], [39.2, -11.4, 0.62, 0.62, 0.9, 0, 'barrel', 1],
-  [22, -1.2, 0.62, 0.62, 0.9, 0, 'barrel'],
-  [30, 30.6, 4.4, 2.0, 1.45, 0, 'car', 1], [22.5, 30.6, 4.4, 2.0, 1.45, 0, 'car', 0],
-  [40, 30, 0.8, 3, 1.1, 0, 'sand'],
-  [23, 37.5, 2.4, 0.9, 0.9, 0, 'stall', 0],
-  [18, -36, 2, 2, 1.2, 0, 'pallet'],
-  [41, -24, 0.8, 3, 1.1, 0, 'sand'],
-  // ---- extra breakers on the long lines (side streets, sidewalks, the strip in front of spawn)
-  [36, 15.9, 1.6, 1.6, 1.6, 0, 'crate'], [36.1, 15.9, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [17.5, 17, 2, 2.5, 1.8, 0, 'crate'],
-  [42, 15.5, 0.8, 3, 1.1, 0, 'sand'],
-  [8, 38.6, 2.4, 0.9, 0.9, 0, 'stall', 1], [30, 38.6, 2, 2.5, 1.8, 0, 'crate'], [44, 38.5, 1.6, 1.6, 1.6, 0, 'crate'],
-  [10, 29.5, 0.8, 3, 1.1, 0, 'sand'],
-  [30, -27.5, 2, 2, 1.2, 0, 'pallet'], [14, -30, 1.6, 1.6, 1.6, 0, 'crate'],
-  [10.5, -5, 1.6, 1.6, 1.6, 0, 'crate'], [14.5, 30.5, 0.62, 0.62, 0.9, 0, 'barrel'],
-  [40, 2, 1.6, 1.6, 1.6, 0, 'crate'], [40.2, 2, 1.4, 1.4, 1.4, 1.6, 'crate'],
-  [41, -5.5, 0.8, 3, 1.1, 0, 'sand'],
-  [39.5, 20, 2.0, 4.4, 1.45, 0, 'car', 0],
-  [42, -31, 2, 2.5, 1.8, 0, 'crate'],
-  [39, 36, 0.8, 3, 1.1, 0, 'sand'],
-  [40, 8, 6, 6, 3.4, 0, 'house', { w: [['d', 1]], e: [['d', -1]], n: [['w', 0]], s: [['d', 0]], props: [['crates', 1.6, 1.6]] }],
-  [38, -36, 7, 6, 3.4, 0, 'house', { n: [['d', -1.5]], w: [['d', 0]], e: [['d', 0]], props: [['shelf', 1.5, 0, 1]] }],
-  [22, -12.5, 1.6, 1.6, 1.6, 0, 'crate'], [36, -2, 1.6, 1.6, 1.6, 0, 'crate'], [36, 28, 0.8, 3, 1.1, 0, 'sand'],
-  [44.5, 26, 1, 3, 3.5, 0, 'hesco'], [44.5, -27, 1, 3, 3.5, 0, 'hesco'],
-  // ---- spawn: staggered HESCO
-  [46, 18, 1, 4, 3.5, 0, 'hesco'],
-  [46, -2, 1, 4, 3.5, 0, 'hesco'],
-  [46, -20, 1, 4, 3.5, 0, 'hesco'],
-  [48, 8, 3, 1, 3.5, 0, 'hesco'],
-  [48, -12, 3, 1, 3.5, 0, 'hesco'],
-  [48, 28, 3, 1, 3.5, 0, 'hesco'],
-  [48, -30, 3, 1, 3.5, 0, 'hesco'],
-  [52, -6, 3, 1, 3.5, 0, 'hesco'],
-  [52, 14, 3, 1, 3.5, 0, 'hesco'],
-  [51, 34, 2, 2, 1.2, 0, 'ammo'],
+  // ---- Pioneer Place: granite paving (runs on under the building fronts), the Underground beneath its south edge
+  [8.5, -16.5, 25, 41, 0, 0, 'paving'],
+  [6.25, 3.5, 11.5, 6, 3.24, 0, 'tunnel', { lid: true, gaps: [['w', 0, 2.4], ['e', 0, 2.4]] }],
+  [-2.75, 3.5, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: 1 }],
+  [15.25, 3.5, 6.5, 2.4, 3.24, 0, 'stairdown', { dir: -1 }],
+  [3.5, 3.5, 4.2, 3.4, 0, 0, 'prism'], [9.2, 3.5, 4.2, 3.4, 0, 0, 'prism'],
+  [15.25, 3.5, 9, 4.4, 3.8, 0, 'pergola'],
+  // the totem pole, plane trees, benches, lamps, a few planters and the information kiosk
+  [1.5, -21, 1.0, 1.0, 15, 0, 'totem'], [1.5, -21, 3.2, 3.2, 0.9, 0, 'railing', { open: 's' }],
+  [-1.5, -6, 0, 0, 9, 0, 'tree'], [6.5, -6.5, 0, 0, 9.5, 0, 'tree'], [-1.5, -14, 0, 0, 10, 0, 'tree'], [5, -14.5, 0, 0, 9, 0, 'tree'], [-1.8, -27, 0, 0, 9, 0, 'tree'],
+  [2.2, -9.5, 1.8, 0.6, 0.95, 0, 'bench'], [-2.4, -19, 1.8, 0.6, 0.95, 0, 'bench'], [9.5, -1.8, 1.8, 0.6, 0.95, 0, 'bench'],
+  [-3.2, -2.5, 0, 0, 0, 0, 'vlamp'], [11, -5, 0, 0, 0, 0, 'vlamp'], [-3.2, -23, 0, 0, 0, 0, 'vlamp'], [4.5, -0.6, 0, 0, 0, 0, 'vlamp'],
+  [8.5, -10.5, 2.2, 1.6, 2.6, 0, 'kiosk'],
+  [1.5, -2, 1.3, 1.3, 0.75, 0, 'planter'], [-1, -31.5, 1.3, 1.3, 0.75, 0, 'planter'], [11.5, -0.5, 1.3, 1.3, 0.75, 0, 'planter'],
+  // cover in the plaza: a coffee cart, crates by the kiosk
+  [2.5, -15.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [5.2, -2.6, 1.6, 1.6, 1.6, 0, 'crate'],
+  // bollards across the end of James St, where it meets the plaza
+  ...[1.5, 3.4, 5.3, 7.2, 9.1].map(sp => { const [x, z] = psAt(sp, -0.5); return [x, z, 0, 0, 0, 0, 'bollard']; }),
+  // ---- the Pioneer Building (rotated to the downtown grid) and James St beside it
+  [15, -15.5, 30, 31, 24, 0, 'pioneerbldg', { xf: PS_XF(PS_B0) }],
+  [23, 0, 46, 11, 0, 0, 'droad', { xf: PS_XF(PS_JAMES), cross: true }],
+  // ---- the Sinking Ship garage on the wedge between James St and Yesler
+  [0, 0, 0, 0, 12, 0, 'flatiron', { pts: PS_GARAGE, prow: 0 }],
+  // ---- west of 1st Ave: the Mutual Life Building on the corner, more brick blocks, an alley, a café
+  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8 }],
+  [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true }],
+  [-31, -15, 9, 5, 3.6, 0, 'house', { s: [['d', 1.5]], n: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['table', 0, 0], ['shelf', 3, 1.5, 0]], light: 1 }],
+  [-34.5, 33.5, 17, 13, 15, 0, 'brick'],
+  // ---- south of Yesler: the corner block, the tavern (bomb site B), Occidental's pedestrian mall, one more block
+  [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890 }],
+  [18, 33.5, 10, 11, 3.8, 0, 'house', { n: [['d', -2], ['w', 2.2]], e: [['d', 1.5]], w: [['d', 0]], s: [['w', 0]], props: [['table', -2, 1.5], ['table', 2, 2.5], ['shelf', 3.4, -3.2, 0]], light: 1 }],
+  [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 29.5, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
+  [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
+  // ---- Yesler Way: parked cars, a streetcar at its stop, a work zone, sandbags
+  [-38, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-30, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [3, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [31, 10.5, 10, 2.4, 3, 0, 'tram'], [31, 10.5, 10, 1.6, 0, 0, 'tracks'],
+  [-1, 14.5, 3.2, 0.9, 1.1, 0, 'jersey'], [6, 16.5, 3.2, 0.9, 1.1, 0, 'jersey'], [2.5, 15.5, 1.6, 1.6, 1.6, 0, 'crate'],
+  [18, 19.5, 0.8, 3, 1.1, 0, 'sand'], [-40, 16, 2, 2, 1.2, 0, 'pallet'], [40, 17, 2, 2.5, 1.8, 0, 'crate'],
+  [-14.5, 26.5, 0.7, 0.5, 1, 0, 'aframe', 2], [-24.8, 2.5, 0.7, 0.5, 1, 0, 'aframe', 1],
+  // ---- 1st Avenue: parked cars both curbs, a delivery truck's crates, a work zone up north
+  [-21, -6, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, -20, 2.0, 4.4, 1.45, 0, 'car', 1], [-21, -30, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, 31, 2.0, 4.4, 1.45, 0, 'car', 0],
+  [-21, 34, 2.0, 4.4, 1.45, 0, 'car', 1],
+  [-15, -27, 0.9, 3.2, 1.1, 0, 'jersey'], [-13, -33, 1.6, 1.6, 1.6, 0, 'crate'], [-16.5, 29, 0.8, 3, 1.1, 0, 'sand'],
+  [-25, -21, 1.6, 1.6, 1.6, 0, 'crate'], [-5.5, -36.5, 2, 2, 1.2, 0, 'pallet'],
+  // ---- James St and the garage side
+  [32, -9.5, 2.0, 2.5, 1.8, 0, 'crate'], [27, 6.2, 0.62, 0.62, 0.9, 0, 'barrel'], [37.5, -12, 0.8, 3, 1.1, 0, 'sand'],
+  // ---- spawn lots at both ends (past the map's built edge): staggered HESCO
+  [46, 18, 1, 4, 3.5, 0, 'hesco'], [46, -2, 1, 4, 3.5, 0, 'hesco'], [46, -22, 1, 4, 3.5, 0, 'hesco'], [48, 30, 3, 1, 3.5, 0, 'hesco'], [48, -34, 3, 1, 3.5, 0, 'hesco'], [51, 8, 2, 2, 1.2, 0, 'ammo'],
+  [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
+  // ---- Smith Tower, up Yesler to the east
+  [96, -14, 12, 12, 62, 0, 'tower'],
   // ---- perimeter
-  [0, 40.5, 110, 1, 10, 0, 'boundary'],
-  [54.5, 0, 1, 82, 10, 0, 'boundary'],
+  [0, 40.5, 110, 1, 10, 0, 'boundary'], [0, -40.5, 110, 1, 10, 0, 'boundary'],
+  [54.5, 0, 1, 82, 10, 0, 'boundary'], [-54.5, 0, 1, 82, 10, 0, 'boundary'],
 ];
-// street grid (east half; mirrored): First Avenue with the streetcar line, three cross streets
+const PIONEER_HALF = [];
 const PIONEER_ROADS = [
-  [10, -37.4, 15, 37.4, 'z', { center: false, trees: [1], brick: [1] }],
-  [15, 9, 43, 15, 'x', { center: 'double', bike: 1, trees: [-1, 1], brick: [-1, 1] }],          // Yesler Way: bike lane, parked cars
-  [15, -15, 43, -10.5, 'x', { center: 'double', trees: [1] }],
-  [15, 29.5, 43, 36, 'x', { trees: [-1] }],
-  [15, -37, 34, -31, 'x'],
+  [-22, -40, -8, 40, 'z', { center: 'double', trees: [-1], brick: [-1] }],            // 1st Avenue
+  [-54, 8, 54, 22, 'x', { center: 'double', trees: [1], brick: [1] }],               // Yesler Way
 ];
-const PIONEER_SPAWNS = [[51, -34], [51, -24], [51, -16], [51, 0], [51, 10], [51, 22], [51, 30], [49, -8], [49, 4], [49, 16]];
+const PIONEER_SPAWNS = [[50, -34], [50, -26], [50, -16], [50, -6], [50, 2], [50, 12], [50, 20], [48, 27], [47, 35], [51, -1]];
 const PIONEER_PICKUPS = [
-  { type: 'health', pos: [0, 0, 9.5] },
-  { type: 'health', pos: [0, 0, -9.5] },
-  { type: 'health', pos: [25.5, -3.24, 20.8] },
-  { type: 'health', pos: [-25.5, -3.24, -20.8] },
-  { type: 'ammo', pos: [28, 0, -6] },
-  { type: 'ammo', pos: [-28, 0, 6] },
-  { type: 'ammo', pos: [31.5, 0, -21] },
-  { type: 'ammo', pos: [-31.5, 0, 21] },
-  { type: 'ammo', pos: [17, 0, 18] },
-  { type: 'ammo', pos: [-17, 0, -18] },
+  { type: 'health', pos: [1.5, 0, -11] },
+  { type: 'health', pos: [6.25, -3.24, 4.6] },
+  { type: 'health', pos: [-31, 0, -15] },
+  { type: 'health', pos: [29, 0, 33] },
+  { type: 'ammo', pos: [18, 0, 35] },
+  { type: 'ammo', pos: [-15, 0, 0.5] },
+  { type: 'ammo', pos: [33, 0, -2] },
+  { type: 'ammo', pos: [-34, 0, 26.5] },
+  { type: 'ammo', pos: [-2, 0, -33] },
 ];
+// bomb sites (both teams): A down in the Underground, B in the tavern on Yesler
+const PIONEER_SITES = [[6.25, 3.5, -3.24], [18, 34]];
+// the Underground as a second nav level, joined to the plaza by the two stairwells
+const PIONEER_LOWER = {
+  y: -3.24, bounds: { minX: 0, maxX: 12.5, minZ: 0, maxZ: 7 },
+  portals: [
+    { rect: [-6, 2.3, 0.5, 4.7], climb: [[-7, 0, 3.5], [-5.6, 0, 3.5], [-2.75, -1.62, 3.5], [0.2, -3.24, 3.5], [1.4, -3.24, 3.5]] },
+    { rect: [12, 2.3, 18.5, 4.7], climb: [[19.6, 0, 3.5], [18.2, 0, 3.5], [15.25, -1.62, 3.5], [12.3, -3.24, 3.5], [11.1, -3.24, 3.5]] },
+  ],
+};
 
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three market streets, tall blocks and alleys; both bomb sites inside the market halls', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 60, hz: 42 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
-  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: 'Old Seattle brick blocks around an iron pergola; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS, roadsMirror: true,
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_LOWER, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
 };
@@ -492,7 +481,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   scene.add(group);
   const rnd = seeded(1337);
 
+  // XF: a rotated local frame { x, z, a } (origin and yaw). While set, everything put / solid places is authored in
+  // that frame: pieces are turned and moved into place, and collision follows the turned footprint in thin strips.
+  let XF = null;
+  const xfPt = (x, z) => XF ? [XF.x + x * Math.cos(XF.a) + z * Math.sin(XF.a), XF.z - x * Math.sin(XF.a) + z * Math.cos(XF.a)] : [x, z];
   const put = (geo, mat, x, y, z, ry = 0, opts = {}) => {
+    if (XF) { [x, z] = xfPt(x, z); ry += XF.a; }
     _e.set(opts.rx || 0, ry, opts.rz || 0, 'YXZ');
     _q.setFromEuler(_e);
     _p.set(x, y, z);
@@ -502,9 +496,44 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     geo.dispose();
   };
   const B = (mat, w, h, d, x, y, z, ry = 0, opts = {}) => put(worldBox(w, h, d, scaleOf(mat)), mat, x, y + h / 2, z, ry, opts);
-  const solid = (cx, cz, w, d, h, y0 = 0, surface = 'concrete') => { const b = physics.addBox(new Box(cx - w / 2, y0, cz - d / 2, cx + w / 2, y0 + h, cz + d / 2)); b.surface = surface; return b; };
+  const solidAA = (cx, cz, w, d, h, y0 = 0, surface = 'concrete') => { const b = physics.addBox(new Box(cx - w / 2, y0, cz - d / 2, cx + w / 2, y0 + h, cz + d / 2)); b.surface = surface; return b; };
+  // a convex footprint (world x,z points) as axis-aligned strips: slabs along the longer axis, each as wide as the
+  // footprint within it. Returns a handle that sets a flag (navBlock, surface...) on every strip.
+  const solidPoly = (pts, h, y0, surface) => {
+    const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]);
+    const minx = Math.min(...xs), maxx = Math.max(...xs), minz = Math.min(...zs), maxz = Math.max(...zs);
+    const boxes = [];
+    if (maxx - minx < 1.2 && maxz - minz < 1.2) boxes.push(solidAA((minx + maxx) / 2, (minz + maxz) / 2, maxx - minx, maxz - minz, h, y0, surface));
+    else {
+      const alongZ = maxz - minz >= maxx - minx, A = alongZ ? 1 : 0, Bx = alongZ ? 0 : 1;
+      const lo = alongZ ? minz : minx, hi = alongZ ? maxz : maxx, n = Math.max(1, Math.ceil((hi - lo) / 0.4)), st = (hi - lo) / n;
+      for (let i = 0; i < n; i++) {
+        const a0 = lo + i * st, a1 = a0 + st;
+        // clip the polygon to the slab a0..a1 and take its extent across
+        let poly = pts;
+        for (const [lim, sg] of [[a0, 1], [a1, -1]]) {
+          const out = [];
+          for (let k = 0; k < poly.length; k++) {
+            const P = poly[k], Q = poly[(k + 1) % poly.length], pi = (P[A] - lim) * sg >= 0, qi = (Q[A] - lim) * sg >= 0;
+            if (pi) out.push(P);
+            if (pi !== qi) { const t = (lim - P[A]) / (Q[A] - P[A]); out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]); }
+          }
+          poly = out; if (!poly.length) break;
+        }
+        if (poly.length < 2) continue;
+        const b0 = Math.min(...poly.map(p => p[Bx])), b1 = Math.max(...poly.map(p => p[Bx]));
+        if (b1 - b0 < 0.01) continue;
+        boxes.push(alongZ ? solidAA((b0 + b1) / 2, (a0 + a1) / 2, b1 - b0, st, h, y0, surface) : solidAA((a0 + a1) / 2, (b0 + b1) / 2, st, b1 - b0, h, y0, surface));
+      }
+    }
+    return new Proxy(boxes[0] || {}, { set(_t, k, v) { boxes.forEach(b => { b[k] = v; }); return true; } });
+  };
+  const solid = (cx, cz, w, d, h, y0 = 0, surface = 'concrete') => {
+    if (!XF) return solidAA(cx, cz, w, d, h, y0, surface);
+    return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
+  };
   const SURFACE = { container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'dirt', hesco: 'dirt', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
-  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe']);
+  const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- shared decals / glows ----------
   const radial = (stops) => {
@@ -553,14 +582,19 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // ---------- ground ----------
   // lower levels (the Underground): tunnels and their stairwells cut holes in the ground, and the buildings
   // above them leave a nav-transparent "lid" over the tunnel so bots can path underneath
-  const HOLES = [];
+  const HOLES = [], LIDS = [];   // LIDS: tunnels under a walkable sidewalk (extra.lid): the ground is cut, a thin lid covers them
   if (LAYOUT.center && LAYOUT.half) {
-    const scan = (cx, cz, w, d, kind) => { if (kind === 'tunnel' || kind === 'stairdown') HOLES.push([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2]); };
-    for (const it of LAYOUT.center) scan(it[0], it[1], it[2], it[3], it[6]);
-    for (const it of LAYOUT.half) { scan(it[0], it[1], it[2], it[3], it[6]); scan(-it[0], -it[1], it[2], it[3], it[6]); }
+    const scan = (cx, cz, w, d, kind, ex) => {
+      if (kind !== 'tunnel' && kind !== 'stairdown') return;
+      const r = [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2];
+      (kind === 'tunnel' && ex && ex.lid ? LIDS : HOLES).push(r);
+    };
+    for (const it of LAYOUT.center) scan(it[0], it[1], it[2], it[3], it[6], it[7]);
+    for (const it of LAYOUT.half) { scan(it[0], it[1], it[2], it[3], it[6], it[7]); scan(-it[0], -it[1], it[2], it[3], it[6], it[7]); }
   }
   const SOLID_LIDS = HOLES; // building mass over these rects is nav-transparent (a level runs beneath)
-  for (const [x0, z0, x1, z1] of rectsMinus([-200, -200, 200, 200], HOLES)) physics.addBox(new Box(x0, -2, z0, x1, 0, z1)).surface = 'ground';
+  for (const [x0, z0, x1, z1] of rectsMinus([-200, -200, 200, 200], [...HOLES, ...LIDS])) physics.addBox(new Box(x0, -2, z0, x1, 0, z1)).surface = 'ground';
+  for (const [x0, z0, x1, z1] of LIDS) physics.addBox(new Box(x0, -0.3, z0, x1, 0, z1)).surface = 'concrete';
   const plane = (mat, w, d, x, z, y, ry = 0, tint) => {
     if (HOLES.length && !ry) {
       const pieces = rectsMinus([x - w / 2, z - d / 2, x + w / 2, z + d / 2], HOLES);
@@ -1597,6 +1631,203 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         put(new THREE.ConeGeometry(1.0, 2.5, 8), M.stone, cx, h + 30.7, cz, 0, { tint: 0xeeeae0, grime: 0, cast: false });
         break;
       }
+      case 'pioneerbldg': {
+        // The Pioneer Building (1892): six storeys, grey sandstone ground floor with round-arched shopfronts and the
+        // great arched entrance, red-orange brick above in a grid of piers and belt courses, paired windows with
+        // round arches on the top floor, two banded stone piers rising past the roof either side of the entrance,
+        // cast-iron bays (the rounded corner bay, one over the entrance, one on James St) and the pyramid-roofed
+        // tower. Authored with its plaza front on -x and James St on +z (placed rotated with extra.xf).
+        const G = 5.0, FH = 3.6, NF = 5, H = G + NF * FH;            // 23 m to the cornice line
+        const BR = 0xd0784e, ST = 0xaea594, STL = 0xc9c0ae, IRON = 0x8a908c;
+        solid(cx, cz, w, d, H + 1.2, y0, 'brick');
+        B(M.stone, w + 0.1, G, d + 0.1, cx, y0, cz, 0, { tint: ST, grime: 0.5 });
+        B(M.brick, w, H - G + 0.4, d, cx, y0 + G, cz, 0, { tint: BR, grime: 0.35, base: y0 + G });
+        // cornice, frieze and parapet
+        B(M.stone, w + 1.1, 0.55, d + 1.1, cx, y0 + H - 0.1, cz, 0, { tint: STL, grime: 0.2, base: y0 + H - 1 });
+        B(M.stone, w + 0.7, 0.3, d + 0.7, cx, y0 + H - 0.45, cz, 0, { tint: 0xb3a995, grime: 0.2, base: y0 + H - 1 });
+        B(M.brick, w + 0.2, 1.1, d + 0.2, cx, y0 + H + 0.45, cz, 0, { tint: BR, grime: 0.3, base: y0 + H });
+        B(M.stone, w + 0.5, 0.2, d + 0.5, cx, y0 + H + 1.5, cz, 0, { tint: STL, grime: 0.2, base: y0 + H });
+        // the four sides: [outward normal x, z], length, detail level
+        const SIDES = [[-1, 0, d, 2], [0, 1, w, 2], [1, 0, d, 1], [0, -1, w, 0]];
+        for (const [nx, nz, L, lvl] of SIDES) {
+          const ax = -nz, az = nx, ry = Math.atan2(nx, nz);
+          const half = nx ? w / 2 : d / 2;
+          const fx = (t, off = 0) => cx + nx * (half + off) + ax * t, fz = (t, off = 0) => cz + nz * (half + off) + az * t;
+          const bays = Math.max(3, Math.round(L / 3.45)), bw = L / bays, mid = Math.floor(bays / 2);
+          if (lvl === 0) { // back wall (beyond the map): a few windows only
+            for (let i = 0; i < bays; i += 2) for (let f = 0; f < NF; f++) windowDecor(fx(-L / 2 + (i + 0.5) * bw), fz(-L / 2 + (i + 0.5) * bw), nx, nz, y0 + G + 0.6 + f * FH + 1.1, 1.0, 1.7);
+            continue;
+          }
+          // ground floor: rusticated stone joints, arched shopfronts, the main entrance in the middle bay (front)
+          for (let k = 1; k < 7; k++) put(flatBox(L + 0.12, 0.05, 0.04, 0), M.dim, fx(0, 0.06), y0 + k * 0.7, fz(0, 0.06), ry, { grime: 0, tint: 0x5a564e });
+          for (let i = 0; i < bays; i++) {
+            const t = -L / 2 + (i + 0.5) * bw;
+            const main = lvl === 2 && nx === -1 && i === mid;
+            const ow = main ? bw * 0.95 : bw - 0.95, oh = main ? 3.9 : 3.0;
+            put(flatBox(ow, oh, 0.06, 0), main ? M.dim : M.glass, fx(t, 0.02), y0 + oh / 2 + 0.25, fz(t, 0.02), ry, { grime: 0, tint: main ? 0xffffff : (rnd() < 0.3 ? 0xd8c9a0 : 0xffffff) });
+            put(new THREE.CircleGeometry(ow / 2, 16, 0, Math.PI), main ? M.dim : M.glass, fx(t, 0.02), y0 + oh + 0.25, fz(t, 0.02), ry, { grime: 0 });
+            put(new THREE.TorusGeometry(ow / 2 + 0.18, 0.2, 6, 18, Math.PI), M.stone, fx(t, 0.12), y0 + oh + 0.25, fz(t, 0.12), ry, { tint: STL, grime: 0.25 });
+            if (!main) {
+              put(flatBox(0.08, oh, 0.12, 0), M.frame, fx(t, 0.08), y0 + oh / 2 + 0.25, fz(t, 0.08), ry, { grime: 0, tint: 0x24302a });
+              put(flatBox(ow, 0.1, 0.12, 0), M.frame, fx(t, 0.08), y0 + 2.6, fz(t, 0.08), ry, { grime: 0, tint: 0x24302a });
+              if (rnd() < 0.55) put(new THREE.PlaneGeometry(ow + 0.2, 1.3, 4, 2), M.cloth, fx(t, 0.7), y0 + 2.75, fz(t, 0.7), ry, { rx: -Math.PI / 2 + 0.55, tint: [0x2f5a3a, 0x7a2a24, 0x5a3a2a][(rnd() * 3) | 0], grime: 0 });
+            } else {
+              // the entrance: deep stone arch, steps, lamp either side
+              put(new THREE.TorusGeometry(ow / 2 + 0.45, 0.35, 6, 20, Math.PI), M.stone, fx(t, 0.25), y0 + oh + 0.25, fz(t, 0.25), ry, { tint: 0xb9b09e, grime: 0.2 });
+              for (const sd of [-1, 1]) {
+                put(flatBox(0.7, oh + 0.3, 0.6, 3), M.stone, fx(t + sd * (ow / 2 + 0.3), 0.3), y0 + (oh + 0.3) / 2, fz(t + sd * (ow / 2 + 0.3), 0.3), ry, { tint: 0xb9b09e, grime: 0.3 });
+                put(new THREE.SphereGeometry(0.2, 10, 8), M.bulb, fx(t + sd * (ow / 2 + 0.3), 0.75), y0 + 3.2, fz(t + sd * (ow / 2 + 0.3), 0.75), 0, { grime: 0, cast: false }); glows.push([fx(t + sd * (ow / 2 + 0.3), 0.75), y0 + 3.2, fz(t + sd * (ow / 2 + 0.3), 0.75), 1.1]);
+              }
+            }
+            // upper floors: brick piers between bays, paired windows, arches on the top floor
+            if (i > 0) put(flatBox(0.55, H - G, 0.3, scaleOf(M.brick)), M.brick, fx(-L / 2 + i * bw, 0.13), y0 + G + (H - G) / 2, fz(-L / 2 + i * bw, 0.13), ry, { tint: 0xc66e46, grime: 0.3, base: y0 + G });
+            const oriel = (lvl === 2 && nx === -1 && i === mid) || (lvl === 2 && nz === 1 && i === mid);
+            if (oriel) continue;
+            for (let f = 0; f < NF; f++) {
+              const y = y0 + G + 0.55 + f * FH + 1.15, top = f === NF - 1, wh = top ? 1.75 : 2.0, ww = Math.min(0.95, (bw - 1.0) / 2 - 0.08);
+              for (const k of [-1, 1]) windowDecor(fx(t + k * (ww / 2 + 0.1)), fz(t + k * (ww / 2 + 0.1)), nx, nz, y, ww, wh);
+              if (top) {
+                put(new THREE.TorusGeometry(ww + 0.32, 0.16, 5, 16, Math.PI), M.brick, fx(t, 0.08), y + wh / 2 - 0.1, fz(t, 0.08), ry, { tint: 0xb85e3a, grime: 0.2 });
+                put(new THREE.CircleGeometry(ww + 0.2, 16, 0, Math.PI), M.dim, fx(t, 0.02), y + wh / 2 - 0.1, fz(t, 0.02), ry, { grime: 0 });
+              } else if (f === 2) put(new THREE.TorusGeometry(ww / 2 + 0.15, 0.12, 5, 12, Math.PI), M.stone, fx(t, 0.08), y + wh / 2, fz(t, 0.08), ry, { tint: STL, grime: 0.15 });
+            }
+          }
+          // belt courses: a heavy one over the stone base, then one per floor
+          put(flatBox(L + 0.5, 0.4, 0.4, 3), M.stone, fx(0, 0.18), y0 + G + 0.1, fz(0, 0.18), ry, { tint: STL, grime: 0.15 });
+          for (let f = 1; f < NF; f++) put(flatBox(L + 0.25, 0.18, 0.26, 3), M.stone, fx(0, 0.12), y0 + G + f * FH + 0.2, fz(0, 0.12), ry, { tint: STL, grime: 0.12 });
+          if (lvl < 2) continue;
+          // cast-iron bay in the middle of the front and of James St: grey metal, glass on three sides, every floor
+          const ot = -L / 2 + (mid + 0.5) * bw, OW = bw - 0.5, OD = 0.95, oy0 = y0 + G + 0.5, oy1 = y0 + H - FH + 0.3;
+          put(flatBox(OW, oy1 - oy0, OD, 0), M.metal, fx(ot, OD / 2), (oy0 + oy1) / 2, fz(ot, OD / 2), ry, { tint: IRON, grime: 0.25 });
+          for (let f = 0; f < NF - 1; f++) {
+            const y = oy0 + 0.6 + f * FH + 1.0;
+            put(flatBox(OW - 0.4, 1.9, 0.04, 0), M.glass, fx(ot, OD + 0.02), y, fz(ot, OD + 0.02), ry, { grime: 0 });
+            for (const k of [-1, 1]) put(flatBox(0.05, 1.9, OD - 0.3, 0), M.glass, fx(ot + k * (OW / 2 + 0.02), OD / 2), y, fz(ot + k * (OW / 2 + 0.02), OD / 2), ry, { grime: 0 });
+            put(flatBox(OW + 0.1, 0.25, OD + 0.1, 0), M.metal, fx(ot, OD / 2), y0 + G + 0.5 + (f + 1) * FH - 0.1, fz(ot, OD / 2), ry, { tint: 0x4a504e, grime: 0.2 });
+            for (const k of [-0.25, 0.25]) put(flatBox(0.06, 1.9, 0.06, 0), M.metal, fx(ot + k * OW, OD + 0.04), y, fz(ot + k * OW, OD + 0.04), ry, { tint: 0x3e4442, grime: 0 });
+          }
+          put(new THREE.ConeGeometry(OW * 0.75, 0.6, 4), M.metal, fx(ot, OD / 2), oy0 - 0.25, fz(ot, OD / 2), ry + Math.PI / 4, { rx: Math.PI, tint: IRON, grime: 0.2, sz: 0.5 });
+          // the front's two banded stone piers, rising past the cornice to the tower
+          if (nx === -1) for (const k of [-1, 1]) {
+            const pt = ot + k * (bw / 2 + 0.05);
+            for (let y = y0; y < y0 + H + 7.5; y += 0.9) {
+              put(flatBox(1.0, 0.45, 0.75, 3), M.stone, fx(pt, 0.3), y + 0.225, fz(pt, 0.3), ry, { tint: STL, grime: 0.2 });
+              put(flatBox(0.9, 0.45, 0.68, 3), M.brick, fx(pt, 0.28), y + 0.675, fz(pt, 0.28), ry, { tint: 0xb35a38, grime: 0.25 });
+            }
+            put(new THREE.ConeGeometry(0.6, 1.6, 4), M.stone, fx(pt, 0.3), y0 + H + 8.5, fz(pt, 0.3), ry + Math.PI / 4, { tint: STL, grime: 0.1 });
+          }
+        }
+        // the rounded cast-iron bay on the plaza / James corner (-x, +z)
+        {
+          const ox = cx - w / 2 + 0.6, oz = cz + d / 2 - 0.6, R = 1.9, y1 = y0 + G + 0.4, y2 = y0 + H - 0.2;
+          put(new THREE.CylinderGeometry(R, R, y2 - y1, 20, 1, false), M.metal, ox, (y1 + y2) / 2, oz, 0, { tint: IRON, grime: 0.25 });
+          for (let f = 0; f < NF; f++) {
+            const y = y1 + 0.55 + f * FH + 0.9;
+            // window panes round the bay (grey iron between them)
+            for (let k = 0; k < 5; k++) { const a = -Math.PI + (k + 0.5) * Math.PI * 1.5 / 5; put(flatBox(0.62, 1.7, 0.04, 0), M.glass, ox + Math.sin(a) * (R + 0.02), y, oz + Math.cos(a) * (R + 0.02), a, { grime: 0 }); }
+            put(new THREE.CylinderGeometry(R + 0.12, R + 0.12, 0.25, 20), M.metal, ox, y1 + (f + 1) * FH - 0.25, oz, 0, { tint: 0x4a504e, grime: 0.2 });
+            for (let k = 0; k < 6; k++) { const a = -Math.PI + k * Math.PI * 1.5 / 5; put(flatBox(0.07, 1.9, 0.07, 0), M.metal, ox + Math.sin(a) * (R + 0.05), y, oz + Math.cos(a) * (R + 0.05), 0, { tint: 0x3e4442, grime: 0 }); }
+          }
+          put(new THREE.ConeGeometry(R + 0.2, 1.6, 20), M.metal, ox, y2 + 0.8, oz, 0, { tint: 0x4f5654, grime: 0.15 });
+          put(new THREE.ConeGeometry(R, 0.9, 20), M.metal, ox, y1 - 0.45, oz, 0, { rx: Math.PI, tint: IRON, grime: 0.2 });
+          // the arched corner entrance beneath it
+          put(new THREE.TorusGeometry(1.3, 0.22, 6, 16, Math.PI), M.stone, ox - 0.6, y0 + 3.4, oz + 0.6, -Math.PI / 4, { tint: STL, grime: 0.2 });
+        }
+        // the tower over the entrance: brick drum with arched openings, steep slate pyramid with dormers and a finial
+        {
+          const tx = cx - w / 2 + 3.6, tz = cz, TW = 6.2, TH = 6.5, ty = y0 + H + 1.6;
+          B(M.brick, TW, TH, TW, tx, ty, tz, 0, { tint: BR, grime: 0.3, base: ty });
+          for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const k of [-1, 1]) {
+            const ax = -nz, az = nx, px = tx + nx * TW / 2 + ax * k * 1.3, pz = tz + nz * TW / 2 + az * k * 1.3, ry = Math.atan2(nx, nz);
+            put(flatBox(1.0, 2.6, 0.05, 0), M.dim, px + nx * 0.02, ty + 3.2, pz + nz * 0.02, ry, { grime: 0 });
+            put(new THREE.TorusGeometry(0.62, 0.12, 5, 12, Math.PI), M.stone, px + nx * 0.06, ty + 4.5, pz + nz * 0.06, ry, { tint: STL, grime: 0.15 });
+          }
+          B(M.stone, TW + 0.6, 0.4, TW + 0.6, tx, ty + TH, tz, 0, { tint: STL, grime: 0.15 });
+          put(new THREE.ConeGeometry(TW * 0.74, 11, 4), M.iron, tx, ty + TH + 0.4 + 5.5, tz, Math.PI / 4, { tint: 0x55605c, grime: 0.15 });
+          for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const px = tx + nx * 2.0, pz = tz + nz * 2.0, ry = Math.atan2(nx, nz);
+            B(M.brick, 1.0, 1.5, 0.8, px, ty + TH + 2.2, pz, ry, { tint: BR, grime: 0.2 });
+            put(new THREE.ConeGeometry(0.75, 1.0, 4), M.iron, px, ty + TH + 4.2, pz, ry + Math.PI / 4, { tint: 0x55605c, grime: 0 });
+            put(flatBox(0.55, 0.9, 0.04, 0), M.dim, px + nx * 0.42, ty + TH + 2.95, pz + nz * 0.42, ry, { grime: 0 });
+          }
+          put(new THREE.CylinderGeometry(0.05, 0.08, 3, 6), M.iron, tx, ty + TH + 12.4, tz, 0, { grime: 0 });
+          put(new THREE.SphereGeometry(0.2, 8, 6), M.iron, tx, ty + TH + 11.4, tz, 0, { grime: 0 });
+        }
+        // roof: chimneys and a skylight over the atrium
+        for (const [ux, uz] of [[0.3, -0.35], [0.35, 0.3], [-0.1, -0.42]]) B(M.brick, 1.0, 2.2, 1.0, cx + ux * w, y0 + H + 1.5, cz + uz * d, 0, { tint: 0xa85438, grime: 0.6, base: y0 + H });
+        B(M.glass, 8, 0.8, 5, cx + w * 0.1, y0 + H + 1.5, cz, 0, { grime: 0 });
+        break;
+      }
+      case 'flatiron': {
+        // the "Sinking Ship" garage on the old Seattle Hotel's wedge between James St and Yesler Way: concrete decks
+        // following the triangular lot, open between the parapets, columns, cars, a blue P sign at the prow.
+        // extra.pts = footprint (world x, z), convex
+        const pts = extra.pts, decks = Math.max(2, Math.round(h / 3));
+        solidPoly(pts, h, 0, 'concrete');
+        const inset = (P, t) => {
+          // offset a convex polygon inward by t (edges moved in, adjacent ones intersected)
+          let area = 0; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; area += a[0] * b[1] - b[0] * a[1]; }
+          const sg = area > 0 ? -1 : 1, lines = P.map((a, i) => { const b = P[(i + 1) % P.length], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz), nx = -dz / l * sg, nz = dx / l * sg; return [a[0] - nx * t, a[1] - nz * t, dx, dz]; });
+          return lines.map((L1, i) => { const L0 = lines[(i + P.length - 1) % P.length], den = L0[2] * L1[3] - L0[3] * L1[2]; const u = ((L1[0] - L0[0]) * L1[3] - (L1[1] - L0[1]) * L1[2]) / den; return [L0[0] + L0[2] * u, L0[1] + L0[3] * u]; });
+        };
+        const shapeOf = (P, hole) => { const sh = new THREE.Shape(P.map(([x, z]) => new THREE.Vector2(x, -z))); if (hole) sh.holes.push(new THREE.Path(hole.map(([x, z]) => new THREE.Vector2(x, -z)).reverse())); return sh; };
+        const slab = (P, hole, y, t, mat, tint) => {
+          const g = new THREE.ExtrudeGeometry(shapeOf(P, hole), { depth: t, bevelEnabled: false });
+          g.rotateX(-Math.PI / 2);
+          put(g, mat, 0, y, 0, 0, { tint, grime: 0.35, base: y });
+        };
+        const inner = inset(pts, 0.35), core = inset(pts, 1.2);
+        slab(core, null, 0, h - 0.3, M.dim, 0xffffff);
+        for (let k = 0; k <= decks; k++) {
+          const y = k * (h / decks);
+          if (k > 0) slab(pts, null, y - 0.3, 0.3, M.concrete, 0xcfc9bd);
+          if (k < decks) slab(pts, inner, y + (k ? 0 : 0), 1.05, M.concrete, 0xd8d2c6);
+        }
+        // columns along every edge
+        for (let i = 0; i < pts.length; i++) {
+          const a = inner[i], b = inner[(i + 1) % inner.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / 5));
+          for (let j = 0; j <= n; j++) { const t = j / n; B(M.concrete, 0.45, h, 0.45, a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t, 0, { tint: 0xc9c3b6, grime: 0.4 }); }
+        }
+        // cars along the decks
+        const cxp = pts.reduce((q, p) => q + p[0], 0) / pts.length, czp = pts.reduce((q, p) => q + p[1], 0) / pts.length;
+        for (let k = 0; k < decks; k++) for (let i = 0; i < 6; i++) {
+          const f = 0.25 + rnd() * 0.55, P = inner[i % inner.length], x = P[0] + (cxp - P[0]) * f, z = P[1] + (czp - P[1]) * f;
+          B(M.paint, 1.8, 0.7, 4.2, x, k * (h / decks) + 0.25, z, rnd() * 3, { tint: [0x8a1c1c, 0x1c2a44, 0xcfcfcf, 0x2b2b2b, 0x5a6a72][(rnd() * 5) | 0], grime: 0.1 });
+        }
+        // the prow (sharpest corner) carries the blue P sign
+        const prow = pts[extra.prow || 0];
+        put(flatBox(1.2, 1.2, 0.12, 0), M.paint, prow[0] + 1.6, h - 1.4, prow[1] - 0.2, 0, { tint: 0x2a62b8, grime: 0 });
+        break;
+      }
+      case 'droad': {
+        // a street at an angle (authored along local +x, w long, d curb to curb; placed with extra.xf): asphalt,
+        // curbs, double yellow centre line, edge lines, a crosswalk at the low end, manholes
+        const o = extra || {};
+        planePiece(M.asphalt, w, d, cx, cz, 0.024);
+        for (const sd of [-1, 1]) B(M.concrete, w, 0.15, 0.3, cx, 0, cz + sd * (d / 2 + 0.15), 0, { tint: 0xc9c4b8, grime: 0.35, cast: false });
+        const flatL = (mat, lw, ld, x, z, tint) => put(new THREE.PlaneGeometry(lw, ld), mat, x, 0.03, z, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint });
+        const x0 = cx - w / 2 + (o.cross ? 4.5 : 0.5), x1 = cx + w / 2 - 0.5;
+        for (const dz of [-0.11, 0.11]) flatL(M.line, x1 - x0, 0.1, (x0 + x1) / 2, cz + dz, 0xd9b54a);
+        for (const sd of [-1, 1]) flatL(M.line, x1 - x0, 0.12, (x0 + x1) / 2, cz + sd * (d / 2 - 0.45), 0xd8d2c0);
+        if (o.cross) for (let z = cz - d / 2 + 0.45; z + 1.0 <= cz + d / 2 - 0.2; z += 1.55) for (const dd of [0, 0.6]) flatL(M.line, 2.8, 0.4, cx - w / 2 + 1.9, z + dd + 0.2, 0xe6e0d0);
+        for (let x = cx - w / 2 + 8; x < cx + w / 2 - 3; x += 13) put(new THREE.CircleGeometry(0.38, 18), M.dark, x, 0.031, cz + (rnd() - 0.5) * 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false });
+        break;
+      }
+      case 'bollard': {
+        solid(cx, cz, 0.3, 0.3, 1.0, 0, 'metal');
+        put(new THREE.CylinderGeometry(0.13, 0.15, 0.95, 10), M.iron, cx, 0.475, cz, 0, { grime: 0.2 });
+        put(new THREE.SphereGeometry(0.14, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M.iron, cx, 0.95, cz, 0, { grime: 0 });
+        put(new THREE.TorusGeometry(0.15, 0.025, 4, 12), M.iron, cx, 0.8, cz, 0, { rx: Math.PI / 2, grime: 0 });
+        break;
+      }
+      case 'prism': {
+        // glass prism lights set in the sidewalk over the Underground: rows of lavender glass studs in iron frames
+        const pm = M.prism || (M.prism = std({ color: 0xb8a6d8, roughness: 0.2, metalness: 0.1, emissive: 0x2a2040, polygonOffset: true, polygonOffsetFactor: -3 }));
+        for (let x = cx - w / 2 + 0.15; x < cx + w / 2; x += 0.3) for (let z = cz - d / 2 + 0.15; z < cz + d / 2; z += 0.3)
+          put(new THREE.PlaneGeometry(0.16, 0.16), pm, x, 0.026, z, 0, { rx: -Math.PI / 2, grime: 0, cast: false });
+        put(new THREE.PlaneGeometry(w + 0.1, d + 0.1), M.dark, cx, 0.024, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false });
+        break;
+      }
       case 'boundary': break; // dressed by perimeter buildings below
       default:
         B(M.concrete, w, h, d, cx, y0, cz);
@@ -1679,8 +1910,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
 
   // collision + dressing
   const add = (cx, cz, w, d, h, y0, kind, extra, team) => {
+    const xf = extra && extra.xf;
+    const g0 = glows.length, h0 = glowsHot.length;
+    if (xf) XF = xf;
     if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
+    if (xf) {
+      for (const arr of [[glows, g0], [glowsHot, h0]]) for (let i = arr[1]; i < arr[0].length; i++) { const q = arr[0][i]; [q[0], q[2]] = xfPt(q[0], q[2]); }
+      XF = null;
+    }
   };
   if (street) for (const it of LAYOUT.center) add(...it.slice(0, 7), it[7], 0);
   if (street) for (const [cx, cz, w, d, h, y0, kind, extra] of LAYOUT.half) {
@@ -1938,6 +2176,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     };
     world.update(0, 0);
   }
+  if (LAYOUT.sites) world.sites = [LAYOUT.sites, LAYOUT.sites];   // asymmetric maps: both teams use the same two sites
+  if (LAYOUT.lower) world.upper = LAYOUT.lower;                    // a second nav level (here below ground)
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
