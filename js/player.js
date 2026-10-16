@@ -63,7 +63,7 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 
-export const VM_TUNE = { yaw: 0.26, hip: { rifle: [0.105, -0.135, -0.24], smg: [0.1, -0.12, -0.27], sniper: [0.105, -0.138, -0.235], launcher: [0.13, -0.15, -0.2] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
+export const VM_TUNE = { yaw: 0.16, hip: { rifle: [0.115, -0.15, -0.25], smg: [0.11, -0.135, -0.28], sniper: [0.12, -0.162, -0.25], launcher: [0.13, -0.15, -0.2] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
 const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
 
 export class PlayerController {
@@ -411,7 +411,10 @@ export class PlayerController {
     this.breathT += dt;
     const scoped = c.weapon.def.scope;
     const holdBreath = scoped && (this.game.input.down('ShiftLeft') || this.game.input.padHeld('sprint'));
-    const amp = c.adsT * (scoped ? (holdBreath ? 0.0006 : 0.0045) : 0.0012);
+    // scope sway eases in over the first second scoped, so a quick-scope is steady
+    this.scopedT = c.adsT >= 0.99 ? (this.scopedT || 0) + dt : 0;
+    const settle = scoped ? Math.min(1, Math.max(0, (this.scopedT - 0.35) / 0.9)) : 1;
+    const amp = c.adsT * (scoped ? (holdBreath ? 0.0004 : 0.0032 * settle) : 0.0006);
     const sy = Math.sin(this.breathT * 0.9) * amp;
     const sp = Math.sin(this.breathT * 1.8) * amp * 0.6;
     c.yaw += sy - this.prevSwayYaw;
@@ -448,7 +451,7 @@ export class PlayerController {
     if (this.correction) { cam.position.add(this.correction); this.correction.multiplyScalar(Math.max(0, 1 - dt * 12)); }
     cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.03 * bobAmt - Math.sin(this.landDip * Math.PI) * 0.07;
     this.shake = Math.max(0, this.shake - dt * 4);
-    const sh = this.shake * this.shake * 0.018;
+    const sh = this.shake * this.shake * 0.018 * (1 - 0.8 * c.adsT);   // aimed: the view barely jitters, so the reticle stays on the target
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     cam.rotation.order = 'YXZ';
     cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
@@ -465,9 +468,10 @@ export class PlayerController {
     }
     // the sight fills more of the screen when aiming (viewmodel FOV narrows, like MW)
     const vmc = this.game.vmCamera;
-    const vmBase = this.game.input.isTouch ? 68 : 60;
+    // hip: the player's weapon FOV (wider = smaller gun); aimed: the sight-size setting as before
+    const vmHip = this.game.input.isTouch ? 76 : clamp(Number(s.vmFov) || 74, 55, 90);
     const a = c.adsT, ae = a * a * (3 - 2 * a);
-    const vf = vmBase * lerp(1, SIGHT_SIZE[s.sightSize] ?? SIGHT_SIZE.large, ae);
+    const vf = lerp(vmHip, (this.game.input.isTouch ? 68 : 60) * (SIGHT_SIZE[s.sightSize] ?? SIGHT_SIZE.large), ae);
     if (Math.abs(vf - this.lastVmFov) > 0.01) { vmc.fov = vf; vmc.updateProjectionMatrix(); this.lastVmFov = vf; }
   }
 
@@ -529,14 +533,14 @@ export class PlayerController {
 
     h.position.set(
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
-      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) + tilt * RP_.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
-      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RP_.y - sw * (G.type === 'pistol' ? 0.16 : 0.2) - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
+      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - ae * 0.92) + tilt * RP_.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
+      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - ae * 0.92) + idle + tilt * RP_.y - sw * (G.type === 'pistol' ? 0.16 : 0.2) - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
       lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RP_.z - mel * 0.12 + J.z,
     );
     h.rotation.set(
-      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 + mel * 0.2 + J.r,
-      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yaw),
-      tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
+      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 * (1 - ae * 0.9) + mel * 0.2 + J.r,
+      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 * (1 - ae * 0.9) + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yaw),
+      tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6 * (1 - ae * 0.9),
     );
     // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
     if (sw > 0) {
