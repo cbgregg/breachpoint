@@ -346,7 +346,7 @@ export class Character {
     this.weapons.forEach(w => w.refill());
     this.cur = 0; this.prev = 1; this.switchT = 0.4;
     if (this.model) setOperatorWeapon(this.model, this.weapon.def);
-    this.grenades = GRENADE.start;
+    this.grenades = this.game.gg ? 0 : GRENADE.start;   // Gun Game: guns only
     this.spawnProtect = PLAYER.spawnProtect;
     this.damagers.clear();
     this.streak = 0;
