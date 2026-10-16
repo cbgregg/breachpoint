@@ -63,7 +63,7 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 
-export const VM_TUNE = { yaw: 0.26, hip: { rifle: [0.105, -0.135, -0.24], smg: [0.1, -0.12, -0.27], sniper: [0.105, -0.138, -0.235] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
+export const VM_TUNE = { yaw: 0.26, hip: { rifle: [0.105, -0.135, -0.24], smg: [0.1, -0.12, -0.27], sniper: [0.105, -0.138, -0.235], launcher: [0.13, -0.15, -0.2] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
 const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
 
 export class PlayerController {
@@ -102,7 +102,7 @@ export class PlayerController {
       holder.add(gun.group);
       holder.visible = false;
       this.vmRoot.add(holder);
-      const pistol = w.id === 'pistol';
+      const pistol = w.def.model.type === 'pistol';
       const touch = this.game.input.isTouch;
       // where the left hand holds the magazine (gun frame): pistols palm it from below, the rest wrap it
       const type = w.def.model.type;
@@ -431,8 +431,8 @@ export class PlayerController {
     this.recoilDebt = Math.min(0.25, this.recoilDebt + climb * 0.65);
     c.yaw += (Math.random() - 0.45) * 2 * def.recoilYaw * rm;
     this.shake = Math.min(1, this.shake + def.recoilPitch * 5);
-    if (def.id === 'sniper' || def.id === 'shotgun') this.cycleT = 60 / def.rpm * 0.9;
-    this.game.input.rumble(def.id === 'sniper' || def.id === 'shotgun' ? 0.7 : 0.25, 0.5, def.auto ? 60 : 120);
+    if (def.mode === 'BOLT' || def.mode === 'PUMP') this.cycleT = 60 / def.rpm * 0.9;
+    this.game.input.rumble(def.mode === 'BOLT' || def.mode === 'PUMP' || def.rocket ? 0.7 : 0.25, 0.5, def.auto ? 60 : 120);
   }
 
   addShake(v) { this.shake = Math.min(1.5, this.shake + v); }

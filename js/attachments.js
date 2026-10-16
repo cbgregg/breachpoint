@@ -1,6 +1,6 @@
 // Gunsmith: attachment slots per weapon, their stat trade-offs, and the compact loadout string
 // that travels over the network ("rifle:acog,sup,agrip,ext,laser/pistol:iron,none,std,none").
-import { WEAPONS, PRIMARIES } from './config.js';
+import { WEAPONS, PRIMARIES, SECONDARIES } from './config.js';
 
 export const SLOTS = ['optic', 'muzzle', 'under', 'mag', 'laser'];
 export const SLOT_NAMES = { optic: 'Optic', muzzle: 'Muzzle', under: 'Underbarrel', mag: 'Magazine', laser: 'Laser' };
@@ -45,6 +45,16 @@ export const GUNSMITH = {
   shotgun: { optic: ['iron', 'reflex', 'holo'], muzzle: ['none', 'choke', 'sup'], mag: ['std', 'ext'], laser: ['none', 'laser'] },
   sniper: { optic: ['scope', 'acog', 'holo', 'iron'], muzzle: ['brake', 'sup'], mag: ['std', 'ext', 'fast'] },
   pistol: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp', 'sup'], mag: ['std', 'ext'], laser: ['none', 'laser'] },
+  kv47: { optic: ['iron', 'reflex', 'holo', 'acog'], muzzle: ['none', 'comp', 'sup'], under: ['none', 'vgrip', 'agrip'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
+  br308: { optic: ['holo', 'reflex', 'acog', 'iron'], muzzle: ['brake', 'comp', 'sup'], under: ['none', 'vgrip', 'agrip'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
+  hx60: { optic: ['reflex', 'holo', 'acog', 'iron'], muzzle: ['none', 'comp', 'sup'], mag: ['std', 'fast'], laser: ['none', 'laser'] },
+  krv45: { optic: ['reflex', 'holo', 'iron'], muzzle: ['none', 'comp', 'sup'], under: ['none', 'vgrip', 'agrip'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
+  mr14: { optic: ['acog', 'holo', 'reflex', 'iron', 'scope'], muzzle: ['brake', 'comp', 'sup'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
+  sa12: { optic: ['iron', 'reflex', 'holo'], muzzle: ['none', 'choke', 'sup'], mag: ['std', 'ext'], laser: ['none', 'laser'] },
+  d50: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp'], mag: ['std', 'ext'], laser: ['none', 'laser'] },
+  r357: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp'], laser: ['none', 'laser'] },
+  mp18: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp', 'sup'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
+  monte: { optic: ['iron'] },
 };
 
 export function defaultsFor(id) {
@@ -102,31 +112,38 @@ function parsePart(str, allowed) {
   return { id, att: cleanAtt(id, att) };
 }
 
-export function encodeLoadout(primary, att, pistolAtt) {
-  const p = PRIMARIES.includes(primary) ? primary : 'rifle';
-  return part(p, cleanAtt(p, att)) + '/' + part('pistol', cleanAtt('pistol', pistolAtt));
+// "primary:atts/secondary:atts". Older clients only ever send the P-45 as the secondary, which still parses.
+export function encodeLoadout(primary, att, secAtt, secondary = 'pistol') {
+  const p = PRIMARIES.includes(primary) ? primary : 'rifle', q = SECONDARIES.includes(secondary) ? secondary : 'pistol';
+  return part(p, cleanAtt(p, att)) + '/' + part(q, cleanAtt(q, secAtt));
 }
 
 // accepts a loadout string or a bare weapon id (older clients); always returns something valid
 export function parseLoadout(str) {
   const [a, b] = typeof str === 'string' ? str.split('/') : [];
-  const prim = parsePart(a, PRIMARIES) || { id: 'rifle', att: defaultsFor('rifle') };
-  const pist = parsePart(b, ['pistol']) || { id: 'pistol', att: defaultsFor('pistol') };
-  return { primary: prim.id, att: prim.att, pistolAtt: pist.att, str: part(prim.id, prim.att) + '/' + part('pistol', pist.att) };
+  const any = [...PRIMARIES, ...SECONDARIES];   // Gun Game puts any gun in either slot
+  const prim = parsePart(a, any) || { id: 'rifle', att: defaultsFor('rifle') };
+  const sec = parsePart(b, any) || { id: 'pistol', att: defaultsFor('pistol') };
+  return { primary: prim.id, att: prim.att, secondary: sec.id, pistolAtt: sec.att, str: part(prim.id, prim.att) + '/' + part(sec.id, sec.att) };
 }
+
+// Gun Game: the same gun in both slots, stock attachments
+export function soloLoadout(id) { const a = cleanAtt(id, {}); return part(id, a) + '/' + part(id, a); }
 
 export function loadoutFromSettings(s) {
-  const all = s.attachments || {};
-  return encodeLoadout(s.primary, all[s.primary], all.pistol);
+  const all = s.attachments || {}, sec = SECONDARIES.includes(s.secondary) ? s.secondary : 'pistol';
+  return encodeLoadout(s.primary, all[s.primary], all[sec], sec);
 }
 
-export function randomLoadout(primary) {
+// bots: a random build, with a random handgun (never The Monte) as the sidearm
+export function randomLoadout(primary, secondary) {
   const pick = (id) => {
     const g = GUNSMITH[id], att = {};
     for (const s of SLOTS) if (g[s]) att[s] = Math.random() < 0.4 ? g[s][0] : g[s][(Math.random() * g[s].length) | 0];
     return att;
   };
-  return encodeLoadout(primary, pick(primary), pick('pistol'));
+  const pist = secondary || ['pistol', 'pistol', 'd50', 'r357', 'mp18'][(Math.random() * 5) | 0];
+  return encodeLoadout(primary, pick(primary), pick(pist), pist);
 }
 
 // short human summary of a weapon's attachments (non-default only)

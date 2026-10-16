@@ -1,7 +1,7 @@
 // Shared character logic (player + bots): movement, health, weapons, operator model + animation
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS } from './config.js';
+import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS, typeOf } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
 import { parseLoadout } from './attachments.js';
 import { cloneSoldier } from './assets.js';
@@ -248,7 +248,7 @@ export function setOperatorWeapon(model, wdef) {
   model.gun = gun;
   model.weaponId = weaponId;
   model.gunHolder.add(gun.group);
-  if (weaponId === 'pistol') model.gunHolder.position.set(0.04, -0.02, -0.46);
+  if (typeOf(weaponId) === 'pistol') model.gunHolder.position.set(0.04, -0.02, -0.46);
   else model.gunHolder.position.set(0.12, -0.06, -0.26);
   // hand targets in aim-group space
   _H.copy(model.gunHolder.position);
@@ -285,7 +285,7 @@ export class Character {
     const lo = parseLoadout(primary);
     this.loadout = lo.str;
     this.primaryId = lo.primary;
-    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState('pistol', lo.pistolAtt)];
+    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState(lo.secondary || 'pistol', lo.pistolAtt)];
     this.pendingLoadout = null;
     this.cur = 0; this.prev = 1; this.switchT = 0;
     this.grenades = GRENADE.start; this.grenadeCd = 0;
@@ -326,7 +326,7 @@ export class Character {
     const lo = parseLoadout(str);
     this.loadout = lo.str;
     this.primaryId = lo.primary;
-    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState('pistol', lo.pistolAtt)];
+    this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState(lo.secondary || 'pistol', lo.pistolAtt)];
     this.cur = 0; this.prev = 1;
     if (this.model) setOperatorWeapon(this.model, this.weapon.def);
     if (this === this.game.player && this.game.playerCtl) this.game.playerCtl.buildViewmodels();
@@ -781,7 +781,7 @@ function animateSoldier(c, dt, showName) {
   _eu.set(pitch, c.yaw + (tac ? 0.35 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
   _qAim.setFromEuler(_eu);
   if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) * 0.7));
-  const pistol = m.weaponId === 'pistol';
+  const pistol = typeOf(m.weaponId) === 'pistol';
   B.Spine2.getWorldPosition(_w3);
   _w1.set(pistol ? 0.04 : 0.13, pistol ? 0.12 : tac ? -0.02 : 0.04, (pistol ? -0.42 : tac ? -0.2 : -0.26) + m.kick * 0.04).applyQuaternion(_qAim);
   _w3.add(_w1); // grip, world

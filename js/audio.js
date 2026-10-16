@@ -6,6 +6,16 @@ const SHOTS = {
   shotgun: { crack: 2600, body: 900, thump: 65, decay: 0.3, tail: 0.9, gain: 0.85 },
   sniper: { crack: 3200, body: 1100, thump: 55, decay: 0.38, tail: 1.3, gain: 1.0 },
   pistol: { crack: 4200, body: 1600, thump: 130, decay: 0.12, tail: 0.45, gain: 0.5 },
+  kv47: { crack: 3500, body: 1250, thump: 85, decay: 0.18, tail: 0.6, gain: 0.66 },
+  br308: { crack: 3300, body: 1150, thump: 75, decay: 0.22, tail: 0.75, gain: 0.75 },
+  hx60: { crack: 3600, body: 1300, thump: 80, decay: 0.18, tail: 0.65, gain: 0.66 },
+  krv45: { crack: 4800, body: 2000, thump: 135, decay: 0.09, tail: 0.35, gain: 0.45 },
+  mr14: { crack: 3300, body: 1150, thump: 70, decay: 0.26, tail: 0.95, gain: 0.8 },
+  sa12: { crack: 2700, body: 950, thump: 70, decay: 0.26, tail: 0.8, gain: 0.8 },
+  d50: { crack: 3400, body: 1100, thump: 85, decay: 0.2, tail: 0.75, gain: 0.8 },
+  r357: { crack: 3200, body: 1000, thump: 80, decay: 0.24, tail: 0.8, gain: 0.85 },
+  mp18: { crack: 4600, body: 1900, thump: 140, decay: 0.09, tail: 0.32, gain: 0.42 },
+  monte: { crack: 1600, body: 500, thump: 45, decay: 0.45, tail: 1.4, gain: 0.95 },
 };
 
 export class GameAudio {
