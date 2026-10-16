@@ -156,7 +156,8 @@ export function createVmArms(team) {
   // a touch lighter than the third-person kit so the arms read against dark scenes
   const shirt = new THREE.Color(k.shirt).offsetHSL(0, 0, 0.07);
   const fab = fabricMaps(shirt);
-  const glove = new THREE.Color(k.glove).offsetHSL(0, 0, 0.04);
+  // viewmodel gloves: a mid-tone tactical colour per team, so the hands read against black guns and dark scenes
+  const glove = new THREE.Color(team === 0 ? 0x6f6450 : 0x4f5448);
   const M = {
     glove: new THREE.MeshStandardMaterial({ color: glove, roughness: 0.68, metalness: 0.05 }),
     tip: new THREE.MeshStandardMaterial({ color: glove.clone().offsetHSL(0, 0, 0.025), roughness: 0.85 }),
@@ -171,7 +172,7 @@ export function createVmArms(team) {
   if (HA) {
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d');
-    const base = glove.clone().multiplyScalar(0.55);
+    const base = glove.clone();
     g.fillStyle = '#' + base.getHexString(); g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 4000; i++) { const v = Math.random() * 30 - 15; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 400})`; g.fillRect(Math.random() * 256, Math.random() * 256, 2, 1); }
     for (let y = 0; y < 256; y += 3) { g.fillStyle = 'rgba(0,0,0,0.05)'; g.fillRect(0, y, 256, 1); }
@@ -306,14 +307,23 @@ function orient(obj, dir, xHint) {
   _om.makeBasis(_ox, _oy, _oz);
   obj.quaternion.setFromRotationMatrix(_om);
 }
-export function poseArm(arm, shoulder, pos, q, pose, pole) {
+// the shoulder comes forward (protracts) when the hand reaches further than the arm: no stretched arms
+const _sh = new THREE.Vector3();
+function reachShoulder(shoulder, wrist) {
+  const d = _sh.subVectors(wrist, shoulder), L = d.length(), max = (UPPER + FORE) * 0.93;
+  if (L <= max) return _sh.copy(shoulder);
+  return _sh.copy(shoulder).addScaledVector(d, (L - max) / L);
+}
+export function poseArm(arm, shoulder0, pos, q, pose, pole) {
   const h = arm.hand;
+  let shoulder = shoulder0;
   if (arm.rig) {
     const R = arm.rig, m = R.mirror;
     // work in the rig's right-hand space (mirrored for the left)
     _mp.copy(pos); _mq.copy(q); if (m) { _mp.x = -_mp.x; mirrorQ(_mq); }
     _mw.copy(R.palmOff).applyQuaternion(_mq).negate().add(_mp);      // wrist (hand bone), rig space
     _w.copy(_mw); if (m) _w.x = -_w.x;                                  // wrist, camera space
+    shoulder = reachShoulder(shoulder0, _w);
     solveElbow(shoulder, _w, UPPER, FORE, pole, _e);
     _me.copy(_e); if (m) _me.x = -_me.x;
     driveRig(R, _mw, _mq, _md.subVectors(_mw, _me), pose);
@@ -333,6 +343,7 @@ export function poseArm(arm, shoulder, pos, q, pose, pole) {
   applyPose(h, pose);
   h.pose = pose;
   _w.copy(WRIST).applyQuaternion(q).add(pos);
+  shoulder = reachShoulder(shoulder0, _w);
   solveElbow(shoulder, _w, UPPER, FORE, pole, _e);
   // forearm rolls with the wrist (flat side of the arm = back of the hand), upper arm follows the forearm
   _hx.set(1, 0, 0).applyQuaternion(q);
@@ -351,12 +362,13 @@ export function poseArm(arm, shoulder, pos, q, pose, pole) {
 // wrap the grip, handguard or magazine they hold instead of passing through it or hanging in the air.
 // The palm is pushed back off the surface first if it starts inside. Runs once per gun when it's built.
 const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _tc = new THREE.Vector3(), _tm = new THREE.Matrix4();
-export function surfaceCloud(root, step = 0.0035) {
+const ckey = (x, y, z) => ((x + 1024) * 2048 + (y + 1024)) * 2048 + (z + 1024);
+export function surfaceCloud(root, step = 0.0045) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const cell = 0.012, grid = new Map(), pts = [];
   const push = (v) => {
-    const k = `${Math.floor(v.x / cell)},${Math.floor(v.y / cell)},${Math.floor(v.z / cell)}`;
+    const k = ckey(Math.floor(v.x / cell), Math.floor(v.y / cell), Math.floor(v.z / cell));
     let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(v.x, v.y, v.z); pts.push(1);
   };
   const area2 = step * step;
@@ -373,7 +385,7 @@ export function surfaceCloud(root, step = 0.0035) {
       const ia = idx ? idx.getX(i) : i, ib = idx ? idx.getX(i + 1) : i + 1, ic = idx ? idx.getX(i + 2) : i + 2;
       _ta.fromBufferAttribute(pos, ia).applyMatrix4(_tm); _tb.fromBufferAttribute(pos, ib).applyMatrix4(_tm); _tc.fromBufferAttribute(pos, ic).applyMatrix4(_tm);
       const ab = _tb.clone().sub(_ta), ac = _tc.clone().sub(_ta);
-      const area = ab.clone().cross(ac).length() / 2;
+      const area = _fn.crossVectors(ab, ac).length() / 2;
       const k = Math.min(400, Math.ceil(area / area2));
       push(_ta.clone());
       for (let j = 0; j < k; j++) {
@@ -388,7 +400,7 @@ function hits(cloud, p, r) {
   const c = cloud.cell, x0 = Math.floor((p.x - r) / c), x1 = Math.floor((p.x + r) / c), y0 = Math.floor((p.y - r) / c), y1 = Math.floor((p.y + r) / c), z0 = Math.floor((p.z - r) / c), z1 = Math.floor((p.z + r) / c);
   const r2 = r * r;
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
-    const a = cloud.grid.get(`${x},${y},${z}`); if (!a) continue;
+    const a = cloud.grid.get(ckey(x, y, z)); if (!a) continue;
     for (let i = 0; i < a.length; i += 3) { const dx = a[i] - p.x, dy = a[i + 1] - p.y, dz = a[i + 2] - p.z; if (dx * dx + dy * dy + dz * dz < r2) return true; }
   }
   return false;

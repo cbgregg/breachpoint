@@ -15,7 +15,7 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const _E = new THREE.Vector3(), _R = new THREE.Vector3(), _L = new THREE.Vector3(), _D = new THREE.Vector3();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
-const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Vector3(-0.2, -0.5, 0.05);
+const SHOULDER_R = new THREE.Vector3(0.32, -0.5, 0.2), SHOULDER_L = new THREE.Vector3(-0.3, -0.5, 0.05);
 const POLE_R = new THREE.Vector3(0.7, -1.4, 0.2), POLE_L = new THREE.Vector3(-0.4, -1, 0.2);
 // where the hands go, in the gun's frame (origin = top of the pistol grip, barrel toward -z)
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -24,7 +24,7 @@ const GRIP_F = V3(0, -0.25, -0.97), PALM_L = V3(-1, 0, 0), PALM_R = V3(1, 0, 0),
 // support hand: thumbs-forward two-hand grip, the left hand wrapping round the front of the grip over the right fingers
 const LH_PISTOL = V3(-0.055, -0.03, 0.005), LH_PISTOL_F = V3(0.45, -0.25, -0.86), LH_PISTOL_P = V3(0.9, -0.1, 0.4);
 const VG_OFF = V3(-0.03, -0.015, 0.036), VG_F = V3(0, -0.12, -1);
-const SUP_OFF = V3(-0.03, -0.02, 0.012), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
+const SUP_OFF = V3(-0.03, -0.02, 0.012), SUP_OFF_PUMP = V3(-0.03, -0.02, 0.05), SUP_F = V3(0.45, -0.1, -0.9), PALM_SUP = V3(0.6, 0.8, 0);
 const PORT_OFF = V3(0.034, -0.015, 0.01), PORT_F = V3(0, -0.2, -1);
 const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
@@ -62,6 +62,7 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 
+export const VM_TUNE = { yaw: 0.26, hip: { rifle: [0.105, -0.135, -0.24], smg: [0.1, -0.12, -0.27], sniper: [0.105, -0.138, -0.235] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
 const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
 
 export class PlayerController {
@@ -108,6 +109,7 @@ export class PlayerController {
       if (type !== 'shotgun') {
         holder.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(gun.mag).applyMatrix4(gun.group.matrixWorld.clone().invert());
+        if (box.isEmpty() || box.max.y - box.min.y < 0.03) box.set(V3(-0.015, -0.17, -0.02), V3(0.015, -0.05, 0.02)); // mag modelled into the grip
         magHold = type === 'pistol'
           ? { pos: V3((box.min.x + box.max.x) / 2 - 0.004, box.min.y - 0.016, (box.min.z + box.max.z) / 2 + 0.006), f: V3(0.55, 0, -0.85), p: PALM_UP, pose: POSES.cup }
           : { pos: V3(box.min.x - 0.016, box.max.y + (box.min.y - box.max.y) * 0.6, Math.max(box.min.z + 0.046, (box.min.z + box.max.z) / 2)), f: V3(0, -0.1, -1), p: PALM_R, pose: POSES.wrap };
@@ -118,7 +120,7 @@ export class PlayerController {
         id: w.id, holder, gun, type, magHold, fit,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
-          : pistol ? new THREE.Vector3(0.06, -0.094, -0.25) : new THREE.Vector3(0.11, -0.145, -0.21),
+          : VM_TUNE.hip[type] ? new THREE.Vector3(...VM_TUNE.hip[type]) : pistol ? new THREE.Vector3(0.06, -0.094, -0.25) : new THREE.Vector3(0.11, -0.145, -0.21),
         ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
         // the pistol at the hip: up in front, muzzle tipped up and turned in, both hands on it (CoD style)
         hipRot: pistol && !touch ? [0.08, 0.18, -0.05] : null,
@@ -152,7 +154,7 @@ export class PlayerController {
     let L;
     if (type === 'pistol') L = one(this.arms.L, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, POSES.wrap, SHOULDER_L, POLE_L);
     else if (A.under === 'vgrip') L = one(this.arms.L, _v1.copy(gun.foregrip.position).add(VG_OFF), VG_F, PALM_R, POSES.wrap, SHOULDER_L, POLE_L);
-    else L = one(this.arms.L, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF), SUP_F, PALM_SUP, POSES.support, SHOULDER_L, POLE_L);
+    else L = one(this.arms.L, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(gun.pump ? SUP_OFF_PUMP : SUP_OFF), SUP_F, PALM_SUP, POSES.support, SHOULDER_L, POLE_L);
     let M = null;
     if (MH) { M = one(this.arms.L, MH.pos, MH.f, MH.p, MH.pose, SHOULDER_L, POLE_L); MH.pos.add(M.push); MH.pose = M.pose; }
     const res = { R, L, M };
@@ -532,7 +534,7 @@ export class PlayerController {
     );
     h.rotation.set(
       this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 + mel * 0.2 + J.r,
-      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
+      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yaw),
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
     // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
@@ -612,7 +614,7 @@ export class PlayerController {
     let lPose;
     if (type === 'pistol') handFrame(_L, _lq, gun.group, _gq, _v1.copy(LH_PISTOL).add(FIT.L.push), LH_PISTOL_F, LH_PISTOL_P);
     else if (A.under === 'vgrip') handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF).add(FIT.L.push), VG_F, PALM_R);
-    else handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF).add(FIT.L.push), SUP_F, PALM_SUP);
+    else handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(gun.pump ? SUP_OFF_PUMP : SUP_OFF).add(FIT.L.push), SUP_F, PALM_SUP);
     lPose = FIT.L.pose;
     let tPose = lPose, lk = 0, leftFree = false;
     const toward = (pos, q, pose, k) => { _L.lerp(pos, k); _lq.slerp(q, k); tPose = pose; lk = k; };

@@ -832,6 +832,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     if (A.mag === 'fast') {
       // orange pull tab on the floorplate
       const box = new THREE.Box3().setFromObject(mag);
+      if (box.isEmpty()) box.setFromObject(g);   // magazine is part of the model (TPM): tab under the gun's lowest point
       tabMat = tabMat || new THREE.MeshStandardMaterial({ color: 0xc8641e, roughness: 0.8 });
       const tab = new THREE.Mesh(new RoundedBoxGeometry(0.012, 0.022, 0.016, 2, 0.003), tabMat);
       tab.position.set(0, box.min.y - 0.008, (box.min.z + box.max.z) / 2 + 0.01);
