@@ -1087,3 +1087,81 @@ body.mode-online #pane-play .pane-title, body.mode-online #pane-play .pane-sub {
 .about-row.credits a { color: var(--bo, #e8a83a); text-decoration: none; }
 .about-row.credits a:hover { text-decoration: underline; }
 .rows.two .about-row.credits { grid-column: 1 / -1; }
+
+/* ---------- menu layout fixes (Oct 2026) ---------- */
+/* Play tab: START MATCH stays on screen; it sticks to the bottom of the scrolling body */
+/* Play tab: START MATCH sits in its own bar under the scrolling body, so it's always on screen */
+.menu-cta { display: none; flex: none; }
+#menu[data-tab="play"] .menu-cta { display: flex; }
+body.mode-online .menu-cta { display: none !important; }
+.menu-cta .cta { margin: 0; width: min(560px, 100%); }
+#menu .mw-foot { padding-right: 190px; }
+/* the map intel card only matters on Play; the other tabs get the full width */
+#menu[data-tab="loadout"] .intel, #menu[data-tab="options"] .intel { display: none; }
+#menu[data-tab="loadout"] #pane-loadout.on, #menu[data-tab="options"] #pane-options.on { grid-column: 1 / -1; max-width: 1180px; }
+/* game-type screen: normal flow, so the title can never sit on top of the cards */
+.mode-wrap { justify-content: flex-start; overflow-y: auto; padding-bottom: 72px; }
+.mode-wrap .mw-head, #mode .mw-foot { position: static; }
+.mode-cards { margin-top: auto; }
+#mode .mw-foot { margin-top: auto; }
+.mode-cf { align-self: flex-start; }
+/* title screen: the logo fits narrow phones */
+@media (max-width: 520px) {
+  .title-logo { font-size: clamp(28px, 10vw, 44px); letter-spacing: 0.12em; padding-left: 0.12em; }
+  .title-sub { font-size: 11px; letter-spacing: 0.2em; padding-left: 0.2em; }
+  .bo-title b { font-size: 22px; white-space: normal; }
+  #menu .mw-foot { padding-right: 0; }
+  .menu-cta .cta { width: 100%; }
+}
+/* short landscape phones: compact header so panes get the height */
+@media (max-height: 520px) {
+  #menu .mw { gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+  #menu .bo-title b { font-size: 24px; } #menu .bo-title small { font-size: 10px; }
+  #menu .pane-title { font-size: 22px; }
+  #menu .mw-head { gap: 8px; }
+  .side-btn { bottom: 6px; padding: 5px 10px; }
+  .menu-cta .cta { font-size: 18px; padding: 8px 16px; }
+}
+
+/* ---------- Create a Class: class list → class card → editor ---------- */
+.cls-view { display: none; }
+.cls-view.on { display: grid; }
+#cls-pick { grid-template-columns: minmax(220px, 340px) minmax(0, 1fr); gap: 24px; align-items: start; }
+#cls-editor { gap: 12px; }
+.cls-list { display: flex; flex-direction: column; gap: 4px; }
+.cls-list .group:first-child { margin-top: 0; }
+.cls-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; text-align: left; padding: 10px 14px; background: var(--bo-panel); border: 1px solid var(--bo-line); border-left: 3px solid transparent; color: var(--bo-ink); cursor: pointer; position: relative; outline: none; }
+.cls-row .cr-n { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cls-row .cr-w { font-size: 11px; letter-spacing: 0.16em; color: var(--ink-faint); }
+.cls-row .cr-eq { grid-column: 1 / -1; font-size: 10px; letter-spacing: 0.22em; color: var(--bo-hi); }
+.cls-row:hover, .cls-row.pad-focus, .cls-row:focus-visible { background: rgba(247, 148, 29, 0.14); }
+.cls-row.sel { border-left-color: var(--bo); background: rgba(247, 148, 29, 0.12); }
+.cls-row.eq .cr-n::before { content: '✓ '; color: var(--bo); }
+.cls-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cls-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--bo-line); padding-bottom: 4px; }
+.cls-name { font-family: var(--display); font-weight: 700; font-size: 30px; letter-spacing: 0.08em; color: #fff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cls-kind { font-size: 11px; letter-spacing: 0.22em; color: var(--bo); flex: none; }
+.cls-slot .gs-view canvas { aspect-ratio: 8 / 2.4; max-height: 210px; }
+#gs-viewbox canvas { max-height: 230px; }
+.cls-wpn { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; padding: 10px 12px; background: var(--bo-panel); border: 1px solid var(--bo-line); }
+.cw-k { font-size: 11px; letter-spacing: 0.22em; color: var(--bo); align-self: center; }
+.cw-n { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.08em; display: flex; gap: 10px; align-items: baseline; }
+.cw-n small { font-size: 11px; color: var(--ink-faint); letter-spacing: 0.16em; }
+.cw-a { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
+.cw-a span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border: 1px solid var(--bo-line); color: var(--ink-dim); }
+.cw-a span.mod { color: var(--bo-hi); border-color: rgba(247, 148, 29, 0.45); }
+.cls-actions { display: flex; gap: 10px; align-items: stretch; }
+.cls-actions .cta { margin: 0; flex: 1; font-size: 22px; }
+.cls-actions .cta.done { filter: saturate(0.4) brightness(0.85); }
+.cls-actions .menu-btn { flex: 1; justify-content: center; text-align: center; }
+.cls-ebar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.cls-rn { display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: 0.2em; color: var(--ink-faint); }
+.cls-rn input { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; width: 15em; }
+@media (max-width: 760px) {
+  #cls-pick { grid-template-columns: 1fr; }
+  .cls-row { padding: 7px 10px; } .cls-row .cr-n { font-size: 15px; }
+  .cls-wpn { grid-template-columns: 1fr; } .cw-a { grid-column: 1; }
+  .cls-name { font-size: 22px; }
+  .cls-rn input { width: 100%; } .cls-rn { flex: 1; }
+}
+#menu .mw-foot { min-height: 34px; align-items: center; }

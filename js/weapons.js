@@ -483,7 +483,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     if (A.under === 'vgrip') {
       p.lathe(M.poly, [[0, 0], [0.0125, 0], [0.014, 0.012], [0.0145, 0.06], [0.012, 0.075], [0, 0.077]], 0, 0, 16);
       const vfg = p.by.get(M.poly).pop();
-      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2 + 0.15));
+      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(-(Math.PI / 2 + 0.12)) /* lathe runs along -z: swing it to hang down, bottom raked back */);
       vfg.translate(0, 0.012, -0.36);
       p.by.get(M.poly).push(vfg);
       foregrip.position.set(0, -0.024, -0.365);
@@ -602,7 +602,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     if (A.under === 'vgrip') {
       p.lathe(M.poly, [[0, 0], [0.0125, 0], [0.014, 0.012], [0.0145, 0.06], [0.012, 0.075], [0, 0.077]], 0, 0, 16);
       const vfg = p.by.get(M.poly).pop();
-      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2 + 0.15));
+      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(-(Math.PI / 2 + 0.12)) /* lathe runs along -z: swing it to hang down, bottom raked back */);
       vfg.translate(0, 0.016, -0.38);
       p.by.get(M.poly).push(vfg);
       p.rbox(M.poly, 0.018, 0.006, 0.04, 0, 0.0145, -0.38, 0.002);
@@ -672,7 +672,7 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     if (A.under === 'vgrip') {
       p.lathe(M.poly, [[0, 0], [0.0125, 0], [0.014, 0.012], [0.0145, 0.06], [0.012, 0.075], [0, 0.077]], 0, 0, 16);
       const vfg = p.by.get(M.poly).pop();
-      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2 + 0.15));
+      vfg.applyMatrix4(new THREE.Matrix4().makeRotationX(-(Math.PI / 2 + 0.12)) /* lathe runs along -z: swing it to hang down, bottom raked back */);
       vfg.translate(0, -0.012, -0.34);
       p.by.get(M.poly).push(vfg);
       foregrip.position.set(0, -0.052, -0.345);

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { TEAMS, MELEE, GRENADE, PLAYER } from './config.js';
 import { buildGun } from './weapons.js';
-import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose } from './vmarms.js';
+import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose, surfaceCloud, fitGrip } from './vmarms.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -62,6 +62,8 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 
+const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
+
 export class PlayerController {
   constructor(game, char) {
     this.game = game;
@@ -110,8 +112,10 @@ export class PlayerController {
           ? { pos: V3((box.min.x + box.max.x) / 2 - 0.004, box.min.y - 0.016, (box.min.z + box.max.z) / 2 + 0.006), f: V3(0.55, 0, -0.85), p: PALM_UP, pose: POSES.cup }
           : { pos: V3(box.min.x - 0.016, box.max.y + (box.min.y - box.max.y) * 0.6, Math.max(box.min.z + 0.046, (box.min.z + box.max.z) / 2)), f: V3(0, -0.1, -1), p: PALM_R, pose: POSES.wrap };
       }
+      // fit the hands to this gun: fingers close round the grip, handguard / foregrip and magazine until they touch
+      const fit = this.fitHands(gun, type, magHold);
       return {
-        id: w.id, holder, gun, type, magHold,
+        id: w.id, holder, gun, type, magHold, fit,
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
           : pistol ? new THREE.Vector3(0.06, -0.094, -0.25) : new THREE.Vector3(0.11, -0.145, -0.21),
@@ -128,6 +132,32 @@ export class PlayerController {
       this.vmFlashLight = new THREE.PointLight(0xffb060, 0, 2, 2);
     }
     this.vmRoot.add(this.flash, this.vmFlashLight);
+  }
+
+  fitHands(gun, type, MH) {
+    const A = gun.att || {};
+    const key = type + ':' + JSON.stringify(A) + ':' + (this.game.input.isTouch ? 1 : 0);
+    const hit = FIT_CACHE.get(key);
+    if (hit) { if (MH && hit.M) { MH.pos.add(hit.M.push); MH.pose = hit.M.pose; } return hit; }
+    let cloud = null;
+    try { cloud = surfaceCloud(gun.group); } catch (e) { console.warn('grip fit', e); }
+    gun.group.updateMatrixWorld(true);
+    gun.group.getWorldQuaternion(_gq);
+    const one = (arm, pos, f, p, pose, sh, pole, opts) => {
+      handFrame(_tp, _tq, gun.group, _gq, pos, f, p);
+      const r = fitGrip(arm, gun.group, cloud, pos, _tq, pose, sh, pole, opts);
+      return r;
+    };
+    const R = one(this.arms.R, type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG), GRIP_F, PALM_L, POSES.trigger, SHOULDER_R, POLE_R, { keep: [0] });
+    let L;
+    if (type === 'pistol') L = one(this.arms.L, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, POSES.wrap, SHOULDER_L, POLE_L);
+    else if (A.under === 'vgrip') L = one(this.arms.L, _v1.copy(gun.foregrip.position).add(VG_OFF), VG_F, PALM_R, POSES.wrap, SHOULDER_L, POLE_L);
+    else L = one(this.arms.L, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF), SUP_F, PALM_SUP, POSES.support, SHOULDER_L, POLE_L);
+    let M = null;
+    if (MH) { M = one(this.arms.L, MH.pos, MH.f, MH.p, MH.pose, SHOULDER_L, POLE_L); MH.pos.add(M.push); MH.pose = M.pose; }
+    const res = { R, L, M };
+    FIT_CACHE.set(key, res);
+    return res;
   }
 
   muzzleWorld(out) {
@@ -576,12 +606,14 @@ export class PlayerController {
     const type = G.type, A = gun.att || {};
     gun.group.getWorldQuaternion(_gq);
     // right hand on the pistol grip, trigger finger in the guard
-    handFrame(_R, _rq, gun.group, _gq, type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG), GRIP_F, PALM_L);
+    const FIT = G.fit;
+    handFrame(_R, _rq, gun.group, _gq, _v1.copy(type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG)).add(FIT.R.push), GRIP_F, PALM_L);
     // left hand where it rests on the gun: support hand on a pistol, vertical grip, or palm up under the handguard / pump
     let lPose;
-    if (type === 'pistol') { handFrame(_L, _lq, gun.group, _gq, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P); lPose = POSES.wrap; }
-    else if (A.under === 'vgrip') { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF), VG_F, PALM_R); lPose = POSES.wrap; }
-    else { handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF), SUP_F, PALM_SUP); lPose = POSES.support; }
+    if (type === 'pistol') handFrame(_L, _lq, gun.group, _gq, _v1.copy(LH_PISTOL).add(FIT.L.push), LH_PISTOL_F, LH_PISTOL_P);
+    else if (A.under === 'vgrip') handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF).add(FIT.L.push), VG_F, PALM_R);
+    else handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(SUP_OFF).add(FIT.L.push), SUP_F, PALM_SUP);
+    lPose = FIT.L.pose;
     let tPose = lPose, lk = 0, leftFree = false;
     const toward = (pos, q, pose, k) => { _L.lerp(pos, k); _lq.slerp(q, k); tPose = pose; lk = k; };
     const MH = G.magHold;
@@ -680,7 +712,7 @@ export class PlayerController {
       this.vmNade.rotation.set(0.4, 0.3, 0);
     }
     blendPose(this.lPose, lPose, tPose, lk);
-    poseArm(this.arms.R, SHOULDER_R, _R, _rq, this.rPose, POLE_R);
+    poseArm(this.arms.R, SHOULDER_R, _R, _rq, FIT.R.pose, POLE_R);
     poseArm(this.arms.L, SHOULDER_L, _L, _lq, this.lPose, leftFree ? _a.set(-0.4, -1, 0.1) : POLE_L);
   }
 
