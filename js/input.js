@@ -1,10 +1,10 @@
 // Input: keyboard + mouse (pointer lock), Xbox / standard gamepads, touch.
 // Everything funnels into: analog move/look, held fire/ads, and one-shot "actions".
 
-const GAME_KEYS = new Set(['Space', 'Tab', 'KeyH', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const GAME_KEYS = new Set(['Space', 'Tab', 'KeyH', 'KeyZ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const KEY_ACTIONS = {
   KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
-  KeyC: 'crouch', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause', KeyH: 'loadout',
+  KeyC: 'crouch', KeyZ: 'prone', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause', KeyH: 'loadout',
 };
 // Standard gamepad mapping (Xbox layout)
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
@@ -180,7 +180,7 @@ export class Input {
   action(name) { if (this.actions.has(name)) { this.actions.delete(name); this.used.push(name); return true; } return false; }
   padHeld(name) {
     if (!this.pad) return false;
-    const idx = { sprint: PAD.L3, scoreboard: PAD.VIEW }[name];
+    const idx = { sprint: PAD.L3, scoreboard: PAD.VIEW, crouch: PAD.B }[name];
     const b = this.pad.buttons[idx];
     return !!(b && b.pressed);
   }

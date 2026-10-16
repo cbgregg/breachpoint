@@ -23,6 +23,9 @@ export const PLAYER = {
   crouchHeight: 1.2,
   eye: 1.62,
   crouchEye: 1.05,
+  proneHeight: 0.6,  // lying down: hold crouch (or Z / hold B on a controller)
+  proneEye: 0.38,
+  proneSpeed: 1.1,
   walk: 4.5,
   sprint: 6.6,
   tacSprint: 8.1,   // tactical sprint (double-tap sprint): faster, gun up, limited

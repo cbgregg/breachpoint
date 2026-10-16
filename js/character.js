@@ -278,7 +278,7 @@ export class Character {
     this.yaw = 0; this.pitch = 0;
     this.radius = PLAYER.radius;
     this.height = PLAYER.height;
-    this.crouchT = 0; this.wantCrouch = false;
+    this.crouchT = 0; this.wantCrouch = false; this.proneT = 0; this.wantProne = false;
     this.onGround = false;
     this.health = PLAYER.maxHealth;
     this.alive = false;
@@ -312,7 +312,7 @@ export class Character {
   // the character this machine looks through; its sounds play unpositioned
   get local() { return this === this.game.player; }
   get spos() { return this.local ? null : this.pos; }
-  get eyeHeight() { return lerp(PLAYER.eye, PLAYER.crouchEye, this.crouchT); }
+  get eyeHeight() { return lerp(lerp(PLAYER.eye, PLAYER.crouchEye, this.crouchT), PLAYER.proneEye, this.proneT); }
   eyePos(out) { return out.set(this.pos.x, this.pos.y + this.eyeHeight, this.pos.z); }
   chestPos(out) { return out.set(this.pos.x, this.pos.y + this.height * 0.68, this.pos.z); }
   headPos(out) { return out.set(this.pos.x, this.pos.y + this.height - 0.16, this.pos.z); }
@@ -341,7 +341,7 @@ export class Character {
     this.yaw = yaw; this.pitch = 0;
     this.health = PLAYER.maxHealth;
     this.alive = true;
-    this.crouchT = 0; this.wantCrouch = false; this.height = PLAYER.height;
+    this.crouchT = 0; this.wantCrouch = false; this.proneT = 0; this.wantProne = false; this.height = PLAYER.height;
     this.slideT = 0; this.meleeT = 0; this.meleeCd = 0;
     this.weapons.forEach(w => w.refill());
     this.cur = 0; this.prev = 1; this.switchT = 0.4;
@@ -384,7 +384,8 @@ export class Character {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     s += d.moveSpread * Math.min(1, hs / PLAYER.walk) * (1 - (d.scope ? 0.96 : 0.85) * k);
     if (!this.onGround) s += 0.05 * (1 - 0.5 * k);
-    if (this.crouchT > 0.5 && this.slideT <= 0) s *= 0.75;
+    if (this.proneT > 0.6) s *= 0.55;
+    else if (this.crouchT > 0.5 && this.slideT <= 0) s *= 0.75;
     return s + this.bloom * (1 - 0.65 * k);
   }
 
@@ -482,10 +483,15 @@ export class Character {
     if (this.tacSprinting) { this.tacFuel = Math.max(0, this.tacFuel - dt); this.tacIdle = 0; }
     else { this.tacIdle = (this.tacIdle || 0) + dt; if (this.tacIdle > 1) this.tacFuel = Math.min(PLAYER.tacTime, this.tacFuel + dt * PLAYER.tacTime / PLAYER.tacRecharge); }
     if (sliding) this.tacSprinting = false;
-    let target = (this.wantCrouch || sliding) ? 1 : 0;
+    // prone: only from the ground, not mid-slide; getting up needs room to kneel
+    let pTarget = this.wantProne && this.onGround && !sliding ? 1 : this.wantProne && this.proneT > 0 ? 1 : 0;
+    if (pTarget === 0 && this.proneT > 0 && phys.overlap(this.pos.x, this.pos.y + 0.05, this.pos.z, this.radius * 0.95, PLAYER.crouchHeight - 0.05)) pTarget = 1;
+    this.proneT += Math.sign(pTarget - this.proneT) * Math.min(Math.abs(pTarget - this.proneT), dt * 2.6);
+    let target = (this.wantCrouch || sliding || this.proneT > 0) ? 1 : 0;
     if (target === 0 && this.crouchT > 0 && phys.overlap(this.pos.x, this.pos.y + 0.05, this.pos.z, this.radius * 0.95, PLAYER.height - 0.05)) target = 1;
     this.crouchT += Math.sign(target - this.crouchT) * Math.min(Math.abs(target - this.crouchT), dt * (sliding ? 10 : 7));
-    this.height = lerp(PLAYER.height, PLAYER.crouchHeight, this.crouchT);
+    this.height = lerp(lerp(PLAYER.height, PLAYER.crouchHeight, this.crouchT), PLAYER.proneHeight, this.proneT);
+    const prone = this.proneT > 0.5;
 
     if (sliding) {
       this.slideT -= dt;
@@ -496,9 +502,9 @@ export class Character {
       this.sprinting = false;
       if (jump && this.onGround) { this.slideT = 0; }
     } else {
-      this.sprinting = sprint && this.crouchT < 0.3;
+      this.sprinting = sprint && this.crouchT < 0.3 && this.proneT <= 0;
       this.tacSprinting = !!tac && this.sprinting && this.tacFuel > 0.05;
-      let speed = this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.tacSprinting ? PLAYER.tacSprint : this.sprinting ? PLAYER.sprint : PLAYER.walk;
+      let speed = this.proneT > 0.05 ? PLAYER.proneSpeed * (prone ? 1 : 0.4) : this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.tacSprinting ? PLAYER.tacSprint : this.sprinting ? PLAYER.sprint : PLAYER.walk;
       speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
       const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
       const tx = wish.x * speed, tz = wish.z * speed;
@@ -508,6 +514,7 @@ export class Character {
       this.vel.x += dx; this.vel.z += dz;
     }
 
+    if (jump && this.proneT > 0) { this.wantProne = false; jump = false; } // jump from prone gets you up to a crouch
     if (jump && this.onGround && (this.crouchT < 0.5 || sliding)) {
       this.vel.y = PLAYER.jump;
       this.onGround = false;
@@ -694,6 +701,9 @@ function deathImpulse(c) {
   return { point: c.chestPos(new THREE.Vector3()), dir: dir.normalize(), power: 1 };
 }
 
+export const PRONE_POSE = { tilt: 1.42, lift: 0.14, arch: 0.45, head: 0.6 };
+let PRONE_TILT = 1.42, PRONE_LIFT = 0.14, PRONE_ARCH = 0.45, PRONE_HEAD = 0.6;
+export function setPronePose(p) { ({ tilt: PRONE_TILT, lift: PRONE_LIFT, arch: PRONE_ARCH, head: PRONE_HEAD } = { tilt: PRONE_TILT, lift: PRONE_LIFT, arch: PRONE_ARCH, head: PRONE_HEAD, ...p }); }
 function animateSoldier(c, dt, showName) {
   const m = c.model, r = m.root, B = m.bones;
   const alive = c.alive;
@@ -732,6 +742,12 @@ function animateSoldier(c, dt, showName) {
     }
   }
   m.mixer.update(alive ? dt : 0);
+  // prone: the whole body tips forward about the feet and slides back so the chest sits over the
+  // character's position (head just ahead of it, legs out behind)
+  const pr = alive ? (c.proneT || 0) : (m.proneLeft || 0);
+  if (alive) m.proneLeft = pr;
+  m.body.rotation.x = -pr * PRONE_TILT;
+  m.body.position.z = pr * 1.0;
   r.updateMatrixWorld(true);
 
   // legs face the movement direction, upper body stays on the aim
@@ -745,15 +761,16 @@ function animateSoldier(c, dt, showName) {
   const right = _w4.set(co, 0, -s);
   const cr = alive ? c.crouchT : 0;
   if (alive) {
-    rotateBoneWorld(B.Hips, UP, m.legYaw);
-    rotateBoneWorld(B.Spine, UP, -m.legYaw * 0.5);
-    rotateBoneWorld(B.Spine1, UP, -m.legYaw * 0.5);
+    const ly = m.legYaw * (1 - pr);   // lying down the legs stay straight behind
+    rotateBoneWorld(B.Hips, UP, ly);
+    rotateBoneWorld(B.Spine, UP, -ly * 0.5);
+    rotateBoneWorld(B.Spine1, UP, -ly * 0.5);
   }
   const dyn = alive ? applyDynamics(mo, c, B, rotateBoneWorld, dt) : { knee: 0, drop: 0 };
   // crouch / slide: bend knees and drop the body so the feet stay planted
-  let bend = cr * 1.05 + dyn.knee * (1 - cr);
+  let bend = (cr * 1.05 + dyn.knee * (1 - cr)) * (1 - pr);
   if (sliding) bend = 0.9;
-  m.body.position.y = -2 * m.legLen * (1 - Math.cos(bend)) * 0.95 - dyn.drop;
+  m.body.position.y = -2 * m.legLen * (1 - Math.cos(bend)) * 0.95 - dyn.drop + pr * PRONE_LIFT;
   if (bend > 0.01) {
     for (const sideName of ['Left', 'Right']) {
       rotateBoneWorld(B[sideName + 'UpLeg'], right, bend);
@@ -780,6 +797,11 @@ function animateSoldier(c, dt, showName) {
   rotateBoneWorld(B.Spine1, right, -pitch * 0.3);
   rotateBoneWorld(B.Spine2, right, -pitch * 0.3);
   rotateBoneWorld(B.Head, right, -pitch * 0.25);
+  if (pr > 0.01) { // lying down: arch the chest and lift the head to look along the ground
+    rotateBoneWorld(B.Spine1, right, PRONE_ARCH * pr);
+    rotateBoneWorld(B.Spine2, right, PRONE_ARCH * pr);
+    rotateBoneWorld(B.Head, right, PRONE_HEAD * pr);
+  }
   m.kick = Math.max(0, m.kick - dt * 12);
   _eu.set(pitch, c.yaw + (tac ? 0.35 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
   _qAim.setFromEuler(_eu);

@@ -577,10 +577,16 @@ export class Game {
   }
 
   rayCharacter(o, d, c, maxT) {
-    const hx = c.pos.x, hy = c.pos.y + c.height - 0.16, hz = c.pos.z;
+    // lying down the head is out in front and the body runs back along the ground
+    const pr = c.proneT || 0, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
+    const hx = c.pos.x + fx * 0.55 * pr, hy = c.pos.y + c.height - 0.16, hz = c.pos.z + fz * 0.55 * pr;
     let t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, hx - 0.16, hy - 0.16, hz - 0.16, hx + 0.16, hy + 0.16, hz + 0.16, maxT);
     let head = t < maxT;
-    const tb = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, c.pos.x - 0.28, c.pos.y, c.pos.z - 0.28, c.pos.x + 0.28, c.pos.y + c.height - 0.32, c.pos.z + 0.28, Math.min(maxT, t));
+    let tb;
+    if (pr > 0.5) {
+      const ax = c.pos.x + fx * 0.35, az = c.pos.z + fz * 0.35, bx = c.pos.x - fx * 1.15, bz = c.pos.z - fz * 1.15;
+      tb = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, Math.min(ax, bx) - 0.22, c.pos.y, Math.min(az, bz) - 0.22, Math.max(ax, bx) + 0.22, c.pos.y + 0.4, Math.max(az, bz) + 0.22, Math.min(maxT, t));
+    } else tb = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, c.pos.x - 0.28, c.pos.y, c.pos.z - 0.28, c.pos.x + 0.28, c.pos.y + c.height - 0.32, c.pos.z + 0.28, Math.min(maxT, t));
     if (tb < Math.min(maxT, t)) { t = tb; head = false; }
     return { t, head };
   }
