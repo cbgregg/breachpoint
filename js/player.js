@@ -30,7 +30,11 @@ const SPRINT_F = V3(0.15, -0.55, -0.8), SPRINT_P = V3(1, 0.2, 0);
 const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
 const COOK_F = V3(0.25, 0.1, -1);
 // gun pose at the height of a magazine change (offsets added to the hip pose)
-export const RELOAD_POSE = { x: -0.07, y: 0.075, z: 0.02, rx: 0.06, ry: -0.04, rz: -0.55 };
+export const RELOAD_POSES = {
+  long: { x: -0.05, y: 0.11, z: -0.16, rx: 0.15, ry: 0.55, rz: -0.55 },     // up, out and turned so the magwell faces you
+  pistol: { x: -0.03, y: 0.035, z: -0.05, rx: 0.22, ry: 0.3, rz: -0.4 },     // a quick tip of the grip toward you
+  shotgun: { x: -0.03, y: 0.06, z: -0.08, rx: 0.1, ry: 0.3, rz: -0.35 },     // loading port turned up
+};
 export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _ld = new THREE.Vector3(), _gl = new THREE.Vector3(), _m0 = new THREE.Vector3(), _m1 = new THREE.Vector3(), _pp = new THREE.Vector3(), _fg = new THREE.Vector3();
@@ -471,6 +475,7 @@ export class PlayerController {
     const s2 = this.inspectT > 0 ? smooth(0.42, 0.56, ip) * (1 - smooth(0.82, 0.98, ip)) : 0;
     const mel = c.meleeT > 0 ? Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) : 0;
     const idle = Math.sin(this.breathT * 1.6) * 0.002 * (1 - a);
+    const RP_ = RELOAD_POSES[G.type] || RELOAD_POSES.long;
     const tilt = w.reloading ? sm5(rp / 0.22) * (1 - sm5((rp - 0.8) / 0.2)) : 0;
     const slide = this.slideK;
     if (w.reloading && G.magHold) {
@@ -484,14 +489,14 @@ export class PlayerController {
 
     h.position.set(
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
-      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) + tilt * RELOAD_POSE.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
-      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RELOAD_POSE.y - sw * 0.25 - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
-      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RELOAD_POSE.z - mel * 0.12 + J.z,
+      lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - a * 0.7) + tilt * RP_.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
+      lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - a * 0.7) + idle + tilt * RP_.y - sw * 0.25 - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
+      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RP_.z - mel * 0.12 + J.z,
     );
     h.rotation.set(
-      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RELOAD_POSE.rx - spr * 0.25 + this.swayY * 0.8 + mel * 0.2 + J.r,
-      spr * 0.55 + tilt * RELOAD_POSE.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
-      tilt * RELOAD_POSE.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
+      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 + mel * 0.2 + J.r,
+      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 + mel * 0.3 + (1 - a) * 0.035,
+      tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6,
     );
     // per-gun hip pose (the pistol is held up and turned in, both hands on it, like CoD)
     if (G.hipRot) { const k = 1 - ae; h.rotation.x += G.hipRot[0] * k; h.rotation.y += G.hipRot[1] * k; h.rotation.z += G.hipRot[2] * k; }
@@ -572,8 +577,8 @@ export class PlayerController {
       // magazine change: grab the mag, pull it, take it down out of view, bring a fresh one up, seat it,
       // slap it home, back to the gun. The mag rides in the hand the whole time.
       handFrame(_m0, _mq, gun.group, _gq, MH.pos, MH.f, MH.p);                 // M0: holding the seated mag
-      _m1.copy(_m0).add(_a.set(0.01, -0.15, 0.05));                           // M1: pulled clear
-      _pp.copy(_m0).add(_a.set(-0.06, -0.42, 0.06));                          // P: down, out of view
+      _m1.copy(_m0).add(_a.set(0.01, -0.11, 0.04));                           // M1: pulled clear
+      _pp.copy(_m0).add(_a.set(-0.07, -0.32, 0.08));                          // P: down to the pouch
       // one continuous, time-parametrised spline through the beats (no stop-start between them):
       // grip -> mag -> pulled -> down out of view -> back up -> seated -> slap -> grip
       _gl.copy(_L); _lq2.copy(_lq);                                            // the resting grip
