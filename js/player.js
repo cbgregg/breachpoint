@@ -31,9 +31,10 @@ const THROW_F = V3(0.1, 1, -0.3), THROW_P = V3(0.2, 0, -1);
 const COOK_F = V3(0.25, 0.1, -1);
 // gun pose at the height of a magazine change (offsets added to the hip pose)
 export const RELOAD_POSES = {
-  long: { x: -0.05, y: 0.11, z: -0.16, rx: 0.15, ry: 0.55, rz: -0.55 },     // up, out and turned so the magwell faces you
-  pistol: { x: -0.03, y: 0.035, z: -0.05, rx: 0.22, ry: 0.3, rz: -0.4 },     // a quick tip of the grip toward you
-  shotgun: { x: -0.03, y: 0.06, z: -0.08, rx: 0.1, ry: 0.3, rz: -0.35 },     // loading port turned up
+  // kept low and right so the centre of the screen (your line of sight) stays clear; the roll turns the magwell toward you
+  long: { x: 0.0, y: 0.0, z: -0.03, rx: 0.05, ry: 0.2, rz: -0.7 },
+  pistol: { x: 0.0, y: -0.01, z: -0.01, rx: 0.15, ry: 0.15, rz: -0.45 },
+  shotgun: { x: 0.0, y: 0.0, z: -0.02, rx: 0.06, ry: 0.15, rz: -0.45 },     // loading port turned toward you
 };
 export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();

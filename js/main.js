@@ -277,6 +277,8 @@ function wpnBlock(label, id, att) {
     <div class="cw-a">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<span class="${sum.includes(ATTACHMENTS[s][att[s]].name) ? 'mod' : ''}">${ATTACHMENTS[s][att[s]].name}</span>`).join('')}</div>`;
 }
 function renderClasses() {
+  // the list is rebuilt: keep the controller / keyboard focus on the same class
+  const had = document.querySelector('#cls-list .pad-focus'), keep = had && had.dataset.cls;
   const row = (key, c) => `<button class="cls-row${key === clsSel ? ' sel' : ''}${key === settings.cls ? ' eq' : ''}" data-cls="${key}" data-nav>
       <span class="cr-n">${escHtml(c.name)}</span><span class="cr-w">${WEAPONS[c.primary].short}</span>${key === settings.cls ? '<span class="cr-eq">EQUIPPED</span>' : ''}</button>`;
   $('cls-list').innerHTML = `<div class="group">DEFAULT CLASSES</div>${DEFAULT_CLASSES.map((c, i) => row('d' + i, c)).join('')}
@@ -295,6 +297,7 @@ function renderClasses() {
   $('cls-edit').textContent = custom ? 'EDIT CLASS' : 'COPY TO A CUSTOM CLASS';
   $('cls-note').textContent = custom ? 'Pick a primary and attachments in the editor. Changes save automatically.' : 'Default classes can\'t be changed. Copy one into a custom slot to tweak it.';
   if (!editKey) { $('cls-viewslot').appendChild($('gs-viewbox')); preview.show(c.primary, clsAtt(c, c.primary)); }
+  if (keep) focusEl($('cls-list').querySelector(`[data-cls="${keep}"]`));
 }
 function equipClass() {
   settings.cls = clsSel;
@@ -867,6 +870,7 @@ function navItems() {
   return [...scr.querySelectorAll('[data-nav]')].filter(el => el.offsetParent !== null && !el.closest('.tabs'));
 }
 function focusEl(el) {
+  document.querySelectorAll('.pad-adjust').forEach(e => { if (e !== el) e.classList.remove('pad-adjust'); });
   document.querySelectorAll('.pad-focus').forEach(e => e.classList.remove('pad-focus'));
   document.querySelectorAll('.pad-row').forEach(e => e.classList.remove('pad-row'));
   if (!el) return;
@@ -956,11 +960,10 @@ game.input.onNav = (dir) => {
     case 'up': case 'down': go(dir); break;
     case 'left': case 'right': {
       const d = dir === 'left' ? -1 : 1;
-      // value controls change with left/right; everything else moves to its neighbour. Tabs are LB / RB only.
-      if (el && el.tagName === 'SELECT') { cycleSelect(el, d); tick(); }
-      else if (el && el.type === 'range') { stepRange(el, d); tick(); }
-      else if (el && el.type === 'checkbox') { if (el.checked !== d > 0) { el.checked = d > 0; el.dispatchEvent(new Event('change')); tick(); } }
-      else go(dir);
+      // left / right always move to the neighbouring control. Dropdowns open, checkboxes toggle and sliders
+      // start adjusting (then left / right step them, A or B finishes) with A only. Tabs are LB / RB.
+      if (el && el.type === 'range' && el.classList.contains('pad-adjust')) { stepRange(el, d); tick(); }
+      else { el?.classList.remove('pad-adjust'); go(dir); }
       break;
     }
     case 'accept':
@@ -968,11 +971,12 @@ game.input.onNav = (dir) => {
       if (el.type === 'checkbox') { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
       else if (el.tagName === 'SELECT') openDropdown(el);
       else if ((el.tagName === 'INPUT' && el.type !== 'range') || el.tagName === 'TEXTAREA') { el.focus(); break; }
-      else if (el.tagName === 'INPUT') break;
+      else if (el.type === 'range') { el.classList.toggle('pad-adjust'); }
       else el.click();
       game.audio.play('ui', null, { ui: true });
       break;
     case 'back':
+      if (el && el.classList.contains('pad-adjust')) { el.classList.remove('pad-adjust'); break; }
       if (((screen === 'menu' && tab === 'loadout') || (screen === 'pause' && pauseSec === 'loadout')) && closeEditor()) break;
       if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
       else if (screen === 'pause') game.resume();
