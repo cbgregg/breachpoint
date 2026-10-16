@@ -379,7 +379,8 @@ function build(ctx) {
       const mid = (a + b) / 2;
       const x = alongX ? x0 + sgn * mid : x0, z = alongX ? z0 : z0 + sgn * mid;
       const w = alongX ? b - a : t, d = alongX ? t : b - a;
-      solid(x, z, w, d, y1 - y0, y0 + base, s);
+      const sb = solid(x, z, w, d, y1 - y0, y0 + base, s);
+      if (s === 'glass' && sb) sb.pass = true;   // shop windows: you can shoot (and see) through them
       B(m, w, y1 - y0, d, x, y0 + base, z, 0, { tint: tn, grime: base ? 0.1 : 0.25, base });
     };
     let cur = 0;
@@ -485,7 +486,7 @@ function build(ctx) {
       P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, cx, 0.75, z, 0, { sx: 1 - i * 0.01 });
       P(new THREE.BoxGeometry(0.06, 0.04, 0.6), M.paint, cx - 0.5, 1.05, z, 0, { tint: 0xc8322b });
     }
-    solid(x + n * 0.19, z, n * 0.38 + 0.7, 0.7, 1.05, 0, 'metal');
+    solid(x + n * 0.19, z, n * 0.38 + 0.7, 0.7, 0.55, 0.5, 'metal');   // the baskets: open underneath
   };
   carts(-21.2, 22.6, 5); carts(-21.2, -22.6, 4);
   // neon over the front end: CHECKOUTS above the lanes (both faces), CUSTOMER SERVICE over the desk
@@ -574,7 +575,7 @@ function build(ctx) {
     SB(M.woodOld, 1.0, 1.0, L, 10.2, 0, cz, { tint: 0x9a7a5a }, 'wood');
     B(M.steelK, 1.05, 0.04, L, 10.2, 1.0, cz, 0, { grime: 0 });
     face(M.clearGlass, L, 0.45, 9.69, 1.25, cz, -Math.PI / 2, 3);
-    solid(10.2, cz, 1.0, L, 1.48, 0, 'glass');
+    solid(10.2, cz, 1.0, L, 1.48, 0, 'glass').pass = true;   // the glass case: bullets go through
     for (let z = z0 + 0.4; z < z1 - 0.3; z += 0.42) {
       P(new RoundedBoxGeometry(0.3, 0.12, 0.16, 2, 0.05), M.bread, 10.15, 1.1, z, 0.3);
       if ((z * 10 | 0) % 3 === 0) P(new THREE.SphereGeometry(0.07, 10, 6), M.crust, 10.4, 1.09, z + 0.1);
@@ -605,7 +606,7 @@ function build(ctx) {
   SB(M.steelK, 0.9, 1.3, 0.9, 13, 0, -9, { grime: 0 }, 'metal');
   P(new THREE.CylinderGeometry(0.35, 0.3, 0.45, 16), M.steelK, 13, 1.5, -9);
   const breadCart = (x, z) => {
-    solid(x, z, 0.7, 0.9, 1.8, 0, 'metal');
+    solid(x, z, 0.7, 0.9, 1.8, 0, 'metal').pass = true;   // open wire rack: blocks you, not bullets
     for (const dx of [-0.33, 0.33]) for (const dz of [-0.43, 0.43]) P(new THREE.CylinderGeometry(0.015, 0.015, 1.8, 5), M.steelK, x + dx, 0.9, z + dz);
     for (let y = 0.25; y < 1.8; y += 0.3) { B(M.steelK, 0.66, 0.02, 0.86, x, y, z, 0, { grime: 0 }); for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.22, 0.1, 0.14, 2, 0.045), M.bread, x, y + 0.07, z - 0.28 + i * 0.28, 0.1, { tint: 0xffe8c8 }); }
   };
@@ -631,7 +632,7 @@ function build(ctx) {
     SB(M.paint, 1.0, 1.0, L, 10.2, 0, cz, { tint: 0xe8e4dc }, 'metal');
     face(M.clearGlass, L, 0.5, 9.69, 1.25, cz, -Math.PI / 2, 3);
     face(M.goodsCan, L - 0.1, 0.3, 9.72, 0.75, cz, -Math.PI / 2, 1);
-    solid(10.2, cz, 1.0, L, 1.5, 0, 'glass');
+    solid(10.2, cz, 1.0, L, 1.5, 0, 'glass').pass = true;
   }
   SB(M.steelK, 1.0, 0.9, 2.4, 12.6, 0, -3.4, { grime: 0 }, 'metal');
   SB(M.steelK, 1.0, 0.9, 2.4, 12.6, 0, 3.4, { grime: 0 }, 'metal');
@@ -650,7 +651,7 @@ function build(ctx) {
   }
   const rack = (x0, x1, z) => {
     const L = x1 - x0, cx = (x0 + x1) / 2;
-    solid(cx, z, L, 1.0, 3.6, 0, 'metal');
+    solid(cx, z, L, 1.0, 3.6, 0, 'metal').pass = true;   // open racking with cardboard: you can see and shoot through the gaps
     for (let x = x0; x <= x1 + 0.01; x += L / 2) for (const dz of [-0.45, 0.45]) B(M.paint, 0.08, 3.6, 0.08, x, 0, z + dz, 0, { tint: 0x2e5a9a, grime: 0.1 });
     for (const y of [0.15, 1.35, 2.55]) {
       for (const dz of [-0.45, 0.45]) B(M.paint, L, 0.1, 0.06, cx, y, z + dz, 0, { tint: 0xe07020, grime: 0.1 });
@@ -778,9 +779,11 @@ function build(ctx) {
 
   // ---------- outside: parking lot ----------
   const parked = [[-30.2, -22.8], [-30.2, -17.2], [-30.2, -8.8], [-30.2, 2.4], [-30.2, 10.8], [-30.2, 19.2], [-34.8, -20], [-34.8, -6], [-34.8, 5.2], [-34.8, 16.4], [-34.8, 24.8], [-30.2, 25]];
+  // car collision: the body, then the narrower, shorter cabin (no invisible corners)
+  const carSolid = (x, z) => { solid(x, z, 3.9, 1.75, 0.85, 0, 'metal'); solid(x, z, 2.9, 1.5, 0.6, 0.85, 'metal').pass = true; };   // the cabin is mostly glass
   for (const [x, z] of parked) {
     buildCar(x, z, x > -32 ? Math.PI : 0, 0);
-    solid(x, z, 4.4, 2.0, 1.45, 0, 'metal');
+    carSolid(x, z);
   }
   // light poles (real lights on High / Ultra)
   for (const z of [-14, 0, 14]) {
@@ -799,7 +802,7 @@ function build(ctx) {
   }
   // cart corrals, bollards, planter islands
   for (const z of [-11, 11]) {
-    solid(-32.5, z, 2.6, 1.2, 1.0, 0, 'metal');
+    solid(-32.5, z, 2.6, 1.2, 1.0, 0, 'metal').pass = true;   // rails: stop you, not bullets
     for (const s of [-1, 1]) B(M.steelK, 2.6, 0.05, 0.05, -32.5, 0.95, z + s * 0.55, 0, { grime: 0 });
     P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, -32.9, 0.75, z, Math.PI / 2);
   }
@@ -836,7 +839,8 @@ function build(ctx) {
   const semi = (zc) => {
     const tx0 = 22.7, tL = 11.4, tx = tx0 + tL / 2;
     SB(M.paint, tL, 2.75, 2.5, tx, 1.2, zc, { tint: 0xeae8e2, grime: 0.12 }, 'metal');
-    solid(tx, zc, tL, 2.5, 1.2, 0, 'metal');
+    for (const dx of [3.6, 4.85]) for (const s of [-1, 1]) solid(tx0 + dx, zc + s * 1.0, 1.0, 0.4, 1.0, 0, 'metal');   // wheels; open under the trailer (crawl under it)
+    for (const s of [-1, 1]) solid(tx0 + tL - 2.2, zc + s * 0.9, 0.14, 0.14, 1.0, 0, 'metal');   // landing gear legs
     B(M.dark, tL - 0.4, 0.25, 2.2, tx, 0.95, zc, 0, { grime: 0 });
     for (const s of [-1, 1]) {
       const sm = signMesh(signTex(['FRESHWAY', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.55, zc + s * 1.262, s > 0 ? 0 : Math.PI, 0.05);
@@ -851,7 +855,8 @@ function build(ctx) {
     SB(M.paint, 1.3, 2.5, 2.4, cx0 + 2.35, 1.1, zc, { tint: 0x2a4a7a, grime: 0.1 }, 'metal');     // sleeper
     SB(M.paint, 1.9, 2.0, 2.45, cx0 + 3.95, 1.1, zc, { tint: 0x2a4a7a, grime: 0.1 }, 'metal');    // cab
     SB(M.paint, 1.4, 1.25, 2.1, cx0 + 5.55, 0.95, zc, { tint: 0x2a4a7a, grime: 0.15 }, 'metal');  // hood
-    solid(cx0 + 3.9, zc, 5.6, 2.45, 1.1, 0, 'metal');
+    solid(cx0 + 3.9, zc, 5.6, 2.45, 0.5, 0.6, 'metal');                               // frame and tanks
+    for (const dx of [1.2, 2.5, 5.4]) for (const s of [-1, 1]) solid(cx0 + dx, zc + s * 1.0, 1.0, 0.4, 1.04, 0, 'metal'); // wheels
     P(new THREE.BoxGeometry(0.04, 0.85, 2.1), M.glass, cx0 + 4.91, 2.55, zc, 0, { tint: 0xffffff });
     B(M.steelK, 0.12, 0.6, 2.2, cx0 + 6.3, 0.95, zc, 0, { grime: 0 }); // grille
     for (const s of [-1, 1]) {
@@ -922,12 +927,14 @@ function build(ctx) {
   };
   fence(41.6, -30, 41.6, 30);
   fence(-24, 30, 41.6, 30); fence(-24, -30, 41.6, -30);
+  // ...and round the front lot too, so the edge of the map is always something you can see
+  fence(-42.2, -30, -42.2, 30); fence(-42.2, 30, -24, 30); fence(-42.2, -30, -24, -30);
   for (let z = -28; z <= 28; z += 3.3) P(new THREE.SphereGeometry(1.6, 8, 6), M.leaf, 45 + Math.sin(z) * 1.2, 2.4, z, z, { sy: 1.3, cast: true, tint: 0x9ab080 });
   // ---------- right lane (+z): the parking strip, cars along the fence between hedge planters ----------
   plane(M.asphalt, 46, 6.2, -1, 27.3, 0.006);
   P(new THREE.PlaneGeometry(44, 0.14), M.line, -1, 0.02, 27.15, 0, { rx: -Math.PI / 2, cast: false, tint: 0xd8c050 });
   for (const x of [-20, -9.6, -6.4, 4, 7.2, 18.4]) P(new THREE.PlaneGeometry(0.12, 2.6), M.line, x, 0.02, 28.6, 0, { rx: -Math.PI / 2, cast: false, tint: 0xe8e4d8 });
-  for (const [x, ry] of [[-14.8, 0], [-1.2, Math.PI], [12.8, 0]]) { buildCar(x, 28.6, ry, 0); solid(x, 28.6, 4.4, 2.0, 1.45, 0, 'metal'); }
+  for (const [x, ry] of [[-14.8, 0], [-1.2, Math.PI], [12.8, 0]]) { buildCar(x, 28.6, ry, 0); carSolid(x, 28.6); }
   const planter = (x, z, w, d) => {
     SB(M.concrete, w, 0.6, d, x, 0, z, { tint: 0xc8c0b0, grime: 0.3 });
     plane(M.dirt, w - 0.2, d - 0.2, x, z, 0.61);
@@ -982,7 +989,7 @@ function build(ctx) {
   graf('BP43', 59, 2.6, 33.5, 1.3, -20.88, 0);
   // hedges beyond the side fences
   for (let x = -22; x <= 40; x += 2.2) for (const s of [-1, 1]) P(new THREE.SphereGeometry(1.0, 8, 6), M.leaf, x, 0.9, s * 31.3, x, { sy: 0.9, cast: true, tint: 0x9ab080 });
-  // map edge (invisible walls)
+  // map edge: right behind the fences
   solid(-42.8, 0, 1, 64, 10, 0, 'concrete');
   solid(42.3, 0, 1, 64, 10, 0, 'concrete');
   solid(0, 30.6, 86, 1, 10, 0, 'concrete');
@@ -1007,7 +1014,7 @@ function build(ctx) {
     for (const [dx, dz] of [[-1.15, -1.55], [1.15, -1.55], [-1.15, 1.55], [1.15, 1.55]]) P(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 8), M.dark, x + dx, 1.2, z + dz);
     B(M.metal, 2.6, 0.08, 3.4, x, 2.4, z, 0, { tint: 0x2f5a3a, grime: 0.15 });
     for (let i = 0; i < 4; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x + 0.2, 0.75, z - 1.0 + i * 0.4, Math.PI / 2);
-    solid(x + 0.2, z, 1.0, 2.4, 1.05, 0, 'metal');
+    solid(x + 0.2, z, 1.0, 2.4, 0.55, 0.5, 'metal');
   };
   shelter(-26.2, -4); shelter(-39.6, 8);
   const boxVan = (x, z, tint) => {

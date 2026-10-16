@@ -311,7 +311,7 @@ export class Input {
           else if (k === 'ads') { this.touchAdsHeld = true; this.adsPress(); if (lookId === null) lookStart(t); }
           else if (k === 'score') this.touchScore = true;
           else if (k === 'grenade') this.touchGren = true;
-          else { if (k === 'reload') this.touchUse = true; this.actions.add(k); }
+          else { if (k === 'reload') this.touchUse = true; if (k === 'crouch') this.touchCrouch = true; this.actions.add(k); }
           continue;
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
@@ -360,6 +360,7 @@ export class Input {
           if (btn.dataset.btn === 'score') this.touchScore = false;
           if (btn.dataset.btn === 'grenade') this.touchGren = false;
           if (btn.dataset.btn === 'reload') this.touchUse = false;
+          if (btn.dataset.btn === 'crouch') this.touchCrouch = false;
         }
       }
     };

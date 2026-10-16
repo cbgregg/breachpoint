@@ -56,6 +56,7 @@ export class Physics {
   raycast(o, d, maxDist) {
     let best = maxDist, bestBox = null, axis = -1, sign = 0;
     for (const b of this.boxes) {
+      if (b.pass) continue;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
       const t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, best);
       if (t < best) { best = t; bestBox = b; axis = _axis; sign = _sign; }
     }
@@ -73,6 +74,7 @@ export class Physics {
     const ix = dx / len, iy = dy / len, iz = dz / len;
     const max = len - 0.05;
     for (const bx of this.boxes) {
+      if (bx.pass) continue;
       if (rayBox(a.x, a.y, a.z, ix, iy, iz, bx.minx, bx.miny, bx.minz, bx.maxx, bx.maxy, bx.maxz, max) < max) return true;
     }
     return false;
