@@ -204,9 +204,15 @@ export class GameAudio {
         break;
       }
       case 'headshot': {
-        const o = dry(0);
-        this.noiseBurst(o, t, { type: 'highpass', freq: 6000, decay: 0.04, gain: 0.4, attack: 0.0006 });
-        this.tone(o, t, { freq: 3800, type: 'sine', decay: 0.18, gain: 0.18 });
+        // the "ching": a struck steel plate. Inharmonic bell partials ring out over a crisp tick, with a
+        // touch of room so it hangs in the air for a moment
+        const o = dry(0.22), f = 1780 * (0.97 + Math.random() * 0.06);
+        this.noiseBurst(o, t, { type: 'highpass', freq: 7000, decay: 0.025, gain: 0.32, attack: 0.0004 });
+        this.tone(o, t, { freq: 950, end: 720, type: 'triangle', decay: 0.05, gain: 0.07, attack: 0.0006 });
+        for (const [m, d, gn] of [[1, 0.75, 0.2], [2.76, 0.48, 0.11], [5.4, 0.28, 0.055], [8.93, 0.16, 0.03]]) {
+          this.tone(o, t, { freq: f * m, type: 'sine', decay: d, gain: gn, attack: 0.0008 });
+          this.tone(o, t, { freq: f * m * 1.004, type: 'sine', decay: d * 0.8, gain: gn * 0.45, attack: 0.0008 }); // slight beat = shimmer
+        }
         break;
       }
       case 'kill': {

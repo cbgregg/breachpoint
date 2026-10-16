@@ -849,7 +849,7 @@ export class HostSession {
     for (const o of g.characters) {
       if (o === c || !this.visible(r, o)) continue;
       const w = o.weapon;
-      const fl = (o.alive ? 1 : 0) | (o.sprinting ? 2 : 0) | (o.onGround ? 4 : 0) | (o.slideT > 0 ? 8 : 0) | (o.tacSprinting ? 16 : 0);
+      const fl = (o.alive ? 1 : 0) | (o.sprinting ? 2 : 0) | (o.onGround ? 4 : 0) | (o.slideT > 0 ? 8 : 0) | (o.tacSprinting ? 16 : 0) | (o.adsT > 0.5 ? 32 : 0);
       ch.push([o.id, r2(o.pos.x), r2(o.pos.y), r2(o.pos.z), r3(o.yaw), r3(o.pitch), r2(o.vel.x), r2(o.vel.y), r2(o.vel.z), fl,
         r2(o.crouchT), o.cur, w.reloading ? r2(w.reloadProgress) : 0, Math.round(o.health)]);
     }
@@ -1260,6 +1260,7 @@ export class GuestSession {
       c.tacSprinting = !!(A.fl & 16);
       c.onGround = !!(A.fl & 4);
       c.slideT = A.fl & 8 ? 0.1 : 0;
+      c.adsT = clamp(c.adsT + ((A.fl & 32 ? 1 : 0) - c.adsT > 0 ? dt * 4 : -dt * 4), 0, 1);   // aiming (sniper glare)
       c.health = A.hp;
       if (A.cur !== c.cur) c.switchTo(A.cur);
       const w = c.weapon;
