@@ -43,6 +43,8 @@ const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _qd = new THR
 const _ch = new THREE.Vector3(), _cz = new THREE.Vector3(), _cq = new THREE.Quaternion();
 // support hand on the charging handle / slide: palm down over the top, fingers across to the right
 const CH_F = new THREE.Vector3(0.85, -0.35, -0.4), CH_P = new THREE.Vector3(0.1, -1, 0.15);
+// palm on the bolt catch: flat against the left of the receiver, fingers forward and up
+const BC_F = new THREE.Vector3(0, 0.35, -0.94), BC_P = new THREE.Vector3(1, 0, 0);
 const EYE_RELIEF = -0.12; // sights sit close to the eye when aiming: a big, clear sight picture
 const INSPECT = 3.0; // seconds
 const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multiplier at full ADS // close to the eye, like CoD: the optic frames the target
@@ -605,9 +607,11 @@ export class PlayerController {
       let KT, n;
       if (empty) {
         // the charge point: AR / SMG charging handle at the back of the upper, the pistol's slide serrations
-        const chg = type === 'pistol' ? _a.set(-0.012, 0.072, 0.045) : _a.set(-0.02, 0.07, 0.07);
-        handFrame(_ch, _cq, gun.group, _gq, chg, CH_F, CH_P);
-        KP[7].copy(_ch); KP[8].copy(_ch).addScaledVector(_cz.set(0, 0, 1).applyQuaternion(_gq), 0.055); KP[9].copy(_gl);
+        // pistol: grab the front serrations over the top and rack the slide back; rifle / SMG: palm-slap the
+        // bolt catch on the left of the receiver (keeps the arm low, out of your face)
+        const pis = type === 'pistol';
+        handFrame(_ch, _cq, gun.group, _gq, pis ? _a.set(-0.008, 0.07, -0.085) : _a.set(-0.045, 0.006, -0.055), pis ? CH_F : BC_F, pis ? CH_P : BC_P);
+        KP[7].copy(_ch); KP[8].copy(_ch).addScaledVector(_cz.set(pis ? 0 : 1, 0, pis ? 1 : 0).applyQuaternion(_gq), pis ? 0.045 : 0.022); KP[9].copy(_gl);
         KT = [0, 0.08, 0.18, 0.33, 0.47, 0.58, 0.64, 0.76, 0.83, 0.95]; n = 10;
       } else { KP[7].copy(_gl); KT = [0, 0.1, 0.22, 0.4, 0.56, 0.68, 0.76, 0.9]; n = 8; }
       if (rp >= KT[n - 1]) _L.copy(KP[n - 1]);
