@@ -81,7 +81,7 @@ const bindings = [
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
   ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
-  ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
+  ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
@@ -830,7 +830,14 @@ window.addEventListener('paste', (e) => {
   const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
   if (digits) { joinCode = digits; joinError = ''; renderLobby(); }
 });
-for (const ev of ['beforeunload', 'pagehide']) window.addEventListener(ev, () => { if (lobby.active) lobby.close(); });
+window.addEventListener('pagehide', () => { if (lobby.active) lobby.close(); });
+// during a match, a stray Ctrl+W (or a mis-click on the tab's X) asks before closing instead of ending the match
+window.addEventListener('beforeunload', (e) => {
+  if (game.state === 'playing' || game.state === 'paused') { e.preventDefault(); e.returnValue = ''; return ''; }
+  if (lobby.active) lobby.close();
+});
+// leaving fullscreen (holding Esc) also gives the keyboard back to the browser
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) game.input.releaseKeys(); });
 
 // re-capture the mouse if lock was lost without pausing
 $('app').addEventListener('click', () => {

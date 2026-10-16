@@ -106,7 +106,11 @@ export class Game {
     this.grenadeMat = new THREE.MeshStandardMaterial({ color: 0x3d4a2e, roughness: 0.55, metalness: 0.35 });
 
     this.input.onLockChange = (locked) => {
-      if (!locked && this.state === 'playing' && !this.input.isTouch && !this.input.fallback && this.input.lastDevice !== 'pad') this.pause();
+      if (!locked && this.state === 'playing' && !this.input.isTouch && !this.input.fallback && this.input.lastDevice !== 'pad') {
+        // a fullscreen switch can drop pointer lock for a moment: take it back instead of pausing
+        if (performance.now() - (this.input.fsT || 0) < 1500) { setTimeout(() => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); }, 50); return; }
+        this.pause();
+      }
     };
     window.addEventListener('resize', () => this.renderer.setSize());
     this.last = performance.now();
@@ -134,6 +138,7 @@ export class Game {
     const adsMode = this.input.isTouch ? (s.touchAds || 'toggle') : (s.adsMode || 'hold');
     if (this.input.adsMode !== adsMode) { this.input.adsMode = adsMode; this.input.clearAds(); }
     this.input.vibration = s.vibration;
+    this.input.fullscreen = s.fullscreen !== false;
   }
 
   // ---------- match lifecycle ----------
@@ -342,6 +347,7 @@ export class Game {
     this.music.play('menu');
     this.input.enabled = false;
     this.input.unlock();
+    this.input.releaseKeys();          // back in the menus: browser shortcuts work again
     this.hud.show(false);
     for (const c of this.characters) c.dispose();
     this.characters = [];

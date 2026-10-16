@@ -1168,3 +1168,4 @@ body.mode-online .menu-cta { display: none !important; }
 /* controller: a slider being adjusted (A to start, left / right to change, A or B to finish) */
 input[type=range].pad-adjust { outline: 2px solid var(--bo); outline-offset: 4px; }
 .row.pad-row:has(.pad-adjust) label::after { content: '  ◀ ▶'; color: var(--bo); letter-spacing: 0.1em; }
+body.touch .touch-hide { display: none !important; }

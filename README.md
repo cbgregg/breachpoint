@@ -52,6 +52,8 @@ Developed by cbgregg. Artificial intelligence was used to assist with developmen
 | Pause | `Esc` / `P` | Menu | ❚❚ |
 | Menu tabs | `Q` / `E` | LB / RB | tap |
 
+Desktop matches run **fullscreen with the keyboard locked** (Options → Fullscreen in matches, on by default): browsers only let a page receive Ctrl+W, Ctrl+T and Ctrl+N while it's fullscreen, so Ctrl-crouch while moving forward no longer closes the tab. A short Esc pauses; hold Esc to leave fullscreen. If the tab is about to close mid-match anyway, the browser asks first.
+
 The controller follows Call of Duty's **Default** button layout. RB (tactical equipment) and the rest of the D-pad (killstreaks) are unused because the game has neither; D-pad down inspects your weapon.
 
 Browsers only expose a controller after you press a button on it, so press any button once the page is open. Xbox controllers that a browser reports without the standard layout (common in Firefox on macOS and Linux) are remapped automatically.
