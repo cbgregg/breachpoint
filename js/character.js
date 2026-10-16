@@ -377,12 +377,15 @@ export class Character {
 
   currentSpread() {
     const d = this.weapon.def;
-    let s = lerp(d.spread, d.adsSpread, this.adsT);
+    // aiming: full sight accuracy from 80% of the way in (so quick-scopes land where the reticle is),
+    // and moving or recent shots barely widen it while aimed
+    let k = Math.min(1, this.adsT / 0.8); k = k * k * (3 - 2 * k);
+    let s = lerp(d.spread, d.adsSpread, k);
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    s += d.moveSpread * Math.min(1, hs / PLAYER.walk) * (1 - 0.6 * this.adsT);
-    if (!this.onGround) s += 0.05;
+    s += d.moveSpread * Math.min(1, hs / PLAYER.walk) * (1 - (d.scope ? 0.96 : 0.85) * k);
+    if (!this.onGround) s += 0.05 * (1 - 0.5 * k);
     if (this.crouchT > 0.5 && this.slideT <= 0) s *= 0.75;
-    return s + this.bloom;
+    return s + this.bloom * (1 - 0.65 * k);
   }
 
   tryFire(origin, dir) {

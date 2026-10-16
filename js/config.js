@@ -54,7 +54,7 @@ export const SCORE = { kill: 100, headshot: 25, assist: 50, melee: 25 };
 export const WEAPONS = {
   rifle: {
     id: 'rifle', name: 'MK-4 Carbine', short: 'MK-4', mode: 'AUTO', auto: true, rpm: 750, damage: 24, headMult: 1.6,
-    mag: 30, reserve: 150, reload: 2.2, spread: 0.03, adsSpread: 0.004, moveSpread: 0.03,
+    mag: 30, reserve: 150, reload: 2.2, spread: 0.03, adsSpread: 0.003, moveSpread: 0.03,
     recoilPitch: 0.011, recoilYaw: 0.006, range: 150, falloffStart: 35, falloffEnd: 80, falloffMin: 0.7,
     pellets: 1, adsFov: 50, adsTime: 0.22, botRange: [8, 40],
     model: { type: 'rifle', sight: 'holo' },
@@ -82,7 +82,7 @@ export const WEAPONS = {
   },
   pistol: {
     id: 'pistol', name: 'P-45 Sidearm', short: 'P-45', mode: 'SEMI', auto: false, rpm: 400, damage: 30, headMult: 1.6,
-    mag: 12, reserve: 60, reload: 1.5, spread: 0.022, adsSpread: 0.008, moveSpread: 0.015,
+    mag: 12, reserve: 60, reload: 1.5, spread: 0.022, adsSpread: 0.0025, moveSpread: 0.015,
     recoilPitch: 0.018, recoilYaw: 0.006, range: 100, falloffStart: 18, falloffEnd: 45, falloffMin: 0.6,
     pellets: 1, adsFov: 58, adsTime: 0.14, botRange: [3, 25],
     model: { type: 'pistol', sight: 'iron' },
@@ -132,21 +132,21 @@ export const WEAPONS = {
   },
   d50: {
     id: 'd50', name: 'D-50 Hand Cannon', short: 'D-50', mode: 'SEMI', auto: false, rpm: 220, damage: 55, headMult: 1.8,
-    mag: 7, reserve: 35, reload: 1.9, spread: 0.03, adsSpread: 0.009, moveSpread: 0.02,
+    mag: 7, reserve: 35, reload: 1.9, spread: 0.03, adsSpread: 0.003, moveSpread: 0.02,
     recoilPitch: 0.05, recoilYaw: 0.012, range: 110, falloffStart: 20, falloffEnd: 50, falloffMin: 0.6,
     pellets: 1, adsFov: 56, adsTime: 0.17, botRange: [3, 28],
     model: { type: 'pistol', sight: 'iron', look: { metal: 0xb8b8b4, big: true } },
   },
   r357: {
     id: 'r357', name: 'R-357 Revolver', short: 'R-357', mode: 'SEMI', auto: false, rpm: 160, damage: 62, headMult: 1.7,
-    mag: 6, reserve: 30, reload: 2.6, spread: 0.028, adsSpread: 0.008, moveSpread: 0.02,
+    mag: 6, reserve: 30, reload: 2.6, spread: 0.028, adsSpread: 0.002, moveSpread: 0.02,
     recoilPitch: 0.055, recoilYaw: 0.01, range: 110, falloffStart: 22, falloffEnd: 50, falloffMin: 0.6,
     pellets: 1, adsFov: 56, adsTime: 0.17, botRange: [3, 28],
     model: { type: 'pistol', sight: 'iron', look: { metal: 0x2b2b2e, grip: 0x6a3a1e, revolver: true } },
   },
   mp18: {
     id: 'mp18', name: 'MP-18 Machine Pistol', short: 'MP-18', mode: 'AUTO', auto: true, rpm: 1000, damage: 17, headMult: 1.35,
-    mag: 20, reserve: 100, reload: 1.6, spread: 0.035, adsSpread: 0.016, moveSpread: 0.012,
+    mag: 20, reserve: 100, reload: 1.6, spread: 0.035, adsSpread: 0.009, moveSpread: 0.012,
     recoilPitch: 0.008, recoilYaw: 0.01, range: 70, falloffStart: 8, falloffEnd: 22, falloffMin: 0.5,
     pellets: 1, adsFov: 58, adsTime: 0.13, botRange: [2, 14],
     model: { type: 'pistol', sight: 'iron', look: { metal: 0x3d4a3a, extMag: true } },
@@ -219,6 +219,7 @@ export const PUBLIC_MATCH = { fillBots: true, mode: 'tdm', teamSize: 6, difficul
 export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
+  vmFov: 74,           // weapon (viewmodel) field of view at the hip: wider = smaller gun
   fpsCap: 0,           // 0 = unlimited (the display's refresh rate)
   fullscreen: true,    // desktop matches go fullscreen with the keyboard locked (so Ctrl+W crouches instead of closing the tab)
   fillBots: true, chat: true,
