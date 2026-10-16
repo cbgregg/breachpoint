@@ -631,8 +631,12 @@ export class Game {
       // The Monte: a real rocket from the muzzle along the aim (the host flies it; guests get it as an event)
       if (cosmetic) return;
       applySpread(dir, spread, _d);
-      const vel = _d.clone().multiplyScalar(def.rocket.speed);
+      // aim from the muzzle at whatever the crosshair is on, so it lands where you point (the tube sits off the eye line)
+      const wt = this.physics.raycast(origin, _d, 150), aimT = wt ? wt.t : 150;
       const start = muzzle.clone().addScaledVector(_d, 0.2);
+      const tgt = _a.copy(origin).addScaledVector(_d, aimT);
+      const fly = aimT > 2 ? tgt.sub(start).normalize() : _d.clone();
+      const vel = fly.clone().multiplyScalar(def.rocket.speed);
       const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
       this.spawnRocket(id, start, vel, shooter, def.rocket);
       this.emit(['rkt', id, +start.x.toFixed(2), +start.y.toFixed(2), +start.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), shooter.id]);
