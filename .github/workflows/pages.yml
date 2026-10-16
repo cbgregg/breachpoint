@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Stamp build version (so browsers and the CDN pick up every deploy)
+        run: |
+          V=${GITHUB_SHA::8}
+          sed -i -E "s#(from +['\"]\.{1,2}/[^'\"?]+\.js)(['\"])#\1?v=$V\2#g; s#(import\(['\"]\.{1,2}/[^'\"?]+\.js)(['\"])#\1?v=$V\2#g" js/*.js
+          sed -i -E "s#src=\"js/main\.js\"#src=\"js/main.js?v=$V\"#; s#href=\"css/style\.css\"#href=\"css/style.css?v=$V\"#" index.html
+          grep -c "?v=$V" js/main.js index.html
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

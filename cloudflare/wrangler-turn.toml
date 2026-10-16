@@ -1,0 +1,8 @@
+# Relay credentials (cloudflare/turn-worker.js), deployed by Cloudflare Workers Builds on push.
+# TURN_KEY_ID and the TURN_KEY_API_TOKEN secret stay in the Cloudflare dashboard;
+# keep_vars stops deploys from removing them.
+name = "breachpoint-turn"
+main = "turn-worker.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+keep_vars = true

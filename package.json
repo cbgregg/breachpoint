@@ -1,0 +1,11 @@
+{
+  "name": "breachpoint",
+  "version": "1.0.0",
+  "description": "Browser FPS with team deathmatch and AI bots, built with Three.js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve ."
+  },
+  "license": "MIT"
+}

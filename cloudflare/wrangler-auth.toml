@@ -1,0 +1,16 @@
+# Account server (cloudflare/auth-worker.js), deployed by Cloudflare Workers Builds on push.
+# Secrets (RESEND_API_KEY, FEEDBACK_TO) live only in the Cloudflare dashboard, never here;
+# keep_vars stops deploys from removing anything set there.
+name = "breachpoint-auth"
+main = "auth-worker.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+keep_vars = true
+
+kv_namespaces = [
+  { binding = "ACCOUNTS", id = "69cc1566fb19450cb28e718e90d34e9f" },
+]
+
+[vars]
+MAIL_FROM = "Breachpoint <login@breach-point.net>"
+APP_URL = "https://breach-point.net"

@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Breachpoint | PRE-ALPHA</title>
+  <meta name="description" content="Breachpoint: a free browser first-person shooter. Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends. Controller support. Pre-alpha.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Breachpoint">
+  <meta property="og:title" content="Breachpoint | PRE-ALPHA">
+  <meta property="og:description" content="Free browser FPS: Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends. No download.">
+  <meta property="og:url" content="https://breach-point.net/">
+  <meta property="og:image" content="https://breach-point.net/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="First-person view in Breachpoint: a rifle with a reflex sight aimed down a sunlit market street at an enemy soldier.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Breachpoint | PRE-ALPHA">
+  <meta name="twitter:description" content="Free browser FPS: Team Deathmatch, Gunfight and Search & Destroy against bots or online with friends.">
+  <meta name="twitter:image" content="https://breach-point.net/assets/og.jpg">
+  <meta name="theme-color" content="#0b0d0e">
+  <meta name="theme-color" content="#0b0d0e">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0d0e'/%3E%3Cpath d='M32 8v14M32 42v14M8 32h14M42 32h14' stroke='%23e8e4da' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23ff4d4d'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body data-device="kbm">
+  <div id="app"></div>
+  <div id="bo-fx" aria-hidden="true"></div>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud">
+    <div id="scope"><div class="lens"><i class="h"></i><i class="v"></i><i class="dot"></i></div></div>
+
+    <div id="tl">
+      <div id="mm-wrap"><canvas id="minimap" width="440" height="440"></canvas><span class="mm-n">N</span></div>
+      <div id="scorebox">
+        <div class="srow friendly"><span class="sname">FRIENDLY</span><div class="sbar"><i id="bar-f"></i></div><b id="score-f">0</b></div>
+        <div class="srow enemy"><span class="sname">ENEMY</span><div class="sbar"><i id="bar-e"></i></div><b id="score-e">0</b></div>
+        <div class="smeta"><span id="timer">10:00</span><span class="dot">•</span><span id="mode-short">TDM</span><span class="dot">•</span><span id="limit">75</span></div>
+      </div>
+    </div>
+
+    <div id="compass"><canvas id="compass-c" width="1040" height="64"></canvas><div id="bearing">000</div></div>
+    <div id="tags"></div>
+    <div id="killfeed"></div>
+    <div id="fps"></div>
+
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="dmg-ind"></div>
+    <div id="score-pop"></div>
+    <div id="medal"></div>
+    <div id="prompt"></div>
+    <div id="center-msg"></div>
+    <div id="count-label"><b>MATCH BEGINS IN</b><span id="count-sub"></span></div>
+    <div id="countdown"></div>
+    <div id="protect">SPAWN PROTECTION</div>
+
+    <div id="health-wrap"><div id="health-bar"><i id="health-fill"></i></div></div>
+
+    <div id="ammo">
+      <div id="weapon-name">MK-4 CARBINE</div>
+      <div class="ammo-row">
+        <span id="ammo-mag">30</span>
+        <div class="ammo-side"><span id="ammo-res">150</span><span id="fire-mode">AUTO</span></div>
+      </div>
+      <div class="equip">
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a6 6 0 1 0 0.01 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3h4v4h-4zM14 4l4-2" stroke="currentColor" stroke-width="2" fill="none"/></svg><b id="grenades">1</b><span class="glyph" data-act="grenade"></span></span>
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l12-12M14 6l4-2 2 2-2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><span class="glyph" data-act="melee"></span></span>
+      </div>
+    </div>
+
+    <div id="death">
+      <div class="d-label">KILLED BY</div>
+      <div id="death-killer"></div>
+      <div id="death-detail"></div>
+      <div id="death-timer"></div>
+      <div id="death-actions">
+        <button id="death-respawn" class="dbtn">RESPAWN <span class="glyph" data-act="reload"></span></button>
+        <button id="death-loadout" class="dbtn">CHOOSE CLASS <span class="glyph" data-act="pause"></span></button>
+      </div>
+    </div>
+    <div id="cook"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" class="trk"/><circle id="cook-arc" cx="20" cy="20" r="17" class="arc"/></svg><b id="cook-t"></b></div>
+    <div id="spawn-hint">CHOOSE CLASS <span class="glyph" data-act="pause"></span></div>
+    <div id="scoreboard"></div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- ============ Touch controls ============ -->
+  <div id="touch">
+    <div id="stick"><div id="stick-knob"></div></div>
+    <button data-btn="pause" class="tb small" id="tb-pause">❚❚</button>
+    <button data-btn="score" class="tb small" id="tb-score">TAB</button>
+    <button data-btn="fire" class="tb big" id="tb-fire">FIRE</button>
+    <button data-btn="fire" class="tb big" id="tb-fire2">FIRE</button>
+    <button data-btn="ads" class="tb" id="tb-ads">ADS</button>
+    <button data-btn="jump" class="tb" id="tb-jump">JUMP</button>
+    <button data-btn="crouch" class="tb" id="tb-crouch">CROUCH</button>
+    <button data-btn="reload" class="tb" id="tb-reload">RELOAD</button>
+    <button data-btn="swap" class="tb" id="tb-swap">SWAP</button>
+    <button data-btn="grenade" class="tb" id="tb-frag">FRAG</button>
+    <button data-btn="melee" class="tb" id="tb-melee">MELEE</button>
+    <button data-btn="sprint" class="tb" id="tb-sprint">SPRINT</button>
+  </div>
+
+  <!-- ============ Title ============ -->
+  <div id="title" class="screen">
+    <div class="title-wrap">
+      <div class="title-logo"><span class="mark"></span>BREACHPOINT</div>
+      <div class="title-sub">TEAM DEATHMATCH · GUNFIGHT · SEARCH &amp; DESTROY</div>
+      <div class="title-pa"><span class="pa-chip">PRE-ALPHA</span></div>
+      <div class="title-press" id="title-press">PRESS ENTER TO START</div>
+    </div>
+    <div class="title-foot"><span id="title-acct"></span></div>
+  </div>
+
+  <!-- ============ Offline / online ============ -->
+  <div id="mode" class="screen">
+    <div class="mw mode-wrap">
+      <header class="mw-head"><div class="bo-title"><b>BREACHPOINT</b><small>SELECT GAME TYPE</small></div></header>
+      <div class="mode-cards">
+        <button class="mode-card" id="mode-offline" data-nav>
+          <span class="mc-k">OFFLINE · VERSUS BOTS</span><span class="mc-t">COMBAT TRAINING</span>
+          <span class="mc-d">Play against AI squads on your own. No account, no internet needed once loaded.</span>
+        </button>
+        <button class="mode-card" id="mode-online" data-nav>
+          <span class="mc-k">ONLINE · PLAYERS</span><span class="mc-t">MULTIPLAYER</span>
+          <span class="mc-d" id="mode-online-d">Quick match with anyone, or a private 6-digit code for friends. Sign in with your email, no password.</span>
+        </button>
+      </div>
+      <div class="mode-extra">
+        <button class="menu-btn" id="mode-options" data-nav>⚙ OPTIONS <small>GRAPHICS · CONTROLS · AUDIO</small></button>
+        <button class="menu-btn" id="mode-friends" data-nav>FRIENDS <small>SIGN IN · FRIEND CODE</small></button>
+      </div>
+      <div class="mode-acct" id="mode-acct"></div>
+      <div class="cf-badge mode-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+      <footer class="mw-foot" id="mode-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ Sign in (email link only, no passwords) ============ -->
+  <div id="signin" class="screen">
+    <div class="mw narrow signin">
+      <header class="mw-head"><div class="bo-title"><b id="si-title">SIGN IN</b><small>MULTIPLAYER ACCOUNT · NO PASSWORD</small></div></header>
+      <div class="si-step" id="si-email">
+        <p class="si-lead">Enter your email and we'll send you a sign-in code and link. There's no password to remember or leak.</p>
+        <input id="si-email-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
+        <label class="si-remember"><input type="checkbox" id="si-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
+        <p class="si-warn" id="si-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link, and sign out on shared or public computers.</p>
+        <button id="si-send" class="cta" data-nav><span>EMAIL ME A SIGN-IN CODE</span><span class="glyph" data-act="accept"></span></button>
+      </div>
+      <div class="si-step" id="si-sent">
+        <div class="si-mail" aria-hidden="true"></div>
+        <p class="si-lead">We emailed a 6-digit code and a sign-in link to <b id="si-to"></b>. Type the code here, or open the link on this device. Both work once, for 15 minutes.</p>
+        <input id="si-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" data-nav>
+        <button id="si-verify" class="cta" data-nav><span>SIGN IN</span><span class="glyph" data-act="accept"></span></button>
+        <p class="si-lead dim">Nothing yet? Check your spam folder, or send it again.</p>
+        <div class="si-row"><button id="si-resend" class="menu-btn small" data-nav>SEND AGAIN</button><button id="si-other" class="menu-btn small" data-nav>USE A DIFFERENT EMAIL</button></div>
+      </div>
+      <div class="si-step" id="si-terms">
+        <p class="si-lead">Please read these terms. Scroll to the bottom to accept.</p>
+        <div class="terms" id="terms-box" tabindex="0" data-nav>
+          <h3>Breachpoint terms of use and safety</h3>
+          <p class="t-meta">Version 2026-10-12 · Breachpoint is in pre-alpha</p>
+
+          <h4>1. Who can play online</h4>
+          <p>You must be at least 13 years old to make an account and play online. If the law where you live sets a higher age for using online services without a parent's permission, you need that permission. Offline play against bots needs no account.</p>
+
+          <h4>2. Your account</h4>
+          <ul>
+            <li><b>No passwords.</b> You sign in with a one-time code or link sent to your email. Codes and links expire after 15 minutes, work once, and a code stops working after 5 wrong tries.</li>
+            <li><b>Your email is private.</b> It is used only to sign you in and is never shown to other players, not even your friends. You see your own address only partly hidden.</li>
+            <li><b>Remember me</b> keeps you signed in on that device for 60 days. Only use it on your own device. Without it you are signed out when the browser closes.</li>
+            <li>Never share your sign-in code or link. Nobody from Breachpoint will ever ask for it.</li>
+            <li>You can sign out or <b>delete your account</b> at any time in Options. Deleting removes your account, Name Tag, display name and friends.</li>
+          </ul>
+
+          <h4>3. What is stored, and what is not</h4>
+          <ul>
+            <li>Stored: your email address, your Name Tag and up to 10 previous Name Tags, your optional display name, your friend code, friends and friend requests, and the date you accepted these terms.</li>
+            <li>For a few minutes only: whether you are online and which match you are in, shown only to accepted friends.</li>
+            <li>Sign-in codes, links and sessions are stored only as one-way hashes, so a leak of the account database could not be used to sign in as you.</li>
+            <li>Feedback and player reports you send are kept for up to a year so they can be reviewed.</li>
+            <li>Your data is never sold or used for advertising. It is processed by Cloudflare (hosting, accounts, relay) and Resend (sign-in emails).</li>
+            <li>Chat messages are not stored anywhere. They exist only in the match.</li>
+          </ul>
+
+          <h4>4. How the game keeps you safe</h4>
+          <ul>
+            <li><b>Verified players.</b> Every player in an online match carries a signed match pass from the account server. Nobody can join without an account or pretend to be someone else, and a kicked player cannot rejoin from a new tab.</li>
+            <li><b>Cheat checks.</b> The host's game checks everything other players send: speed, health, ammo and hits are decided by the host, not by each player's computer. Players are only sent what they could plausibly see.</li>
+            <li><b>Encrypted connections.</b> Game traffic between players is encrypted, and the site and account server only use secure HTTPS connections.</li>
+            <li><b>Your IP address.</b> In public matches your connection goes through Cloudflare's relay, so other players cannot see your IP address. In private matches with friends the connection can be direct, which lets the other players' computers see your IP address; turn on <i>Hide my IP in private matches</i> in Options to always use the relay.</li>
+            <li><b>Chat filter.</b> Offensive words are replaced with *** and links are removed before anyone sees them. Chat is rate-limited and you can turn it off completely.</li>
+            <li><b>Name Tag filter.</b> Offensive Name Tags are rejected or replaced. Name Tags can change once a day, and friends can see previous ones, so nobody can hide behind a new name.</li>
+            <li><b>Your controls.</b> From the scoreboard in the pause menu you can <b>mute</b>, <b>block</b> or <b>report</b> any player, and start a <b>vote to kick</b>: a player is removed when 60% of the other players vote yes. Hosts can also approve, kick and ban players in their lobbies, and friends' presence is only visible to accepted friends.</li>
+            <li><b>Rate limits</b> on sign-in emails, friend requests, chat, reports and feedback stop spam and abuse.</li>
+          </ul>
+
+          <h4>5. Rules</h4>
+          <p>When you play online you agree not to:</p>
+          <ul>
+            <li>cheat, hack, use bots, modify the game to gain an advantage, or exploit bugs on purpose;</li>
+            <li>harass, threaten, bully or abuse other players, or post hateful, sexual or violent content;</li>
+            <li>share anyone's personal information, including your own, or ask other players for theirs;</li>
+            <li>impersonate other players or the developer, or pick an offensive Name Tag;</li>
+            <li>spam, advertise, or try to trick other players into visiting links or giving away sign-in codes;</li>
+            <li>attack, overload or try to break into the game's servers, or other players' connections.</li>
+          </ul>
+
+          <h4>6. Enforcement</h4>
+          <p>Reports are reviewed. Players who break the rules can be removed from matches, have their account restricted, or have their account suspended or deleted, without warning in serious cases.</p>
+
+          <h4>7. Pre-alpha</h4>
+          <p>Breachpoint is an early, free test version made by one developer. Features can change, progress or accounts may be reset, and things will break. The game is provided "as is", without warranties, and the developer is not liable for any loss from using it, to the extent the law allows.</p>
+
+          <h4>8. Ownership</h4>
+          <p>Breachpoint, its name, logo and original content are made by cbgregg. Artificial intelligence was used to assist with development. Third-party assets are credited in the project's documentation.</p>
+
+          <h4>9. Changes and contact</h4>
+          <p>If these terms change, you will be asked to read and accept them again before playing online. Questions, problems or requests to delete your data: use <i>Options → About → Send feedback</i>.</p>
+          <p class="t-end">End of terms.</p>
+        </div>
+        <label class="si-remember"><input type="checkbox" id="terms-ok" disabled data-nav><span>I'm 13 or older and I agree to the terms and rules above</span></label>
+        <button id="terms-accept" class="cta" disabled data-nav><span>ACCEPT AND CONTINUE</span><span class="glyph" data-act="accept"></span></button>
+        <p class="si-lead dim" id="terms-hint">Scroll to the bottom of the terms to continue.</p>
+      </div>
+      <div class="si-step" id="si-name">
+        <p class="si-lead">Choose your <b>Name Tag</b>. It's what everyone sees in matches. You can change it once a day, and friends can see your previous Name Tags.</p>
+        <input id="si-name-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav>
+        <button id="si-name-save" class="cta" data-nav><span>CONTINUE</span><span class="glyph" data-act="accept"></span></button>
+      </div>
+      <div class="join-status" id="si-status"></div>
+      <p class="pane-note si-fine">Your email is only used to sign you in. Nobody else can ever see it, not even your friends.</p>
+      <div class="cf-badge" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+      <button id="si-back" class="menu-btn" data-nav>BACK</button>
+    </div>
+  </div>
+
+  <!-- ============ Feedback form ============ -->
+  <div id="feedback" class="screen">
+    <div class="mw narrow signin fbw">
+      <header class="mw-head"><div class="bo-title"><b>FEEDBACK</b><small>FEATURE REQUESTS · BUGS · IDEAS</small></div></header>
+      <div class="fb-kinds" role="radiogroup" aria-label="Type">
+        <button class="mp on" data-fb="feature" data-nav><b>FEATURE</b><small>Something to add</small></button>
+        <button class="mp" data-fb="bug" data-nav><b>BUG</b><small>Something broken</small></button>
+        <button class="mp" data-fb="feedback" data-nav><b>FEEDBACK</b><small>Anything else</small></button>
+      </div>
+      <textarea id="fb-text" maxlength="2000" rows="6" placeholder="What would make Breachpoint better? For bugs: what happened, and what you expected." data-nav></textarea>
+      <div class="fb-count" id="fb-count">0 / 2000</div>
+      <input id="fb-contact" maxlength="120" autocomplete="off" spellcheck="false" placeholder="How to reach you (optional)" data-nav>
+      <p class="pane-note si-fine">Only the developer reads this. Your device type and current map are included to help with bugs. Leave the contact box empty to stay anonymous.</p>
+      <button id="fb-send" class="cta" data-nav><span>SEND</span><span class="glyph" data-act="accept"></span></button>
+      <div class="join-status" id="fb-status"></div>
+      <button id="fb-back" class="menu-btn" data-nav>BACK</button>
+    </div>
+  </div>
+
+  <!-- ============ Report a player ============ -->
+  <div id="report" class="screen">
+    <div class="mw narrow signin fbw">
+      <header class="mw-head"><div class="bo-title"><b>REPORT</b><small id="rp-who">PLAYER</small></div></header>
+      <div class="rp-reasons" role="radiogroup" aria-label="Reason">
+        <button class="mp on" data-rp="cheating" data-nav><b>CHEATING</b><small>Hacks, aimbot, exploits</small></button>
+        <button class="mp" data-rp="abuse" data-nav><b>ABUSE</b><small>Harassment, hate in chat</small></button>
+        <button class="mp" data-rp="name" data-nav><b>NAME TAG</b><small>Offensive name</small></button>
+        <button class="mp" data-rp="grief" data-nav><b>GRIEFING</b><small>Team killing, trolling</small></button>
+        <button class="mp" data-rp="other" data-nav><b>OTHER</b><small>Anything else</small></button>
+      </div>
+      <textarea id="rp-text" maxlength="800" rows="4" placeholder="What happened? (optional)" data-nav></textarea>
+      <p class="pane-note si-fine">Reports go to the developer with the match details. The player isn't told who reported them. You can also mute or block them, or start a vote to kick.</p>
+      <button id="rp-send" class="cta" data-nav><span>SEND REPORT</span><span class="glyph" data-act="accept"></span></button>
+      <div class="join-status" id="rp-status"></div>
+      <button id="rp-back" class="menu-btn" data-nav>BACK</button>
+    </div>
+  </div>
+
+  <!-- ============ Main menu ============ -->
+  <div id="menu" class="screen">
+    <div class="mw">
+      <header class="mw-head">
+        <div class="bo-title"><b id="menu-title">COMBAT TRAINING</b><small id="menu-subtitle">OFFLINE · VERSUS BOTS</small></div>
+        <nav class="tabs" role="tablist">
+          <span class="glyph bumper" data-act="prevTab"></span>
+          <button class="tab on" data-tab="play" data-nav>PLAY</button>
+          <button class="tab" data-tab="loadout" data-nav>CREATE A CLASS</button>
+          <button class="tab" data-tab="options" data-nav>OPTIONS</button>
+          <span class="glyph bumper" data-act="nextTab"></span>
+        </nav>
+        <button id="mode-chip" class="pcard" data-nav title="Change game type (offline / online)"></button>
+      </header>
+
+      <div class="mw-body">
+        <section class="pane on" id="pane-play">
+          <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
+          <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
+          <div class="sec-k mo-on">1 · GAME MODE</div>
+          <div class="mode-pick" role="radiogroup" aria-label="Game mode">
+            <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
+            <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
+            <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
+          </div>
+          <div class="sec-k mo-on">2 · QUICK MATCH <small>public · drop in</small></div>
+          <button id="quick-btn" class="menu-btn quick mo-on" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
+          <p class="pane-note mo-on">Joins a public match in the mode above. <b>Maps aren't picked here:</b> players vote on the next map in the lobby between matches.</p>
+          <div class="sec-k mo-on">OR · PRIVATE MATCH <small>play with friends</small></div>
+          <div class="online-row mo-on">
+            <button id="host-btn" class="menu-btn" data-nav>HOST <small>GET A 6-DIGIT CODE</small></button>
+            <button id="join-btn" class="menu-btn" data-nav>JOIN <small>ENTER A FRIEND'S CODE</small></button>
+          </div>
+          <div class="sec-k mo-on sm">PRIVATE MATCH SETTINGS <small>used when you host</small></div>
+          <div class="rows" id="play-rows">
+            <div class="row" style="display:none"><label for="opt-mode">Mode</label><select id="opt-mode">
+              <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option></select></div>
+            <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
+              <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="pioneer">Pioneer Square</option><option value="mart">Freshway · indoor</option><option value="random">Random</option></select></div>
+            <div class="row tdm-snd"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
+              <option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option>
+              <option value="5">5v5</option><option value="6">6v6</option><option value="8">8v8</option></select></div>
+            <div class="row"><label for="opt-diff">Bot difficulty</label><select id="opt-diff" data-nav>
+              <option value="easy">Recruit</option><option value="normal">Regular</option><option value="hard">Veteran</option></select></div>
+            <div class="row tdm-only"><label for="opt-score">Score limit</label><select id="opt-score" data-nav>
+              <option>25</option><option>50</option><option>75</option><option>100</option><option>150</option></select></div>
+            <div class="row tdm-only"><label for="opt-time">Time limit</label><select id="opt-time" data-nav>
+              <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
+            <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
+          </div>
+          <button id="play" class="cta" data-nav><span>START MATCH</span><span class="glyph" data-act="pause"></span></button>
+          <p class="pane-note mo-on">Online play is peer-to-peer: the host's browser runs the match. Bots fill empty slots.</p>
+          <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+        </section>
+
+        <section class="pane" id="pane-loadout">
+          <h2 class="pane-title">CREATE A CLASS</h2>
+          <p class="notice in-match-only">Changes apply the next time you spawn.</p>
+          <div class="lo-grid">
+            <div class="lo-left">
+              <div class="rows">
+                <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+              </div>
+              <div class="group">PRIMARY</div>
+              <div id="weapon-list" class="weapons"></div>
+              <div class="group">SECONDARY · P-45 SIDEARM</div>
+              <div class="rows" id="gs-pistol"></div>
+            </div>
+            <div class="gs lo-right" id="gunsmith">
+              <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
+              <div class="gs-view"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
+              <div class="rows" id="gs-slots"></div>
+              <div class="gs-stats" id="gs-stats"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pane" id="pane-options">
+          <h2 class="pane-title">OPTIONS</h2>
+          <div class="rows two">
+            <div class="group">GRAPHICS</div>
+            <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
+              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></div>
+            <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
+            <div class="row"><label for="opt-dynres">Dynamic resolution<small>Lowers render resolution when the frame rate drops</small></label><input type="checkbox" id="opt-dynres" data-nav></div>
+            <div class="row"><label for="opt-fps">FPS counter</label><input type="checkbox" id="opt-fps" data-nav></div>
+            <div class="group">AIMING</div>
+            <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
+              <option value="hold">Hold</option><option value="toggle">Toggle</option></select></div>
+            <div class="row"><label for="opt-adszoom">ADS zoom <output id="out-adszoom"></output></label><input type="range" id="opt-adszoom" min="0.5" max="1.6" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-sightsize">Sight size when aiming</label><select id="opt-sightsize" data-nav>
+              <option value="normal">Normal</option><option value="large">Large</option><option value="huge">Huge</option></select></div>
+            <div class="row touch-only"><label for="opt-touchsize">Touch: button size</label><select id="opt-touchsize" data-nav>
+              <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
+            <div class="row touch-only"><label for="opt-touchads">Touch: aim down sights</label><select id="opt-touchads" data-nav>
+              <option value="toggle">Tap</option><option value="hold">Hold</option></select></div>
+            <div class="row touch-only"><label for="opt-autofire">Touch: auto-fire on target</label><input type="checkbox" id="opt-autofire" data-nav></div>
+            <div class="group">MOUSE &amp; KEYBOARD</div>
+            <div class="row"><label for="opt-sens">Mouse sensitivity <output id="out-sens"></output></label><input type="range" id="opt-sens" min="0.2" max="3" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-invert">Invert look</label><input type="checkbox" id="opt-invert" data-nav></div>
+            <div class="group">CONTROLLER</div>
+            <div class="row"><label for="opt-padsens">Stick sensitivity <output id="out-padsens"></output></label><input type="range" id="opt-padsens" min="0.3" max="2.5" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-deadzone">Stick deadzone <output id="out-deadzone"></output></label><input type="range" id="opt-deadzone" min="0.04" max="0.3" step="0.01" data-nav></div>
+            <div class="row"><label for="opt-aa">Aim assist</label><input type="checkbox" id="opt-aa" data-nav></div>
+            <div class="row"><label for="opt-vib">Vibration</label><input type="checkbox" id="opt-vib" data-nav></div>
+            <div class="group relay-only">ONLINE</div>
+            <div class="row"><label for="opt-chat">Text chat<small>Online matches and lobbies. Press T or Enter to type.</small></label><input type="checkbox" id="opt-chat" data-nav></div>
+            <div class="row relay-only"><label for="opt-relay">Hide my IP in private matches</label><input type="checkbox" id="opt-relay" data-nav></div>
+            <div class="row relay-only"><label>Cloudflare relay <output id="relay-status"></output></label><button id="relay-test" class="menu-btn small" data-nav>TEST</button></div>
+            <div class="group acct-only">ACCOUNT</div>
+            <div class="row acct-only"><label>Signed in <output id="acct-email"></output></label><button id="acct-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
+            <div class="row acct-only"><label>Delete account, Name Tag and friends</label><button id="acct-del" class="menu-btn small danger" data-nav>DELETE</button></div>
+            <div class="group">AUDIO</div>
+            <div class="row"><label for="opt-vol">Master volume <output id="out-vol"></output></label><input type="range" id="opt-vol" min="0" max="1" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-music">Music volume <output id="out-music"></output></label><input type="range" id="opt-music" min="0" max="1" step="0.05" data-nav></div>
+            <div class="group">ABOUT</div>
+            <div class="row about-row"><label><span>Developed by cbgregg · <span class="pa-chip">PRE-ALPHA</span></span><small>Artificial intelligence was used to assist with development of this project.</small></label></div>
+            <div class="row about-row credits"><label><span>3D model credits <small>CC BY 4.0</small></span><small>
+              <a href="https://sketchfab.com/3d-models/ar-15-game-ready-4620d29f61ab4723844d6162d29c9f4c" target="_blank" rel="noopener">AR-15 (game ready)</a> by IVA ·
+              <a href="https://sketchfab.com/3d-models/tpm-smg-b9e68645f0e048419f3fe84ebd58dd92" target="_blank" rel="noopener">TPM SMG</a> by TORI106 ·
+              <a href="https://sketchfab.com/3d-models/sniper-rifle-gameready-free-e520b234140049e7890db0b6c29d3925" target="_blank" rel="noopener">Sniper rifle GameReady Free</a> by pashtetuser ·
+              <a href="https://sketchfab.com/3d-models/g19-pistol-game-ready-free-version-e3412d9803f04bdaa97ad9b68ed665d7" target="_blank" rel="noopener">G19 Pistol, Game Ready</a> by Rotuma ·
+              <a href="https://sketchfab.com/3d-models/fps-red-dot-sight-game-model-0cf999d9363940c2b149dcd80c448554" target="_blank" rel="noopener">FPS Red Dot Sight</a> by Michael Makivic ·
+              <a href="https://sketchfab.com/3d-models/remington-870-shotgun-05a6a02909ee4fcfa5cde3d76cb067f0" target="_blank" rel="noopener">Remington 870 Shotgun</a> by Urpo ·
+              <a href="https://sketchfab.com/3d-models/low-poly-ar-15-magazines-72b06590aa4b4b6ab324dc7e0c11b884" target="_blank" rel="noopener">Low-Poly AR-15 magazines</a> by notcplkerry ·
+              <a href="https://sketchfab.com/3d-models/truck-container-pack-low-poly-asia-000b6d08ad7b4f4198dcab2790008553" target="_blank" rel="noopener">Truck Container Pack Low-poly ASIA</a> by knitro_builds ·
+              <a href="https://sketchfab.com/3d-models/wooden-stairs-5-mb-56271a83e8ff487b84289e39a159d3c5" target="_blank" rel="noopener">Wooden Stairs_5_MB</a> by Mehdi Shahsavan ·
+              <a href="https://sketchfab.com/3d-models/corkboard-3ceda8ed02af45d1a8b36570076193e1" target="_blank" rel="noopener">Corkboard</a> by XIN ·
+              <a href="https://sketchfab.com/3d-models/simple-bin-steel-7fce89ddbf1c49a4b7612993447571a2" target="_blank" rel="noopener">Simple Bin - steel</a> by Sousinho ·
+              <a href="https://sketchfab.com/3d-models/downtown-buildings-set-low-poly-model-7378e7fb9c914c39880d9913a6f4e1d6" target="_blank" rel="noopener">Downtown Buildings Set</a> by Daniel Zhabotinsky.
+              Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; resized and recompressed for the web.</small></label></div>
+            <div class="row"><label>Feature request or feedback<small>Goes straight to the developer</small></label><button id="feedback-btn" class="menu-btn small" data-nav>SEND FEEDBACK</button></div>
+            <div class="row"><label>Keep the servers running<small>I'm a one-man team</small></label><button id="coffee-btn" class="menu-btn small" data-nav>☕ BUY ME A COFFEE</button></div>
+          </div>
+          <div class="controls-ref">
+            <table>
+              <thead><tr><th>Action</th><th>Keyboard &amp; mouse</th><th>Controller</th></tr></thead>
+              <tbody>
+                <tr><td>Move / look</td><td>WASD / mouse</td><td>Left stick / right stick</td></tr>
+                <tr><td>Fire / aim</td><td>LMB / RMB</td><td>RT / LT</td></tr>
+                <tr><td>Jump</td><td>Space</td><td>A</td></tr>
+                <tr><td>Crouch · slide while sprinting</td><td>C · Ctrl</td><td>B</td></tr>
+                <tr><td>Sprint · hold breath</td><td>Shift</td><td>L3</td></tr>
+                <tr><td>Tactical sprint</td><td>Double-tap Shift</td><td>L3 again while sprinting</td></tr>
+                <tr><td>Reload</td><td>R</td><td>X</td></tr>
+                <tr><td>Swap weapon</td><td>Q / 1 / 2 / wheel</td><td>Y</td></tr>
+                <tr><td>Frag grenade · hold to cook</td><td>G</td><td>LB (release to throw)</td></tr>
+                <tr><td>Plant / defuse bomb (Search &amp; Destroy)</td><td>Hold R or F</td><td>Hold X</td></tr>
+                <tr><td>Next teammate (spectating)</td><td>Space / click</td><td>A</td></tr>
+                <tr><td>Inspect weapon</td><td>I</td><td>D-pad down</td></tr>
+                <tr><td>Respawn early (when dead)</td><td>R / Space / click</td><td>X / A</td></tr>
+                <tr><td>Melee</td><td>V</td><td>R3</td></tr>
+                <tr><td>Scoreboard</td><td>Tab</td><td>View</td></tr>
+                <tr><td>Pause</td><td>Esc</td><td>Menu</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="intel">
+          <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
+          <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
+          <div class="intel-k">MODE</div><div class="intel-v" id="intel-mode">TEAM DEATHMATCH</div>
+          <div class="intel-k">INPUT</div><div class="intel-v" id="intel-input">KEYBOARD &amp; MOUSE</div>
+        </aside>
+      </div>
+
+      <footer class="mw-foot" id="menu-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ Pause ============ -->
+  <div id="pause" class="screen">
+    <div class="mw pause-wrap">
+      <header class="mw-head">
+        <div class="bo-title"><b>PAUSED</b><small id="pause-meta"></small></div>
+        <nav class="tabs ptabs"><span class="glyph bumper" data-act="prevTab"></span><span class="glyph bumper" data-act="nextTab"></span></nav>
+      </header>
+      <div class="pause-body">
+        <nav class="pause-nav">
+          <button id="resume" class="cta" data-nav><span>RESUME GAME</span><span class="glyph" data-act="pause"></span></button>
+          <button class="menu-btn psec on" data-sec="match" data-nav>SCOREBOARD</button>
+          <button class="menu-btn psec" data-sec="loadout" data-nav>CHOOSE CLASS</button>
+          <button class="menu-btn psec" data-sec="options" data-nav>OPTIONS</button>
+          <button id="pause-lobby" class="menu-btn online-only host-only" data-nav>PLAYERS &amp; JOIN REQUESTS</button>
+          <button id="pause-end" class="menu-btn online-only host-only danger" data-nav>END MATCH FOR EVERYONE</button>
+          <button id="restart" class="menu-btn" data-nav>RESTART GAME</button>
+          <button id="quit" class="menu-btn danger" data-nav>END GAME</button>
+          <p class="pane-note online-only">The match keeps running while this menu is open.</p>
+          <p class="pane-note online-only" id="pause-conn"></p>
+        </nav>
+        <section class="pause-panel">
+          <div class="psec-pane on" id="psec-match">
+            <div class="pm-score">
+              <div class="pm-team f"><span>FRIENDLY</span><b id="pm-f">0</b></div>
+              <div class="pm-mid"><span id="pm-time">10:00</span><small id="pm-limit">FIRST TO 75</small></div>
+              <div class="pm-team e"><b id="pm-e">0</b><span>ENEMY</span></div>
+            </div>
+            <div class="pm-me" id="pm-me"></div>
+            <div class="pm-board" id="pause-board"></div>
+            <div class="pm-players online-only" id="pm-players-wrap"><div class="group">PLAYERS · MUTE · BLOCK · REPORT · VOTE TO KICK</div><div id="pm-players" class="plist"></div></div>
+          </div>
+          <div class="psec-pane" id="psec-loadout"></div>
+          <div class="psec-pane" id="psec-options"></div>
+        </section>
+      </div>
+      <footer class="mw-foot" id="pause-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ Online lobby ============ -->
+  <div id="lobby" class="screen">
+    <div class="mw narrow lobby">
+      <header class="mw-head"><div class="bo-title"><b id="lobby-title">ONLINE MATCH</b><small>MULTIPLAYER</small></div></header>
+
+      <!-- host view -->
+      <div id="lobby-host" class="lobby-view">
+        <div class="code-label">MATCH CODE</div>
+        <div class="code-big" id="host-code">––– –––</div>
+        <div class="code-actions">
+          <button id="copy-code" class="menu-btn small" data-nav>COPY CODE</button>
+          <button id="copy-link" class="menu-btn small" data-nav>COPY INVITE LINK</button>
+        </div>
+        <div class="row"><label for="opt-approve">Approve each player before they join<small>Friends always get straight in</small></label><input type="checkbox" id="opt-approve" data-nav checked></div>
+        <div class="row" id="fillbots-row"><label for="opt-fillbots">Fill empty slots with bots<small>Off: only real players. Each team needs at least one player.</small></label><input type="checkbox" id="opt-fillbots" data-nav checked></div>
+        <div class="mapvote" id="mv-host"></div>
+        <div id="pending-wrap" class="lobby-block">
+          <div class="group">JOIN REQUESTS</div>
+          <div id="pending-list" class="plist"></div>
+        </div>
+        <div class="lobby-block">
+          <div class="group">PLAYERS <span id="host-count"></span></div>
+          <div id="host-players" class="plist"></div>
+        </div>
+        <p class="pane-note" id="host-note">Match settings come from the Play tab. Bots fill any empty slots.</p>
+        <button id="lobby-start" class="cta" data-nav><span>START MATCH</span></button>
+        <button id="lobby-back" class="cta" data-nav><span>BACK TO MATCH</span></button>
+      </div>
+
+      <!-- quick match notice (first time only) -->
+      <div id="lobby-quickintro" class="lobby-view">
+        <div class="code-label">PUBLIC MATCH</div>
+        <p class="notice" id="quick-ipnote">Quick match puts you in a game with strangers. Like any peer-to-peer game, <b>the other players in your match can see your IP address</b>, and whoever hosts runs the match.</p>
+        <p class="notice dim">Text chat is filtered (offensive words and links are removed) and can be turned off in Options. Offensive Name Tags are replaced automatically. Use <b>Private match</b> for a game with friends.</p>
+        <button id="quick-go" class="cta" data-nav><span>FIND A MATCH</span></button>
+      </div>
+
+      <!-- join view -->
+      <div id="lobby-join" class="lobby-view">
+        <div class="code-label" id="join-label">ENTER MATCH CODE</div>
+        <div class="code-slots" id="code-slots"><i></i><i></i><i></i><b></b><i></i><i></i><i></i></div>
+        <div class="keypad" id="keypad">
+          <button data-key="1" data-nav>1</button><button data-key="2" data-nav>2</button><button data-key="3" data-nav>3</button>
+          <button data-key="4" data-nav>4</button><button data-key="5" data-nav>5</button><button data-key="6" data-nav>6</button>
+          <button data-key="7" data-nav>7</button><button data-key="8" data-nav>8</button><button data-key="9" data-nav>9</button>
+          <button data-key="del" data-nav>⌫</button><button data-key="0" data-nav>0</button><button data-key="go" class="go" data-nav>JOIN</button>
+        </div>
+        <div class="join-status" id="join-status"></div>
+        <div class="join-info" id="join-info"></div>
+        <div class="mapvote" id="mv-join"></div>
+        <div class="lobby-block" id="join-players-wrap">
+          <div class="group">PLAYERS</div>
+          <div id="join-players" class="plist"></div>
+        </div>
+      </div>
+
+      <div class="conn-note" id="conn-note"></div>
+      <div class="cf-badge" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+      <button id="lobby-leave" class="menu-btn" data-nav>LEAVE</button>
+      <footer class="mw-foot" id="lobby-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ End of match ============ -->
+  <div id="end" class="screen">
+    <div class="mw wide">
+      <div id="end-title">VICTORY</div>
+      <div id="end-score"></div>
+      <div id="end-mvp"></div>
+      <div id="end-board"></div>
+      <div class="mapvote" id="mv-end"></div>
+      <div class="end-actions">
+        <button id="again" class="cta" data-nav><span>PLAY AGAIN</span></button>
+        <button id="menu-btn" class="menu-btn" data-nav>MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate"><div>↻</div><p>Rotate your device to landscape</p></div>
+  <!-- ============ Text chat (online) ============ -->
+  <div id="chat" aria-live="polite">
+    <div id="chat-log"></div>
+    <form id="chat-form" autocomplete="off"><span class="chat-to">ALL</span><input id="chat-in" maxlength="120" spellcheck="false" placeholder="Say something… (Enter to send)" enterkeyhint="send"></form>
+  </div>
+  <button id="chat-btn" class="chat-btn" title="Chat">CHAT</button>
+
+  <!-- ============ Pre-alpha + support (all menus) ============ -->
+  <div id="support" class="support">
+    <span class="pa-chip">PRE-ALPHA</span>
+    <span class="sp-msg">Keep the servers running: I'm a one-man team.</span>
+    <a class="sp-coffee" href="https://buymeacoffee.com/breachpoint" target="_blank" rel="noopener">☕ BUY ME A COFFEE</a>
+  </div>
+
+  <!-- ============ Social sidebar (Y / F): sign in, Name Tag, friend code, friends ============ -->
+  <button id="side-btn" class="side-btn" title="Friends and account (Y on a controller, F on a keyboard)"><span class="glyph" data-act="alt"></span><span class="sb-t">FRIENDS</span><span class="sb-on" id="sb-on"></span><span class="sb-req" id="sb-req"></span></button>
+  <div id="side-scrim"></div>
+  <aside id="side" aria-label="Friends and account" aria-hidden="true">
+    <header class="sd-head">
+      <div class="bo-title"><b>SOCIAL</b><small id="sd-sub">FRIENDS · ACCOUNT</small></div>
+      <button id="sd-close" class="sd-x" data-nav title="Close"><span class="glyph" data-act="back"></span><span>CLOSE</span></button>
+    </header>
+    <div class="sd-body">
+      <!-- accounts not switched on for this server -->
+      <section class="sd-sec" id="sd-off">
+        <p class="sd-note">Online accounts aren't switched on for this server yet, so friends and sign-in are unavailable. Your Name Tag is saved on this device (Create a Class).</p>
+      </section>
+
+      <!-- signed out -->
+      <section class="sd-sec" id="sd-in">
+        <div class="sd-k">SIGN IN</div>
+        <p class="sd-note">Sign in with an email link to get a Name Tag, a friend code, and to join friends' matches. No password.</p>
+        <input id="sd-email" class="sd-in" type="email" inputmode="email" autocomplete="email" spellcheck="false" placeholder="you@example.com" maxlength="254" data-nav>
+        <label class="si-remember"><input type="checkbox" id="sd-remember" data-nav><span><b>Remember me</b> on this device for 60 days</span></label>
+        <p class="si-warn" id="sd-warn"><b>Keep your account safe:</b> only use Remember me on your own device. Anyone who can open this browser can play as you. Never share or forward your sign-in link.</p>
+        <button id="sd-send" class="menu-btn sd-cta" data-nav>EMAIL ME A SIGN-IN CODE</button>
+        <div class="join-status" id="sd-in-status"></div>
+        <div class="sd-codebox" id="sd-codebox">
+          <div class="sd-k">ENTER THE CODE <small>or open the link on this device</small></div>
+          <div class="sd-line"><input id="sd-code-in" class="sd-in code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" data-nav><button id="sd-verify" class="menu-btn small" data-nav>SIGN IN</button></div>
+        </div>
+      </section>
+
+      <!-- signed in -->
+      <section class="sd-sec" id="sd-me">
+        <div class="sd-card">
+          <span class="pc-emb" id="sd-emb"></span>
+          <div class="sd-who"><b id="sd-tag"></b><small id="sd-acct"></small></div>
+        </div>
+        <nav class="sd-tabs" role="tablist">
+          <button class="sd-tab on" data-sdt="friends" data-nav>FRIENDS <span class="sd-tab-n" id="sd-tab-req"></span></button>
+          <button class="sd-tab" data-sdt="add" data-nav>ADD FRIEND</button>
+          <button class="sd-tab" data-sdt="profile" data-nav>PROFILE</button>
+        </nav>
+
+        <div class="sd-pane on" data-sdp="friends">
+          <div id="sd-req-wrap"><div class="sd-k">FRIEND REQUESTS</div><div id="sd-req" class="sd-list"></div></div>
+          <div class="sd-k">FRIENDS <small id="sd-fcount"></small></div>
+          <div id="sd-friends" class="sd-list"></div>
+          <div class="sd-k">RECENT PLAYERS <small>from your online matches</small></div>
+          <div id="sd-recent" class="sd-list"></div>
+        </div>
+
+        <div class="sd-pane" data-sdp="add">
+          <div class="sd-k">ADD A FRIEND <small>enter their friend code</small></div>
+          <div class="sd-line"><input id="sd-add-in" class="sd-in code" maxlength="9" autocomplete="off" spellcheck="false" placeholder="ABCD-2345" data-nav><button id="sd-add" class="menu-btn small" data-nav>SEND</button></div>
+          <div class="join-status" id="sd-add-status"></div>
+          <div class="sd-k">YOUR FRIEND CODE</div>
+          <div class="sd-line"><div class="sd-code" id="sd-code"></div><button id="sd-code-copy" class="menu-btn small" data-nav>COPY</button></div>
+          <p class="sd-note">Give this code to friends so they can add you. You can also add people from Recent Players.</p>
+        </div>
+
+        <div class="sd-pane" data-sdp="profile">
+          <div class="sd-k">NAME TAG <small>everyone sees this</small></div>
+          <div class="sd-line"><input id="sd-tag-in" class="sd-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Name Tag" data-nav><button id="sd-tag-save" class="menu-btn small" data-nav>CHANGE</button></div>
+          <p class="sd-note" id="sd-tag-note"></p>
+          <div class="sd-k">DISPLAY NAME <small>only friends see this</small></div>
+          <div class="sd-line"><input id="sd-disp-in" class="sd-in" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. your first name" data-nav><button id="sd-disp-save" class="menu-btn small" data-nav>SAVE</button></div>
+          <div class="sd-foot"><button id="sd-out" class="menu-btn small" data-nav>SIGN OUT</button></div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div id="loading" class="screen on">
+    <div class="ld-bg" id="ld-bg"></div>
+    <div class="ld-top"><div class="load-logo">BREACHPOINT</div></div>
+    <div class="ld-map"><canvas id="ld-mapc" width="336" height="240"></canvas></div>
+    <div class="ld-info">
+      <div class="ld-mode" id="ld-mode">LOADING</div>
+      <div class="ld-name" id="ld-name">BREACHPOINT</div>
+      <div class="ld-desc" id="ld-desc"></div>
+    </div>
+    <div class="ld-foot">
+      <p class="ld-tip"><b>TIP</b> <span id="ld-tip"></span></p>
+      <div class="load-bar"><i id="load-fill"></i></div>
+      <p id="load-text">Loading…</p>
+    </div>
+  </div>
+  <noscript><p style="color:#fff;padding:2rem">Breachpoint requires JavaScript and WebGL.</p></noscript>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
