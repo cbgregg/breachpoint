@@ -1205,7 +1205,7 @@ export class Game {
           for (const w of c.weapons) {
             if (w.reserve < w.def.reserve) { w.reserve = Math.min(w.def.reserve, w.reserve + w.def.mag * (p.small ? 1 : 2)); used = true; }
           }
-          if (c.grenades < GRENADE.max) { c.grenades++; used = true; }
+          if (!this.gg && c.grenades < GRENADE.max) { c.grenades++; used = true; }
         }
         if (used) {
           p.active = false;

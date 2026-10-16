@@ -68,7 +68,7 @@ Pick a mode on the Play tab. All three work offline against bots and online.
 | **Team Deathmatch** | 2v2 to 8v8 | Respawns on; every kill scores | Score or time limit |
 | **Gunfight** | 2v2 | One life each. Everyone gets the same random loadout (new every two rounds). After 40 s a flag appears in the middle: hold it for 3 s to win, or the team with more health left after 10 s of overtime takes the round | First to 6 rounds |
 | **Search & Destroy** | 2v2 to 8v8 | One life each. Attackers carry a bomb to site A or B and hold **R / F** (controller **X**) for 5 s to plant; it goes off 45 s later. Defenders hold the same button for 7.5 s to defuse. Wipe the other team, run out the clock (defenders), or detonate / defuse | First to 4 rounds, sides switch at halftime |
-| **Gun Game** | 2v2 to 8v8 | Respawns on, no class choice. Everyone starts on the MK-4; every kill moves you up a gun right away, through all 15 guns (The Monte included) down to the P-45. A knife kill sends the victim back one gun. The team score is its best player's rung | First kill with the P-45 wins |
+| **Gun Game** | 2v2 to 8v8 | Respawns on, no class choice, no grenades. Everyone starts on the MK-4; every kill moves you up a gun right away, through all 15 guns (The Monte included) down to the P-45. A knife kill sends the victim back one gun. The team score is its best player's rung | First kill with the P-45 wins |
 
 In round modes there are no pickups, the bomb carrier drops it on death (any attacker can pick it up), and once you're out you spectate a living teammate (**Space / click / A** to switch). Bots play the objective: they plant, defuse, guard sites and rush the overtime flag.
 
