@@ -78,7 +78,8 @@ class RoundMode {
       return ij ? new THREE.Vector3(nav.cx(ij[0]), 0, nav.cz(ij[1])) : new THREE.Vector3(x, 0, z);
     };
     // sites[t] = the sites team t defends. Maps can list their own; mirrored maps use SITES.
-    if (w.sites) this.sites = w.sites.map(list => list.map(([x, z]) => near(x, z)));
+    // a site can sit on a lower level (the Underground): [x, z, y]
+    if (w.sites) this.sites = w.sites.map(list => list.map(([x, z, y]) => { const v = near(x, z); if (y) v.y = y; return v; }));
     else {
       const base = SITES[w.id] || [[9, -16], [9, 16]];
       this.sites = [base.map(([x, z]) => near(-x, -z)), base.map(([x, z]) => near(x, z))];
@@ -336,7 +337,7 @@ class RoundMode {
     if (this.id !== 'snd' || this.phase !== 'live' || !c || !c.alive) return null;
     const b = this.bomb;
     if (b.state === BOMB.carried && b.carrier === c) {
-      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius && c.pos.y < 1.5) return 'plant';
+      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius && Math.abs(c.pos.y - s.y) < 1.5) return 'plant';
     }
     if (b.state === BOMB.planted && c.team === this.defend && Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < this.cfg.defuseRadius) return 'defuse';
     return null;
@@ -347,10 +348,10 @@ class RoundMode {
     b.state = BOMB.dropped;
     b.carrier = null;
     b.pos.copy(pos || this.defSites[0]);
-    b.pos.y = Math.max(0, b.pos.y);
+    b.pos.y = b.pos.y < -1 ? b.pos.y : Math.max(0, b.pos.y);   // below ground = the Underground: stays down there
     // don't leave it out of reach on a ledge or tucked against a wall: drop to the nearest open floor
     // cell when it's high up or where nobody can stand (bots path to open cells only)
-    if (b.pos.y > 2.5 || !g.world.nav.isOpenAt(b.pos.x, b.pos.z)) {
+    if (b.pos.y > 2.5 || (b.pos.y > -1 && !g.world.nav.isOpenAt(b.pos.x, b.pos.z))) {
       const nav = g.world.nav, ij = nav.nearestOpen(nav.ci(b.pos.x), nav.cj(b.pos.z));
       if (ij) b.pos.set(nav.cx(ij[0]), 0, nav.cz(ij[1]));
     }
@@ -555,7 +556,7 @@ class RoundMode {
     if (!me.isBot) me.useHeld = me.alive && !g.frozen && g.input.useHeld;
     // site rings on the defending side
     const sites = snd ? this.defSites : [];
-    this.siteMeshes.forEach((m, i) => { m.visible = snd && !!sites[i]; if (sites[i]) m.position.set(sites[i].x, 0.04, sites[i].z); });
+    this.siteMeshes.forEach((m, i) => { m.visible = snd && !!sites[i]; if (sites[i]) m.position.set(sites[i].x, sites[i].y + 0.04, sites[i].z); });
     // bomb on the ground or planted
     const showBomb = snd && (b.state === BOMB.planted || (b.state === BOMB.dropped && me.team === this.attack));
     this.bombMesh.visible = showBomb || (snd && b.state === BOMB.defused);
@@ -633,7 +634,7 @@ class RoundMode {
     if (this.id !== 'snd' || this.phase !== 'live' || !c.alive) return null;
     const b = this.bomb;
     if (b.state === BOMB.carried && b.carrier === c) {
-      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius) return 'plant';
+      for (const s of this.defSites) if (Math.hypot(c.pos.x - s.x, c.pos.z - s.z) < this.cfg.siteRadius && Math.abs(c.pos.y - s.y) < 1.5) return 'plant';
     }
     if (b.state === BOMB.planted && c.team === this.defend && Math.hypot(c.pos.x - b.pos.x, c.pos.z - b.pos.z) < this.cfg.defuseRadius) return 'defuse';
     return null;

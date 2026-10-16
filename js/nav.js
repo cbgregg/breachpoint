@@ -145,8 +145,9 @@ export class NavGrid {
     const U = this.upper;
     if (!U) return this.findPathFlat(from, to, route);
     const onStair = (p) => U.portals.find(q => p.x > q.rect[0] && p.x < q.rect[2] && p.z > q.rect[1] && p.z < q.rect[3]);
-    const lvl = (p) => (p.y > U.y - 1.0 ? 1 : 0);
-    const fs = onStair(from), fl = fs ? (from.y > U.y * 0.5 ? 1 : 0) : lvl(from), tl = lvl(to);
+    // the other level can be above (an upper floor) or below (the Underground)
+    const lvl = (p) => (U.y > 0 ? p.y > U.y - 1.0 : p.y < U.y + 1.0) ? 1 : 0;
+    const fs = onStair(from), fl = fs ? ((U.y > 0 ? from.y > U.y * 0.5 : from.y < U.y * 0.5) ? 1 : 0) : lvl(from), tl = lvl(to);
     if (fl === tl && !fs) return fl ? U.grid.findPathFlat(from, to) : this.findPathFlat(from, to, route);
     // pick the stair with the shortest straight-line detour
     let best = null, bd = Infinity;
