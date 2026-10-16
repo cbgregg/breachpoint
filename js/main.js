@@ -81,7 +81,7 @@ const bindings = [
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
   ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
-  ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
+  ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
@@ -430,6 +430,7 @@ function launch(cfg, online = null) {
   })();
 }
 function deploy() {
+  game.input.goFullscreen();   // in the click itself: the browser only allows fullscreen (and Ctrl+W capture) inside a user gesture
   for (const [id, key, type] of bindings) readField(id, key, type);
   saveSettings(settings);
   launch(settings);
@@ -502,7 +503,8 @@ game.onPause = (paused) => {
     $('quit').textContent = lobby.active ? 'LEAVE GAME' : 'END GAME';
     // dead, or only just spawned: open straight onto Change Loadout
     const p = game.player;
-    setPauseSec(p && (!p.alive || game.inSpawnWindow(p)) ? 'loadout' : 'match');
+    setPauseSec(game.wantLoadout || (p && (!p.alive || game.inSpawnWindow(p))) ? 'loadout' : 'match');
+    game.wantLoadout = false;
     showScreen('pause');
     pauseTimer = setInterval(() => { if (screen === 'pause' && pauseSec === 'match') renderPauseMatch(); }, 1000);
   } else { restorePanes(); showScreen(null); }
@@ -536,6 +538,7 @@ game.onEnd = (r) => {
 const shuffleArr = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 let nextMatchT = 0;
 $('again').addEventListener('click', () => {
+  game.input.goFullscreen();
   if (lobby.active) { lobby.mapReady(); openLobby(); return; }
   launch(settings);
 });
@@ -711,6 +714,7 @@ function startQuick() {
   renderLobby();
 }
 $('quick-btn').addEventListener('click', () => {
+  game.input.goFullscreen();
   if (acked()) { startQuick(); return; }
   quickIntro = true;
   showScreen('lobby');
@@ -776,6 +780,7 @@ const setMapHint = () => {
 for (const id of ['opt-fillbots', 'opt-team', 'opt-ff']) $(id).addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); renderLobby(); } });
 $('opt-mode').addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); } });
 $('lobby-start').addEventListener('click', () => {
+  game.input.goFullscreen();
   readAll();
   if (!lobby.public && settings.fillBots === false) {
     const teams = [lobby.hostTeam, ...[...lobby.players.values()].map(p => p.team)];

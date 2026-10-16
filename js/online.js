@@ -108,7 +108,7 @@ export class Lobby {
       p.lastPong ??= t;
       const ms = await Promise.race([this.net.ping(p.peerId), new Promise(r => setTimeout(() => r(0), 3000))]);
       if (ms) { p.ping = Math.round(ms); p.lastPong = now(); }
-      else if (now() - p.lastPong > 20 && this.players.has(p.peerId)) { // generous: a guest may be busy loading a map
+      else if (now() - p.lastPong > (this.game && this.game.session && this.game.session.remotes && [...this.game.session.remotes.values()].some(r => r.peerId === p.peerId && !r.started) ? 60 : 20) && this.players.has(p.peerId)) { // generous: a guest may be busy loading a map (a minute while it hasn't started)
         this.dropPlayer(p.peerId);
         this.toast(`${p.name.toUpperCase()} LOST CONNECTION`);
       }
@@ -931,7 +931,10 @@ export class GuestSession {
       this.sendT = 1 / 60;
     }
     this.interpolate(dt);
-    if (now() - this.lastSnap > 15) { this.lobby.close('Lost connection to the host.'); return; }
+    // the clock starts with our first frame in the match, not when the host said "go": loading a big map on a
+    // slow machine used to take longer than the timeout and drop us straight back to the menu
+    if (!this.begun) { this.begun = true; this.lastSnap = Math.max(this.lastSnap, now()); }
+    if (now() - this.lastSnap > 20) { this.lobby.close('Lost connection to the host.'); return; }
     if (now() - this.lastSnap > 4 && now() - (this.warnT || 0) > 4) { this.warnT = now(); g.hud.message('CONNECTION TO HOST INTERRUPTED…'); }
   }
 

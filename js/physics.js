@@ -96,8 +96,10 @@ export class Physics {
       const key = axis === 0 ? 'x' : 'z';
       const delta = e.vel[key] * dt;
       if (delta === 0) continue;
+      const before = p[key], startIn = !!this.overlap(p.x, p.y, p.z, r, h);
       p[key] += delta;
-      for (let iter = 0; iter < 4; iter++) {
+      let iter = 0;
+      for (; iter < 4; iter++) {
         const b = this.overlap(p.x, p.y, p.z, r, h);
         if (!b) break;
         const step = b.maxy - p.y;
@@ -110,6 +112,9 @@ export class Physics {
         else p.z = delta > 0 ? b.minz - r - 1e-4 : b.maxz + r + 1e-4;
         e.vel[key] = 0;
       }
+      // a gap narrower than we are: pushing out of one side lands us in the other. Stay where we were instead of
+      // being shoved back and forth (that read as the view rubber-banding in tight spots)
+      if (!startIn && this.overlap(p.x, p.y, p.z, r, h)) { p[key] = before; e.vel[key] = 0; }
     }
 
     // vertical

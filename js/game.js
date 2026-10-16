@@ -139,6 +139,7 @@ export class Game {
     if (this.input.adsMode !== adsMode) { this.input.adsMode = adsMode; this.input.clearAds(); }
     this.input.vibration = s.vibration;
     this.input.fullscreen = s.fullscreen !== false;
+    if (!!s.showCollision !== !!this.collisionView) this.setCollisionView(!!s.showCollision);
   }
 
   // ---------- match lifecycle ----------
@@ -385,9 +386,16 @@ export class Game {
       if (now < (this.nextFrameT || 0) - 1) return;
       this.nextFrameT = Math.max((this.nextFrameT || 0) + iv, now - iv);
     }
+    if (background) {
+      // a hidden host tab gets timers about once a second: catch the match up in 50 ms steps (up to 2 s), or
+      // everyone else's game would crawl and time out
+      let left = Math.min(2, (now - this.last) / 1000);
+      this.last = now;
+      while (left > 0.0001 && this.live) { const st = Math.min(0.05, left); this.update(st); this.input.endFrame(); left -= st; }
+      return;
+    }
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    if (background) { this.update(dt); this.input.endFrame(); return; }
     this.input.poll(dt);
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
@@ -426,6 +434,8 @@ export class Game {
     const inp = this.input;
     const guest = this.mode === 'guest';
     if (this.state === 'playing' && inp.action('pause')) { this.pause(); if (this.mode === 'local') return; }
+    // H / D-pad right: straight to Change Class (applies on the next spawn)
+    if (this.state === 'playing' && inp.action('loadout')) { this.wantLoadout = true; this.pause(); if (this.mode === 'local') return; }
 
     if (this.countdownT > 0) {
       this.countdownT -= dt;
@@ -990,6 +1000,26 @@ export class Game {
     sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6));
   }
 
+  // Options > Show collision: outline every solid box in the world (finds the "invisible walls")
+  setCollisionView(on, rebuild = false) {
+    if (this.colLines && (!on || rebuild)) { this.scene.remove(this.colLines); this.colLines.geometry.dispose(); this.colLines = null; }
+    this.collisionView = on;
+    if (!on || this.colLines) return;
+    const v = [];
+    const E = [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+    for (const b of this.physics.boxes) {
+      if (b.surface === 'ground' || b.maxy < 0.05 || b.maxy - b.miny > 60) continue;
+      const C = [];
+      for (const y of [b.miny, b.maxy]) for (const z of [b.minz, b.maxz]) for (const x of [b.minx, b.maxx]) C.push([x, y, z]);
+      for (const [a, c] of E) v.push(...C[a], ...C[c]);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    this.colLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }));
+    this.colLines.renderOrder = 5;
+    this.scene.add(this.colLines);
+  }
+
   loadMap(id) {
     if (!MAPS[id] || (this.world && this.world.id === id)) return;
     if (this.world) {
@@ -1013,6 +1043,7 @@ export class Game {
     const sc = this.renderer.sun.shadow.camera;
     if (sc.right !== ext) { sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.far = Math.max(200, ext * 3.2); sc.updateProjectionMatrix(); this.renderer.sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6)); }
     this.fitShadows();
+    if (this.collisionView) this.setCollisionView(true, true);
     this.renderer.setLook(this.world.look);
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects.clear();
