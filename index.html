@@ -42,6 +42,7 @@
   <!-- ============ HUD ============ -->
   <div id="hud">
     <div id="stun-fx"></div>
+    <div id="apply-dlg" class="apply-dlg" hidden><div class="ad-box"><b>APPLY CHANGES?</b><p>You changed some options. Apply them, or go back to how they were?</p><div class="ad-btns"><button id="ad-apply" class="cta small" data-nav><span>APPLY</span></button><button id="ad-discard" class="menu-btn small" data-nav>DISCARD</button><button id="ad-cancel" class="menu-btn small" data-nav>KEEP EDITING</button></div></div></div>
     <div id="gpu-warn" class="gpu-warn" hidden><b>Hardware acceleration is off</b><span id="gpu-warn-text"></span><button id="gpu-warn-x" class="menu-btn small">OK</button></div>
     <div id="scope"><div class="lens"><i class="h"></i><i class="v"></i><i class="dot"></i></div></div>
 
@@ -401,6 +402,7 @@
 
         <section class="pane" id="pane-options">
           <div class="crumbs" id="opt-crumbs">OPTIONS</div>
+          <div class="opt-apply" id="opt-apply" hidden><span>UNSAVED CHANGES</span><button id="opt-apply-btn" class="cta small" data-nav><span>APPLY</span><span class="glyph" data-act="x"></span></button><button id="opt-discard-btn" class="menu-btn small" data-nav>DISCARD</button></div>
           <nav class="subtabs" id="opt-subtabs" role="tablist">
             <span class="glyph bumper" data-act="prevSub"></span>
             <button class="subtab on" data-sub="general" data-nav>GENERAL</button>
@@ -438,6 +440,8 @@
             <div class="row"><label for="opt-gfxao">Ambient occlusion<small>Contact shadows in corners and under objects</small></label><input type="checkbox" id="opt-gfxao" data-nav></div>
             <div class="row"><label for="opt-gfxbloom">Bloom<small>Glow on lights, muzzle flash and the sun</small></label><input type="checkbox" id="opt-gfxbloom" data-nav></div>
             <div class="row"><label for="opt-gfxaa">Anti-aliasing<small>SMAA: smooths jagged edges</small></label><input type="checkbox" id="opt-gfxaa" data-nav></div>
+            <div class="row"><label for="opt-gfxmsaa">Multisample AA<small>MSAA: true edge smoothing on geometry, combined with SMAA</small></label><select id="opt-gfxmsaa" data-nav>
+              <option value="0">Off</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
             <div class="row"><label for="opt-gfxlights">Dynamic lights<small>Lamps and light fixtures cast light</small></label><input type="checkbox" id="opt-gfxlights" data-nav></div>
             <div class="row"><label for="opt-gfxaniso">Texture filtering<small>Sharper ground and walls at an angle</small></label><select id="opt-gfxaniso" data-nav>
               <option value="1">Off</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></div>
@@ -705,6 +709,7 @@
       <div id="end-mvp"></div>
       <div id="end-board"></div>
       <div class="mapvote" id="mv-end"></div>
+      <p class="end-next" id="end-next"></p>
       <div class="end-actions">
         <button id="again" class="cta" data-nav><span>PLAY AGAIN</span></button>
         <button id="menu-btn" class="menu-btn" data-nav>MAIN MENU</button>

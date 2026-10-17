@@ -195,7 +195,29 @@ function build(ctx) {
     pine: std({ color: 0xffffff, roughness: 0.95 }),
     chaseA: new THREE.MeshStandardMaterial({ color: 0xffe8b0, emissive: 0xffc860, emissiveIntensity: 8 }),
     chaseB: new THREE.MeshStandardMaterial({ color: 0xffe8b0, emissive: 0xffc860, emissiveIntensity: 0.3 }),
-    beam: new THREE.MeshBasicMaterial({ color: 0xbfd8ff, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    // the projector beam: a soft additive volume that's bright at the lens and fades toward the screen, with dust
+    // drifting through it and the faint flicker of the film running through the gate
+    beam: new THREE.ShaderMaterial({
+      uniforms: { time: { value: 0 }, color: { value: new THREE.Color(1.0, 0.94, 0.8) } },
+      vertexShader: `attribute float along; varying float vAlong; varying vec3 vW; varying vec3 vN; varying vec3 vV;
+        void main() { vAlong = along; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal);
+          vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `uniform float time; uniform vec3 color; varying float vAlong; varying vec3 vW; varying vec3 vN; varying vec3 vV;
+        float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+        float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y),
+                     mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z); }
+        void main() {
+          float fade = pow(1.0 - vAlong, 1.6) * 0.85 + 0.15;
+          float face = 0.35 + 0.65 * abs(dot(normalize(vN), normalize(vV)));          // soft where the sheet turns edge-on
+          float dust = 0.6 + 0.4 * n3(vW * 1.4 + vec3(time * 0.12, time * 0.05, -time * 0.09)) + 0.25 * n3(vW * 5.0 + vec3(0.0, time * 0.3, time * 0.2));
+          float rays = 0.8 + 0.2 * sin(vW.y * 2.3 + vW.z * 1.7 + time * 0.6);       // the picture's brighter and darker areas
+          float flick = 0.95 + 0.05 * sin(time * 150.8) * sin(time * 3.1);           // 24 fps shutter
+          float k = fade * face * dust * rays * flick * 0.16;
+          gl_FragColor = vec4(color * k, 1.0);
+        }`,
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }),
   });
   Object.assign(ctx.S, { grass: 3, checkerD: 1.2, enamel: 0, gloss: 0, chrome: 0 });
   if (ctx.tex.checker && ctx.tex.checker.photo) { M.checkerD = ctx.pbr(ctx.tex.checker, { roughness: 1 }); ctx.S.checkerD = 3; }
@@ -352,7 +374,10 @@ function build(ctx) {
   }
 
   // ---------- ground ----------
-  plane(M.dirt, 400, 400, 0, 0, -0.02, 0, 0x7a6a58);
+  // the dirt beyond the lot sits under the asphalt; a polygon offset keeps it behind at any range (2 cm apart is
+  // nothing for the depth buffer 60 m away, and the whole lot flickered)
+  { const under = M.dirt.clone(); under.polygonOffset = true; under.polygonOffsetFactor = 4; under.polygonOffsetUnits = 8; M._dirtUnder = under;
+    plane(under, 400, 400, 0, 0, -0.05, 0, 0x7a6a58); }
   plane(M.asphalt, 2 * XS, 2 * HZ, 0, 0, 0, 0, 0xb0aaa0);
   for (const sx of [-1, 1]) {
     plane(M.grass, HX - XS + 0.2, 2 * HZ, sx * (HX + XS) / 2, 0, 0.004);       // the lawns behind the screens
@@ -441,13 +466,12 @@ function build(ctx) {
     const p = [[x0, y0 + 0.12, -0.12], [x0, y0 + 0.12, 0.12], [x0, y0 - 0.12, 0.12], [x0, y0 - 0.12, -0.12],
       [x1, y1 + H / 2, -W / 2], [x1, y1 + H / 2, W / 2], [x1, y1 - H / 2, W / 2], [x1, y1 - H / 2, -W / 2]];
     const idx = [0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7];
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(p.flat(), 3));
-    // fade along the beam: bright near the lens
-    g.setAttribute('color', new THREE.Float32BufferAttribute(p.flatMap((_, i) => i < 4 ? [1, 1, 1] : [0.35, 0.35, 0.35]), 3));
-    g.setIndex(idx);
+    const g0 = new THREE.BufferGeometry();
+    g0.setAttribute('position', new THREE.Float32BufferAttribute(p.flat(), 3));
+    g0.setAttribute('along', new THREE.Float32BufferAttribute(p.map((_, i) => (i < 4 ? 0 : 1)), 1));   // 0 at the lens, 1 at the screen
+    g0.setIndex(idx);
+    const g = g0.toNonIndexed(); g.computeVertexNormals();
     const m = new THREE.Mesh(g, M.beam);
-    M.beam.vertexColors = true;
     m.userData.noMinimap = true; m.renderOrder = 4;
     group.add(m); signs.push(m);
   }
@@ -864,6 +888,7 @@ function build(ctx) {
         const f = 0.92 + Math.sin(time * 23) * 0.012;      // a faint projector shimmer (no sudden dips)
         screenMat.color.setScalar(f);
       }
+      M.beam.uniforms.time.value = time;
       const on = Math.floor(time * 3) % 2 === 0;
       M.chaseA.emissiveIntensity = on ? 8 : 0.3;
       M.chaseB.emissiveIntensity = on ? 0.3 : 8;

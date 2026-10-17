@@ -251,7 +251,8 @@ export class Lobby {
     if (this.role !== 'host') return;
     clearInterval(this.mvTimer);
     const now = Date.now();
-    this.mv = { o: options.slice(0, 4), votes: new Map(), ready: new Set(['host']), cdEnd: countdown ? now + countdown * 1000 : 0, hard: now + 60000 };
+    // the host is "back in the lobby" once its own scoreboard closes (mapReady), like everyone else
+    this.mv = { o: options.slice(0, 4), votes: new Map(), ready: new Set(countdown ? ['host'] : []), cdEnd: countdown ? now + countdown * 1000 : 0, hard: now + 60000 };
     this.mapVote = { o: this.mv.o, v: this.mv.o.map(() => 0), cd: -1, rd: 1, n: 1 + this.players.size, my: -1 };
     this.mvTimer = setInterval(() => this.mapVoteTick(), 500);
     this.mapVoteTick();
@@ -269,12 +270,16 @@ export class Lobby {
     this.mapVote.my = idx;
     this.mapVoteTick();
   }
-  mapReady() { if (this.role === 'guest' && this.hostId && this.mapVote) this.net.send({ t: 'mv', r: 1 }, this.hostId); }
+  mapReady() {
+    if (this.role === 'guest' && this.hostId && this.mapVote) this.net.send({ t: 'mv', r: 1 }, this.hostId);
+    else if (this.role === 'host' && this.mv) { this.mv.ready.add('host'); this.mapVoteTick(); }
+  }
   mapVoteTick() {
     const mv = this.mv;
     if (!mv || this.role !== 'host') return;
     const now = Date.now();
     for (const k of mv.ready) if (k !== 'host' && !this.players.has(k)) mv.ready.delete(k);
+    if (now > mv.hard - 45000 && !mv.ready.has('host') && this.game.state !== 'ended') mv.ready.add('host');   // host left the scoreboard some other way
     for (const k of mv.votes.keys()) if (k !== 'host' && !this.players.has(k)) mv.votes.delete(k);
     const n = 1 + this.players.size, rd = mv.ready.size;
     if (!mv.cdEnd && (rd * 2 > n || now > mv.hard)) mv.cdEnd = now + 15000;
