@@ -1394,3 +1394,66 @@ body { --amber: var(--bo); }
 .cl-setup-h { display: none; font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: 0.1em; color: #fff; border-bottom: 2px solid var(--bo); padding-bottom: 4px; }
 #lobby.cl-editing:has(#play-rows.cl-setup) .cl-setup-h { display: block; }
 body[data-gmode="ffa"] #opt-team option, body[data-gmode="gungame"] #opt-team option { }
+
+/* ===================== Lobby look across the multiplayer menus (Oct 2026) =====================
+   The pre-match lobby sits straight on the live 3D background (no painted globe), and the Multiplayer
+   menu uses the same language: big plain list items, amber when selected, a ▸ description under them,
+   and the message of the day on the right. */
+#lobby.classic { background: linear-gradient(90deg, rgba(4, 6, 9, 0.9) 0%, rgba(4, 6, 9, 0.72) 42%, rgba(4, 6, 9, 0.35) 100%); }
+#lobby.classic .cl::before { content: none; display: none; }
+body.mode-online #menu { background: linear-gradient(90deg, rgba(4, 6, 9, 0.9) 0%, rgba(4, 6, 9, 0.66) 45%, rgba(4, 6, 9, 0.3) 100%); }
+body.mode-online #play-tiles { gap: 0; }
+body.mode-online #play-tiles .tile { display: block; min-height: 0; padding: 3px 0; background: none; border: 0; transform: none; overflow: visible; }
+body.mode-online #play-tiles .tile .art, body.mode-online #play-tiles .tile::before, body.mode-online #play-tiles .tile small, body.mode-online #play-tiles .tile span, body.mode-online #play-tiles .tile.cur::after { display: none; }
+body.mode-online #play-tiles .tile b { font-family: var(--display); font-weight: 600; font-size: clamp(22px, 2.5vw, 32px); letter-spacing: 0.02em; color: #f2f2f0; }
+body.mode-online #play-tiles .tile:hover b, body.mode-online #play-tiles .tile.pad-focus b, body.mode-online #play-tiles .tile:focus-visible b { color: var(--amber); }
+body.mode-online #play-tiles .tile[data-tile="quick"] b::after { content: ' ●'; color: #6bd36b; font-size: 0.5em; vertical-align: middle; }
+.tile-desc { display: none; margin: 6px 0 0; min-height: 2.6em; font-size: 16px; line-height: 1.35; color: #d8d6d0; max-width: 40ch; }
+.tile-desc::before { content: '▸ '; font-size: 12px; }
+body.mode-online #menu[data-pv="root"] .tile-desc { display: block; }
+body.mode-online #menu[data-pv="root"] .intel { background: none; border: 0; padding: 0; }
+body.mode-online #menu[data-pv="root"] .intel-tile { display: none; }
+/* message of the day */
+.motd[hidden] { display: none; }
+.motd { grid-column: 1 / 3; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding: 14px 16px; background: rgba(6, 9, 12, 0.72); border: 1px solid var(--bo-line); border-left: 3px solid var(--bo); }
+.motd-k { font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--bo); }
+.motd-date { color: var(--bo-faint); letter-spacing: 0.1em; }
+.motd-t { font-family: var(--display); font-size: 22px; letter-spacing: 0.04em; color: #fff; line-height: 1.1; }
+.motd-b { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--bo-dim); }
+#menu:not([data-pv="root"]) #motd-menu, body.mode-offline #motd-menu { display: none; }
+body.mode-online #menu[data-pv="root"] #motd-menu { display: flex; }
+#lobby .motd { margin: 14px 0 0 34px; max-width: 520px; }
+@media (max-width: 760px) { #lobby .motd { margin-left: 0; } }
+/* public match: choose game modes (X) */
+.cl-modes { display: none; }
+#lobby.cl-modes-on .cl-modes { display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
+#lobby.cl-modes-on .cl-setup-h:not(.on) { display: none; }
+.cl-modes .cl-setup-h.on { display: block; }
+.cl-mf-note { margin: 0 0 6px; color: var(--bo-dim); font-size: 14px; line-height: 1.5; }
+.cl-mf { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-items: center; text-align: left; padding: 10px 14px; background: rgba(6, 9, 12, 0.72); border: 1px solid var(--bo-line); color: #fff; cursor: pointer; outline: none; }
+.cl-mf i { grid-row: 1 / 3; width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.5); }
+.cl-mf.on i { background: var(--bo); border-color: var(--bo); box-shadow: inset 0 0 0 3px #0e1114; }
+.cl-mf b { font-family: var(--display); font-size: 20px; letter-spacing: 0.06em; }
+.cl-mf small { color: var(--bo-dim); font-size: 12.5px; }
+.cl-mf:hover, .cl-mf.pad-focus { border-color: var(--bo); background: rgba(var(--bo-rgb), 0.16); }
+/* match browser */
+.mb-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.mb-chip { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.12em; padding: 6px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--bo-line); color: var(--bo-dim); cursor: pointer; outline: none; }
+.mb-chip.on { background: rgba(var(--bo-rgb), 0.18); border-color: var(--bo); color: #fff; }
+.mb-chip:hover, .mb-chip.pad-focus { box-shadow: inset 0 0 0 2px #fff; color: #fff; }
+.mb-head, .mb-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1.2fr) 70px 96px; gap: 10px; align-items: center; }
+.mb-head { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; color: var(--bo-faint); padding: 0 12px; margin-top: 4px; }
+.mb-list { display: flex; flex-direction: column; gap: 3px; }
+.mb-row { text-align: left; padding: 9px 12px; font-family: var(--display); font-weight: 600; font-size: 18px; color: #f2f2f0; background: linear-gradient(90deg, rgba(118, 132, 124, 0.36), rgba(76, 88, 82, 0.4)); border: 0; border-top: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; outline: none; }
+.mb-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-row i { color: var(--bo-dim); font-style: normal; }
+.mb-row:hover, .mb-row.pad-focus { background: linear-gradient(90deg, var(--bo-hi), var(--bo) 55%, var(--bo-deep)); color: #0e1114; }
+.mb-row:hover i, .mb-row.pad-focus i { color: #0e1114; }
+.mb-row.full { opacity: 0.5; cursor: default; }
+.mb-st { font-size: 13px; letter-spacing: 0.12em; }
+.mb-st.ig { color: #ff9a7a; } .mb-st.lb { color: #7be07b; }
+.mb-row:hover .mb-st, .mb-row.pad-focus .mb-st { color: #0e1114; }
+@media (max-width: 760px) { .mb-head { display: none; } .mb-row { grid-template-columns: minmax(0, 1fr) auto; font-size: 15px; } .mb-row span:nth-child(3), .mb-row span:nth-child(4) { display: none; } }
+body.mode-online #menu[data-pv="browser"] .intel { display: none; }
+#menu[data-pv="browser"] #pane-play { grid-column: 1 / 3; }
+.ld-tip:has(#ld-tip:empty) { visibility: hidden; }

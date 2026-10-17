@@ -51,16 +51,17 @@ export class Board {
     const clean = {
       code: ad.code, v: ad.v | 0, n: Math.max(0, Math.min(16, ad.n | 0)), max: Math.max(1, Math.min(16, ad.max | 0)),
       ig: !!ad.ig, open: ad.open !== 0, m: ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].includes(ad.m) ? ad.m : 'tdm', seen: Date.now(),
+      h: String(ad.h || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').slice(0, 16), map: /^[a-z]{2,12}$/.test(ad.map || '') ? ad.map : '',
     };
     this.ads.set(clean.code, clean);
     if (this.onAd) this.onAd(clean);
   }
 
   // open lobbies, fullest first so players end up together
-  candidates(proto, exclude, mode = 'tdm') {
-    const t = Date.now();
+  candidates(proto, exclude, modes = ['tdm']) {
+    const t = Date.now(), want = Array.isArray(modes) ? modes : [modes];
     return [...this.ads.values()]
-      .filter(a => a.v === proto && a.open && a.m === mode && a.n < a.max && t - a.seen < STALE && !exclude.has(a.code))
+      .filter(a => a.v === proto && a.open && want.includes(a.m) && a.n < a.max && t - a.seen < STALE && !exclude.has(a.code))
       .sort((a, b) => b.n - a.n || Math.random() - 0.5);
   }
 
@@ -68,6 +69,12 @@ export class Board {
     const msg = await createEvent(TOPIC, JSON.stringify(ad));
     this.pendingAd = msg;
     for (const ws of this.sockets) this.sendTo(ws, msg);
+  }
+
+  // every live public match (the match browser)
+  list(proto) {
+    const t = Date.now();
+    return [...this.ads.values()].filter(a => a.v === proto && a.open && t - a.seen < STALE).sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
   }
 
   sendTo(ws, msg) { if (ws.readyState === 1) { try { ws.send(msg); } catch (_) { /* closed */ } } }
