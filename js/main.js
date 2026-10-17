@@ -89,7 +89,7 @@ const bindings = [
   ['opt-name', 'name', 'text'], ['opt-theme', 'theme', 'str'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
-  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
+  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxmsaa', 'gfxMsaa', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
@@ -141,11 +141,61 @@ function readField(id, key, type) {
   if (key === 'name' && onlineName()) return; // edits go to the account instead (see below)
   settings[key] = v;
 }
+// ---------- staged options: changes wait for Apply (X); leaving with unsaved changes asks first ----------
+const OPT_KEYS = bindings.filter(([id]) => $(id).closest('#pane-options')).map(([, key]) => key).concat(['quality']);
+const optState = () => JSON.stringify(Object.fromEntries([...new Set(OPT_KEYS)].map(k => [k, settings[k]])));
+let optBase = optState();
+const optDirty = () => optState() !== optBase;
+function syncApplyBar() { $('opt-apply').hidden = !optDirty(); }
+function applyOptions() {
+  if (!optDirty()) return;
+  saveSettings(settings);
+  applyTheme();
+  game.applySettings(settings);
+  if (game.settings) Object.assign(game.settings, { vmFov: settings.vmFov, sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
+  const gfx = JSON.parse(optBase);
+  const gfxChanged = Object.keys(gfx).some(k => (k === 'quality' || k.startsWith('gfx')) && gfx[k] !== settings[k]);
+  optBase = optState();
+  syncApplyBar();
+  if (gfxChanged) checkMsaa();
+  game.hud.toast('SETTINGS APPLIED');
+  game.audio.play('ui', null, { ui: true });
+}
+function discardOptions() {
+  Object.assign(settings, JSON.parse(optBase));
+  writeForm();
+  syncApplyBar();
+}
+let applyThen = null;
+// run `go` now, or after asking to apply / discard if there are unsaved option changes
+function guardOptions(go) {
+  if (!optDirty()) { go(); return; }
+  applyThen = go;
+  $('apply-dlg').hidden = false;
+  game.audio.play('ui', null, { ui: true });
+  setTimeout(() => focusEl($('ad-apply')), 0);
+}
+const closeApplyDlg = () => { $('apply-dlg').hidden = true; const f = applyThen; applyThen = null; return f; };
+$('ad-apply').addEventListener('click', () => { const f = closeApplyDlg(); applyOptions(); if (f) f(); });
+$('ad-discard').addEventListener('click', () => { const f = closeApplyDlg(); discardOptions(); if (f) f(); });
+$('ad-cancel').addEventListener('click', () => { closeApplyDlg(); if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('opt-apply-btn').offsetParent ? $('opt-apply-btn') : null) || focusFirst(), 0); });
+$('opt-apply-btn').addEventListener('click', applyOptions);
+$('opt-discard-btn').addEventListener('click', () => { discardOptions(); game.audio.play('ui', null, { ui: true }); });
+const optionsOpen = () => (screen === 'menu' && tab === 'options') || (screen === 'pause' && pauseSec === 'options');
+
 for (const [id, key, type] of bindings) {
   const el = $(id);
   const ev = el.type === 'range' || el.tagName === 'INPUT' && type === 'text' ? 'input' : 'change';
   el.addEventListener(ev, () => {
     readField(id, key, type);
+    if (OPT_KEYS.includes(key)) {
+      // an option: show it in the form, apply it later
+      if (key === 'quality' && settings.quality !== 'custom') { Object.assign(settings, presetGfx(settings.quality)); writeGfx(); }
+      else if (key.startsWith('gfx') && settings.quality !== 'custom') { settings.quality = 'custom'; $('opt-quality').value = 'custom'; }
+      if (outputs[id]) $(outputs[id][0]).textContent = outputs[id][1](el.value);
+      syncApplyBar();
+      return;
+    }
     // graphics: a preset fills in every detail setting; changing any detail makes the preset Custom (like CoD)
     if (key === 'quality' && settings.quality !== 'custom') { Object.assign(settings, presetGfx(settings.quality)); writeGfx(); }
     else if (key.startsWith('gfx') && settings.quality !== 'custom') { settings.quality = 'custom'; $('opt-quality').value = 'custom'; }
@@ -567,7 +617,9 @@ $('cls-rename').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.
 const TABS = ['play', 'loadout', 'options'];
 let tab = 'play';
 function setTab(t) {
+  if (tab === 'options' && t !== 'options' && optDirty()) { guardOptions(() => setTab(t)); return; }
   tab = t;
+  if (t === 'options') { optBase = optState(); syncApplyBar(); }
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('#menu .pane').forEach(p => p.classList.toggle('on', p.id === `pane-${t}`));
   game.audio.play('ui', null, { ui: true });
@@ -638,8 +690,10 @@ $('play-tiles').addEventListener('mouseover', tileHover);
 $('play-tiles').addEventListener('focusin', tileHover);
 
 // ---------- message of the day (motd.json in the site root: edit it and push to change it) ----------
+let motdData = null, motdShown = false;
 fetch('motd.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).then(m => {
   if (!m || !m.body) return;
+  motdData = m;
   for (const id of ['motd-menu', 'motd-lobby']) {
     const el = $(id);
     el.querySelector('.motd-t').textContent = String(m.title || '').slice(0, 80);
@@ -712,6 +766,7 @@ const OPT_DESC = {
   'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom. Mobile is built for phones and tablets: fast render path with MSAA, a pixel budget for high-DPI screens, low geometry, hard shadows.',
   'opt-fsr': 'AMD FidelityFX Super Resolution 1.0. The game draws the scene at the percentage shown and FSR upscales it to your screen with edge-aware filtering and sharpening: more frames for a small loss in detail. Works on every GPU, on top of any preset; dynamic resolution moves the render scale further when frames run long.',
   'opt-fsrsharp': 'How strongly FSR sharpens the upscaled image (RCAS).',
+  'opt-gfxmsaa': 'Multisample anti-aliasing smooths the edges of geometry itself (thin gun parts, wires, railings) before SMAA cleans up the rest. 4× is the sweet spot; 8× costs more for a small gain.',
   'opt-gfxpath': 'Full: the post-processing chain (SMAA, bloom, ambient occlusion, colour grade). Fast: draws straight to the screen with hardware MSAA; much lighter on phones. Switching restarts the game from the menu.',
   'opt-gfxdetail': 'Low: the world uses square-edged boxes and lighter sandbags, small props stop casting shadows, and other players\' guns use simpler geometry. Rebuilds the map.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
@@ -859,11 +914,12 @@ function restorePanes() {
   document.querySelectorAll('#menu .pane').forEach(p => p.classList.toggle('on', p.id === `pane-${tab}`));
 }
 function setPauseSec(sec) {
+  if (pauseSec === 'options' && sec !== 'options' && optDirty()) { guardOptions(() => setPauseSec(sec)); return; }
   pauseSec = sec;
   document.querySelectorAll('.psec').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
   document.querySelectorAll('.psec-pane').forEach(p => p.classList.toggle('on', p.id === `psec-${sec}`));
   if (sec === 'loadout') { $('psec-loadout').appendChild($('pane-loadout')); $('pane-loadout').classList.add('on'); if (editKey) renderGunsmith(false); else renderClasses(); }
-  if (sec === 'options') { $('psec-options').appendChild($('pane-options')); $('pane-options').classList.add('on'); writeForm(); }
+  if (sec === 'options') { $('psec-options').appendChild($('pane-options')); $('pane-options').classList.add('on'); writeForm(); optBase = optState(); syncApplyBar(); }
   if (sec === 'match') renderPauseMatch();
   renderHints(game.input.lastDevice);
 }
@@ -956,6 +1012,22 @@ game.onEnd = (r) => {
   reportMatch(r);
   $('again').firstElementChild.textContent = r.mode === 'local' ? 'PLAY AGAIN' : 'BACK TO LOBBY';
   setTimeout(() => { if (game.state === 'ended') showScreen('end'); }, 900);
+  // 10 seconds on the scoreboard, then back to the lobby (online: the next-map vote is there) or the menu
+  clearInterval(endTimer);
+  let left = 10.9;
+  const tickEnd = () => {
+    if (game.state !== 'ended') { clearInterval(endTimer); $('end-next').textContent = ''; return; }
+    left -= 0.25;
+    const n = Math.max(0, Math.ceil(left));
+    $('end-next').innerHTML = `${lobby.active ? 'BACK TO THE LOBBY' : 'BACK TO THE MENU'} IN <b>${n}</b>`;
+    if (left <= 0) {
+      clearInterval(endTimer);
+      if (lobby.active) $('again').click();
+      else { game.quitToMenu(); writeForm(); showScreen('menu'); setTab('play'); openPlayView(playMode === 'online' ? 'root' : 'setup'); }
+    }
+  };
+  endTimer = setInterval(tickEnd, 250);
+  tickEnd();
   if (lobby.public && lobby.role === 'host') {
     // public lobbies vote on the next map; the countdown starts once most players are back
     clearTimeout(nextMatchT);
@@ -963,13 +1035,14 @@ game.onEnd = (r) => {
   }
 };
 const shuffleArr = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
-let nextMatchT = 0;
+let nextMatchT = 0, endTimer = 0;
 $('again').addEventListener('click', () => {
+  clearInterval(endTimer);
   game.input.goFullscreen();
   if (lobby.active) { lobby.mapReady(); openLobby(); return; }
   launch(settings);
 });
-$('menu-btn').addEventListener('click', () => { leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
+$('menu-btn').addEventListener('click', () => { clearInterval(endTimer); leaveOnline(); game.quitToMenu(); writeForm(); showScreen('menu'); });
 
 // ---------- online (peer-to-peer, 6-digit codes) ----------
 // sandboxed previews can't open WebRTC/WebSocket connections; builds there set this flag
@@ -1620,6 +1693,14 @@ game.input.onNav = (dir) => {
     else if (dir === 'back' || dir === 'left' || dir === 'right') { const sel = dd.sel; closeDropdown(); focusEl(sel); }
     return;
   }
+  if (!$('apply-dlg').hidden) {
+    const items = [...$('apply-dlg').querySelectorAll('[data-nav]')], cur = items.indexOf(document.querySelector('#apply-dlg .pad-focus'));
+    if (dir === 'left' || dir === 'right' || dir === 'up' || dir === 'down') { const n = items[Math.max(0, Math.min(items.length - 1, cur + (dir === 'right' || dir === 'down' ? 1 : -1)))]; if (n) focusEl(n); }
+    else if (dir === 'accept') (items[cur] || items[0]).click();
+    else if (dir === 'back') $('ad-cancel').click();
+    return;
+  }
+  if (dir === 'x' && optionsOpen()) { applyOptions(); return; }
   if (dir === 'alt') { toggleSide(); return; }
   if (sideOpen && dir === 'back') { closeSide(); return; }
   if (sideOpen && (dir === 'prevTab' || dir === 'nextTab') && account.signedIn) {
@@ -1726,6 +1807,7 @@ window.addEventListener('keydown', (e) => {
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'q' || e.key === 'Q')) game.input.onNav('prevTab');
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
   else if (!typing && screen === 'lobby' && (e.key === 'x' || e.key === 'X') && !e.repeat) game.input.onNav('x');
+  else if (!typing && optionsOpen() && (e.key === 'x' || e.key === 'X') && !e.repeat) applyOptions();
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'z' || e.key === 'Z')) game.input.onNav('prevSub');
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'c' || e.key === 'C')) game.input.onNav('nextSub');
 });
@@ -1737,6 +1819,18 @@ function titleGo() {
   if (screen !== 'title') return;
   game.audio.init();
   game.audio.play('ui', null, { ui: true });
+  // the message of the day pops up once per visit, right after the title screen
+  if (motdData && !motdShown) {
+    motdShown = true;
+    $('nt-title').textContent = String(motdData.title || 'MESSAGE OF THE DAY').slice(0, 80).toUpperCase();
+    $('nt-text').textContent = String(motdData.body).slice(0, 600) + (motdData.date ? `\n\n${String(motdData.date).slice(0, 10)}` : '');
+    $('notice').classList.remove('bad');
+    $('notice').classList.add('motd-pop');
+    noticeDone = () => { $('notice').classList.remove('motd-pop'); openMode(); };
+    showScreen('notice');
+    if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('nt-ok')), 0);
+    return;
+  }
   openMode();
 }
 $('title').addEventListener('click', titleGo);
@@ -2498,9 +2592,9 @@ function renderHints(device) {
   let ps = 'match'; try { ps = pauseSec; } catch (_) { /* before init */ }
   const inOpt = tab === 'options', pOpt = ps === 'options', deep = tab === 'play' && playView !== 'root';
   $('menu-hints').innerHTML = device === 'pad'
-    ? [hint('accept', 'Select'), hint('back', 'Back'), bumpers('Tabs'), inOpt ? subs('Categories') : '', playMode !== 'online' && deep ? hint('pause', 'Start match') : ''].join('')
-    : device === 'touch' ? '' : [kb(['↑', '↓'], 'Navigate'), kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Tabs'), inOpt ? kb(['Z', 'C'], 'Categories') : '', kb(['Esc'], 'Back')].join('');
-  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', ps === 'match' ? 'Resume' : 'Back'), bumpers('Sections'), pOpt ? subs('Categories') : ''].join('') : device === 'touch' ? '' : [kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Sections'), pOpt ? kb(['Z', 'C'], 'Categories') : '', kb(['Esc'], ps === 'match' ? 'Resume' : 'Back')].join('');
+    ? [hint('accept', 'Select'), hint('back', 'Back'), bumpers('Tabs'), inOpt ? subs('Categories') : '', inOpt ? hint('x', 'Apply') : '', playMode !== 'online' && deep ? hint('pause', 'Start match') : ''].join('')
+    : device === 'touch' ? '' : [kb(['↑', '↓'], 'Navigate'), kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Tabs'), inOpt ? kb(['Z', 'C'], 'Categories') : '', inOpt ? kb(['X'], 'Apply') : '', kb(['Esc'], 'Back')].join('');
+  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', ps === 'match' ? 'Resume' : 'Back'), bumpers('Sections'), pOpt ? subs('Categories') : '', pOpt ? hint('x', 'Apply') : ''].join('') : device === 'touch' ? '' : [kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Sections'), pOpt ? kb(['Z', 'C'], 'Categories') : '', pOpt ? kb(['X'], 'Apply') : '', kb(['Esc'], ps === 'match' ? 'Resume' : 'Back')].join('');
   $('lobby-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : '<span><kbd>0</kbd>–<kbd>9</kbd> Code</span><span><kbd>Enter</kbd> Join</span>' + hint('back', 'Back');
   $('title-press').innerHTML = device === 'pad' ? `PRESS ${glyph('accept', 'pad')} TO START` : device === 'touch' ? 'TAP TO START' : 'PRESS <kbd>ENTER</kbd> TO START';
   $('mode-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : hint('back', 'Back');

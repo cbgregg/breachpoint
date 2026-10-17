@@ -280,6 +280,12 @@ export class Renderer {
     this.aoPass.enabled = q.ao && !q.fast;
     this.bloomPass.enabled = q.bloom && !q.fast;
     this.smaaPass.enabled = q.aa && !q.fast;
+    // MSAA on the post-processing path: the composer's render targets are multisampled
+    const ms = q.fast ? 0 : Math.min(q.msaa || 0, this.renderer.capabilities.maxSamples || 4);
+    if (ms !== this.msaaSamples) {
+      this.msaaSamples = ms;
+      for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) { rt.samples = ms; rt.dispose(); }
+    }
     this.setSize();
   }
 

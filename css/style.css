@@ -1607,3 +1607,26 @@ select option.nr { color: #9a8f80; }
 .gpu-warn { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; background: rgba(40, 10, 8, 0.94); border: 1px solid #ff6a55; color: #fff; font-size: 13px; line-height: 1.45; }
 .gpu-warn b { font-family: var(--display); letter-spacing: 0.14em; color: #ff8a7a; }
 .gpu-warn .menu-btn { align-self: flex-end; margin: 0; }
+#notice.motd-pop .mw-head small { visibility: hidden; }
+#notice.motd-pop .mw-head small::after { content: 'MESSAGE OF THE DAY'; visibility: visible; display: block; }
+#notice .nt-text { white-space: pre-line; }
+
+/* options are staged: nothing changes until Apply (X) */
+.opt-apply { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; padding: 6px 10px; background: rgba(var(--bo-rgb), 0.12); border: 1px solid var(--bo); }
+.opt-apply[hidden] { display: none; }
+.opt-apply > span { font-size: 11px; letter-spacing: 0.2em; color: var(--bo-hi); flex: 1; }
+.opt-apply .cta.small { margin: 0; padding: 6px 16px; font-size: 15px; }
+.opt-apply .menu-btn.small { margin: 0; }
+.apply-dlg { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); }
+.apply-dlg[hidden] { display: none; }
+.ad-box { background: var(--bo-panel, #12161b); border: 1px solid var(--bo); padding: 20px 24px; max-width: min(460px, 92vw); display: flex; flex-direction: column; gap: 10px; }
+.ad-box b { font-family: var(--display); font-size: 24px; letter-spacing: 0.1em; color: #fff; }
+.ad-box p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+.ad-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.ad-btns .cta.small { margin: 0; padding: 6px 18px; font-size: 16px; }
+.ad-btns .menu-btn.small { margin: 0; }
+
+/* the end screen is the scoreboard only (10 s); the next-map vote happens back in the lobby, like CoD */
+#mv-end { display: none; }
+.end-next { text-align: center; margin: 6px 0 0; font-size: 12px; letter-spacing: 0.22em; color: var(--ink-dim); }
+.end-next b { color: var(--bo-hi); font-size: 15px; }

@@ -612,6 +612,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // polygon offset: it always draws on top of the layers below, at any range.
   const layered = new Map();
   const layerMat = (mat, y) => {
+    // just under the ground (the dirt that runs out to the horizon): pushed back, so it never shows through
+    if (y < -1e-4 && y > -0.1) {
+      const k = mat.uuid + ':under';
+      let m = layered.get(k);
+      if (!m) { m = mat.clone(); m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 8; layered.set(k, m); M[`_layer${layered.size}`] = m; }
+      return m;
+    }
     const f = y - Math.floor(y + 1e-4);                  // height above the floor level it lies on (0 for ground, 3.6 for a roof)
     if (f <= 0.0005 || f > 0.08) return mat;
     const L = Math.min(10, Math.round(f / 0.004) + 1), k = mat.uuid + ':' + L;

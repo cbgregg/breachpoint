@@ -8,11 +8,11 @@ const KEY_ACTIONS = {
 };
 // Standard gamepad mapping (Xbox layout)
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
-// Call of Duty "Default" layout. LT/RT (aim/fire), View (scoreboard) and LB (frag, thrown on release)
-// are handled separately below. RB (tactical) and the D-pad (killstreaks etc.) have nothing to do here.
+// Call of Duty "Default" layout. LT/RT (aim/fire), View (scoreboard) and RB (lethal, thrown on release)
+// are handled separately below. LB is the tactical.
 const PAD_ACTIONS = {
   [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap',
-  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect', [PAD.RIGHT]: 'loadout', [PAD.RB]: 'tactical',
+  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect', [PAD.RIGHT]: 'loadout', [PAD.LB]: 'tactical',
 };
 
 // Some browsers (Firefox on Linux/macOS, older Safari) report Xbox pads without the "standard"
@@ -120,10 +120,12 @@ export class Input {
       if (!this.locked && !this.fallback) return;
       if (e.button === 0) this.mouseFire = true;
       if (e.button === 2) { this.mouseAds = true; this.adsPress(); }
+      if (e.button === 1) { this.mouseMid = true; e.preventDefault(); }   // wheel click: lethal (hold to cook)
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseFire = false;
       if (e.button === 2) this.mouseAds = false;
+      if (e.button === 1) this.mouseMid = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
@@ -162,7 +164,7 @@ export class Input {
   get moveX() { return Math.max(-1, Math.min(1, this.touchMoveX + this.padMoveX)); }
   get moveY() { return Math.max(-1, Math.min(1, this.touchMoveY + this.padMoveY)); }
   // frag button held (cook while held, throw on release)
-  get grenadeHeld() { return this.keys.has('KeyG') || !!this.lbHeld || !!this.touchGren; }
+  get grenadeHeld() { return this.keys.has('KeyG') || !!this.rbHeld || !!this.mouseMid || !!this.touchGren; }
   // plant / defuse: hold F or R, X on a controller, or the RELOAD touch button
   get useHeld() {
     const b = this.pad && this.pad.buttons[PAD.X];
@@ -282,11 +284,11 @@ export class Input {
         const a = PAD_ACTIONS[i];
         if (a) this.actions.add(a);
       }
-      // lethal: hold LB to cook, release to throw (handled by the player controller)
-      this.lbHeld = btn(PAD.LB);
+      // lethal: hold RB to cook, release to throw (handled by the player controller); LB is the tactical
+      this.rbHeld = btn(PAD.RB);
     } else if (this.onNav && !this.suspendNav) {
       // menu navigation with D-pad / left stick (with key-repeat)
-      this.lbHeld = false;
+      this.rbHeld = false;
       for (const i of edges) {
         // directions come from the D-pad / stick below (with key-repeat); bumpers switch tabs
         const m = { [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab', [PAD.LT]: 'prevSub', [PAD.RT]: 'nextSub', [PAD.X]: 'x' }[i];
@@ -324,7 +326,7 @@ export class Input {
     this.touchMoveX = this.touchMoveY = 0;
     this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
     this.padAds = this.padFire = this.padScore = false;
-    this.lbHeld = false; this.touchGren = false;
+    this.rbHeld = false; this.mouseMid = false; this.touchGren = false;
   }
 
   setupTouch() {

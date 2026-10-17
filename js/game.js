@@ -82,7 +82,7 @@ export class Game {
   constructor(container) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 2600); // near 0.1: 2.5x the depth precision of 0.04, no distant z-fighting
+    this.camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.16, 2600); // near 0.16: depth precision for distant ground layers (the viewmodel has its own camera)
     this.scene.add(this.camera);
     this.vmScene = new THREE.Scene();
     // a wider viewmodel FOV on phones makes the gun and optic take up less of the small screen
