@@ -401,6 +401,11 @@ function build(ctx) {
   // ---------- the screens ----------
   const movie = movieTex();
   const screenMat = new THREE.MeshBasicMaterial({ map: movie, color: new THREE.Color(0.95, 0.95, 0.95) });
+  // the feature: the project owner's own painting of Terror from Planet Z! (the canvas frame shows until it loads)
+  new THREE.TextureLoader().load('assets/textures/drivein/feature.jpg', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    screenMat.map = t; screenMat.needsUpdate = true; movie.dispose();
+  });
   const towerTint = 0x4a5450;
   const screenTower = (cx, cz, w, d, h) => {
     const s = Math.sign(cx);
