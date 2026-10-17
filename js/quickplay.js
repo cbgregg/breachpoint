@@ -50,7 +50,7 @@ export class Board {
     if (!ad || typeof ad.code !== 'string' || !/^\d{6}$/.test(ad.code)) return;
     const clean = {
       code: ad.code, v: ad.v | 0, n: Math.max(0, Math.min(16, ad.n | 0)), max: Math.max(1, Math.min(16, ad.max | 0)),
-      ig: !!ad.ig, open: ad.open !== 0, m: ['tdm', 'gunfight', 'snd'].includes(ad.m) ? ad.m : 'tdm', seen: Date.now(),
+      ig: !!ad.ig, open: ad.open !== 0, m: ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].includes(ad.m) ? ad.m : 'tdm', seen: Date.now(),
     };
     this.ads.set(clean.code, clean);
     if (this.onAd) this.onAd(clean);

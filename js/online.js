@@ -324,7 +324,7 @@ export class Lobby {
   quick(name, primary, mode = 'tdm') {
     this.close();
     this.quickMode = true;
-    this.quickGm = ['tdm', 'gunfight', 'snd'].includes(mode) ? mode : 'tdm';
+    this.quickGm = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].includes(mode) ? mode : 'tdm';
     this.quickTried = new Set();
     this.quickName = name; this.quickPrimary = primary;
     this.status = 'matching';
@@ -609,7 +609,7 @@ export class HostSession {
 
   // called by game.startMatch for each accepted player
   createRemote(p) {
-    const c = new Character(this.game, { name: p.name, team: p.team, isBot: false, primary: p.primary, remote: true });
+    const c = new Character(this.game, { name: p.name, team: this.game.ffa ? 1 : p.team, isBot: false, primary: p.primary, remote: true });
     c.uid = p.uid || '';
     this.bind(p.peerId, c);
     return c;
@@ -822,7 +822,7 @@ export class HostSession {
 
   visible(r, o) {
     const g = this.game, me = r.c, t = g.time;
-    if (o.team === me.team) return true;
+    if (!g.foes(o, me)) return true;
     if (!o.alive) return t - o.deathT < 6;
     if (!me.alive && o === me.killer) return true;
     const eye = me.alive ? me.eyePos(_v1) : _v1.set(me.pos.x, me.pos.y + 2.2, me.pos.z);
@@ -863,7 +863,7 @@ export class HostSession {
 
   sendEnd(result) {
     this.lobby.broadcastLobby(); // tells guests the host is back in the lobby
-    const msg = { t: 'end', w: result.winner, sc: result.scores, sb: this.scoreboard() };
+    const msg = { t: 'end', w: result.winner, sc: result.scores, sb: this.scoreboard(), wid: result.winnerId };
     for (const r of this.remotes.values()) {
       // flush whatever events were still queued (the final kill) before the result
       if (r.ev.length || r.pv.length) this.net.send(this.snapshot(r, null, this.pickupBits()), r.peerId);
@@ -949,6 +949,7 @@ export class GuestSession {
       case 'end':
         if (Array.isArray(m.sb)) this.applyScoreboard(m.sb);
         if (Array.isArray(m.sc)) g.scores = [m.sc[0] | 0, m.sc[1] | 0];
+        if (g.ffa && Number.isFinite(m.wid)) g.ffaWinnerId = m.wid;
         g.endMatch();
         break;
       default: break;
@@ -1129,7 +1130,7 @@ export class GuestSession {
           }
           first = false;
           const p = g.player;
-          if (!whiz && p.alive && c.team !== p.team) {
+          if (!whiz && p.alive && g.foes(c, p)) {
             p.headPos(_v3).sub(muzzle);
             const al = _v3.dot(dir), len = end.distanceTo(muzzle);
             if (al > 2 && al < len && _v3.lengthSq() - al * al < 2.2) { whiz = true; g.audio.play('whiz', null, { ui: true }); }

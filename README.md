@@ -84,6 +84,17 @@ Xbox, PlayStation and most other controllers work over USB or Bluetooth. The bro
 
 **Other devices:** the game uses the controller you last pressed a button on. Devices a Mac lists as gamepads (keyboards, receivers, headsets) are ignored. A device that only reports moving sticks can't take over the menus until one of its buttons is pressed.
 
+## Free-for-All, Gun Game and private match setup
+
+| Mode | Rules |
+|---|---|
+| Free-for-All | Everyone for themselves, respawns on. First to 30 kills wins. Spawns are spread over the whole map, away from other players. The scoreboard is one list in placing order, and the top three count as a win. |
+| Gun Game | Free-for-all. Every kill moves you to the next of 15 guns; a knife kill sends the victim back one. First kill with the last gun wins. |
+
+The private match lobby has GAME MODE, MAP and GAME SETUP for the host (match size, time, score, bots, friendly fire). Guests see the changes straight away. On a controller, ← → steps through modes and maps.
+
+**Menu colour** (Options › General): Amber, Arctic blue, Crimson, Toxic green, Royal purple, Gold, Teal or Ghost white. It recolours the menus, highlights and HUD accents.
+
 ## Menus
 
 The menus are a tree, laid out like Modern Warfare (2019):

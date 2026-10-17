@@ -28,6 +28,8 @@ function saveSettings(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
 }
 const settings = loadSettings();
+const applyTheme = () => { document.body.dataset.theme = settings.theme || 'amber'; };
+applyTheme();
 const account = new Account();
 const loginToken = takeLoginToken(); // sign-in link opened: read and wipe it before anything else runs
 let playMode = 'offline';            // chosen on the Offline / Online screen
@@ -80,7 +82,7 @@ game.applySettings(settings);
 
 // ---------- form binding ----------
 const bindings = [
-  ['opt-name', 'name', 'text'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
+  ['opt-name', 'name', 'text'], ['opt-theme', 'theme', 'str'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
   ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
@@ -145,6 +147,7 @@ for (const [id, key, type] of bindings) {
     else if (key.startsWith('gfx') && settings.quality !== 'custom') { settings.quality = 'custom'; $('opt-quality').value = 'custom'; }
     if (outputs[id]) $(outputs[id][0]).textContent = outputs[id][1](el.value);
     saveSettings(settings);
+    if (key === 'theme') applyTheme();
     game.applySettings(settings);
     if (game.settings) Object.assign(game.settings, { vmFov: settings.vmFov, sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
   });
@@ -154,6 +157,9 @@ for (const [id, key, type] of bindings) {
 function syncModeRows() {
   const m = MODES[settings.mode] || MODES.tdm;
   document.body.dataset.gmode = m.id;
+  // match size reads as a player count in the free-for-all modes
+  $('opt-team').closest('.row').querySelector('label').firstChild.textContent = m.ffa ? 'Players' : 'Match size';
+  for (const o of $('opt-team').options) o.textContent = m.ffa ? `${o.value * 2} players` : `${o.value}v${o.value}`;
   document.querySelectorAll('.mode-pick .mp').forEach(b => { const on = b.dataset.mode === m.id; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
   $('intel-mode').textContent = m.name.toUpperCase();
   $('play-title').textContent = m.name.toUpperCase();
@@ -386,7 +392,7 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 // Level 1 is a column of playlist tiles; each opens its own page (Back returns). Offline the tiles are the
 // game modes and open the match setup; online they're Quick Play, Private Match, Friends and Combat Training.
 let playView = 'root', tileSel = null;
-const TILE_ART = { tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
+const TILE_ART = { tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', ffa: 'pioneer-3', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
 function playTiles() {
   if (playMode === 'online') return [
     { id: 'quick', k: 'PUBLIC · DROP IN', t: 'QUICK PLAY', d: 'Join a public match in the playlist you pick. Players vote on the next map in the lobby.' },
@@ -394,7 +400,7 @@ function playTiles() {
     { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
     { id: 'training', k: 'OFFLINE · VERSUS BOTS', t: 'COMBAT TRAINING', d: 'Switch to offline matches against bots. No account needed.' },
   ];
-  return [...['tdm', 'gunfight', 'snd', 'gungame'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
+  return [...['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
     { id: 'online', k: 'ONLINE · PLAYERS', t: 'MULTIPLAYER', d: 'Quick play with anyone, or a private match with friends. Sign in with your email, no password.' }];
 }
 function tilePreview(t) {
@@ -447,6 +453,7 @@ const GROUP_SUB = { PROFILE: 'general', GRAPHICS: 'graphics', AIMING: 'controls'
   document.querySelector('#pane-options .controls-ref').dataset.osub = 'controls';
 }
 const OPT_DESC = {
+  'opt-theme': 'The accent colour of the menus, highlights, buttons and HUD details. It only changes how the game looks to you.',
   'opt-name': 'The name other players see. Signed in, this is your Name Tag: it can change once a day and friends can see your previous ones.',
   'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
@@ -502,6 +509,7 @@ setOptSub('general');
 let screen = 'menu';
 function showScreen(id) {
   closeDropdown();
+  try { if (id !== 'lobby' && clSetup) closeLobbySetup(); } catch (_) { /* before init */ }
   if (id !== 'pause' && id !== 'lobby' && $('pane-loadout').closest('#pause, #cl')) { clEditing = false; restorePanes(); }
   if (id !== 'pause') clearInterval(pauseTimer);
   screen = id;
@@ -601,13 +609,21 @@ function setPauseSec(sec) {
   if (sec === 'match') renderPauseMatch();
   renderHints(game.input.lastDevice);
 }
+const ordinal = (n) => `${n}${(n % 100 >= 11 && n % 100 <= 13) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
 const mmss = (t) => `${Math.floor(Math.max(0, t) / 60)}:${String(Math.floor(Math.max(0, t) % 60)).padStart(2, '0')}`;
 function renderPauseMatch() {
   const g = game, p = g.player;
   if (!p) return;
   $('pause-meta').textContent = `${(MODES[g.settings.mode] || MODES.tdm).name.toUpperCase()} · ${(MAPS[g.world.id]?.name || '').toUpperCase()}${g.mode === 'local' ? ' · VS BOTS' : ' · ONLINE'}`;
-  $('pm-f').textContent = g.scores[p.team];
-  $('pm-e').textContent = g.scores[1 - p.team];
+  if (g.ffa) {
+    const st = g.ffaStandings(), lv = (c) => (g.gg ? (c.ggLevel || 0) : c.kills), top = st.find(c => c !== p);
+    $('pm-fl').textContent = `YOU · ${ordinal(st.indexOf(p) + 1)}`; $('pm-el').textContent = 'LEADER';
+    $('pm-f').textContent = lv(p); $('pm-e').textContent = top ? lv(top) : 0;
+  } else {
+    $('pm-fl').textContent = 'FRIENDLY'; $('pm-el').textContent = 'ENEMY';
+    $('pm-f').textContent = g.scores[p.team];
+    $('pm-e').textContent = g.scores[1 - p.team];
+  }
   $('pm-time').textContent = mmss(g.timeLeft);
   $('pm-limit').textContent = `FIRST TO ${g.settings.scoreLimit}`;
   const kd = p.deaths ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
@@ -664,11 +680,18 @@ confirmBtn($('quit'), () => { clearInterval(pauseTimer); restorePanes(); leaveOn
 game.onEnd = (r) => {
   const title = $('end-title');
   title.className = '';
-  if (r.winner === -1) title.textContent = 'DRAW';
-  else if (r.winner === r.playerTeam) { title.textContent = 'VICTORY'; title.classList.add('win'); }
-  else { title.textContent = 'DEFEAT'; title.classList.add('lose'); }
   const mine = r.playerTeam;
-  $('end-score').innerHTML = `<span style="color:${FRIENDLY_CSS}">${r.scores[mine]}</span> <span style="color:var(--ink-faint)">—</span> <span style="color:${ENEMY_CSS}">${r.scores[1 - mine]}</span>`;
+  if (r.ffa) {
+    // Free-for-All: your placing; the top three count as a win
+    title.textContent = r.place === 1 ? 'VICTORY' : `${ordinal(r.place).toUpperCase()} PLACE`;
+    title.classList.add(r.place && r.place <= 3 ? 'win' : 'lose');
+    $('end-score').innerHTML = `<span style="color:${FRIENDLY_CSS}">${ordinal(r.place).toUpperCase()}</span> <span style="color:var(--ink-faint)">OF ${r.count}</span>`;
+  } else {
+    if (r.winner === -1) title.textContent = 'DRAW';
+    else if (r.winner === r.playerTeam) { title.textContent = 'VICTORY'; title.classList.add('win'); }
+    else { title.textContent = 'DEFEAT'; title.classList.add('lose'); }
+    $('end-score').innerHTML = `<span style="color:${FRIENDLY_CSS}">${r.scores[mine]}</span> <span style="color:var(--ink-faint)">—</span> <span style="color:${ENEMY_CSS}">${r.scores[1 - mine]}</span>`;
+  }
   const mvp = r.mvp;
   $('end-mvp').textContent = `MVP  ${mvp.name.toUpperCase()}  ·  ${mvp.score} PTS  ·  ${mvp.kills}/${mvp.deaths}`;
   game.hud.renderScoreboard($('end-board'));
@@ -805,7 +828,7 @@ function renderLobby() {
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
-      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change these on the Play tab; ${settings.fillBots === false ? 'no bots: only real players.' : 'bots fill empty slots.'}`;
+      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : (MODES[settings.mode] || {}).ffa ? `${settings.teamSize * 2} players` : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : settings.mode === 'ffa' ? ` · 30 kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change them with Game Mode, Map and Game Setup; ${settings.fillBots === false ? 'no bots: only real players.' : 'bots fill empty slots.'}`;
     $('lobby-leave').textContent = inMatch ? 'END SESSION' : lobby.public ? 'CANCEL MATCHMAKING' : 'CLOSE LOBBY';
     $('lobby-leave').classList.toggle('cancel', !inMatch && !!lobby.public);
   } else {
@@ -841,7 +864,7 @@ function renderLobby() {
 }
 lobby.onUpdate = () => { renderLobby(); noteRecent(lobbyPeople()); syncChat(); };
 // ---------- classic lobby (menu + map on the left, players on the right) ----------
-let clDescText = '', clEditing = false;
+let clDescText = '', clEditing = false, clSetup = false;
 const classicOn = () => !quickIntro && (lobby.role === 'host' || lobby.role === 'guest' || !!lobby.quickMode);
 const mapCard = (id, modeName, extra = '') => {
   const m = MAPS[id], ph = m && m.photos && m.photos[0];
@@ -864,7 +887,7 @@ function clPeople() {
 function renderClassic() {
   const on = classicOn();
   $('lobby').classList.toggle('classic', on);
-  $('lobby').classList.toggle('cl-editing', on && clEditing);
+  $('lobby').classList.toggle('cl-editing', on && (clEditing || clSetup));
   if (!on) { if (clEditing) closeClassEditor(); return; }
   const host = lobby.role === 'host', inMatch = host && game.mode === 'host' && game.live;
   const pub = !!(lobby.public || lobby.quickMode);
@@ -877,6 +900,13 @@ function renderClassic() {
   if (host && !inMatch) items.push(['start', 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
   if (inMatch) items.push(['back', 'BACK TO MATCH', 'Return to the match in progress.']);
   items.push(['class', 'CREATE A CLASS', 'Pick your class and build your guns. The class you equip is the one you spawn with.']);
+  if (host && !pub && !inMatch) {
+    // private match: the host sets the match up right here (press to step through, or ← → on a controller)
+    const mapName = MAPS[settings.map] ? MAPS[settings.map].name.toUpperCase() : 'RANDOM';
+    items.push(['mode', `GAME MODE: ${mode.name.toUpperCase()}`, `${mode.blurb} Press to change the mode (← → steps through them).`]);
+    items.push(['map', `MAP: ${mapName}`, 'Press to change the map (← → steps through them). Random picks one when the match starts.']);
+    items.push(['setup', 'GAME SETUP', 'Mode, map, match size, score and time limits, bot difficulty and friendly fire.']);
+  }
   if (host && !pub) {
     items.push(['invite', 'COPY INVITE LINK', 'Copy a link your friends can open to join this lobby.']);
     items.push(['approve', `JOIN APPROVAL: ${lobby.approval ? 'ON' : 'OFF'}`, 'On: you accept each player before they get in. Friends always get straight in.']);
@@ -951,7 +981,37 @@ function syncLobbyLoadout() {
   if (lobby.role === 'host') lobby.hostPrimary = l;
   else if (lobby.role === 'guest' && lobby.hostId) lobby.net.send({ t: 'lo', l }, lobby.hostId);
 }
-$('cl-done').addEventListener('click', () => closeClassEditor());
+$('cl-done').addEventListener('click', () => { if (clSetup) closeLobbySetup(); else closeClassEditor(); });
+// private lobby: step the mode / map, and the full match setup (the Play tab's settings rows, moved in here)
+function stepLobbySel(which, d) {
+  const sel = $(which === 'mode' ? 'opt-mode' : 'opt-map'), n = sel.options.length;
+  sel.selectedIndex = (sel.selectedIndex + d + n) % n;
+  sel.dispatchEvent(new Event('change'));
+  renderClassic();
+  const b = $('cl-menu').querySelector(`[data-cl="${which}"]`);
+  if (b) { clDescText = b.dataset.desc; $('cl-desc').textContent = clDescText; if (game.input.lastDevice === 'pad') focusEl(b); }
+}
+let setupHome = null;
+function openLobbySetup() {
+  const rows = $('play-rows');
+  setupHome = { parent: rows.parentNode, next: rows.nextSibling };
+  clSetup = true;
+  $('cl-editor').insertBefore(rows, $('cl-done'));
+  rows.classList.add('cl-setup');
+  renderClassic();
+  if (game.input.lastDevice === 'pad') focusFirst();
+}
+function closeLobbySetup() {
+  if (!clSetup) return;
+  clSetup = false;
+  const rows = $('play-rows');
+  rows.classList.remove('cl-setup');
+  if (setupHome) setupHome.parent.insertBefore(rows, setupHome.next);
+  readAll(); saveSettings(settings);
+  if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); }
+  renderClassic();
+  if (game.input.lastDevice === 'pad') focusEl($('cl-menu').querySelector('[data-cl="setup"]'));
+}
 $('cl-menu').addEventListener('click', (e) => {
   const b = e.target.closest('[data-cl]');
   if (!b) return;
@@ -962,6 +1022,8 @@ $('cl-menu').addEventListener('click', (e) => {
   else if (a === 'leave') $('lobby-leave').click();
   else if (a === 'invite') $('copy-link').click();
   else if (a === 'class') openClassEditor();
+  else if (a === 'mode' || a === 'map') { stepLobbySel(a, 1); }
+  else if (a === 'setup') openLobbySetup();
   else if (a === 'approve') { const c = $('opt-approve'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); renderClassic(); }
   else if (a === 'bots') { const c = $('opt-fillbots'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); renderClassic(); }
 });
@@ -1056,12 +1118,12 @@ const setMapHint = () => {
   const cfg = lobby.public ? publicSettings() : settings;
   lobby.info = { m: cfg.mode || 'tdm', map: MAPS[cfg.map] ? cfg.map : 'random', n: cfg.mode === 'gunfight' ? 2 : cfg.teamSize, b: cfg.fillBots === false ? 0 : 1, ff: !!cfg.friendlyFire };
 };
-for (const id of ['opt-fillbots', 'opt-team', 'opt-ff']) $(id).addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); renderLobby(); } });
+for (const id of ['opt-fillbots', 'opt-team', 'opt-ff', 'opt-map', 'opt-score', 'opt-time', 'opt-diff']) $(id).addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); renderLobby(); } });
 $('opt-mode').addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); } });
 $('lobby-start').addEventListener('click', () => {
   game.input.goFullscreen();
   readAll();
-  if (!lobby.public && settings.fillBots === false) {
+  if (!lobby.public && settings.fillBots === false && !(MODES[settings.mode] || {}).ffa) {
     const teams = [lobby.hostTeam, ...[...lobby.players.values()].map(p => p.team)];
     if (!teams.includes(0) || !teams.includes(1)) { game.hud.toast('BOTS ARE OFF: PUT AT LEAST ONE PLAYER ON EACH TEAM (⇄)'); return; }
   }
@@ -1181,7 +1243,7 @@ function focusFirst() {
     : screen === 'menu' && tab === 'options' ? document.querySelector('#pane-options .row:not(.osub-off) [data-nav]')
     : screen === 'menu' ? document.querySelector(`#pane-${tab} [data-nav]`)
     : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : pauseSec === 'options' ? document.querySelector('#pane-options .row:not(.osub-off) [data-nav]') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
-    : screen === 'lobby' && clEditing ? document.querySelector('#cl-editor [data-nav]')
+    : screen === 'lobby' && (clEditing || clSetup) ? document.querySelector('#cl-editor [data-nav]')
     : screen === 'lobby' && $('lobby').classList.contains('classic') ? $('cl-menu').querySelector('[data-nav]')
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
     : $('again');
@@ -1259,6 +1321,7 @@ game.input.onNav = (dir) => {
       // left / right always move to the neighbouring control. Dropdowns open, checkboxes toggle and sliders
       // start adjusting (then left / right step them, A or B finishes) with A only. Tabs are LB / RB.
       if (el && el.type === 'range' && el.classList.contains('pad-adjust')) { stepRange(el, d); tick(); }
+      else if (el && (el.dataset.cl === 'map' || el.dataset.cl === 'mode')) { stepLobbySel(el.dataset.cl, d); tick(); }
       else { el?.classList.remove('pad-adjust'); go(dir); }
       break;
     }
@@ -1285,6 +1348,7 @@ game.input.onNav = (dir) => {
       else if (screen === 'report') closeReport();
       else if (screen === 'notice') $('nt-ok').click();
       else if (screen === 'end') $('menu-btn').click();
+      else if (screen === 'lobby' && clSetup) closeLobbySetup();
       else if (screen === 'lobby' && clEditing) { if (!closeEditor()) closeClassEditor(); }
       else if (screen === 'lobby') {
         if (game.mode === 'host' && game.live) showScreen('pause');
@@ -1421,7 +1485,7 @@ function reportMatch(r) {
   if (game.mode === 'host') {
     const byUid = new Map([...lobby.players.values()].filter(p => p.uid).map(p => [p.uid, p]));
     const players = game.characters.filter(c => !c.isBot).map(c => {
-      const row = { s: c.score | 0, k: c.kills | 0, d: c.deaths | 0, w: c.team === r.winner ? 1 : 0 };
+      const row = { s: c.score | 0, k: c.kills | 0, d: c.deaths | 0, w: (r.ffa ? r.players.indexOf(c) < 3 : c.team === r.winner) ? 1 : 0 };
       if (c === game.player) return { ...row, me: 1 };
       const p = byUid.get(c.uid);
       return p && p.tk ? { ...row, tk: p.tk } : null;

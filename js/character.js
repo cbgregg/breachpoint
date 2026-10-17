@@ -438,7 +438,7 @@ export class Character {
 
   takeDamage(amount, attacker, weaponId, headshot, fromPos) {
     if (!this.alive || this.spawnProtect > 0 || !this.game.live || this.game.mode === 'guest') return;
-    if (attacker && attacker !== this && attacker.team === this.team && !this.game.settings.friendlyFire) return;
+    if (attacker && attacker !== this && !this.game.foes(attacker, this) && !this.game.settings.friendlyFire) return;
     this.health -= amount;
     this.lastDamageT = this.game.time;
     if (attacker && attacker !== this) {
