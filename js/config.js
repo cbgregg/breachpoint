@@ -255,6 +255,7 @@ export const DEFAULT_SETTINGS = {
   aimAssist: true,
   vibration: true,
   theme: 'amber',
+  quickModes: ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'],   // public match playlists (any of them)
 };
 
 export const BOT_NAMES = [

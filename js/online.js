@@ -21,7 +21,10 @@ import { parseLoadout, soloLoadout } from './attachments.js';
 import { GUN_LADDER } from './modes.js';
 
 export const MAX_HUMANS = 8;
-const PROTO = 1;
+export const PROTO = 1;
+export const QUICK_MODES = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'];
+export const QUICK_SEARCH_MS = 10000;   // look for an open lobby this long, then open one
+export const QUICK_COUNTDOWN = 30;      // a new public lobby counts down (with the map vote) this many seconds
 const SNAP_HZ = 30;
 const INTERP = 0.12;          // guests render others this far in the past (seconds)
 const MAX_REWIND = 0.5;       // lag compensation window
@@ -41,6 +44,8 @@ const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vect
 // ---------------------------------------------------------------------------------------------
 // Lobby: owns the connection for the whole online session (across several matches).
 // ---------------------------------------------------------------------------------------------
+const cleanModes = (m) => { const l = (Array.isArray(m) ? m : [m]).filter(x => QUICK_MODES.includes(x)); return l.length ? [...new Set(l)] : ['tdm']; };
+
 export class Lobby {
   constructor(game) {
     this.game = game;
@@ -242,11 +247,11 @@ export class Lobby {
   // ---------- map vote between public matches ----------
   // Everyone gets a vote; the countdown starts once most players are back in the lobby (voted or
   // pressed Back to lobby), or after a minute regardless.
-  startMapVote(options) {
+  startMapVote(options, countdown = 0) {
     if (this.role !== 'host') return;
     clearInterval(this.mvTimer);
     const now = Date.now();
-    this.mv = { o: options.slice(0, 4), votes: new Map(), ready: new Set(['host']), cdEnd: 0, hard: now + 60000 };
+    this.mv = { o: options.slice(0, 4), votes: new Map(), ready: new Set(['host']), cdEnd: countdown ? now + countdown * 1000 : 0, hard: now + 60000 };
     this.mapVote = { o: this.mv.o, v: this.mv.o.map(() => 0), cd: -1, rd: 1, n: 1 + this.players.size, my: -1 };
     this.mvTimer = setInterval(() => this.mapVoteTick(), 500);
     this.mapVoteTick();
@@ -321,26 +326,46 @@ export class Lobby {
   // ---------- guest ----------
   // ---------- quick match ----------
   // read public lobby notices for a few seconds, join the fullest open one, or host if there are none
-  quick(name, primary, mode = 'tdm') {
+  // modes: the playlists the player wants (any of them will do). Open lobbies in those modes are joined as soon
+  // as one shows up; after QUICK_SEARCH_MS with none, this player opens a public lobby in one of them at random.
+  quick(name, primary, modes = ['tdm']) {
     this.close();
     this.quickMode = true;
-    this.quickGm = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].includes(mode) ? mode : 'tdm';
+    this.quickModes = cleanModes(modes);
+    this.quickGm = null;
     this.quickTried = new Set();
     this.quickName = name; this.quickPrimary = primary;
+    this.quickDeadline = Date.now() + QUICK_SEARCH_MS;
     this.status = 'matching';
     this.board.connect();
     clearTimeout(this.quickTimer);
-    this.quickTimer = setTimeout(() => this.quickNext(), 4500);
+    this.quickTimer = setTimeout(() => this.quickNext(), 1200);
     this.changed();
   }
 
   quickNext() {
-    if (!this.quickMode) return;
+    if (!this.quickMode || this.public) return;
     this.net.close();
     this.role = null;
-    const c = this.board.candidates(PROTO, this.quickTried, this.quickGm)[0];
+    this.status = 'matching';
+    const c = this.board.candidates(PROTO, this.quickTried, this.quickModes)[0];
     if (c) { this.quickTried.add(c.code); this.join(c.code, this.quickName, this.quickPrimary, true); return; }
-    this.hostPublic();
+    if (Date.now() >= this.quickDeadline) { this.hostPublic(); return; }
+    clearTimeout(this.quickTimer);
+    this.quickTimer = setTimeout(() => this.quickNext(), 1000);
+    this.changed();
+  }
+
+  // the player changed their playlists: searching uses them straight away; a public lobby still waiting for its
+  // match switches to one of them if its mode isn't one any more
+  setQuickModes(modes) {
+    this.quickModes = cleanModes(modes);
+    if (this.public && this.role === 'host' && !this.inMatch && !this.quickModes.includes(this.quickGm)) {
+      this.quickGm = this.quickModes[(Math.random() * this.quickModes.length) | 0];
+      if (this.advertise) this.advertise();
+      if (this.onQuickModes) this.onQuickModes();
+    }
+    this.changed();
   }
 
   openNet(code, relayOnly) {
@@ -355,13 +380,16 @@ export class Lobby {
   wantRelay(pub) { return pub || !!(this.game.settings || {}).privateRelay || !!this.privateRelay; }
 
   hostPublic() {
+    const modes = this.quickModes && this.quickModes.length ? this.quickModes : ['tdm'];
+    this.quickGm = modes[(Math.random() * modes.length) | 0];
     this.host(this.quickName, this.quickPrimary, true);
     this.public = true;
     this.approval = false;
     clearInterval(this.adTimer);
-    const advertise = () => {
+    const advertise = this.advertise = () => {
       if (!this.public || this.role !== 'host') return;
-      this.board.publish({ v: PROTO, code: this.code, n: this.players.size + 1, max: MAX_HUMANS, ig: this.inMatch ? 1 : 0, open: 1, m: this.quickGm || 'tdm' }).catch(() => {});
+      const g = this.game, map = this.inMatch && g.world ? g.world.id : (this.nextMap || '');
+      this.board.publish({ v: PROTO, code: this.code, n: this.players.size + 1, max: MAX_HUMANS, ig: this.inMatch ? 1 : 0, open: 1, m: this.quickGm || 'tdm', h: cleanName(this.hostName || this.quickName), map }).catch(() => {});
     };
     advertise();
     this.adTimer = setInterval(advertise, 4000);

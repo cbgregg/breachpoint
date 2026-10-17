@@ -306,7 +306,7 @@
         <section class="pane on" id="pane-play">
           <div class="crumbs" id="play-crumbs"></div>
           <!-- PLAY, level 1: playlist tiles (MW2019 style); each opens its own page -->
-          <div class="pv on" id="pv-root"><div class="tiles" id="play-tiles" role="list"></div></div>
+          <div class="pv on" id="pv-root"><div class="tiles" id="play-tiles" role="list"></div><p class="tile-desc" id="tile-desc"></p></div>
           <!-- level 2, online: Quick Play playlist -->
           <div class="pv" id="pv-quick">
             <h2 class="pane-title">QUICK PLAY</h2>
@@ -320,6 +320,15 @@
             <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Free-for-all · next gun every kill</small></button>
           </div>
             <button id="quick-btn" class="menu-btn quick" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
+          </div>
+          <!-- level 2, online: the match browser (every public match right now) -->
+          <div class="pv" id="pv-browser">
+            <h2 class="pane-title">MATCH BROWSER</h2>
+            <p class="pane-sub">Every public match right now, in its lobby or already playing. Pick one to join it.</p>
+            <div class="mb-filters" id="mb-filters" role="group" aria-label="Game modes"></div>
+            <div class="mb-head"><span>HOST</span><span>MODE</span><span>MAP</span><span>PLAYERS</span><span>STATUS</span></div>
+            <div class="mb-list" id="mb-list"></div>
+            <p class="pane-note" id="mb-note">Looking for matches…</p>
           </div>
           <!-- level 2: match setup (offline: the mode you picked; online: private match) -->
           <div class="pv" id="pv-setup">
@@ -514,6 +523,7 @@
 
         <aside class="intel">
           <div class="intel-tile" id="intel-tile"><small id="it-k"></small><b id="it-t"></b><p id="it-d"></p></div>
+          <div class="motd" id="motd-menu" hidden><div class="motd-k">MESSAGE OF THE DAY <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p></div>
           <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
           <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
           <div class="intel-k">MODE</div><div class="intel-v" id="intel-mode">TEAM DEATHMATCH</div>
@@ -670,9 +680,11 @@
         <div class="cl-count" id="cl-count"></div>
         <div class="cl-list" id="cl-list"></div>
         <div class="cl-note" id="cl-note"></div>
+        <div class="motd" id="motd-lobby" hidden><div class="motd-k">MESSAGE OF THE DAY <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p></div>
       </div>
       <div class="cl-editor" id="cl-editor">
         <div class="cl-setup-h">GAME SETUP</div>
+        <div class="cl-modes" id="cl-modes"></div>
         <button class="menu-btn cl-done" id="cl-done" data-nav>BACK TO LOBBY</button>
       </div>
       <footer class="cl-foot" id="cl-foot"></footer>
@@ -779,8 +791,10 @@
     </div>
   </aside>
 
-  <div id="loading" class="screen on">
-    <div class="ld-bg" id="ld-bg"></div>
+  <div id="loading" class="screen on boot has-photo">
+    <!-- a screenshot from the game shows the moment the page opens (before any script runs) -->
+    <div class="ld-bg on kb" id="ld-bg" style="background-image:url('assets/loading/drivein-1.jpg')"></div>
+    <script>(function () { var l = ['drivein-1', 'drivein-2', 'pioneer-1', 'pioneer-3']; document.getElementById('ld-bg').style.backgroundImage = "url('assets/loading/" + l[(Math.random() * l.length) | 0] + ".jpg')"; })();</script>
     <div class="ld-top"><div class="load-logo">BREACHPOINT</div></div>
     <div class="ld-map"><canvas id="ld-mapc" width="336" height="240"></canvas></div>
     <div class="ld-info">

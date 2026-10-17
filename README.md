@@ -84,6 +84,17 @@ Xbox, PlayStation and most other controllers work over USB or Bluetooth. The bro
 
 **Other devices:** the game uses the controller you last pressed a button on. Devices a Mac lists as gamepads (keyboards, receivers, headsets) are ignored. A device that only reports moving sticks can't take over the menus until one of its buttons is pressed.
 
+## Public matches, the match browser and the message of the day
+
+| Feature | How it works |
+|---|---|
+| Public Match | Opens the lobby and searches for an open lobby in your game modes (press **X** / X button in the lobby to choose them). If none turns up within 10 seconds, the lobby opens itself in one of those modes at random, advertises itself and starts a 30-second countdown with a map vote. Players searching meanwhile drop in, and bots fill the rest when it starts. |
+| Match Browser | Multiplayer › Match Browser lists every public match right now: host, mode, map (or "Voting"), players and whether it's in the lobby or already playing. Filter by mode, and pick one to join. If it's gone or full, matchmaking carries on in your modes. |
+| Message of the day | Shown on the Multiplayer menu and in lobbies. It comes from `motd.json` in the site root; edit it and push to change it. |
+| First load | The loading screen shows a screenshot from the game the moment the page opens, before any script runs. |
+
+The Multiplayer menus use the pre-match lobby's look: plain list items, a ▸ description and the live 3D background behind. The painted globe is gone.
+
 ## Free-for-All, Gun Game and private match setup
 
 | Mode | Rules |
