@@ -234,9 +234,17 @@ export class Renderer {
     this.lookKey = key;
     const u = this.sky.material.uniforms;
     u.turbidity.value = L.turbidity; u.rayleigh.value = L.rayleigh; u.mieCoefficient.value = L.mie;
-    this.dome.visible = !!L.blueSky; this.sky.visible = !L.blueSky;
+    // the dome: blue for clear-day maps, or a map's own gradient (look.dome: [top, mid, bottom])
+    const du = this.domeMat.uniforms, dc = L.dome || [0x2f6fc4, 0x7fb0e2, 0xd4e3ef];
+    du.top.value.set(dc[0]); du.mid.value.set(dc[1]); du.bottom.value.set(dc[2]);
+    du.sunDir.value.copy(L.sunElev != null ? new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAz ?? 222)) : SUN_DIR);
+    this.dome.visible = !!(L.blueSky || L.dome); this.sky.visible = !this.dome.visible;
     this.makeEnv(L.ground);
     this.scene.fog.density = L.fog; this.scene.fog.color.set(L.fogColor);
+    // maps can move the sun (a low dusk sun); the default is SUN_DIR
+    const sd = L.sunElev != null ? new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAz ?? 222)) : SUN_DIR;
+    u.sunPosition.value.copy(sd);
+    this.sun.position.copy(sd).multiplyScalar(80);
     this.sun.intensity = L.sun; this.sun.color.set(L.sunColor);
     this.hemi.intensity = L.hemi; this.hemi.color.set(L.hemiSky); this.hemi.groundColor.set(L.ground);
     this.renderer.toneMappingExposure = L.exposure;

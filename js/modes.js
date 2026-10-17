@@ -35,7 +35,7 @@ export const MODE_IDS = Object.keys(MODES);
 
 // bomb sites on team 1's side (+x); team 0's are point-mirrored, like the maps themselves
 // (about 30 m from the defenders' spawn and 45 m from the attackers': both teams reach them at nearly the same time)
-const SITES = { tarsa: [[20, -34.5], [22, 35]], shuran: [[9, -16], [9, 17]], pioneer: [[27, 22], [28, -6]] }; // Tarsa: inside the two market halls
+const SITES = { tarsa: [[20, -34.5], [22, 35]], shuran: [[9, -16], [9, 17]], pioneer: [[27, 22], [28, -6]], drivein: [[22, 29.5], [26, -29]] }; // Tarsa: inside the two market halls
 const BOMB = { carried: 0, dropped: 1, planted: 2, defused: 3, exploded: 4 };
 const PHASE = ['pre', 'live', 'post'];
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
