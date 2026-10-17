@@ -49,6 +49,18 @@ export const PLAYER = {
 };
 
 export const GRENADE = { start: 1, max: 2, fuse: 3.2, radius: 7, damage: 140, throwSpeed: 17, cooldown: 0.9 };
+// Equipment: one lethal (LB / G, frag cooks while held) and one tactical (RB / E) per class.
+// fuse: seconds from the throw; sticky: sticks to the first surface or player it touches; knife: flies fast and
+// kills on a body hit; shock: electric pulses that damage and stun; stun: no damage, slows movement and aim.
+export const EQUIPMENT = {
+  frag: { slot: 'lethal', name: 'Frag Grenade', short: 'FRAG', desc: 'Cook it while you hold the button. Bounces, big blast.', fuse: 3.2, cook: true, radius: 7, damage: 140, speed: 17, count: 1, max: 2 },
+  semtex: { slot: 'lethal', name: 'Semtex', short: 'SEMTEX', desc: 'Sticks to walls, floors and players. Goes off two seconds after it lands.', fuse: 2.1, sticky: true, radius: 6, damage: 140, speed: 16, count: 1, max: 2 },
+  knife: { slot: 'lethal', name: 'Throwing Knife', short: 'KNIFE', desc: 'Silent, fast and nearly flat. One hit to the body or head is a kill.', knife: true, speed: 32, damage: 150, count: 2, max: 3 },
+  shock: { slot: 'lethal', name: 'Shock Stick', short: 'SHOCK', desc: 'Sticks, then sends three electric pulses through anyone close: damage and a stun.', fuse: 0.9, sticky: true, shock: true, radius: 3.6, damage: 38, pulses: 3, stun: 1.6, speed: 16, count: 1, max: 2 },
+  stun: { slot: 'tactical', name: 'Stun Grenade', short: 'STUN', desc: 'No damage: anyone caught in it moves and aims slowly for a few seconds.', fuse: 1.4, radius: 9, stun: 3.5, speed: 16, count: 2, max: 2 },
+};
+export const LETHALS = ['frag', 'semtex', 'knife', 'shock'];
+export const TACTICALS = ['stun'];
 export const MELEE = { damage: 100, range: 2.3, cooldown: 0.75, time: 0.4 };
 export const SCORE = { kill: 100, headshot: 25, assist: 50, melee: 25 };
 

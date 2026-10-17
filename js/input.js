@@ -1,9 +1,9 @@
 // Input: keyboard + mouse (pointer lock), Xbox / standard gamepads, touch.
 // Everything funnels into: analog move/look, held fire/ads, and one-shot "actions".
 
-const GAME_KEYS = new Set(['Space', 'Tab', 'KeyH', 'KeyZ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const GAME_KEYS = new Set(['Space', 'Tab', 'KeyH', 'KeyZ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'KeyC', 'KeyQ', 'KeyE', 'KeyG', 'KeyR', 'KeyV', 'KeyF', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const KEY_ACTIONS = {
-  KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', Digit1: 'slot1', Digit2: 'slot2',
+  KeyR: 'reload', KeyI: 'inspect', KeyV: 'melee', KeyQ: 'swap', KeyE: 'tactical', Digit1: 'slot1', Digit2: 'slot2',
   KeyC: 'crouch', KeyZ: 'prone', ControlLeft: 'slide', Space: 'jump', Escape: 'pause', KeyP: 'pause', KeyH: 'loadout',
 };
 // Standard gamepad mapping (Xbox layout)
@@ -12,7 +12,7 @@ export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8
 // are handled separately below. RB (tactical) and the D-pad (killstreaks etc.) have nothing to do here.
 const PAD_ACTIONS = {
   [PAD.A]: 'jump', [PAD.B]: 'crouch', [PAD.X]: 'reload', [PAD.Y]: 'swap',
-  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect', [PAD.RIGHT]: 'loadout',
+  [PAD.MENU]: 'pause', [PAD.L3]: 'sprint', [PAD.R3]: 'melee', [PAD.DOWN]: 'inspect', [PAD.RIGHT]: 'loadout', [PAD.RB]: 'tactical',
 };
 
 // Some browsers (Firefox on Linux/macOS, older Safari) report Xbox pads without the "standard"

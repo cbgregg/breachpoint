@@ -1,6 +1,6 @@
 // HUD (modern military shooter style): compass, rotating minimap, score widget, ammo cluster,
 // score popups, medals, killfeed, prompts with device-aware button glyphs, scoreboard.
-import { WEAPONS, PLAYER, FRIENDLY_CSS, ENEMY_CSS, GRENADE } from './config.js';
+import { WEAPONS, PLAYER, FRIENDLY_CSS, ENEMY_CSS, GRENADE, EQUIPMENT } from './config.js';
 import { MAP } from './world.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,11 +9,11 @@ export const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.fl
 
 const PAD_GLYPH = {
   accept: ['A', 'a'], back: ['B', 'b'], jump: ['A', 'a'], crouch: ['B', 'b'], reload: ['X', 'x'], swap: ['Y', 'y'],
-  grenade: ['LB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'], prevSub: ['LT', 'bump'], nextSub: ['RT', 'bump'],
+  grenade: ['LB', 'bump'], tactical: ['RB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'], prevSub: ['LT', 'bump'], nextSub: ['RT', 'bump'],
   pause: ['☰', 'bump'], scoreboard: ['⧉', 'bump'], alt: ['Y', 'y'], x: ['X', 'x'],
 };
 const KEY_GLYPH = {
-  accept: 'Enter', back: 'Esc', jump: 'Space', crouch: 'C', reload: 'R', swap: 'Q', grenade: 'G', melee: 'V', sprint: 'Shift',
+  accept: 'Enter', back: 'Esc', jump: 'Space', crouch: 'C', reload: 'R', swap: 'Q', grenade: 'G', tactical: 'E', melee: 'V', sprint: 'Shift',
   prevTab: 'Q', nextTab: 'E', prevSub: 'Z', nextSub: 'C', x: 'X', pause: 'Esc', scoreboard: 'Tab', alt: 'F',
 };
 export function glyph(act, device) {
@@ -138,14 +138,19 @@ export class HUD {
     this.txt('ammo-res', w.reserve);
     this.txt('fire-mode', w.def.mode);
     this.txt('grenades', p.grenades);
+    this.txt('tacticals', p.tacticals | 0);
+    if (p.lethal !== this.lethalShown) { this.lethalShown = p.lethal; const e = EQUIPMENT[p.lethal]; if (e) { this.txt('lethal-name', e.short); const tb = document.getElementById('tb-frag'); if (tb) tb.textContent = e.short; } }
+    if (p.tactical !== this.tacShown) { this.tacShown = p.tactical; const e = EQUIPMENT[p.tactical]; if (e) { this.txt('tactical-name', e.short); const tb = document.getElementById('tb-tac'); if (tb) tb.textContent = e.short; } }
+    const st = p.alive && p.stunT > 0 ? Math.min(1, p.stunT / 1.2) : 0;
+    if (Math.abs(st - (this.stunShown || 0)) > 0.02) { this.stunShown = st; this.sty('stun-fx', 'opacity', st.toFixed(2)); }
 
     // prompt
     let key = '', html = '', warn = false;
     if (p.alive && this.objPrompt) { key = 'obj' + this.objPrompt; html = this.objPrompt; }
     else if (p.alive && !w.reloading) {
       if (w.mag === 0 && w.reserve === 0) { key = 'noammo'; html = 'NO AMMO'; warn = true; }
-      else if (w.mag <= Math.ceil(w.def.mag * 0.25) && w.reserve > 0) { key = 'reload' + this.device; html = `${glyph('reload', this.device)} RELOAD`; }
-      else if (w.mag + w.reserve <= w.def.mag) { key = 'low'; html = 'LOW AMMO'; warn = true; }
+      else if ((w.mag === 0 || (w.def.mag >= 4 && w.mag <= Math.ceil(w.def.mag * 0.25))) && w.reserve > 0) { key = 'reload' + this.device; html = `${glyph('reload', this.device)} RELOAD`; }
+      else if (w.def.mag >= 4 && w.mag + w.reserve <= w.def.mag) { key = 'low'; html = 'LOW AMMO'; warn = true; }
     }
     if (key !== this.promptKey) {
       this.promptKey = key;
@@ -330,7 +335,7 @@ export class HUD {
     const kf = $('killfeed');
     const d = document.createElement('div');
     d.className = 'kf' + ((killer === g.player || victim === g.player) ? ' mine' : '');
-    const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', melee: 'MELEE', fall: 'FALL' }[weaponId] || '✖');
+    const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', semtex: 'SEMTEX', knife: 'KNIFE', shock: 'SHOCK', melee: 'MELEE', fall: 'FALL' }[weaponId] || '✖');
     const col = (c) => (c === g.player || !g.foes(c, g.player) ? FRIENDLY_CSS : ENEMY_CSS);
     const kName = killer && killer !== victim ? `<span style="color:${col(killer)}">${esc(killer.name)}</span>` : '';
     d.innerHTML = `${kName}<span class="kw">${wname}${headshot ? ' ◎' : ''}</span><span style="color:${col(victim)}">${esc(victim.name)}</span>`;
@@ -405,7 +410,7 @@ export class HUD {
 
   showDeath(killer, weaponId) {
     const g = this.game;
-    const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', melee: 'Melee', fall: 'Fall damage' }[weaponId] || '');
+    const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', semtex: 'Semtex', knife: 'Throwing knife', shock: 'Shock stick', melee: 'Melee', fall: 'Fall damage' }[weaponId] || '');
     if (killer && killer !== g.player) {
       $('death-killer').textContent = killer.name.toUpperCase();
       $('death-killer').style.color = !g.foes(killer, g.player) ? FRIENDLY_CSS : ENEMY_CSS;

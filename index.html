@@ -41,6 +41,8 @@
 
   <!-- ============ HUD ============ -->
   <div id="hud">
+    <div id="stun-fx"></div>
+    <div id="gpu-warn" class="gpu-warn" hidden><b>Hardware acceleration is off</b><span id="gpu-warn-text"></span><button id="gpu-warn-x" class="menu-btn small">OK</button></div>
     <div id="scope"><div class="lens"><i class="h"></i><i class="v"></i><i class="dot"></i></div></div>
 
     <div id="tl">
@@ -77,7 +79,8 @@
         <div class="ammo-side"><span id="ammo-res">150</span><span id="fire-mode">AUTO</span></div>
       </div>
       <div class="equip">
-        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a6 6 0 1 0 0.01 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3h4v4h-4zM14 4l4-2" stroke="currentColor" stroke-width="2" fill="none"/></svg><b id="grenades">1</b><span class="glyph" data-act="grenade"></span></span>
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a6 6 0 1 0 0.01 0z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3h4v4h-4zM14 4l4-2" stroke="currentColor" stroke-width="2" fill="none"/></svg><b id="grenades">1</b><small id="lethal-name">FRAG</small><span class="glyph" data-act="grenade"></span></span>
+        <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h8v14H8zM8 9h8M10 3h4v3h-4z" fill="none" stroke="currentColor" stroke-width="2"/></svg><b id="tacticals">2</b><small id="tactical-name">STUN</small><span class="glyph" data-act="tactical"></span></span>
         <span class="eq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l12-12M14 6l4-2 2 2-2 4" stroke="currentColor" stroke-width="2" fill="none"/></svg><span class="glyph" data-act="melee"></span></span>
       </div>
     </div>
@@ -111,6 +114,7 @@
     <button data-btn="reload" class="tb" id="tb-reload">RELOAD</button>
     <button data-btn="swap" class="tb" id="tb-swap">SWAP</button>
     <button data-btn="grenade" class="tb" id="tb-frag">FRAG</button>
+    <button data-btn="tactical" class="tb" id="tb-tac">STUN</button>
     <button data-btn="melee" class="tb" id="tb-melee">MELEE</button>
     <button data-btn="sprint" class="tb" id="tb-sprint">SPRINT</button>
   </div>
@@ -417,6 +421,7 @@
             <div class="group">GRAPHICS</div>
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
               <option value="mobile">Mobile</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option><option value="custom">Custom</option></select></div>
+            <div class="row gpu-row"><label>Graphics hardware<small id="gpu-note">Checking…</small></label><span class="gpu-name" id="gpu-name"></span></div>
             <div class="row"><label for="opt-fsr">Upscaling<small>AMD FSR 1.0: renders fewer pixels and upscales them sharply</small></label><select id="opt-fsr" data-nav>
               <option value="off">Off (native)</option><option value="ultra">FSR Ultra Quality (77%)</option><option value="quality">FSR Quality (67%)</option><option value="balanced">FSR Balanced (59%)</option><option value="performance">FSR Performance (50%)</option></select></div>
             <div class="row"><label for="opt-fsrsharp">FSR sharpness <output id="out-fsrsharp"></output></label><input type="range" id="opt-fsrsharp" min="0" max="100" step="5" data-nav></div>

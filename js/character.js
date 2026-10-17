@@ -1,7 +1,7 @@
 // Shared character logic (player + bots): movement, health, weapons, operator model + animation
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS, typeOf } from './config.js';
+import { PLAYER, GRENADE, TEAMS, MELEE, FRIENDLY_CSS, ENEMY_CSS, typeOf, EQUIPMENT } from './config.js';
 import { WeaponState, buildGun } from './weapons.js';
 import { parseLoadout } from './attachments.js';
 import { cloneSoldier } from './assets.js';
@@ -336,6 +336,7 @@ export class Character {
     this.loadout = lo.str;
     this.primaryId = lo.primary;
     this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState(lo.secondary || 'pistol', lo.pistolAtt)];
+    this.lethal = lo.lethal; this.tactical = lo.tactical; this.tacticals = 0; this.stunT = 0;
     this.pendingLoadout = null;
     this.cur = 0; this.prev = 1; this.switchT = 0;
     this.grenades = GRENADE.start; this.grenadeCd = 0;
@@ -377,6 +378,7 @@ export class Character {
     this.loadout = lo.str;
     this.primaryId = lo.primary;
     this.weapons = [new WeaponState(lo.primary, lo.att), new WeaponState(lo.secondary || 'pistol', lo.pistolAtt)];
+    this.lethal = lo.lethal; this.tactical = lo.tactical;
     this.cur = 0; this.prev = 1;
     if (this.model) setOperatorWeapon(this.model, this.weapon.def);
     if (this === this.game.player && this.game.playerCtl) this.game.playerCtl.buildViewmodels();
@@ -390,13 +392,15 @@ export class Character {
     this.vel.set(0, 0, 0);
     this.yaw = yaw; this.pitch = 0;
     this.health = PLAYER.maxHealth;
-    this.alive = true;
+    this.alive = true; this.mantle = null;
     this.crouchT = 0; this.wantCrouch = false; this.proneT = 0; this.wantProne = false; this.height = PLAYER.height;
     this.slideT = 0; this.meleeT = 0; this.meleeCd = 0;
     this.weapons.forEach(w => w.refill());
     this.cur = 0; this.prev = 1; this.switchT = 0.4;
     if (this.model) setOperatorWeapon(this.model, this.weapon.def);
-    this.grenades = this.game.gg ? 0 : GRENADE.start;   // Gun Game: guns only
+    this.grenades = this.game.gg ? 0 : EQUIPMENT[this.lethal].count;   // Gun Game: guns only
+    this.tacticals = this.game.gg ? 0 : EQUIPMENT[this.tactical].count;
+    this.stunT = 0;
     this.spawnProtect = PLAYER.spawnProtect;
     this.damagers.clear();
     this.streak = 0;
@@ -462,14 +466,26 @@ export class Character {
   canThrow() { return this.alive && this.grenades > 0 && this.grenadeCd <= 0 && this.meleeT <= 0; }
 
   // cook: seconds the grenade was held after pulling the pin (bots cook a little so you can't run)
+  canTactical() { return this.alive && this.tacticals > 0 && this.grenadeCd <= 0 && this.meleeT <= 0; }
   throwGrenade(target, cook = target ? 0.5 + Math.random() * 0.8 : 0) {
     if (!this.canThrow()) return false;
+    const spec = EQUIPMENT[this.lethal];
     this.grenades--;
-    this.grenadeCd = GRENADE.cooldown;
+    this.grenadeCd = spec.knife ? 0.55 : GRENADE.cooldown;
     this.weapon.cancelReload();
-    this.game.throwGrenade(this, target, Math.max(0, Math.min(GRENADE.fuse, cook || 0)));
+    this.game.throwGrenade(this, target, spec.cook ? Math.max(0, Math.min(spec.fuse, cook || 0)) : 0, this.lethal);
     return true;
   }
+  throwTactical(target) {
+    if (!this.canTactical()) return false;
+    this.tacticals--;
+    this.grenadeCd = GRENADE.cooldown;
+    this.weapon.cancelReload();
+    this.game.throwGrenade(this, target, 0, this.tactical);
+    return true;
+  }
+  // stunned (stun grenade, shock stick): slow feet and slow aim for a few seconds
+  stun(sec) { if (this.alive && sec > 0) this.stunT = Math.max(this.stunT || 0, Math.min(5, sec)); }
 
   melee() {
     if (!this.alive || this.meleeCd > 0 || this.switchT > 0) return false;
@@ -508,6 +524,7 @@ export class Character {
     for (const w of this.weapons) w.update(dt);
     if (this.switchT > 0) this.switchT -= dt;
     if (this.grenadeCd > 0) this.grenadeCd -= dt;
+    if (this.stunT > 0) this.stunT = Math.max(0, this.stunT - dt);
     if (this.meleeCd > 0) this.meleeCd -= dt;
     if (this.meleeT > 0) this.meleeT -= dt;
     if (this.spawnProtect > 0) this.spawnProtect -= dt;
@@ -518,8 +535,69 @@ export class Character {
   }
 
   // slideReq: crouch was just pressed this frame (starts a slide when sprinting)
+  // Mantle: run into something waist-to-chest high and you vault onto it; press jump in front of anything up
+  // to about head height and you pull yourself up. Quick and fully scripted (no physics while it runs), so
+  // the host and the player's own machine play it the same way from the same inputs.
+  findLedge(wish, maxH) {
+    const phys = this.game.physics, p = this.pos, r = this.radius;
+    const wl = Math.hypot(wish.x, wish.z);
+    if (wl < 0.4) return null;
+    const dx = wish.x / wl, dz = wish.z / wl;
+    const fx = p.x + dx * (r + 0.32), fz = p.z + dz * (r + 0.32), cw = 0.14;
+    let top = -Infinity, wall = false;
+    for (const b of phys.boxes) {
+      if (fx - cw >= b.maxx || fx + cw <= b.minx || fz - cw >= b.maxz || fz + cw <= b.minz) continue;
+      if (b.maxy <= p.y + PLAYER.stepHeight + 0.02 || b.miny > p.y + maxH) continue;
+      if (b.maxy > p.y + maxH) { wall = true; break; }
+      if (b.maxy > top) top = b.maxy;
+    }
+    if (wall || top === -Infinity) return null;
+    // somewhere to stand on top (crouched if that's all that fits) and nothing above our head on the way up
+    const tx = p.x + dx * (r + 0.5), tz = p.z + dz * (r + 0.5);
+    let crouch = false;
+    if (phys.overlap(tx, top + 0.01, tz, r * 0.9, PLAYER.height - 0.02)) {
+      if (phys.overlap(tx, top + 0.01, tz, r * 0.9, PLAYER.crouchHeight - 0.02)) return null;
+      crouch = true;
+    }
+    if (phys.overlap(p.x, p.y + 0.05, p.z, r * 0.9, top - p.y + (crouch ? PLAYER.crouchHeight : PLAYER.height) - 0.05)) return null;
+    return { x: tx, z: tz, y: top, crouch, h: top - p.y };
+  }
+
+  updateMantle(dt) {
+    const m = this.mantle;
+    m.t = Math.min(1, m.t + dt / m.dur);
+    // up first, then over the edge: height leads the forward motion
+    const up = 1 - Math.pow(1 - Math.min(1, m.t / 0.7), 2), fwd = Math.max(0, (m.t - 0.35) / 0.65), fw = fwd * fwd * (3 - 2 * fwd);
+    this.pos.set(m.x0 + (m.x - m.x0) * fw, m.y0 + (m.y - m.y0) * up, m.z0 + (m.z - m.z0) * fw);
+    this.vel.set(0, 0, 0);
+    this.onGround = false;
+    if (m.t >= 1) {
+      this.pos.set(m.x, m.y, m.z);
+      this.vel.set(m.vx, 0, m.vz);
+      this.onGround = true;
+      this.mantle = null;
+    }
+  }
+
   updateMovement(dt, wish, sprint, jump, slideReq = false, tac = false) {
     const phys = this.game.physics;
+    if (this.mantle) { if (!this.alive) this.mantle = null; else { this.updateMantle(dt); return; } }
+    if (this.alive && this.proneT < 0.1 && this.slideT <= 0) {
+      const hs = Math.hypot(this.vel.x, this.vel.z);
+      const fwdIn = (this.vel.x * wish.x + this.vel.z * wish.z) / Math.max(1e-3, hs) > 0.5 || hs < 0.5;
+      // auto vault when running into it; jump pulls you up onto anything up to about 2 m (also mid-air)
+      const autoV = this.onGround && (sprint || hs > 3.2) && fwdIn;
+      const L = (jump || autoV) ? this.findLedge(wish, jump ? 2.05 : 1.3) : null;
+      if (L && (jump || L.h >= 0.5)) {
+        const dur = 0.2 + 0.12 * L.h;
+        this.mantle = { t: 0, dur, x0: this.pos.x, y0: this.pos.y, z0: this.pos.z, x: L.x, y: L.y, z: L.z, vx: wish.x * 3, vz: wish.z * 3, h: L.h };
+        if (L.crouch) this.wantCrouch = true;
+        this.slideT = 0;
+        this.game.audio.play('land', this.spos);
+        this.updateMantle(dt);
+        return;
+      }
+    }
     const hs0 = Math.hypot(this.vel.x, this.vel.z);
     if (slideReq && this.sprinting && this.onGround && hs0 > PLAYER.walk && this.slideT <= 0) {
       this.slideT = PLAYER.slideTime;
@@ -556,6 +634,7 @@ export class Character {
       this.tacSprinting = !!tac && this.sprinting && this.tacFuel > 0.05;
       let speed = this.proneT > 0.05 ? PLAYER.proneSpeed * (prone ? 1 : 0.4) : this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.tacSprinting ? PLAYER.tacSprint : this.sprinting ? PLAYER.sprint : PLAYER.walk;
       speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
+      if (this.stunT > 0) speed *= 1 - 0.5 * Math.min(1, this.stunT / 1.5);
       const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
       const tx = wish.x * speed, tz = wish.z * speed;
       let dx = tx - this.vel.x, dz = tz - this.vel.z;

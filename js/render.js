@@ -324,11 +324,16 @@ export class Renderer {
     if (d.grace > 0) { d.grace -= ft; return; }              // shader compiles right after a load don't count
     d.ema += (ft - d.ema) * 0.08;
     if (d.ema > 1 / 48) { d.slow += ft; d.fast = 0; } else if (d.ema < 1 / 58) { d.fast += ft; d.slow = 0; } else { d.slow = Math.max(0, d.slow - ft); d.fast = 0; }
-    if (d.slow > 1.2 && d.scale > 0.55) {
+    // a resolution change reallocates every render target (a hitch of its own): only act on a sustained
+    // slowdown, and never more than once every few seconds
+    if ((d.cool = (d.cool || 0) - ft) > 0) return;
+    if (d.slow > 2.2 && d.scale > 0.55) {
+      d.cool = 4;
       d.ceil = Math.min(d.ceil, d.scale);                       // this level was too heavy
       d.scale = Math.max(0.55, +(d.scale - 0.1).toFixed(2));
       d.slow = 0; d.ema = 1 / 55; this.applyPR(); this.setSize();
-    } else if (d.fast > 8 && d.scale < d.ceil - 0.05) {
+    } else if (d.fast > 10 && d.scale < d.ceil - 0.05) {
+      d.cool = 4;
       d.scale = Math.min(d.ceil - 0.05, +(d.scale + 0.1).toFixed(2));
       d.fast = 0; this.applyPR(); this.setSize();
     } else if (d.fast > 30 && d.ceil < 1) { d.ceil = Math.min(1, d.ceil + 0.1); d.fast = 0; } // conditions improved: allow a step up again

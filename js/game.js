@@ -1,6 +1,6 @@
 // Match orchestration: scene + renderer, combat resolution, spawning, scoring, pickups, grenades, melee
 import * as THREE from 'three';
-import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom } from './config.js';
+import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom, EQUIPMENT } from './config.js';
 const WEAPON_IDS = Object.keys(WEAPONS);
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
@@ -53,6 +53,30 @@ function pickBotWeapon() {
 }
 
 const INTRO_SECS = 10.6; // 10 on screen once the loading screen fades
+
+// sniper glint: a soft white core with four thin tapering rays on a fully transparent background
+let _glint = null;
+function glintTex() {
+  if (_glint) return _glint;
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), h = N / 2;
+  const core = g.createRadialGradient(h, h, 0, h, h, h * 0.42);
+  core.addColorStop(0, 'rgba(255,255,255,1)'); core.addColorStop(0.18, 'rgba(255,255,255,0.95)'); core.addColorStop(0.45, 'rgba(225,238,255,0.35)'); core.addColorStop(1, 'rgba(200,225,255,0)');
+  g.fillStyle = core; g.fillRect(0, 0, N, N);
+  g.globalCompositeOperation = 'lighter';
+  for (const [a, len, w] of [[0, 1, 0.055], [Math.PI / 2, 1, 0.055], [Math.PI / 4, 0.42, 0.03], [-Math.PI / 4, 0.42, 0.03]]) {
+    g.save(); g.translate(h, h); g.rotate(a);
+    const gr = g.createLinearGradient(-h * len, 0, h * len, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(-h * len, 0); g.lineTo(0, -h * w); g.lineTo(h * len, 0); g.lineTo(0, h * w); g.closePath(); g.fill();
+    g.restore();
+  }
+  _glint = new THREE.CanvasTexture(c);
+  _glint.colorSpace = THREE.SRGBColorSpace;
+  _glint.premultiplyAlpha = true;
+  return _glint;
+}
 
 export class Game {
   constructor(container) {
@@ -457,6 +481,7 @@ export class Game {
     }
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
+    this.frameCount = (this.frameCount || 0) + 1;
     this.input.poll(dt);
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
@@ -608,9 +633,12 @@ export class Game {
       let gl = this.glares.get(c);
       if (dot < 0.94 && !gl) continue;
       if (!gl) {
-        const mk = (col) => new THREE.Sprite(new THREE.SpriteMaterial({ map: this.effects.starTex, color: col, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, fog: false }));
-        gl = { core: mk(new THREE.Color(4, 4, 4.4)), streak: mk(new THREE.Color(2.4, 2.8, 3.4)), k: 0, vis: false, t: 0 };
-        this.scene.add(gl.core, gl.streak);
+        // one sprite with its own material (opacity is per glint), sharing a clean star texture
+        const mat = new THREE.SpriteMaterial({ map: glintTex(), color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, fog: false });
+        gl = { core: new THREE.Sprite(mat), k: 0, vis: false, t: 0 };
+        gl.streak = gl.core;
+        gl.core.renderOrder = 5;
+        this.scene.add(gl.core);
         this.glares.set(c, gl);
       }
       gl.live = true;
@@ -619,16 +647,18 @@ export class Game {
       if ((gl.t -= dt) <= 0) { gl.t = 0.12; gl.vis = k > 0 && !this.physics.blocked(scope, cam.position); }
       if (!gl.vis) k = 0;
       gl.k += (k - gl.k) * Math.min(1, dt * 14);
-      const fl = gl.k * (0.86 + 0.14 * Math.sin(this.time * 21 + c.id * 1.7)), s = d * 0.11 * fl;
-      gl.core.position.copy(scope); gl.streak.position.copy(scope);
-      gl.core.scale.set(s, s, 1); gl.streak.scale.set(s * 5, s * 0.28, 1);
-      gl.core.material.opacity = Math.min(1, fl * 1.2); gl.streak.material.opacity = fl * 0.7;
-      gl.core.visible = gl.streak.visible = gl.k > 0.02;
+      // a white four-point star: constant size on screen (grows with distance), twinkling and turning slowly
+      const fl = gl.k * (0.85 + 0.15 * Math.sin(this.time * 19 + c.id * 1.7)), s = Math.max(0.35, d * 0.05) * (0.55 + 0.45 * fl);
+      gl.core.position.copy(scope);
+      gl.core.scale.set(s, s, 1);
+      gl.core.material.rotation = Math.sin(this.time * 1.3 + c.id) * 0.12;
+      gl.core.material.opacity = Math.min(1, fl * 1.15);
+      gl.core.visible = gl.k > 0.02;
     }
     for (const [c, gl] of this.glares) {
       if (gl.live && this.characters.includes(c)) continue;
-      gl.k = 0; gl.core.visible = gl.streak.visible = false;
-      if (!this.characters.includes(c)) { this.scene.remove(gl.core, gl.streak); gl.core.material.dispose(); gl.streak.material.dispose(); this.glares.delete(c); }
+      gl.k = 0; gl.core.visible = false;
+      if (!this.characters.includes(c)) { this.scene.remove(gl.core); gl.core.material.dispose(); this.glares.delete(c); }
     }
   }
 
@@ -674,6 +704,7 @@ export class Game {
       case 'spawn': inp.clearAds(); hud.hideDeath(); this.audio.play('spawn', null, { ui: true }); if (ctl) { ctl.lastFov = 0; ctl.recoilDebt = 0; ctl.crouchToggle = false; } break;
       case 'pickup': this.audio.play('pickup', null, { ui: true }); hud.message(a[0] === 'health' ? '+50 HEALTH' : 'AMMO RESUPPLIED'); break;
       case 'msg': hud.message(a[0]); break;
+      case 'stun': if (this.player) this.player.stun(+a[0] || 1); hud.stunned && hud.stunned(+a[0] || 1); inp.rumble(0.5, 0.5, 300); break;
       default: break;
     }
   }
@@ -834,34 +865,60 @@ export class Game {
     this.notify(attacker, 'hit', wasAlive && !best.alive, false, true);
   }
 
-  throwGrenade(c, target, cook = 0) {
+  throwGrenade(c, target, cook = 0, type = 'frag') {
     if (this.mode === 'guest') return; // the host spawns it and tells us
+    const spec = EQUIPMENT[type] || EQUIPMENT.frag;
     const origin = c.eyePos(new THREE.Vector3());
     const f = c.forward(_d);
-    const fuse = Math.max(0, GRENADE.fuse - cook);
+    const fuse = spec.knife ? 8 : Math.max(0, spec.fuse - cook);
     origin.addScaledVector(f, fuse <= 0 ? 0.2 : 0.5);
     let vel;
-    if (target) {
+    if (spec.knife) {
+      // a knife flies almost flat: aim straight at the target (bots lead a touch for the drop)
+      if (target) { vel = _a.copy(target).add(new THREE.Vector3(0, 1.2, 0)).sub(origin).normalize().multiplyScalar(spec.speed); vel = vel.clone(); }
+      else vel = f.clone().multiplyScalar(spec.speed).add(new THREE.Vector3(0, 0.6, 0));
+    } else if (target) {
       const dx = target.x - origin.x, dz = target.z - origin.z, dy = target.y + 0.3 - origin.y;
       const dist = Math.hypot(dx, dz);
       const T = Math.max(0.5, Math.min(1.4, dist / 14));
       vel = new THREE.Vector3(dx / T, (dy + 0.5 * GRAV * T * T) / T, dz / T);
     } else {
-      vel = f.clone().multiplyScalar(GRENADE.throwSpeed).add(new THREE.Vector3(0, 3, 0)).addScaledVector(c.vel, 0.5);
+      vel = f.clone().multiplyScalar(spec.speed || GRENADE.throwSpeed).add(new THREE.Vector3(0, 3, 0)).addScaledVector(c.vel, 0.5);
     }
     const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
     if (fuse <= 0) vel.set(0, 0, 0); // cooked too long: it goes off in your hand
-    this.spawnGrenade(id, origin, vel, c, fuse);
-    this.emit(['gren', id, +origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), c.id, +fuse.toFixed(2)]);
+    this.spawnGrenade(id, origin, vel, c, fuse, type);
+    this.emit(['gren', id, +origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), c.id, +fuse.toFixed(2), type]);
   }
 
-  spawnGrenade(id, origin, vel, owner, fuse = GRENADE.fuse) {
-    const mesh = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
+  // one shared mesh per kind of thrown equipment
+  equipMesh(type) {
+    if (type === 'frag' || !EQUIPMENT[type]) return new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
+    this.equipGeo = this.equipGeo || {};
+    if (!this.equipGeo[type]) {
+      const M = (o) => new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.4, ...o });
+      if (type === 'semtex') this.equipGeo[type] = [[new THREE.BoxGeometry(0.1, 0.05, 0.07), M({ color: 0x8a7a52 })], [new THREE.SphereGeometry(0.012, 8, 6).translate(0, 0.028, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 0.2, 0.1), toneMapped: false })]];
+      else if (type === 'knife') {
+        const blade = new THREE.Shape(); blade.moveTo(0, -0.012); blade.lineTo(0.16, -0.004); blade.lineTo(0.19, 0.0); blade.lineTo(0.16, 0.012); blade.lineTo(0, 0.012);
+        const bg = new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false }); bg.rotateY(Math.PI / 2); bg.translate(-0.0015, 0, 0);
+        this.equipGeo[type] = [[bg, M({ color: 0xb8bcc0, roughness: 0.25, metalness: 1 })], [new THREE.BoxGeometry(0.012, 0.022, 0.1).translate(0, 0, 0.05), M({ color: 0x1b1c1e, roughness: 0.9, metalness: 0 })]];
+      } else if (type === 'shock') this.equipGeo[type] = [[new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10).rotateX(Math.PI / 2), M({ color: 0x2a2d33 })], [new THREE.CylinderGeometry(0.02, 0.02, 0.03, 10).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.6, 3.2), toneMapped: false })]];
+      else if (type === 'stun') this.equipGeo[type] = [[new THREE.CylinderGeometry(0.03, 0.03, 0.11, 12), M({ color: 0x4b5a3a })], [new THREE.CylinderGeometry(0.031, 0.031, 0.02, 12), M({ color: 0xa8a8a0, metalness: 0.9 })]];
+    }
+    const g = new THREE.Group();
+    for (const [geo, mat] of this.equipGeo[type]) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); }
+    return g;
+  }
+
+  spawnGrenade(id, origin, vel, owner, fuse = GRENADE.fuse, type = 'frag') {
+    const spec = EQUIPMENT[type] || EQUIPMENT.frag;
+    const mesh = this.equipMesh(type);
     mesh.castShadow = true;
     mesh.position.copy(origin);
     this.scene.add(mesh);
-    this.grenades.push({ id, pos: origin, vel, fuse, owner, mesh });
-    if (owner !== this.player) this.audio.play('pin', owner ? owner.pos : origin); // our own pin was pulled when cooking began
+    this.grenades.push({ id, pos: origin, vel, fuse, owner, mesh, type, spec, prev: origin.clone() });
+    if (spec.knife) this.audio.play('melee', owner ? owner.pos : origin);
+    else if (owner !== this.player) this.audio.play('pin', owner ? owner.pos : origin); // our own pin was pulled when cooking began
   }
 
   spawnRocket(id, origin, vel, owner, spec) {
@@ -917,6 +974,8 @@ export class Game {
         }
         continue;
       }
+      const spec = g.spec || EQUIPMENT.frag;
+      if (spec.knife || spec.sticky) { if (this.updateStickyOrKnife(g, spec, dt)) { this.scene.remove(g.mesh); this.grenades.splice(i, 1); } continue; }
       for (let s = 0; s < 2; s++) {
         const h = dt / 2;
         g.vel.y -= GRAV * h;
@@ -932,6 +991,105 @@ export class Game {
         this.grenades.splice(i, 1);
       }
     }
+  }
+
+  // knives and sticky charges: swept along their path so they can't tunnel through a wall or a player.
+  // Returns true when it's finished (exploded, done shocking, or a knife that has lain there long enough).
+  updateStickyOrKnife(g, spec, dt) {
+    const host = this.mode !== 'guest';
+    if (!g.stuck && !g.attach) {
+      g.prev.copy(g.pos);
+      g.vel.y -= GRAV * (spec.knife ? 0.3 : 1) * dt;
+      const step = g.vel.length() * dt;
+      if (step > 1e-5) {
+        _d.copy(g.vel).normalize();
+        const wall = this.physics.raycast(g.prev, _d, step + 0.05);
+        let best = wall ? wall.t : step, who = null;
+        for (const c of this.characters) {
+          if (!c.alive || c === g.owner || c.hidden) continue;
+          if (c.pos.distanceToSquared(g.prev) > (step + 3) * (step + 3)) continue;
+          const r = this.rayCharacter(g.prev, _d, c, best);
+          if (r.t < best) { best = r.t; who = c; g.head = r.head; }
+        }
+        g.pos.copy(g.prev).addScaledVector(_d, Math.max(0, best - 0.02));
+        if (who) {
+          if (spec.knife) {
+            if (host && (this.foes(g.owner || who, who) || this.settings.friendlyFire)) {
+              const wasAlive = who.alive;
+              who.hitReact(g.pos, _d, 1.6, !!g.head);
+              who.takeDamage(spec.damage, g.owner, 'knife', !!g.head, g.owner ? g.owner.pos : g.pos);
+              if (g.owner) this.notify(g.owner, 'hit', wasAlive && !who.alive, !!g.head);
+              this.audio.play('meleehit', who.pos);
+              this.emit(['boom', g.id, +g.pos.x.toFixed(2), +g.pos.y.toFixed(2), +g.pos.z.toFixed(2), 'knife']);
+            }
+            return true;
+          }
+          g.attach = who; g.off = g.pos.clone().sub(who.pos);   // stuck to a player
+          this.audio.play('bounce', g.pos);
+        } else if (wall) {
+          g.stuck = true;
+          this.audio.play(spec.knife ? 'impact' : 'bounce', g.pos);
+          if (spec.knife) g.fuse = Math.min(g.fuse, 6);
+        }
+      }
+      if (spec.knife) g.mesh.lookAt(_a.copy(g.pos).sub(g.vel)); else g.mesh.rotation.x += 12 * dt;
+    }
+    if (g.attach) {
+      if (g.attach.alive) g.pos.copy(g.attach.pos).add(g.off);
+      else g.attach = null, g.stuck = true;
+    }
+    g.mesh.position.copy(g.pos);
+    g.fuse -= dt;
+    if (spec.knife) return g.fuse <= 0;
+    // semtex light blinks faster as it's about to go
+    if (g.mesh.children[1]) g.mesh.children[1].visible = Math.sin(this.time * (g.fuse < 0.8 ? 40 : 14)) > 0;
+    if (spec.shock) {
+      if (g.fuse > 0) return false;
+      g.pulseT = (g.pulseT ?? 0) - dt;
+      if (g.pulseT <= 0) {
+        g.pulses = (g.pulses ?? spec.pulses);
+        if (g.pulses <= 0) return true;
+        g.pulses--; g.pulseT = 0.42;
+        if (host) this.shockPulse(g, spec);
+      }
+      return false;
+    }
+    if (g.fuse <= (host ? 0 : -1.5)) { if (host) this.explode(g); return true; }
+    return false;
+  }
+
+  shockPulse(g, spec) {
+    const pos = g.pos;
+    this.equipFx('shock', pos);
+    this.emit(['boom', g.id, +pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), 'shock']);
+    const src = _a.copy(pos); src.y += 0.2;
+    for (const c of this.characters) {
+      if (!c.alive) continue;
+      const cp = c.chestPos(new THREE.Vector3()), d = cp.distanceTo(pos);
+      if (d > spec.radius && c !== g.attach) continue;
+      if (c !== g.attach && this.physics.blocked(src, cp)) continue;
+      c.stun(spec.stun); this.notify(c, 'stun', spec.stun);
+      const before = c.health, wasAlive = c.alive;
+      c.takeDamage(spec.damage * (c === g.attach ? 1.5 : 1), g.owner, 'shock', false, pos);
+      if (g.owner && c !== g.owner && c.health < before) this.notify(g.owner, 'hit', wasAlive && !c.alive, false);
+    }
+  }
+
+  // effects for the equipment that isn't a plain explosion (also run on guests from the host's 'boom' event)
+  equipFx(type, pos) {
+    if (type === 'shock') {
+      this.effects.flashLight(pos, 30, 0.12, 0x6ab8ff);
+      for (let k = 0; k < 10; k++) this.effects.debrisChip(pos, new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 6, (Math.random() - 0.5) * 8), 0x9fd8ff, 0.025);
+      this.audio.play('impact', pos); this.audio.play('ui', pos, { freq: 5200 });
+      if (this.player && this.player.alive && this.player.pos.distanceTo(pos) < 6) this.playerCtl.addShake(0.3);
+    } else if (type === 'stun') {
+      this.effects.flashLight(pos, 70, 0.18, 0xdfe8ff);
+      this.effects.flashes.spawn(pos, new THREE.Vector3(), 0xe8f0ff, 2.6, 0.12, { alpha: 1 });
+      this.effects.smoke.spawn(pos, new THREE.Vector3(0, 0.6, 0), 0xd8d8d0, 0.6, 1.4, { grow: 1.4, alpha: 0.25, drag: 2 });
+      this.audio.play('explosion', pos);
+    } else if (type === 'knife') {
+      this.audio.play('meleehit', pos);
+    } else this.explosionFx(pos);
   }
 
   removeGrenade(id) {
@@ -953,11 +1111,12 @@ export class Game {
 
   explode(g) {
     const pos = g.pos;
+    if (g.spec && g.spec.slot === 'tactical') { this.stunBurst(g); return; }
     this.explosionFx(pos);
     this.emit(['boom', g.id, +pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2)]);
     const src = _a.copy(pos); src.y += 0.25;
     if (g.rocket) src.addScaledVector(_d.copy(g.vel).normalize(), -0.3);   // just in front of the wall it hit
-    const R = g.rocket ? g.rocket.radius : GRENADE.radius, DMG = g.rocket ? g.rocket.damage : GRENADE.damage, wid = g.rocket ? 'monte' : 'grenade';
+    const R = g.rocket ? g.rocket.radius : (g.spec ? g.spec.radius : GRENADE.radius), DMG = g.rocket ? g.rocket.damage : (g.spec ? g.spec.damage : GRENADE.damage), wid = g.rocket ? 'monte' : g.type === 'semtex' ? 'semtex' : 'grenade';
     for (const c of this.characters) {
       if (!c.alive) continue;
       const cp = c.chestPos(new THREE.Vector3());
@@ -970,6 +1129,23 @@ export class Game {
       const before = c.health;
       c.takeDamage(dmg, g.owner, wid, false, pos);
       if (g.owner && c !== g.owner && c.health < before) this.notify(g.owner, 'hit', wasAlive && !c.alive, false);
+    }
+  }
+
+  // stun grenade: no damage; everyone in the blast with a line to it is slowed (closer = longer)
+  stunBurst(g) {
+    const pos = g.pos, spec = g.spec;
+    this.equipFx('stun', pos);
+    this.emit(['boom', g.id, +pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), 'stun']);
+    const src = _a.copy(pos); src.y += 0.25;
+    for (const c of this.characters) {
+      if (!c.alive) continue;
+      const hp = c.headPos(new THREE.Vector3()), d = hp.distanceTo(pos);
+      if (d > spec.radius || this.physics.blocked(src, hp)) continue;
+      if (c !== g.owner && g.owner && !this.foes(g.owner, c) && !this.settings.friendlyFire) continue;
+      const sec = spec.stun * (0.35 + 0.65 * (1 - d / spec.radius)) * (c === g.owner ? 0.5 : 1);
+      c.stun(sec); this.notify(c, 'stun', +sec.toFixed(2));
+      if (g.owner && c !== g.owner) this.notify(g.owner, 'hit', false, false);
     }
   }
 
@@ -1187,7 +1363,11 @@ export class Game {
       for (const m of (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []))
         for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap']) if (m[k] && m[k].isTexture) texs.add(m[k]);
     });
+    // thrown equipment too, so the first knife or semtex of the match doesn't compile mid-throw
+    const eq = [];
+    for (const t of ['frag', 'semtex', 'knife', 'shock', 'stun']) { const m = this.equipMesh(t); m.position.copy(this.camera.position).addScaledVector(fwd, 3); this.scene.add(m); eq.push(m); }
     try { r.compile(this.scene, this.camera); r.compile(this.vmScene, this.vmCamera); } catch (_) { /* best effort */ }
+    for (const m of eq) this.scene.remove(m);
     for (const t of texs) { try { r.initTexture(t); } catch (_) { /* best effort */ } }
     try { this.renderer.render(1 / 60, true); } catch (_) { /* best effort */ }
     for (const [m, p] of moved) { m.position.copy(p); m.updateMatrixWorld(true); }
