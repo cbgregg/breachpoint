@@ -33,7 +33,10 @@ export class BotBrain {
     this.stuckT = 1; this.lastPos.copy(this.bot.pos);
     this.unstickT = 0; this.stuckN = 0; if (!this.unstickDir) this.unstickDir = new THREE.Vector3();
     this.grenadeT = rand(4, 10);
-    this.crouch = false;
+    this.crouch = false; this.prone = false;
+    this.holding = false; this.holdStance = 0; this.lookYaw = null; this.lookT = 0; this.lookPitch = 0;
+    this.idleT = 0; this.noPathT = 0; this.proneEngage = false; this.proneT = 0;
+    this.walkSlow = false;
     if (this.spot) this.spot.clear();
   }
 
@@ -153,14 +156,16 @@ export class BotBrain {
       this.goalT = kind === 'roam' || kind === 'intel' ? rand(10, 18) : 12;
       // a fresh route preference per goal: bots spread over different streets and doorways instead of all
       // taking the one shortest lane (pickups and hunting stay on the direct way)
-      this.route = (kind === 'health' || kind === 'ammo' || kind === 'hunt') ? null : { seed: (Math.random() * 1e6) | 0, w: 1.2 + Math.random() * 1.6 };
+      this.walkSlow = kind === 'intel' && Math.random() < 0.3;
+      this.route = (kind === 'health' || kind === 'ammo' || kind === 'hunt') ? null : { seed: (Math.random() * 1e6) | 0, w: 1.2 + Math.random() * 2.6 };
     }
   }
 
   chooseGoal(dt) {
     const b = this.bot, g = this.game;
     this.goalT -= dt;
-    if (this.visible && this.target) { this.goalKind = 'engage'; return; }
+    if (this.idleT > 0) this.idleT -= dt;
+    if (this.visible && this.target) { this.goalKind = 'engage'; this.idleT = 0; return; }
     if (this.goalKind === 'engage') { this.goalKind = 'hunt'; this.goal = null; }
     // round modes hand out objectives: plant, defuse, guard a site, take the flag
     const og = g.gm && g.gm.botGoal(this, b);
@@ -185,6 +190,12 @@ export class BotBrain {
     // got to the last sighting and found nobody: forget it and move on
     if (this.goalKind === 'hunt' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5 && Math.abs(this.goal.y - b.pos.y) < 1.6) { this.goal = null; this.lastKnownT = -99; }
     const reached = this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2 && Math.abs(this.goal.y - b.pos.y) < 1.6;
+    // reaching a roam spot: sometimes stop and check the angles for a moment, like a player would
+    if (reached && (this.goalKind === 'roam' || this.goalKind === 'intel') && this.idleT <= 0 && !this.idleDone && Math.random() < 0.45) {
+      this.idleT = rand(0.8, 2.6); this.idleDone = true; this.pickLook(true);
+    }
+    if (this.idleT > 0) return;
+    this.idleDone = false;
     if (!this.goal || reached || this.goalT <= 0 || this.goalKind === 'hunt' || this.goalKind === 'health' || this.goalKind === 'ammo') {
       const intel = g.intel[b.team];
       // don't all pile onto the same spot: only some answer a callout, and they come at it from different angles
@@ -247,17 +258,34 @@ export class BotBrain {
     const b = this.bot, g = this.game, nav = g.world.nav;
     const wish = this.wish.set(0, 0, 0);
     let sprint = false, jump = false;
-    this.crouch = false;
+    this.crouch = false; this.prone = false;
     b.useHeld = false;
-    // objective spots: stop there (and hold the button to plant / defuse)
-    const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6 }[this.goalKind];
-    if (hold && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < hold) {
-      if (this.goalKind === 'plant' || this.goalKind === 'defuse') b.useHeld = true;
-      this.goalT = 30;
-      b.wantCrouch = this.goalKind === 'guard' && Math.random() < 0.002 ? !b.wantCrouch : b.wantCrouch;
+    // objective spots: stop there (and hold the button to plant / defuse); guard / push spots: settle into
+    // a stance and check angles until the mode hands out the next spot
+    const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6, push: 2 }[this.goalKind];
+    const idle = this.idleT > 0 && this.goalKind !== 'engage';
+    if (idle || (hold && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < hold)) {
+      if (this.goalKind === 'plant' || this.goalKind === 'defuse') { b.useHeld = true; this.crouch = this.goalKind === 'defuse'; }
+      else {
+        if (!this.holding) {   // just arrived: pick how to sit on this angle
+          const r = Math.random();
+          this.holdStance = r < 0.45 ? 0 : r < 0.8 ? 1 : 2;   // stand / crouch / prone
+          if (idle) this.holdStance = Math.min(this.holdStance, 1);
+          this.pickLook(true);
+        }
+        this.holding = true;
+        this.lookT -= dt;
+        if (this.lookT <= 0) this.pickLook(false);
+        this.crouch = this.holdStance === 1; this.prone = this.holdStance === 2;
+        // shuffle a step now and then so nobody is a statue
+        if (this.holdStance === 0 && Math.random() < 0.004) { this.strafeDir *= -1; this.shuffleT = rand(0.25, 0.6); }
+        if (this.shuffleT > 0) { this.shuffleT -= dt; const a = b.yaw; wish.set(Math.cos(a) * this.strafeDir, 0, -Math.sin(a) * this.strafeDir).multiplyScalar(0.5); }
+      }
+      b.wantCrouch = this.crouch; b.wantProne = this.prone;
       b.updateMovement(dt, wish, false, false, false, false);
       return;
     }
+    if (this.holding) { this.holding = false; this.lookYaw = null; }
 
     if (this.goalKind === 'engage' && this.target) {
       const t = this.target;
@@ -271,10 +299,15 @@ export class BotBrain {
         this.strafeT = rand(0.35, 1.3);
         if (Math.random() < (this.game.settings.difficulty === 'hard' ? 0.15 : 0.06)) jump = true;
         this.crouchEngage = Math.random() < 0.2 && dist > 14;
+        // long guns at range: sometimes drop prone and settle in (gets up again after a bit, or if they close in)
+        if (!this.proneEngage && dist > 24 && mx >= 40 && Math.random() < 0.18) { this.proneEngage = true; this.proneT = rand(2.5, 6); }
       }
+      if (this.proneEngage) { this.proneT -= dt; if (this.proneT <= 0 || dist < 14) this.proneEngage = false; }
       this.crouch = !!this.crouchEngage;
-      wish.addScaledVector(perp, this.strafeDir * (this.crouch ? 0.4 : 1));
-      if (dist > mx) {
+      this.prone = this.proneEngage;
+      if (!this.prone) wish.addScaledVector(perp, this.strafeDir * (this.crouch ? 0.4 : 1));
+      if (this.prone) { /* settled in */ }
+      else if (dist > mx) {
         const dir = this.followPath(t.pos, dt);
         if (dir) wish.addScaledVector(dir, 1.2);
       } else if (dist < mn) {
@@ -289,8 +322,15 @@ export class BotBrain {
       if (dir) {
         wish.copy(dir);
         sprint = Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 8;
+        this.noPathT = 0;
+        // clearing a route after a callout: walk it carefully now and then
+        if (this.goalKind === 'intel' && !sprint && this.walkSlow) this.crouch = true;
       } else if (this.goalKind === 'roam' || this.goalKind === 'intel') {
         this.goalT = 0;
+      } else if ((this.noPathT += dt) > 1.2) {
+        // no route to the mode's spot (or already standing on it): ask for a different one
+        this.noPathT = 0; this.gmPatT = 0; this.gmOff = null; this.goal = null;
+        if (this.goalKind === 'push' || this.goalKind === 'guard') this.idleT = rand(0.4, 1.2);
       }
     }
     // personal space: ease away from teammates closer than ~2.2 m so squads don't move as one blob
@@ -325,7 +365,7 @@ export class BotBrain {
       this.lastPos.copy(b.pos);
       this.stuckT = 0.8;
     }
-    b.wantCrouch = this.crouch;
+    b.wantCrouch = this.crouch; b.wantProne = this.prone;
     // long runs with nobody in sight: tactical sprint while the charge is high
     const run = sprint && !this.visible;
     if (!run) this.tac = false;
@@ -373,6 +413,19 @@ export class BotBrain {
     this.unstickT = rand(0.5, 0.9);
   }
 
+  // somewhere to look while holding: mostly out, away from the spot being held (where enemies come from),
+  // swept across a wide arc with occasional glances behind
+  pickLook(fresh) {
+    const b = this.bot, an = this.gmAnchor;
+    let base = b.yaw;
+    if (an && Math.hypot(b.pos.x - an.x, b.pos.z - an.z) > 1.5) base = Math.atan2(-(b.pos.x - an.x), -(b.pos.z - an.z));
+    else if (fresh) base = b.yaw;
+    const r = Math.random();
+    this.lookYaw = r < 0.12 ? base + Math.PI + rand(-0.5, 0.5) : base + rand(-1.3, 1.3);
+    this.lookPitch = rand(-0.08, 0.04);
+    this.lookT = rand(1.2, 3.5);
+  }
+
   aim(dt) {
     const b = this.bot, g = this.game, d = this.diff;
     const eye = b.eyePos(_a);
@@ -397,6 +450,8 @@ export class BotBrain {
     } else if (this.target && g.time - this.lastKnownT < 4) {
       _c.subVectors(this.lastKnown, b.pos);
       if (_c.lengthSq() > 1) dy = Math.atan2(-_c.x, -_c.z);
+    } else if ((this.holding || this.idleT > 0) && this.lookYaw !== null) {
+      dy = this.lookYaw; dp = this.lookPitch;
     } else if (Math.hypot(b.vel.x, b.vel.z) > 1) {
       dy = Math.atan2(-b.vel.x, -b.vel.z);
     }
