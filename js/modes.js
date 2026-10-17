@@ -16,6 +16,7 @@ import { glyph } from './hud.js';
 
 export const MODES = {
   tdm: { id: 'tdm', name: 'Team Deathmatch', short: 'TDM', blurb: 'Two squads, respawns on. First team to the score limit wins.' },
+  ffa: { id: 'ffa', name: 'Free-for-All', short: 'FFA', ffa: true, killLimit: 30, blurb: 'Every player for themselves, respawns on. First to 30 kills wins; the top three are the winners.' },
   gunfight: {
     id: 'gunfight', name: 'Gunfight', short: 'GUNFIGHT', blurb: '2v2, one life, same loadout for everyone. Overtime flag at 40 s. First to 6 rounds.',
     rounds: true, teamSize: 2, winRounds: 6, maxRounds: 15, roundTime: 40, overtime: 10, freeze: 4, capTime: 3, capRadius: 3, fixedLoadout: true,
@@ -25,11 +26,11 @@ export const MODES = {
     rounds: true, winRounds: 4, maxRounds: 7, halftime: 3, roundTime: 120, freeze: 5, bombTime: 45, plantTime: 5, defuseTime: 7.5, siteRadius: 2.4, defuseRadius: 1.8,
   },
   gungame: {
-    id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true,
-    blurb: 'Every kill moves you up to the next gun. A knife kill sends the victim back one. First kill with the last gun wins.',
+    id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true, ffa: true,
+    blurb: 'Free-for-all. Every kill moves you up to the next gun; a knife kill sends the victim back one. First kill with the last gun wins.',
   },
 };
-// Gun Game ladder: rifles down to handguns. The team score is its best player's rung.
+// Gun Game ladder: rifles down to handguns (free-for-all: each player climbs it on their own).
 export const GUN_LADDER = ['rifle', 'kv47', 'br308', 'smg', 'krv45', 'hx60', 'shotgun', 'sa12', 'mr14', 'sniper', 'monte', 'mp18', 'd50', 'r357', 'pistol'];
 export const MODE_IDS = Object.keys(MODES);
 

@@ -159,7 +159,9 @@ export class Game {
     if (!MODES[this.settings.mode]) this.settings.mode = 'tdm';
     const modeCfg = MODES[this.settings.mode];
     if (modeCfg.rounds) this.settings.scoreLimit = modeCfg.winRounds;
-    this.gg = !!modeCfg.ladder;   // Gun Game: TDM rules, but the score is the team's best rung of the gun ladder
+    this.gg = !!modeCfg.ladder;   // Gun Game: every kill is the next gun; first to finish the ladder wins
+    this.ffa = !!modeCfg.ffa;     // Free-for-All and Gun Game: everyone for themselves
+    if (this.ffa && !this.gg) this.settings.scoreLimit = modeCfg.killLimit || 30;
     if (this.gg) {
       this.settings.scoreLimit = GUN_LADDER.length;
       for (const id of GUN_LADDER) { try { prewarmGun(weaponDef(id, {})); } catch (_) { /* built on first use */ } }
@@ -190,7 +192,8 @@ export class Game {
     if (this.mode === 'guest') return this.startGuest(online.start);
 
     const N = this.gm && this.gm.cfg.teamSize ? this.gm.cfg.teamSize : Math.max(1, Math.min(8, settings.teamSize | 0));
-    const myTeam = this.mode === 'host' ? online.lobby.hostTeam : 0;
+    // Free-for-All: everyone is on team 1, so everyone wears the enemy colours and every check goes through foes()
+    const myTeam = this.ffa ? 1 : this.mode === 'host' ? online.lobby.hostTeam : 0;
     this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: loadoutFromSettings(settings) });
     this.player.uid = online && online.lobby ? online.lobby.myUid : '';
     this.characters = [this.player];
@@ -201,7 +204,8 @@ export class Game {
     this.botNames = shuffle([...BOT_NAMES]);
     // private online matches can be humans only (host's "Fill empty slots with bots" switch)
     const fill = !(this.mode === 'host' && settings.fillBots === false);
-    for (let t = 0; t < 2; t++) {
+    if (this.ffa) { for (let i = this.characters.length; fill && i < 2 * N; i++) this.addBot(1); }
+    else for (let t = 0; t < 2; t++) {
       const humans = this.characters.filter(c => c.team === t).length;
       for (let i = humans; fill && i < N; i++) this.addBot(t);
     }
@@ -216,7 +220,10 @@ export class Game {
     this.endT = 0;
     this.damageFx = 0;
 
-    for (const t of [0, 1]) {
+    if (this.ffa) {
+      this.buildFfaSpawns();
+      for (const c of shuffle([...this.characters])) c.spawn(this.chooseSpawn(c.team), this.spawnYawOut);
+    } else for (const t of [0, 1]) {
       const spots = shuffle([...this.world.spawns[t]]);
       this.characters.filter(c => c.team === t).forEach((c, i) => c.spawn(spots[i % spots.length], this.world.spawnYaw[t]));
     }
@@ -299,6 +306,30 @@ export class Game {
     if (this.intro) this.music.hype(this.countdownT); else this.startMusic();
   }
 
+  // enemies? (Free-for-All: everyone but yourself)
+  foes(a, b) { return !!a && !!b && a !== b && (this.ffa || a.team !== b.team); }
+
+  // Free-for-All spawns: spread over the whole map (the team spawns plus open ground everywhere players can
+  // walk to), at least 7 m apart
+  buildFfaSpawns() {
+    const nav = this.world.nav, V = (x, z) => new THREE.Vector3(x, 0, z);
+    const base = [...this.world.spawns[0], ...this.world.spawns[1]];
+    const pts = [...base];
+    if (nav && nav.openCells && base.length) {
+      // only cells joined to the spawns (not sealed corners or the insides of solid blocks)
+      const seen = new Uint8Array(nav.cols * nav.rows), q = [];
+      for (const b of base) { const i = Math.floor((b.x - nav.minX) / nav.cell), j = Math.floor((b.z - nav.minZ) / nav.cell); const k = j * nav.cols + i; if (nav.isOpen(i, j) && !seen[k]) { seen[k] = 1; q.push(k); } }
+      while (q.length) { const k = q.pop(), i = k % nav.cols, j = (k / nav.cols) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + di, jj = j + dj, kk = jj * nav.cols + ii; if (ii >= 0 && jj >= 0 && ii < nav.cols && jj < nav.rows && !seen[kk] && nav.isOpen(ii, jj)) { seen[kk] = 1; q.push(kk); } } }
+      const cells = nav.openCells.filter(k => seen[k] && nav.isOpen((k % nav.cols) + 1, (k / nav.cols) | 0) && nav.isOpen((k % nav.cols) - 1, (k / nav.cols) | 0) && nav.isOpen(k % nav.cols, ((k / nav.cols) | 0) + 1) && nav.isOpen(k % nav.cols, ((k / nav.cols) | 0) - 1));
+      for (let t = 0; t < 600 && pts.length < 70; t++) {
+        const k = cells[(Math.random() * cells.length) | 0]; if (k === undefined) break;
+        const p = V(nav.cx(k % nav.cols), nav.cz((k / nav.cols) | 0));
+        if (pts.every(o => Math.hypot(o.x - p.x, o.z - p.z) > 7)) pts.push(p);
+      }
+    }
+    this.ffaSpawns = pts;
+  }
+
   addBot(team) {
     if (!this.botNames || !this.botNames.length) this.botNames = shuffle([...BOT_NAMES]);
     const b = new Character(this, { name: this.botNames.pop(), team, isBot: true, primary: botLoadout(pickBotWeapon()) });
@@ -366,6 +397,11 @@ export class Game {
     this.renderer.grade.damage.value = 0;
   }
 
+  ffaStandings() {
+    const lv = (c) => (this.gg ? (c.ggLevel || 0) : c.kills);
+    return [...this.characters].sort((a, b) => lv(b) - lv(a) || b.kills - a.kills || b.score - a.score);
+  }
+
   endMatch() {
     if (!this.live) return;
     this.state = 'ended';
@@ -375,11 +411,21 @@ export class Game {
     this.hud.show(false);
     this.renderer.grade.damage.value = 0;
     this.audio.play('horn', null, { ui: true });
-    const winner = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;
-    const sorted = [...this.characters].sort((a, b) => b.score - a.score);
+    let winner = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;
+    let sorted = [...this.characters].sort((a, b) => b.score - a.score);
+    let ffaPlace = 0, winnerId = -1;
+    if (this.ffa) {
+      // Free-for-All: placings by kills (Gun Game: the furthest up the ladder), then score
+      sorted = this.ffaStandings();
+      winnerId = this.ffaWinnerId ?? sorted[0]?.id ?? -1;
+      if (this.ffaWinnerId != null) sorted.sort((a, b) => (b.id === winnerId) - (a.id === winnerId));
+      ffaPlace = sorted.indexOf(this.player) + 1;
+      winner = winnerId === this.player.id ? this.player.team : -2;
+      this.ffaWinnerId = null;
+    }
     this.music.setDuck(false);
     this.music.sting(winner === this.player.team);
-    const result = { winner, scores: [...this.scores], players: sorted, mvp: sorted[0], playerTeam: this.player.team, mode: this.mode };
+    const result = { winner, scores: [...this.scores], players: sorted, mvp: sorted[0], playerTeam: this.player.team, mode: this.mode, ffa: this.ffa, place: ffaPlace, winnerId, count: this.characters.length };
     if (this.mode === 'host' && this.session) this.session.sendEnd(result);
     if (this.onEnd) this.onEnd(result);
   }
@@ -499,7 +545,7 @@ export class Game {
       _sph.center.set(c.pos.x, c.pos.y + 0.9, c.pos.z);
       const dist = _sph.center.distanceTo(this.camera.position);
       const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 22 ? 2 : 1;
-      c.updateModel(dt, c.team === this.player.team || c === this.aimTarget, lod);
+      c.updateModel(dt, !this.foes(c, this.player) || c === this.aimTarget, lod);
     }
     this.updateLasers();
     this.updateGrenades(dt);
@@ -532,7 +578,7 @@ export class Game {
     for (const c of this.characters) {
       if (!c.alive || c === p || c.hidden) continue;
       const t = this.rayCharacter(o, d, c, best);
-      if (t.t < best) { best = t.t; this.aimTarget = c.team !== p.team ? c : null; }
+      if (t.t < best) { best = t.t; this.aimTarget = this.foes(c, p) ? c : null; }
     }
   }
 
@@ -543,7 +589,7 @@ export class Game {
     if (!this.glares) this.glares = new Map();
     for (const gl of this.glares.values()) gl.live = false;
     for (const c of this.characters) {
-      if (c === me || !c.alive || c.hidden || !c.weapon || !c.weapon.def.scope || c.adsT < 0.25 || c.team === me.team) continue;
+      if (c === me || !c.alive || c.hidden || !c.weapon || !c.weapon.def.scope || c.adsT < 0.25 || !this.foes(c, me)) continue;
       const fwd = c.forward(_gf), scope = c.eyePos(_gs).addScaledVector(fwd, 0.3);
       const to = _gt.copy(cam.position).sub(scope), d = to.length();
       if (d < 0.5) continue;
@@ -688,10 +734,10 @@ export class Game {
       const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
       this.spawnRocket(id, start, vel, shooter, def.rocket);
       this.emit(['rkt', id, +start.x.toFixed(2), +start.y.toFixed(2), +start.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), shooter.id]);
-      if (!def.quiet) this.reportIntel(1 - shooter.team, shooter.pos);
+      if (!def.quiet) this.reportIntel(this.ffa ? 1 : 1 - shooter.team, shooter.pos);
       return;
     }
-    if (!cosmetic && !def.quiet) this.reportIntel(1 - shooter.team, shooter.pos);
+    if (!cosmetic && !def.quiet) this.reportIntel(this.ffa ? 1 : 1 - shooter.team, shooter.pos);
     const rewound = this.session && shooter.remote ? this.session.rewind(shooter) : null;
     const hits = new Map();
     const ends = [];
@@ -702,7 +748,7 @@ export class Game {
       const w = this.physics.raycast(origin, _d, def.range);
       if (w) best = w.t;
       for (const c of this.characters) {
-        if (!c.alive || c === shooter || c.hidden || (c.team === shooter.team && !ff)) continue;
+        if (!c.alive || c === shooter || c.hidden || (!this.foes(c, shooter) && !ff)) continue;
         _a.set(c.pos.x - origin.x, c.pos.y + 1 - origin.y, c.pos.z - origin.z);
         const along = _a.dot(_d);
         if (along < 0 || along > best + 1.5) continue;
@@ -714,7 +760,7 @@ export class Game {
       if (!isPlayer || p % 3 === 0) {
         if (!isPlayer || this.time % 0.2 < 0.1 || def.pellets > 1 || !def.auto) this.effects.tracer(muzzle, _end);
       }
-      if (!isPlayer && !cosmetic && !whizzed && hitC !== this.player && this.player.alive && shooter.team !== this.player.team) {
+      if (!isPlayer && !cosmetic && !whizzed && hitC !== this.player && this.player.alive && this.foes(shooter, this.player)) {
         this.player.headPos(_b).sub(origin);
         const al = _b.dot(_d);
         if (al > 2 && al < best && _b.lengthSq() - al * al < 2.2) { whizzed = true; this.audio.play('whiz', null, { ui: true }); }
@@ -757,7 +803,7 @@ export class Game {
     this.emit(['melee', attacker.id]);
     let best = null, bd = MELEE.range;
     for (const c of this.characters) {
-      if (!c.alive || c === attacker || (c.team === attacker.team && !this.settings.friendlyFire)) continue;
+      if (!c.alive || c === attacker || (!this.foes(c, attacker) && !this.settings.friendlyFire)) continue;
       c.chestPos(_a).sub(eye);
       const d = _a.length();
       if (d > bd) continue;
@@ -933,14 +979,14 @@ export class Game {
     victim.adsT = 0;
     victim.slideT = 0;
 
-    const enemyKill = killer && killer !== victim && killer.team !== victim.team;
+    const enemyKill = this.foes(killer, victim);
     if (enemyKill) {
       killer.kills++;
       killer.streak++;
       const bonus = (headshot ? SCORE.headshot : 0) + (weaponId === 'melee' ? SCORE.melee : 0);
       killer.score += SCORE.kill + bonus;
       if (this.gg) this.ggPromote(killer, weaponId, victim);
-      else if (!this.gm) this.scores[killer.team]++; // round modes score rounds, not kills
+      else if (!this.gm && !this.ffa) this.scores[killer.team]++; // round modes score rounds, not kills; FFA scores players
       if (!killer.isBot) {
         this.notify(killer, 'kill');
         this.notify(killer, 'score', 'KILL', SCORE.kill);
@@ -954,14 +1000,14 @@ export class Game {
         const st = { 3: 'KILLSTREAK', 5: 'KILLING SPREE', 10: 'RAMPAGE', 15: 'UNSTOPPABLE', 20: 'LEGENDARY' }[killer.streak];
         if (st) this.notify(killer, 'medal', st, `${killer.streak} KILLS`);
       }
-    } else if (killer && killer !== victim && killer.team === victim.team) {
+    } else if (killer && killer !== victim && !this.foes(killer, victim)) {
       killer.score = Math.max(0, killer.score - SCORE.kill);
     } else {
       victim.score = Math.max(0, victim.score - 50);
     }
 
     for (const [c, rec] of victim.damagers) {
-      if (c === killer || c.team === victim.team || this.time - rec.t > 10 || rec.dmg < 20) continue;
+      if (c === killer || !this.foes(c, victim) || this.time - rec.t > 10 || rec.dmg < 20) continue;
       c.assists++;
       c.score += SCORE.assist;
       this.notify(c, 'score', 'ASSIST', SCORE.assist);
@@ -976,16 +1022,17 @@ export class Game {
     }
     if (this.gm) this.gm.onKill(killer, victim);
     else if (Math.random() < 0.5) this.dropAmmo(victim.pos);
-    if (!this.gm && enemyKill && this.scores[killer.team] >= this.settings.scoreLimit && this.endT <= 0) {
+    const reached = this.ffa ? (this.gg ? killer && killer.ggLevel : killer && killer.kills) >= this.settings.scoreLimit : killer && this.scores[killer.team] >= this.settings.scoreLimit;
+    if (!this.gm && enemyKill && reached && this.endT <= 0) {
       this.endT = 1.4;
-      this.hud.medal(killer.team === this.player.team ? 'VICTORY' : 'DEFEAT', this.gg ? `${killer.name.toUpperCase()} FINISHED THE LADDER` : 'SCORE LIMIT REACHED');
+      this.hud.medal((this.ffa ? killer === this.player : killer.team === this.player.team) ? 'VICTORY' : 'DEFEAT', this.gg ? `${killer.name.toUpperCase()} FINISHED THE LADDER` : 'SCORE LIMIT REACHED');
     }
   }
 
   // Gun Game: a kill moves the killer up a gun (now, mid-life); a knife kill also sends the victim down one
   ggPromote(killer, weaponId, v) {
     killer.ggLevel = Math.min(GUN_LADDER.length, (killer.ggLevel || 0) + 1);
-    this.scores[killer.team] = Math.max(this.scores[killer.team], killer.ggLevel);
+    if (!this.ffa) this.scores[killer.team] = Math.max(this.scores[killer.team], killer.ggLevel);
     if (killer.ggLevel < GUN_LADDER.length) {
       const l = soloLoadout(GUN_LADDER[killer.ggLevel]);
       killer.pendingLoadout = null;
@@ -1020,17 +1067,17 @@ export class Game {
   // there, and how close friendlies are. The yaw to face comes back in this.spawnYawOut.
   chooseSpawn(team) {
     const flip = !this.gm;
-    const sets = flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
+    const sets = this.ffa ? ['ffa'] : flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
     let best = null, bestScore = -Infinity, bestYaw = this.world.spawnYaw[team];
     this.recentDeaths = (this.recentDeaths || []).filter(d => this.time - d.t < 8);
     for (const set of sets) {
-      for (const s of this.world.spawns[set]) {
+      for (const s of set === 'ffa' ? (this.ffaSpawns || [...this.world.spawns[0], ...this.world.spawns[1]]) : this.world.spawns[set]) {
         let minEnemy = 80, crowd = false, threat = 0, friends = 0;
         for (const c of this.characters) {
           if (!c.alive) continue;
           const dx = s.x - c.pos.x, dz = s.z - c.pos.z, d = Math.hypot(dx, dz);
           if (d < 1.5) crowd = true;
-          if (c.team === team) { if (d < 22) friends++; continue; }
+          if (!this.ffa && c.team === team) { if (d < 22) friends++; continue; }
           minEnemy = Math.min(minEnemy, d);
           if (d < 55 && !this.physics.blocked(c.eyePos(_a), _b.set(s.x, 1.5, s.z))) {
             // facing: 1 when the enemy looks straight at the point
@@ -1043,8 +1090,9 @@ export class Game {
         if (minEnemy < 12) score -= 60;                                  // never right next to an enemy
         if (minEnemy > 18) score += Math.min(friends, 3) * 5;            // near the team, away from the fight
         for (const dth of this.recentDeaths) if (Math.hypot(dth.x - s.x, dth.z - s.z) < 10) score -= 15;
-        if (set !== team) score -= 8;                                    // home spawns win ties
-        if (score > bestScore) { bestScore = score; best = s; bestYaw = this.world.spawnYaw[set]; }
+        if (set !== team && set !== 'ffa') score -= 8;                   // home spawns win ties
+        if (minEnemy >= 80) score += Math.random() * 30;                 // nobody around yet: spread out
+        if (score > bestScore) { bestScore = score; best = s; bestYaw = set === 'ffa' ? Math.atan2(s.x, s.z) : this.world.spawnYaw[set]; }
       }
     }
     this.spawnYawOut = bestYaw;

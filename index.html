@@ -314,9 +314,10 @@
             <div class="sec-k">PLAYLIST</div>
             <div class="mode-pick" role="radiogroup" aria-label="Game mode">
             <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
+            <button class="mp" data-mode="ffa" data-nav><b>FREE-FOR-ALL</b><small>Everyone for themselves · 30 kills</small></button>
             <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
             <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
-            <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Kill to get the next gun · 15 guns</small></button>
+            <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Free-for-all · next gun every kill</small></button>
           </div>
             <button id="quick-btn" class="menu-btn quick" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
           </div>
@@ -331,7 +332,7 @@
             <div class="sec-k">MATCH SETTINGS <small class="mo-on">used when you host</small></div>
             <div class="rows" id="play-rows">
             <div class="row mo-on"><label for="opt-mode">Mode</label><select id="opt-mode" data-nav>
-              <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option></select></div>
+              <option value="tdm">Team Deathmatch</option><option value="ffa">Free-for-All</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="pioneer">Pioneer Square</option><option value="mart">Freshway · indoor</option><option value="drivein">Drive-In</option><option value="random">Random</option></select></div>
             <div class="row tdm-snd"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
@@ -408,6 +409,8 @@
           <div class="rows two">
             <div class="group">PROFILE</div>
             <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
+            <div class="row"><label for="opt-theme">Menu colour<small>Accent colour for menus, highlights and the HUD</small></label><select id="opt-theme" data-nav>
+              <option value="amber">Amber</option><option value="arctic">Arctic blue</option><option value="crimson">Crimson</option><option value="toxic">Toxic green</option><option value="royal">Royal purple</option><option value="gold">Gold</option><option value="teal">Teal</option><option value="ghost">Ghost white</option></select></div>
             <div class="group">GRAPHICS</div>
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
               <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option><option value="custom">Custom</option></select></div>
@@ -546,9 +549,9 @@
         <section class="pause-panel">
           <div class="psec-pane on" id="psec-match">
             <div class="pm-score">
-              <div class="pm-team f"><span>FRIENDLY</span><b id="pm-f">0</b></div>
+              <div class="pm-team f"><span id="pm-fl">FRIENDLY</span><b id="pm-f">0</b></div>
               <div class="pm-mid"><span id="pm-time">10:00</span><small id="pm-limit">FIRST TO 75</small></div>
-              <div class="pm-team e"><b id="pm-e">0</b><span>ENEMY</span></div>
+              <div class="pm-team e"><b id="pm-e">0</b><span id="pm-el">ENEMY</span></div>
             </div>
             <div class="pm-me" id="pm-me"></div>
             <div class="pm-board" id="pause-board"></div>
@@ -669,6 +672,7 @@
         <div class="cl-note" id="cl-note"></div>
       </div>
       <div class="cl-editor" id="cl-editor">
+        <div class="cl-setup-h">GAME SETUP</div>
         <button class="menu-btn cl-done" id="cl-done" data-nav>BACK TO LOBBY</button>
       </div>
       <footer class="cl-foot" id="cl-foot"></footer>

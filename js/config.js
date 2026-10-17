@@ -254,6 +254,7 @@ export const DEFAULT_SETTINGS = {
   padDeadzone: 0.12,
   aimAssist: true,
   vibration: true,
+  theme: 'amber',
 };
 
 export const BOT_NAMES = [

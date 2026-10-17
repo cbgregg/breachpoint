@@ -79,7 +79,7 @@ export class BotBrain {
     const fwd = _b.set(-Math.sin(b.yaw), 0, -Math.cos(b.yaw));
     let best = null, bestScore = Infinity, bestExp = 0;
     for (const e of g.characters) {
-      if (!e.alive || e.team === b.team) { this.spot.delete(e); continue; }
+      if (!e.alive || !g.foes(e, b)) { this.spot.delete(e); continue; }
       let m = this.spot.get(e) || 0;
       const dist = e.pos.distanceTo(b.pos);
       _c.subVectors(e.pos, b.pos); _c.y = 0;
@@ -125,7 +125,7 @@ export class BotBrain {
   }
 
   onDamaged(attacker) {
-    if (!attacker || attacker.team === this.bot.team) return;
+    if (!attacker || !this.game.foes(attacker, this.bot)) return;
     if (!this.visible) {
       this.lastKnown.copy(attacker.pos);
       this.lastKnownT = this.game.time;
@@ -195,7 +195,7 @@ export class BotBrain {
         this.goal = null;
         this.setGoal(_e, 'intel');
       } else {
-        const side = b.team === 0 ? 1 : -1; // blue pushes +x, red pushes -x
+        const side = g.ffa ? (Math.random() < 0.5 ? 1 : -1) : b.team === 0 ? 1 : -1; // blue pushes +x, red pushes -x (FFA: anywhere)
         // a few candidates; keep the one furthest from where teammates are already going
         let p = null, best = -1;
         for (let k = 0; k < 4; k++) {
@@ -215,14 +215,14 @@ export class BotBrain {
   // teammates (bots) whose goal is within r of p
   matesHeading(p, r) {
     let n = 0;
-    for (const [c, br] of this.game.brains) if (br !== this && c.team === this.bot.team && c.alive && br.goal && Math.hypot(br.goal.x - p.x, br.goal.z - p.z) < r) n++;
+    for (const [c, br] of this.game.brains) if (br !== this && !this.game.ffa && c.team === this.bot.team && c.alive && br.goal && Math.hypot(br.goal.x - p.x, br.goal.z - p.z) < r) n++;
     return n;
   }
   // distance from p to the nearest teammate's goal (or teammate)
   mateGoalDist(p) {
     let d = 1e9;
     for (const c of this.game.characters) {
-      if (c === this.bot || c.team !== this.bot.team || !c.alive) continue;
+      if (c === this.bot || this.game.foes(c, this.bot) || !c.alive) continue;
       const br = this.game.brains.get(c), q = br && br.goal ? br.goal : c.pos;
       d = Math.min(d, Math.hypot(q.x - p.x, q.z - p.z));
     }
@@ -296,7 +296,7 @@ export class BotBrain {
     // personal space: ease away from teammates closer than ~2.2 m so squads don't move as one blob
     if (this.goalKind !== 'engage' && wish.lengthSq() > 0.01) {
       for (const c of g.characters) {
-        if (c === b || c.team !== b.team || !c.alive) continue;
+        if (c === b || g.foes(c, b) || !c.alive) continue;
         const dx = b.pos.x - c.pos.x, dz = b.pos.z - c.pos.z, d = Math.hypot(dx, dz);
         if (d > 0.01 && d < 3) wish.addScaledVector(_a.set(dx / d, 0, dz / d), (3 - d) * 0.5);
       }

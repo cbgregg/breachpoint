@@ -377,7 +377,7 @@ export class PlayerController {
     const fwd = c.forward(_b);
     let best = null, bestAng = 0.16;
     for (const e of g.characters) {
-      if (!e.alive || e.hidden || e.team === c.team) continue;
+      if (!e.alive || e.hidden || !g.foes(e, c)) continue;
       const dist = e.pos.distanceTo(c.pos);
       if (dist > 70) continue;
       e.chestPos(_c).sub(eye);
@@ -737,7 +737,7 @@ export class PlayerController {
   specCam(dt, next) {
     const c = this.c, g = this.game, cam = this.camera;
     if (g.time - c.deathT < 2.5) return false;
-    const mates = g.characters.filter(m => m !== c && m.team === c.team && m.alive && !m.hidden);
+    const mates = g.characters.filter(m => m !== c && !g.foes(m, c) && m.alive && !m.hidden);
     if (!mates.length) { this.specTarget = null; return false; }
     if (!mates.includes(this.specTarget) || next) {
       const i = mates.indexOf(this.specTarget);

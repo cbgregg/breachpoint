@@ -61,7 +61,7 @@ export class HUD {
     const scoped = p.alive && p.weapon.def.scope && p.adsT > 0.85;
     for (const c of g.characters) {
       if (c === p || !c.alive || c.hidden) continue;
-      const friend = c.team === p.team;
+      const friend = !g.foes(c, p);
       if (!friend && c !== g.aimTarget) continue;
       if (scoped && friend) continue;
       const v = c.headPos(this.tagV); v.y += 0.42;
@@ -111,14 +111,17 @@ export class HUD {
     this.sty('fps', 'display', g.settings.showFps ? 'block' : 'none');
 
     const mine = p.team, theirs = 1 - mine;
-    this.txt('score-f', g.scores[mine]);
-    this.txt('score-e', g.scores[theirs]);
-    this.sty('bar-f', 'width', `${Math.min(100, g.scores[mine] / g.settings.scoreLimit * 100).toFixed(1)}%`);
-    this.sty('bar-e', 'width', `${Math.min(100, g.scores[theirs] / g.settings.scoreLimit * 100).toFixed(1)}%`);
+    // Free-for-All: your kills (Gun Game: your rung) against the best of everyone else
+    let sf = g.scores[mine], se = g.scores[theirs];
+    if (g.ffa) { const lv = (c) => (g.gg ? (c.ggLevel || 0) : c.kills); sf = lv(p); se = 0; for (const c of g.characters) if (c !== p) se = Math.max(se, lv(c)); }
+    this.txt('score-f', sf);
+    this.txt('score-e', se);
+    this.sty('bar-f', 'width', `${Math.min(100, sf / g.settings.scoreLimit * 100).toFixed(1)}%`);
+    this.sty('bar-e', 'width', `${Math.min(100, se / g.settings.scoreLimit * 100).toFixed(1)}%`);
     this.txt('timer', fmtTime(g.timeLeft));
     this.cls('timer', 'low', g.timeLeft < 30);
     this.txt('limit', g.settings.scoreLimit);
-    this.txt('mode-short', g.gm ? g.gm.cfg.short : g.gg ? 'GUN GAME' : 'TDM');
+    this.txt('mode-short', g.gm ? g.gm.cfg.short : g.gg ? 'GUN GAME' : g.ffa ? 'FFA' : 'TDM');
 
     // health: only shown while hurt
     const hurt = p.alive && p.health < PLAYER.maxHealth - 0.5;
@@ -241,7 +244,7 @@ export class HUD {
     }
     // enemy pings (recent gunfire)
     for (const c of g.characters) {
-      if (!c.alive || c.team === p.team || g.time - c.lastFireT > 1.5 || c.weapon.def.quiet) continue;
+      if (!c.alive || !g.foes(c, p) || g.time - c.lastFireT > 1.5 || c.weapon.def.quiet) continue;
       const b = this.heading(Math.atan2(-(c.pos.x - p.pos.x), -(c.pos.z - p.pos.z)));
       let delta = b - hd; if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
       if (Math.abs(delta) > span / 2) continue;
@@ -278,7 +281,7 @@ export class HUD {
     const r = 4.5 / sc * 2;
     for (const c of g.characters) {
       if (!c.alive || c === p) continue;
-      const friend = c.team === p.team;
+      const friend = !g.foes(c, p);
       const since = g.time - c.lastFireT;
       if (!friend && (since > 2 || c.weapon.def.quiet)) continue;
       ctx.globalAlpha = friend ? 1 : Math.max(0.2, 1 - since / 2);
@@ -302,6 +305,14 @@ export class HUD {
 
   renderScoreboard(el) {
     const g = this.game;
+    if (g.ffa) {
+      // one list, in placing order
+      const list = g.ffaStandings ? g.ffaStandings() : [...g.characters];
+      const row = (c, i) => `<tr class="${c === g.player ? 'me' : ''} ${c.alive ? '' : 'dead'}"><td>${i + 1}. ${esc(c.name)}${c.isBot ? ' <span class="tag">BOT</span>' : ''}</td><td>${g.gg ? `${Math.min(c.ggLevel || 0, 15)}/15` : c.score}</td><td>${c.kills}</td><td>${c.deaths}</td><td>${c.assists}</td><td>${c.deaths ? (c.kills / c.deaths).toFixed(2) : c.kills.toFixed(2)}</td></tr>`;
+      el.innerHTML = `<div class="sb-team sb-ffa" style="--tc:${FRIENDLY_CSS}"><div class="sb-head"><span>${g.gg ? 'GUN GAME' : 'FREE-FOR-ALL'}</span><b>${g.gg ? 'GUN' : 'SCORE'}</b></div>
+        <table><thead><tr><th>Name</th><th>${g.gg ? 'Gun' : 'Score'}</th><th>K</th><th>D</th><th>A</th><th>K/D</th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>`;
+      return;
+    }
     const mine = g.player.team;
     const order = [mine, 1 - mine];
     const teams = order.map(t => g.characters.filter(c => c.team === t).sort((a, b) => b.score - a.score || b.kills - a.kills));
@@ -320,7 +331,7 @@ export class HUD {
     const d = document.createElement('div');
     d.className = 'kf' + ((killer === g.player || victim === g.player) ? ' mine' : '');
     const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', melee: 'MELEE', fall: 'FALL' }[weaponId] || '✖');
-    const col = (c) => (c.team === g.player.team ? FRIENDLY_CSS : ENEMY_CSS);
+    const col = (c) => (c === g.player || !g.foes(c, g.player) ? FRIENDLY_CSS : ENEMY_CSS);
     const kName = killer && killer !== victim ? `<span style="color:${col(killer)}">${esc(killer.name)}</span>` : '';
     d.innerHTML = `${kName}<span class="kw">${wname}${headshot ? ' ◎' : ''}</span><span style="color:${col(victim)}">${esc(victim.name)}</span>`;
     kf.appendChild(d);
@@ -397,7 +408,7 @@ export class HUD {
     const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', melee: 'Melee', fall: 'Fall damage' }[weaponId] || '');
     if (killer && killer !== g.player) {
       $('death-killer').textContent = killer.name.toUpperCase();
-      $('death-killer').style.color = killer.team === g.player.team ? FRIENDLY_CSS : ENEMY_CSS;
+      $('death-killer').style.color = !g.foes(killer, g.player) ? FRIENDLY_CSS : ENEMY_CSS;
       const dist = Math.round(killer.pos.distanceTo(g.player.pos));
       $('death-detail').textContent = `${wname.toUpperCase()} · ${dist} M · ${Math.ceil(killer.health)} HP LEFT`;
     } else {
