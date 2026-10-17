@@ -1,5 +1,7 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
 import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx } from './config.js';
+import { setupPadCal } from './padcal.js';
+import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
 import { Game, prewarmBotGuns } from './game.js';
 import { glyph } from './hud.js';
@@ -375,7 +377,7 @@ function setTab(t) {
   game.audio.play('ui', null, { ui: true });
   document.getElementById('menu').dataset.tab = t;
   if (t === 'loadout') { if (editKey) renderGunsmith(false); else renderClasses(); }
-  if (t === 'options') setOptSub(optSub);
+  if (t === 'options') { setOptSub(optSub); syncPadName(); }
   renderHints(game.input.lastDevice);
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
@@ -2112,12 +2114,22 @@ game.input.onDeviceChange = (d) => {
   if (d === 'pad' && screen && !document.querySelector('.pad-focus')) focusFirst();
   if (d !== 'pad') focusEl(null);
 };
+const padCal = setupPadCal({ input: game.input, toast: (t) => game.hud.toast(t), sound: () => game.audio.play('ui', null, { ui: true }), onClose: () => { syncPadName(); if (game.input.lastDevice === 'pad') focusEl($('pad-test')); } });
+function syncPadName() {
+  const p = game.input.rawPad;
+  $('pad-name').textContent = p ? (p.id.replace(/\s*\(.*$/, '').slice(0, 40) || 'Controller') : 'none detected';
+}
+$('pad-test').addEventListener('click', () => padCal.show());
 game.input.onPadChange = (connected, id) => {
-  const name = /xbox|xinput/i.test(id) ? 'XBOX CONTROLLER' : 'CONTROLLER';
+  const name = /xbox|xinput/i.test(id) ? 'XBOX CONTROLLER' : /dualsense|dualshock|054c|playstation/i.test(id) ? 'PLAYSTATION CONTROLLER' : 'CONTROLLER';
   game.hud.toast(connected ? `${name} CONNECTED` : 'CONTROLLER DISCONNECTED');
+  syncPadName();
+  const raw = game.input.rawPad;
+  if (connected && raw && raw.mapping !== 'standard' && !/xbox|xinput|x-box|045e|microsoft/i.test(raw.id) && !loadPadMaps()[raw.id])
+    setTimeout(() => game.hud.toast('BUTTONS WRONG? CALIBRATE IT: OPTIONS › CONTROLS › CONTROLLER'), 2200);
   if (!connected && game.state === 'playing') game.pause();
 };
-document.addEventListener('mousemove', () => { if (screen) focusEl(null); }, { passive: true });
+document.addEventListener('mousemove', () => { if (screen && game.input.lastDevice !== 'pad') focusEl(null); }, { passive: true });
 
 // ---------- menu intel map ----------
 // Picking a map doesn't build it (that waits for the match); the preview shows the map's overhead
