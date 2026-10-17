@@ -19,7 +19,35 @@ const PAD_ACTIONS = {
 // mapping: different button numbers and triggers on axes. Rebuild a standard-layout view of them.
 const XBOX_ID = /xbox|xinput|x-box|045e|microsoft/i;
 function stdButtons(n) { return Array.from({ length: n }, () => ({ pressed: false, value: 0 })); }
+// A layout the player calibrated (Options › Controls › Controller): for pads the browser doesn't map, and Macs
+// (Firefox and some Bluetooth drivers report PlayStation / third-party pads with their own button numbers).
+// buttons[std] = { t: 'b', i } (raw button) | { t: 'a', i, v, b } (raw axis: target value, resting value) | null
+// axes[k] = { i, s } (raw axis, sign) for LX, LY, RX, RY
+const PADMAP_KEY = 'breachpoint.padmap.v1';
+export function loadPadMaps() { try { return JSON.parse(localStorage.getItem(PADMAP_KEY) || '{}') || {}; } catch (_) { return {}; } }
+export function savePadMap(id, map) { const all = loadPadMaps(); if (map) all[id] = map; else delete all[id]; try { localStorage.setItem(PADMAP_KEY, JSON.stringify(all)); } catch (_) { /* ignore */ } }
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+export function axisButton(e, x) {
+  if (Math.abs(e.b) > 1.05) return Math.abs(x - e.v) < 0.12 ? 1 : 0;     // a hat switch (D-pad on one axis): exact positions
+  return Math.abs(e.v - e.b) < 0.01 ? 0 : clamp01((x - e.b) / (e.v - e.b));
+}
+function applyPadMap(p, m) {
+  const B = stdButtons(17);
+  (m.buttons || []).forEach((e, std) => {
+    if (!e) return;
+    if (e.t === 'b') { const r = p.buttons[e.i]; if (r) B[std] = { pressed: !!r.pressed || r.value > 0.5, value: r.value ?? (r.pressed ? 1 : 0) }; }
+    else { const v = axisButton(e, p.axes[e.i] ?? 0); B[std] = { pressed: v > 0.5, value: v }; }
+  });
+  const axes = [0, 1, 2, 3].map(k => { const a = m.axes && m.axes[k]; return a ? (p.axes[a.i] || 0) * a.s : 0; });
+  return { id: p.id, mapping: 'custom', buttons: B, axes, vibrationActuator: p.vibrationActuator, connected: true, index: p.index };
+}
+let PADMAPS = loadPadMaps();
+export function reloadPadMaps() { PADMAPS = loadPadMaps(); }
+// HID devices macOS browsers sometimes list as gamepads (receivers, headsets, keyboards, 3D mice): never use them
+const NOT_A_PAD = /keyboard|mouse|trackpad|touchpad|receiver|unifying|headset|audio|webcam|spacemouse|3dconnexion|apple internal/i;
+export const isRealPad = (p) => !!p && p.connected && !NOT_A_PAD.test(p.id) && p.buttons.length >= 4;
 function normalizePad(p, seen) {
+  if (PADMAPS[p.id]) return applyPadMap(p, PADMAPS[p.id]);
   if (p.mapping === 'standard' || !XBOX_ID.test(p.id)) return p;
   const B = stdButtons(17);
   const raw = (i) => p.buttons[i] || { pressed: false, value: 0 };
@@ -99,7 +127,8 @@ export class Input {
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
-      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) this.setDevice('kbm');
+      const m = Math.abs(e.movementX) + Math.abs(e.movementY);
+      if (m > 2 && (this.lastDevice !== 'pad' || (m > 12 && performance.now() - (this.padActiveAt || 0) > 600))) this.setDevice('kbm');
       if (!this.enabled || (!this.locked && !this.fallback)) return;
       this.mouseDX += Math.max(-300, Math.min(300, e.movementX || 0));
       this.mouseDY += Math.max(-300, Math.min(300, e.movementY || 0));
@@ -192,10 +221,20 @@ export class Input {
   }
 
   poll(dt) {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let pad = null;
-    for (const p of pads) if (p && p.connected) { pad = p; break; }
-    if (pad) pad = normalizePad(pad, this.trigSeen || (this.trigSeen = {}));
+    const pads = navigator.getGamepads ? [...navigator.getGamepads()] : [];
+    // which pad: the one whose button was pressed last (Macs can list extra devices, or the same controller twice
+    // over USB and Bluetooth), else a standard-mapped one, else the first real one
+    this.armed = this.armed || {};
+    for (const p of pads) {
+      if (!isRealPad(p)) continue;
+      const any = p.buttons.some(b => b && (b.pressed || b.value > 0.5));
+      if (any && !this.armed[p.index]) { this.armed[p.index] = true; this.padIndex = p.index; }
+      else if (any && this.prevAny && !this.prevAny[p.index]) this.padIndex = p.index;
+      (this.prevAny || (this.prevAny = {}))[p.index] = any;
+    }
+    let raw = pads.find(p => isRealPad(p) && p.index === this.padIndex) || pads.find(p => isRealPad(p) && p.mapping === 'standard') || pads.find(isRealPad) || null;
+    this.rawPad = raw;
+    let pad = raw ? normalizePad(raw, this.trigSeen || (this.trigSeen = {})) : null;
     if (!!pad !== this.padConnected) {
       this.padConnected = !!pad;
       if (this.onPadChange) this.onPadChange(this.padConnected, pad ? pad.id : '');
@@ -203,7 +242,7 @@ export class Input {
     this.pad = pad;
     this.padMoveX = this.padMoveY = this.lookX = this.lookY = 0;
     this.padFire = this.padAds = this.padScore = false;
-    if (!pad) return;
+    if (!pad || this.calibrating) return;              // the calibration screen reads the raw pad itself
     const btn = (i) => { const b = pad.buttons[i]; return !!b && (b.pressed || b.value > 0.5); };
     const val = (i) => (pad.buttons[i] ? pad.buttons[i].value : 0);
     const ax = (i) => pad.axes[i] || 0;
@@ -225,8 +264,10 @@ export class Input {
     };
     const [lx, ly] = radial(ax(0), ax(1), 1);
     const [rx, ry] = radial(ax(2), ax(3), 1.8);
-    if (lx || ly || rx || ry) activity = true;
-    if (val(PAD.LT) > 0.25 || val(PAD.RT) > 0.25) activity = true;
+    const armed = raw && this.armed[raw.index];
+    if (armed && (lx || ly || rx || ry)) activity = true;
+    if (armed && (val(PAD.LT) > 0.25 || val(PAD.RT) > 0.25)) activity = true;
+    if (activity) this.padActiveAt = performance.now();
     if (activity) this.setDevice('pad');
 
     if (this.enabled) {
@@ -243,7 +284,7 @@ export class Input {
       }
       // lethal: hold LB to cook, release to throw (handled by the player controller)
       this.lbHeld = btn(PAD.LB);
-    } else if (this.onNav) {
+    } else if (this.onNav && !this.suspendNav) {
       // menu navigation with D-pad / left stick (with key-repeat)
       this.lbHeld = false;
       for (const i of edges) {

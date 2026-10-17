@@ -452,6 +452,7 @@
             <div class="row"><label for="opt-deadzone">Stick deadzone <output id="out-deadzone"></output></label><input type="range" id="opt-deadzone" min="0.04" max="0.3" step="0.01" data-nav></div>
             <div class="row"><label for="opt-aa">Aim assist</label><input type="checkbox" id="opt-aa" data-nav></div>
             <div class="row"><label for="opt-vib">Vibration</label><input type="checkbox" id="opt-vib" data-nav></div>
+            <div class="row"><label>Controller <output id="pad-name">none detected</output><small>See every button live, and fix a layout that's wrong (common on Macs)</small></label><button id="pad-test" class="menu-btn small" data-nav>TEST &amp; CALIBRATE</button></div>
             <div class="group relay-only">ONLINE</div>
             <div class="row"><label for="opt-chat">Text chat<small>Online matches and lobbies. Press T or Enter to type.</small></label><input type="checkbox" id="opt-chat" data-nav></div>
             <div class="row relay-only"><label for="opt-relay">Hide my IP in private matches</label><input type="checkbox" id="opt-relay" data-nav></div>
@@ -558,6 +559,27 @@
         </section>
       </div>
       <footer class="mw-foot" id="pause-hints"></footer>
+    </div>
+  </div>
+
+  <!-- ============ controller test & calibration ============ -->
+  <div id="padcal" class="padcal" hidden>
+    <div class="pcal-box" role="dialog" aria-labelledby="pcal-title">
+      <div class="pcal-k">CONTROLLER</div>
+      <b id="pcal-title">TEST &amp; CALIBRATE</b>
+      <small id="pcal-id"></small>
+      <div class="pcal-live">
+        <div class="pcal-stick"><i id="pcal-ls"></i><span>LEFT</span></div>
+        <div class="pcal-btns" id="pcal-btns"></div>
+        <div class="pcal-stick"><i id="pcal-rs"></i><span>RIGHT</span></div>
+      </div>
+      <p class="pcal-prompt" id="pcal-prompt"></p>
+      <div class="pcal-actions">
+        <button id="pcal-go" class="cta"><span>CALIBRATE</span></button>
+        <button id="pcal-skip" class="menu-btn small" hidden>SKIP (S)</button>
+        <button id="pcal-reset" class="menu-btn small">RESET LAYOUT</button>
+        <button id="pcal-close" class="menu-btn small">DONE (ESC)</button>
+      </div>
     </div>
   </div>
 

@@ -73,6 +73,17 @@ Run `python3 tools/drivein_gen.py 90` to search again, or `--rebuild js/drivein_
 
 What you see is what stops you: an automated check casts about 100,000 rays per map against both the collision and the drawn geometry and flags any collision that isn't drawn (invisible walls, blocked gaps, bullet holes in thin air). Props have collision shaped like what's drawn (cars are a body plus a cabin, jersey barriers a wide foot and narrow top, tables only their top, stair flights only their treads). Railings, benches, shop windows, wire racks and car glass stop players but not bullets or sight. The map edges are always a visible building, wall or fence.
 
+## Controllers
+
+Xbox, PlayStation and most other controllers work over USB or Bluetooth. The browser decides each controller's button layout. Chrome, Edge and Safari give the standard layout for Xbox and PlayStation pads. Firefox and some Mac drivers report their own button numbers, so buttons, triggers or the D-pad can land in the wrong place.
+
+**Fixing a wrong layout:** go to Options › Controls › Controller › **Test & Calibrate**.
+- The screen shows every button and both sticks live.
+- **Calibrate** asks for each button in turn. Triggers and D-pads that come through as axes or a hat switch are handled.
+- The layout is saved for that controller in this browser. **Reset Layout** undoes it.
+
+**Other devices:** the game uses the controller you last pressed a button on. Devices a Mac lists as gamepads (keyboards, receivers, headsets) are ignored. A device that only reports moving sticks can't take over the menus until one of its buttons is pressed.
+
 ## Menus
 
 The menus are a tree, laid out like Modern Warfare (2019):
