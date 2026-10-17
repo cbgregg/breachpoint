@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
@@ -9,7 +9,7 @@ import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
-import { GunPreview } from './gunsmith.js';
+import { GunPreview, gunThumb } from './gunsmith.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
 import { levelOf, emblemSVG } from './career.js';
@@ -126,7 +126,7 @@ function writeForm() {
   for (const id in outputs) $(outputs[id][0]).textContent = outputs[id][1]($(id).value);
   $('opt-name').value = myName();
   syncModeRows();
-  renderWeapons();
+  if (editKey) renderEditor(); else renderClasses();
 }
 function readField(id, key, type) {
   const el = $(id);
@@ -233,100 +233,94 @@ function loadoutChanged() {
   saveSettings(settings);
   if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
 }
-function slotRows(id, host, prefix) {
-  const g = GUNSMITH[id], a = attFor(id);
-  host.innerHTML = SLOTS.filter(sl => g[sl]).map(sl => {
-    const cur = ATTACHMENTS[sl][a[sl]];
-    return `<div class="row slot"><label for="${prefix}-${sl}">${SLOT_NAMES[sl]}<small>${cur.desc}</small></label>
-      <select id="${prefix}-${sl}" data-slot="${sl}" data-nav>${g[sl].map(k => `<option value="${k}"${k === a[sl] ? ' selected' : ''}>${ATTACHMENTS[sl][k].name}</option>`).join('')}</select></div>`;
-  }).join('');
-  host.querySelectorAll('select').forEach(el => el.addEventListener('change', () => {
-    const c = clsGet(editKey);
-    if (!c || editKey[0] !== 'c') return;
-    c.atts[id] = { ...attFor(id), [el.dataset.slot]: el.value };
-    el.closest('.row').querySelector('small').textContent = ATTACHMENTS[el.dataset.slot][el.value].desc;
-    loadoutChanged();
-    renderGunsmith(false);
-  }));
-}
-function statBars(d) {
-  const now = statsOf(d), was = statsOf(weaponDef(d.id, null));
-  return now.map(([k, v], i) => {
-    const w = was[i][1], lo = Math.min(v, w), diff = v - w;
-    return `<span class="stat">${k}<i><b style="width:${Math.round(lo * 100)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${Math.round(lo * 100)}%;width:${Math.round(Math.abs(diff) * 100)}%"></em>` : ''}</i></span>`;
-  }).join('');
-}
-function renderGunsmith(rebuildRows = true) {
-  if (!editKey) return;
-  const c = clsGet(editKey), id = c.primary, d = weaponDef(id, attFor(id));
-  $('gs-name').textContent = d.name.toUpperCase();
-  const sec = c.secondary || 'pistol';
-  if (rebuildRows) { slotRows(id, $('gs-slots'), 'gs'); slotRows(sec, $('gs-pistol'), 'gp'); }
-  $('gs-sec-name').textContent = `${WEAPONS[sec].name.toUpperCase()} · ATTACHMENTS`;
-  $('weapon-list-sec').querySelectorAll('.wcard').forEach(b => {
-    b.classList.toggle('on', b.dataset.weapon === sec);
-    const s2 = attSummary(b.dataset.weapon, attFor(b.dataset.weapon));
-    b.querySelector('.wa').textContent = s2.length ? s2.join(' · ') : 'STOCK';
-  });
-  $('gs-stats').innerHTML = statBars(d) + `<span class="gs-facts">${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
-  preview.show(id, attFor(id));
-  $('weapon-list').querySelectorAll('.wcard').forEach(b => {
-    b.classList.toggle('on', b.dataset.weapon === id);
-    const s2 = attSummary(b.dataset.weapon, attFor(b.dataset.weapon));
-    b.querySelector('.wa').textContent = s2.length ? s2.join(' · ') : 'STOCK';
-  });
-}
-function renderWeapons() {
-  const list = $('weapon-list');
-  list.innerHTML = PRIMARIES.map(id => `<button class="wcard" data-weapon="${id}" data-nav>
-      <span class="wn">${WEAPONS[id].name.toUpperCase()}</span><span class="wt">${WEAPONS[id].mode}</span><span class="wa"></span>
-    </button>`).join('');
-  list.querySelectorAll('.wcard').forEach(b => b.addEventListener('click', () => {
-    const c = clsGet(editKey);
-    if (!c || editKey[0] !== 'c') return;
-    c.primary = b.dataset.weapon;
-    loadoutChanged();
-    renderGunsmith();
-  }));
-  const sl = $('weapon-list-sec');
-  sl.innerHTML = SECONDARIES.map(id => `<button class="wcard" data-weapon="${id}" data-nav>
-      <span class="wn">${WEAPONS[id].name.toUpperCase()}</span><span class="wt">${WEAPONS[id].mode}</span><span class="wa"></span>
-    </button>`).join('');
-  sl.querySelectorAll('.wcard').forEach(b => b.addEventListener('click', () => {
-    const c = clsGet(editKey);
-    if (!c || editKey[0] !== 'c') return;
-    c.secondary = b.dataset.weapon;
-    loadoutChanged();
-    renderGunsmith();
-  }));
-  renderClasses();
-}
+// ---- Create a Class UI (BO2 Pick-10 overview + MW2019 cards/gunsmith) ----
 const escHtml = (t) => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-function wpnBlock(label, id, att) {
-  const d = weaponDef(id, att), sum = attSummary(id, att);
-  return `<div class="cw-k">${label}</div><div class="cw-n">${d.name.toUpperCase()}<small>${d.mode}</small></div>
-    <div class="cw-a">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<span class="${sum.includes(ATTACHMENTS[s][att[s]].name) ? 'mod' : ''}">${ATTACHMENTS[s][att[s]].name}</span>`).join('')}</div>`;
+const WCAT = { rifle: 'ASSAULT RIFLES', kv47: 'ASSAULT RIFLES', br308: 'ASSAULT RIFLES', hx60: 'LIGHT MACHINE GUNS', smg: 'SUBMACHINE GUNS', krv45: 'SUBMACHINE GUNS',
+  shotgun: 'SHOTGUNS', sa12: 'SHOTGUNS', mr14: 'MARKSMAN RIFLES', sniper: 'SNIPER RIFLES', pistol: 'PISTOLS', d50: 'PISTOLS', r357: 'PISTOLS', mp18: 'MACHINE PISTOLS', monte: 'LAUNCHERS' };
+// line-art icons for every attachment (stroke = currentColor)
+const ICO = {
+  'optic.iron': '<path d="M6 30h52M14 30v-8h4v8M44 30v-12h6v12M47 18v-5"/>',
+  'optic.reflex': '<path d="M10 34h44M18 34V18h26l6 16"/><circle cx="32" cy="25" r="2" fill="currentColor"/>',
+  'optic.holo': '<path d="M8 36h48M12 36V16h40v20"/><circle cx="32" cy="26" r="7"/><circle cx="32" cy="26" r="1.5" fill="currentColor"/>',
+  'optic.acog': '<path d="M8 38h48M16 38v-6M48 38v-6"/><rect x="10" y="16" width="44" height="16" rx="4"/><path d="M28 27l4-5 4 5"/>',
+  'optic.scope': '<path d="M4 38h56M20 38v-6M44 38v-6"/><path d="M4 18h12l4 4h24l4-4h12v12H48l-4-4H20l-4 4H4z"/>',
+  'muzzle.none': '<path d="M6 26h40v8H6M46 24v12"/>',
+  'muzzle.brake': '<path d="M4 26h28v8H4"/><rect x="32" y="22" width="24" height="16"/><path d="M38 22v6M44 22v6M50 22v6M38 32v6M44 32v6M50 32v6"/>',
+  'muzzle.comp': '<path d="M4 26h28v8H4"/><path d="M32 22h24v16H32z"/><path d="M38 22l4 6M46 22l4 6"/>',
+  'muzzle.sup': '<path d="M4 27h14v6H4"/><rect x="18" y="20" width="42" height="20" rx="4"/><path d="M26 20v20M52 20v20"/>',
+  'muzzle.choke': '<path d="M4 26h30v8H4"/><path d="M34 24l22-4v20l-22-4z"/>',
+  'under.none': '<path d="M6 20h52" /><path d="M22 28h20v18H22z" stroke-dasharray="3 3"/>',
+  'under.vgrip': '<path d="M6 18h52v6H6z"/><path d="M26 24h12v24l-2 4h-8l-2-4z"/><path d="M28 32h8M28 38h8M28 44h8"/>',
+  'under.agrip': '<path d="M6 18h52v6H6z"/><path d="M20 24h28l-12 22h-10z"/>',
+  'mag.std': '<path d="M24 10h16v18l4 22H30l-6-22z"/>',
+  'mag.ext': '<path d="M24 4h16v18l6 34H30l-6-34z"/><path d="M28 50h14"/>',
+  'mag.fast': '<path d="M14 10h12v14l3 22H19l-5-22zM38 10h12v14l3 22H43l-5-22z"/><path d="M12 26h44M12 32h44"/>',
+  'laser.none': '<rect x="10" y="22" width="22" height="16" rx="2" stroke-dasharray="3 3"/>',
+  'laser.laser': '<rect x="6" y="22" width="22" height="16" rx="2"/><circle cx="24" cy="30" r="3"/><path d="M28 30h32" stroke-width="2.5"/>',
+};
+const icon = (sl, k) => `<svg viewBox="0 0 64 56" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">${ICO[sl + '.' + k] || ''}</svg>`;
+const FRAG_ICO = '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="30" cy="34" rx="14" ry="16"/><path d="M22 18h16v-6H22zM38 14c8 0 12 4 12 10M18 28h24M18 40h24M30 18v32"/></svg>';
+const KNIFE_ICO = '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 30h18v6H4zM22 26h4v14h-4M26 30h22l12-6-6 12H26z"/></svg>';
+const isCustom = (k) => !!k && k[0] === 'c';
+const modCount = (id, att) => SLOTS.filter(s => GUNSMITH[id][s] && att[s] !== GUNSMITH[id][s][0]).length;
+const slotCount = (id) => SLOTS.filter(s => GUNSMITH[id][s]).length;
+const pips = (id, att) => `<span class="pips">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<i class="${att[s] !== GUNSMITH[id][s][0] ? 'on' : ''}"></i>`).join('')}</span>`;
+const thumb = (id, att) => { const u = gunThumb(id, att); return u ? `<img class="gthumb" src="${u}" alt="">` : `<span class="gthumb none">${WEAPONS[id].short}</span>`; };
+
+// segmented stat bars (BO2): `now` vs `base` shows the change in green / red
+function statBars(now, base) {
+  const a = statsOf(now), b = statsOf(base || now);
+  return a.map(([k, v], i) => {
+    const w = b[i][1], lo = Math.min(v, w), diff = v - w;
+    return `<span class="stat">${k}<i><b style="width:${(lo * 100).toFixed(1)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${(lo * 100).toFixed(1)}%;width:${(Math.abs(diff) * 100).toFixed(1)}%"></em>` : ''}</i></span>`;
+  }).join('');
 }
+const facts = (d) => `<span class="gs-facts">${WCAT[d.id] || ''} · ${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
+function equippedRow(id, att, hiSlot) {
+  return `<div class="eq-k">EQUIPPED <b>${modCount(id, att)}/${slotCount(id)}</b></div><div class="eq-icons">${SLOTS.filter(s => GUNSMITH[id][s]).map(s =>
+    `<span class="${s === hiSlot ? 'hi' : ''}${att[s] !== GUNSMITH[id][s][0] ? ' mod' : ''}" title="${ATTACHMENTS[s][att[s]].name}">${icon(s, att[s])}</span>`).join('')}</div>`;
+}
+// right-hand detail panel: live 3D preview + name, description, stats, equipped attachments
+function showDetail(id, att, { base = null, title = null, sub = 'GUNSMITH', desc = '', hiSlot = null } = {}) {
+  const d = weaponDef(id, att);
+  $('gs-name').textContent = (title || d.name).toUpperCase();
+  $('gs-sub').textContent = sub;
+  $('gs-desc').textContent = desc;
+  $('gs-stats').innerHTML = statBars(d, base) + facts(d);
+  $('gs-eq').innerHTML = equippedRow(id, att, hiSlot);
+  preview.show(id, att);
+}
+function loadoutCards(c, editable) {
+  const p = c.primary, s = c.secondary || 'pistol', pa = clsAtt(c, p), sa = clsAtt(c, s);
+  const card = (k, id, att, cls, act) => `<button class="lcard ${cls}"${editable ? ` data-nav data-act="${act}"` : ' tabindex="-1"'}>
+      <span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span>
+      <span class="lc-a">${pips(id, att)}<small>${escHtml(attSummary(id, att).join(' · ') || 'STOCK')}</small></span></button>`;
+  return card('PRIMARY', p, pa, 'big', 'w:p') + card('SECONDARY', s, sa, '', 'w:s')
+    + `<div class="lcard small"><span class="lc-k">LETHAL</span>${FRAG_ICO}<span class="lc-n">FRAG GRENADE</span><span class="lc-a"><small>COOK · ×${GRENADE.start}</small></span></div>`
+    + `<div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span><span class="lc-a"><small>ONE HIT</small></span></div>`;
+}
+
+// ---- class list (MW2019 "Edit Loadouts") ----
 function renderClasses() {
-  // the list is rebuilt: keep the controller / keyboard focus on the same class
   const had = document.querySelector('#cls-list .pad-focus'), keep = had && had.dataset.cls;
   const row = (key, c) => `<button class="cls-row${key === clsSel ? ' sel' : ''}${key === settings.cls ? ' eq' : ''}" data-cls="${key}" data-nav>
       <span class="cr-n">${escHtml(c.name)}</span><span class="cr-w">${WEAPONS[c.primary].short} · ${WEAPONS[c.secondary || 'pistol'].short}</span>${key === settings.cls ? '<span class="cr-eq">EQUIPPED</span>' : ''}</button>`;
-  $('cls-list').innerHTML = `<div class="group">DEFAULT CLASSES</div>${DEFAULT_CLASSES.map((c, i) => row('d' + i, c)).join('')}
-    <div class="group">CUSTOM CLASSES</div>${settings.classes.map((c, i) => row('c' + i, c)).join('')}`;
+  $('cls-list').innerHTML = `<div class="group">CUSTOM CLASSES</div>${settings.classes.map((c, i) => row('c' + i, c)).join('')}
+    <div class="group">DEFAULT CLASSES</div>${DEFAULT_CLASSES.map((c, i) => row('d' + i, c)).join('')}`;
   $('cls-list').querySelectorAll('.cls-row').forEach(b => {
     b.addEventListener('click', () => { if (clsSel === b.dataset.cls) { equipClass(); return; } clsSel = b.dataset.cls; renderClasses(); });
     b.addEventListener('dblclick', () => { clsSel = b.dataset.cls; equipClass(); });
+    b.addEventListener('focus', () => { if (clsSel !== b.dataset.cls && game.input.lastDevice === 'pad') { clsSel = b.dataset.cls; renderClasses(); } });
   });
-  const c = clsGet(clsSel), custom = clsSel[0] === 'c', on = clsSel === settings.cls;
+  const c = clsGet(clsSel), custom = isCustom(clsSel), on = clsSel === settings.cls;
   $('cls-name').textContent = c.name;
   $('cls-kind').textContent = custom ? 'CUSTOM CLASS' : 'DEFAULT CLASS';
-  $('cls-prim').innerHTML = wpnBlock('PRIMARY', c.primary, clsAtt(c, c.primary));
-  $('cls-sec').innerHTML = wpnBlock('SECONDARY', c.secondary || 'pistol', clsAtt(c, c.secondary || 'pistol'));
+  $('cls-cards').innerHTML = loadoutCards(c, custom);
+  $('cls-cards').querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => openEditor(clsSel, b.dataset.act)));
   $('cls-equip').querySelector('span').textContent = on ? 'EQUIPPED ✓' : 'EQUIP';
   $('cls-equip').classList.toggle('done', on);
   $('cls-edit').textContent = custom ? 'EDIT CLASS' : 'COPY TO A CUSTOM CLASS';
-  $('cls-note').textContent = custom ? 'Pick a primary and attachments in the editor. Changes save automatically.' : 'Default classes can\'t be changed. Copy one into a custom slot to tweak it.';
+  $('cls-note').textContent = custom ? 'Select a weapon card or Edit Class to open the gunsmith. Changes save automatically.' : 'Default classes can\'t be changed. Copy one into a custom slot to tweak it.';
   if (!editKey) { $('cls-viewslot').appendChild($('gs-viewbox')); preview.show(c.primary, clsAtt(c, c.primary)); }
   if (keep) focusEl($('cls-list').querySelector(`[data-cls="${keep}"]`));
 }
@@ -339,16 +333,88 @@ function equipClass() {
   game.audio.play('ui', null, { ui: true });
   renderClasses();
 }
-function openEditor(key) {
-  editKey = key;
+
+// ---- editor: overview (Pick 10) → weapon picker / attachment picker ----
+let ceView = 'over', ceFrom = null;   // 'over' | 'w:p' | 'w:s' | 'a:p:<slot>' | 'a:s:<slot>'
+const ceGun = (c, which) => which === 'p' ? c.primary : (c.secondary || 'pistol');
+function renderEditor(focusAct) {
+  if (!editKey) return;
+  const c = clsGet(editKey), main = $('ce-main');
+  const parts = [c.name];
+  $('ce-rn').style.display = ceView === 'over' ? '' : 'none';
+  $('cls-back').textContent = ceView === 'over' ? '‹ ALL CLASSES' : '‹ BACK';
+  if (ceView === 'over') {
+    const slotTiles = (which) => { const id = ceGun(c, which), att = clsAtt(c, id);
+      return SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<button class="atile${att[s] !== GUNSMITH[id][s][0] ? ' mod' : ''}" data-nav data-act="a:${which}:${s}">
+        <span class="at-k">${SLOT_NAMES[s]}</span>${icon(s, att[s])}<span class="at-n">${ATTACHMENTS[s][att[s]].name}</span></button>`).join(''); };
+    const wbox = (which, k) => { const id = ceGun(c, which), att = clsAtt(c, id);
+      return `<button class="wbox" data-nav data-act="w:${which}"><span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span><span class="lc-c">${WCAT[id]}</span></button>`; };
+    main.innerHTML = `<div class="p10">
+      <div class="p10-row">${wbox('p', 'PRIMARY')}<div class="p10-atts"><div class="p10-k">PRIMARY ATTACHMENTS ${pips(c.primary, clsAtt(c, c.primary))}</div><div class="atiles">${slotTiles('p')}</div></div></div>
+      <div class="p10-row">${wbox('s', 'SECONDARY')}<div class="p10-atts"><div class="p10-k">SECONDARY ATTACHMENTS ${pips(ceGun(c, 's'), clsAtt(c, ceGun(c, 's')))}</div><div class="atiles">${slotTiles('s') || '<span class="at-none">NO ATTACHMENTS FOR THIS WEAPON</span>'}</div></div></div>
+      <div class="p10-row eqp"><div class="lcard small"><span class="lc-k">LETHAL</span>${FRAG_ICO}<span class="lc-n">FRAG GRENADE</span></div><div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span></div></div>
+    </div>`;
+    main.querySelectorAll('[data-act]').forEach(b => {
+      const a = b.dataset.act, which = a.split(':')[1], id = ceGun(c, which), att = clsAtt(c, id);
+      const hover = () => a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: 'Choose a different weapon.' })
+        : showDetail(id, att, { sub: SLOT_NAMES[a.split(':')[2]].toUpperCase(), desc: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].desc, hiSlot: a.split(':')[2] });
+      b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
+      b.addEventListener('click', () => { ceFrom = a; ceView = a; renderEditor(); });
+    });
+    showDetail(c.primary, clsAtt(c, c.primary), { sub: 'PRIMARY' });
+  } else if (ceView[0] === 'w') {
+    const which = ceView[2], list = which === 'p' ? PRIMARIES : SECONDARIES, cur = ceGun(c, which);
+    parts.push(which === 'p' ? 'PRIMARY' : 'SECONDARY');
+    const cats = [...new Set(list.map(id => WCAT[id]))];
+    main.innerHTML = `<div class="wpick">${cats.map(cat => `<div class="wp-cat"><div class="group">${cat}</div><div class="wp-row">${list.filter(id => WCAT[id] === cat).map(id =>
+      `<button class="wpc${id === cur ? ' on' : ''}" data-nav data-w="${id}">${thumb(id, clsAtt(c, id))}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span><span class="lc-c">${WEAPONS[id].mode}${id === cur ? ' · EQUIPPED' : ''}</span></button>`).join('')}</div></div>`).join('')}</div>`;
+    main.querySelectorAll('.wpc').forEach(b => {
+      const id = b.dataset.w, hover = () => showDetail(id, clsAtt(c, id), { sub: WCAT[id], desc: `${WEAPONS[id].mode} · ${WEAPONS[id].rpm} RPM · ${WEAPONS[id].damage}${WEAPONS[id].pellets > 1 ? '×' + WEAPONS[id].pellets : ''} DMG` });
+      b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
+      b.addEventListener('click', () => { if (which === 'p') c.primary = id; else c.secondary = id; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+    });
+    showDetail(cur, clsAtt(c, cur), { sub: WCAT[cur] });
+    focusAct = focusAct || null;
+  } else {
+    const [, which, sl] = ceView.split(':'), id = ceGun(c, which), att = clsAtt(c, id), base = weaponDef(id, att);
+    parts.push(WEAPONS[id].name.toUpperCase(), SLOT_NAMES[sl].toUpperCase());
+    main.innerHTML = `<div class="apick"><div class="ap-tabs">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<span class="${s === sl ? 'on' : ''}">${SLOT_NAMES[s]}</span>`).join('')}</div>
+      <div class="ap-grid">${GUNSMITH[id][sl].map(k => `<button class="aptile${k === att[sl] ? ' on' : ''}" data-nav data-k="${k}">${icon(sl, k)}<span class="at-n">${ATTACHMENTS[sl][k].name}</span>${k === att[sl] ? '<span class="at-eq">EQUIPPED</span>' : ''}</button>`).join('')}</div>
+      <p class="pane-note">${glyph('prevSub', game.input.lastDevice)} ${glyph('nextSub', game.input.lastDevice)} switch slot</p></div>`;
+    main.querySelectorAll('.aptile').forEach(b => {
+      const k = b.dataset.k, cand = { ...att, [sl]: k };
+      const hover = () => showDetail(id, cand, { base, title: ATTACHMENTS[sl][k].name, sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][k].desc, hiSlot: sl });
+      b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
+      b.addEventListener('mouseleave', () => showDetail(id, att, { sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl }));
+      b.addEventListener('click', () => { c.atts[id] = cand; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+    });
+    showDetail(id, att, { sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl });
+  }
+  crumbs('ce-crumbs', parts);
+  if (game.input.lastDevice === 'pad' || focusAct) setTimeout(() => {
+    const el = (focusAct && main.querySelector(`[data-act="${focusAct}"]`)) || main.querySelector('.wpc.on, .aptile.on') || main.querySelector('[data-nav]');
+    if (el && game.input.lastDevice === 'pad') focusEl(el);
+  }, 0);
+}
+// LT/RT in the attachment picker steps through the gun's slots
+function ceStepSlot(dir) {
+  if (!editKey || ceView[0] !== 'a') return false;
+  const [, which, sl] = ceView.split(':'), c = clsGet(editKey), id = ceGun(c, which), list = SLOTS.filter(s => GUNSMITH[id][s]);
+  const nx = list[(list.indexOf(sl) + dir + list.length) % list.length];
+  ceView = ceFrom = `a:${which}:${nx}`; renderEditor();
+  return true;
+}
+function renderGunsmith() { renderEditor(); }
+function openEditor(key, act = null) {
+  editKey = key; ceView = act || 'over'; ceFrom = act;
   $('cls-pick').classList.remove('on'); $('cls-editor').classList.add('on');
   $('cls-rename').value = clsGet(key).name;
-  $('gunsmith').insertBefore($('gs-viewbox'), $('gs-slots'));
-  renderGunsmith();
-  if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('weapon-list').querySelector('.wcard.on')), 0);
+  $('gunsmith').insertBefore($('gs-viewbox'), $('gs-desc'));
+  renderEditor();
 }
 function closeEditor() {
   if (!editKey) return false;
+  if (ceView !== 'over') { ceView = 'over'; renderEditor(ceFrom); return true; }
   clsSel = editKey; editKey = null;
   $('cls-editor').classList.remove('on'); $('cls-pick').classList.add('on');
   renderClasses();
@@ -357,9 +423,9 @@ function closeEditor() {
 }
 $('cls-equip').addEventListener('click', equipClass);
 $('cls-edit').addEventListener('click', () => {
-  if (clsSel[0] === 'c') { openEditor(clsSel); return; }
+  if (isCustom(clsSel)) { openEditor(clsSel); return; }
   // copy a default into the equipped custom slot if one is equipped, else the first custom slot
-  const i = settings.cls[0] === 'c' ? +settings.cls.slice(1) : 0;
+  const i = isCustom(settings.cls) ? +settings.cls.slice(1) : 0;
   const src = clsGet(clsSel);
   settings.classes[i] = clsCopy(src, `${src.name} (C${i + 1})`.slice(0, 18));
   saveSettings(settings);
@@ -1467,6 +1533,7 @@ game.input.onNav = (dir) => {
       break;
     case 'prevSub': case 'nextSub':
       if ((screen === 'menu' && tab === 'options') || (screen === 'pause' && pauseSec === 'options')) { stepOptSub(dir === 'nextSub' ? 1 : -1); focusFirst(); }
+      else ceStepSlot(dir === 'nextSub' ? 1 : -1);
       break;
     case 'prevTab': case 'nextTab': {
       const step = dir === 'nextTab' ? 1 : -1;

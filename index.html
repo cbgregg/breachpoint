@@ -368,8 +368,7 @@
             <div class="cls-card" id="cls-card">
               <div class="cls-head"><span class="cls-name" id="cls-name"></span><span class="cls-kind" id="cls-kind"></span></div>
               <div class="cls-slot" id="cls-viewslot"></div>
-              <div class="cls-wpn" id="cls-prim"></div>
-              <div class="cls-wpn" id="cls-sec"></div>
+              <div class="lc-row" id="cls-cards"></div>
               <div class="cls-actions">
                 <button id="cls-equip" class="cta cls-cta" data-nav><span>EQUIP</span></button>
                 <button id="cls-edit" class="menu-btn" data-nav>EDIT CLASS</button>
@@ -379,23 +378,18 @@
           </div>
           <div class="cls-view" id="cls-editor">
             <div class="cls-ebar">
-              <button id="cls-back" class="menu-btn small" data-nav>‹ ALL CLASSES</button>
-              <label class="cls-rn"><span>CLASS NAME</span><input id="cls-rename" maxlength="18" autocomplete="off" spellcheck="false" data-nav></label>
+              <button id="cls-back" class="menu-btn small" data-nav>‹ BACK</button>
+              <div class="crumbs ce-crumbs" id="ce-crumbs"></div>
+              <label class="cls-rn" id="ce-rn"><span>CLASS NAME</span><input id="cls-rename" maxlength="18" autocomplete="off" spellcheck="false" data-nav></label>
             </div>
-            <div class="lo-grid">
-              <div class="lo-left">
-                <div class="group">PRIMARY</div>
-                <div id="weapon-list" class="weapons"></div>
-                <div class="group">SECONDARY</div>
-                <div id="weapon-list-sec" class="weapons"></div>
-                <div class="group" id="gs-sec-name">SECONDARY ATTACHMENTS</div>
-                <div class="rows" id="gs-pistol"></div>
-              </div>
-              <div class="gs lo-right" id="gunsmith">
-                <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub">GUNSMITH</span></div>
+            <div class="ce-body">
+              <div class="ce-main" id="ce-main"></div>
+              <div class="gs" id="gunsmith">
+                <div class="gs-head"><span class="gs-name" id="gs-name"></span><span class="gs-sub" id="gs-sub">GUNSMITH</span></div>
                 <div class="gs-view" id="gs-viewbox"><canvas id="gs-view" width="640" height="240" aria-label="Weapon preview"></canvas></div>
-                <div class="rows" id="gs-slots"></div>
+                <p class="gs-desc" id="gs-desc"></p>
                 <div class="gs-stats" id="gs-stats"></div>
+                <div class="gs-eq" id="gs-eq"></div>
               </div>
             </div>
           </div>

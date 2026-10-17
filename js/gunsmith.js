@@ -87,3 +87,44 @@ export class GunPreview {
     this.raf = requestAnimationFrame(loop);
   }
 }
+
+// Static side-profile thumbnails for weapon cards (one shared offscreen renderer, cached as data URLs).
+let thumbR = null, thumbScene = null, thumbCam = null;
+const thumbCache = new Map();
+export function gunThumb(id, att) {
+  const key = id + JSON.stringify(att || {});
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  let url = '';
+  try {
+    if (!thumbR) {
+      const cv = document.createElement('canvas');
+      thumbR = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'low-power' });
+      thumbR.setSize(480, 200, false);
+      thumbR.toneMapping = THREE.ACESFilmicToneMapping;
+      thumbR.outputColorSpace = THREE.SRGBColorSpace;
+      thumbScene = new THREE.Scene();
+      const pm = new THREE.PMREMGenerator(thumbR);
+      thumbScene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      pm.dispose();
+      const k = new THREE.DirectionalLight(0xfff0dc, 2.4); k.position.set(2, 3, 2);
+      const r = new THREE.DirectionalLight(0xbcd4ff, 1.4); r.position.set(-2, 1, -3);
+      thumbScene.add(k, r);
+      thumbCam = new THREE.PerspectiveCamera(20, 480 / 200, 0.05, 20);
+    }
+    const gun = buildGun(id, { att });
+    const g = new THREE.Group(); g.add(gun.group);
+    g.rotation.y = -Math.PI / 2 + 0.12;
+    g.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(g), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+    g.position.sub(c);
+    thumbScene.add(g);
+    const tv = Math.tan(THREE.MathUtils.degToRad(thumbCam.fov) / 2);
+    const d = Math.max(s.x / 2 / (tv * thumbCam.aspect), s.y / 2 / tv) * 1.12 + s.z / 2;
+    thumbCam.position.set(0, d * 0.08, d); thumbCam.lookAt(0, 0, 0);
+    thumbR.render(thumbScene, thumbCam);
+    url = thumbR.domElement.toDataURL('image/png');
+    thumbScene.remove(g);
+  } catch (_) { url = ''; }
+  thumbCache.set(key, url);
+  return url;
+}
