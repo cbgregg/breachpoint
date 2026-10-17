@@ -10,6 +10,7 @@ import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } fro
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
 import { GunPreview, gunThumb } from './gunsmith.js';
+import { applyReticles, cleanReticles, reticlePreview, shapesFor, RET_COLORS, RET_OPTICS } from './reticles.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
 import { levelOf, emblemSVG } from './career.js';
@@ -179,6 +180,7 @@ document.querySelectorAll('.mode-pick .mp').forEach(b => b.addEventListener('cli
 
 // ---------- loadout + gunsmith ----------
 const preview = new GunPreview($('gs-view'));
+settings.reticles = applyReticles(settings.reticles);
 if (!settings.attachments || typeof settings.attachments !== 'object') settings.attachments = {};
 const inMatch = () => game.state === 'playing' || game.state === 'paused';
 function statsOf(d) {
@@ -335,7 +337,7 @@ function equipClass() {
 }
 
 // ---- editor: overview (Pick 10) → weapon picker / attachment picker ----
-let ceView = 'over', ceFrom = null;   // 'over' | 'w:p' | 'w:s' | 'a:p:<slot>' | 'a:s:<slot>'
+let ceView = 'over', ceFrom = null, retOptic = 'holo';   // 'over' | 'w:p' | 'w:s' | 'a:p:<slot>' | 'a:s:<slot>'
 const ceGun = (c, which) => which === 'p' ? c.primary : (c.secondary || 'pistol');
 function renderEditor(focusAct) {
   if (!editKey) return;
@@ -346,7 +348,8 @@ function renderEditor(focusAct) {
   if (ceView === 'over') {
     const slotTiles = (which) => { const id = ceGun(c, which), att = clsAtt(c, id);
       return SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<button class="atile${att[s] !== GUNSMITH[id][s][0] ? ' mod' : ''}" data-nav data-act="a:${which}:${s}">
-        <span class="at-k">${SLOT_NAMES[s]}</span>${icon(s, att[s])}<span class="at-n">${ATTACHMENTS[s][att[s]].name}</span></button>`).join(''); };
+        <span class="at-k">${SLOT_NAMES[s]}</span>${icon(s, att[s])}<span class="at-n">${ATTACHMENTS[s][att[s]].name}</span></button>`).join('')
+        + (id === 'monte' ? '' : `<button class="atile rtile" data-nav data-act="r:${which}"><span class="at-k">Reticle</span><img class="rprev" src="${reticlePreview(att.optic, settings.reticles[att.optic].shape, settings.reticles[att.optic].color, 96)}" alt=""><span class="at-n">${shapesFor(att.optic)[settings.reticles[att.optic].shape]}</span></button>`); };
     const wbox = (which, k) => { const id = ceGun(c, which), att = clsAtt(c, id);
       return `<button class="wbox" data-nav data-act="w:${which}"><span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span><span class="lc-c">${WCAT[id]}</span></button>`; };
     main.innerHTML = `<div class="p10">
@@ -356,10 +359,11 @@ function renderEditor(focusAct) {
     </div>`;
     main.querySelectorAll('[data-act]').forEach(b => {
       const a = b.dataset.act, which = a.split(':')[1], id = ceGun(c, which), att = clsAtt(c, id);
-      const hover = () => a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: 'Choose a different weapon.' })
+      const hover = () => a[0] === 'r' ? showDetail(id, att, { sub: 'RETICLE', desc: `${RET_OPTICS[att.optic]}: ${shapesFor(att.optic)[settings.reticles[att.optic].shape]}, ${RET_COLORS[settings.reticles[att.optic].color][0]}. Reticles apply to that sight on every weapon.` })
+        : a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: 'Choose a different weapon.' })
         : showDetail(id, att, { sub: SLOT_NAMES[a.split(':')[2]].toUpperCase(), desc: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].desc, hiSlot: a.split(':')[2] });
       b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
-      b.addEventListener('click', () => { ceFrom = a; ceView = a; renderEditor(); });
+      b.addEventListener('click', () => { ceFrom = a; ceView = a; if (a[0] === 'r') retOptic = att.optic; renderEditor(); });
     });
     showDetail(c.primary, clsAtt(c, c.primary), { sub: 'PRIMARY' });
   } else if (ceView[0] === 'w') {
@@ -375,6 +379,28 @@ function renderEditor(focusAct) {
     });
     showDetail(cur, clsAtt(c, cur), { sub: WCAT[cur] });
     focusAct = focusAct || null;
+  } else if (ceView[0] === 'r') {
+    const which = ceView[2], id = ceGun(c, which), att = clsAtt(c, id), r = settings.reticles[retOptic];
+    parts.push(WEAPONS[id].name.toUpperCase(), 'RETICLE');
+    const shapes = shapesFor(retOptic);
+    main.innerHTML = `<div class="rpick"><div class="ap-tabs">${Object.keys(RET_OPTICS).map(o => `<span class="${o === retOptic ? 'on' : ''}">${RET_OPTICS[o]}${o === att.optic ? ' ●' : ''}</span>`).join('')}</div>
+      <div class="rp-top"><div class="rp-view${retOptic === 'scope' ? ' scope' : retOptic === 'iron' ? ' iron' : ''}"><img src="${reticlePreview(retOptic, r.shape, r.color, 256)}" alt=""></div>
+        <div class="rp-info"><b>${shapes[r.shape]}</b><span>${RET_OPTICS[retOptic]} · ${RET_COLORS[r.color][0]}</span><small>Applies to the ${RET_OPTICS[retOptic]} on every weapon and class. ${glyph('prevSub', game.input.lastDevice)} ${glyph('nextSub', game.input.lastDevice)} switch sight.</small></div></div>
+      <div class="p10-k">RETICLE</div>
+      <div class="rp-grid">${Object.keys(shapes).map(k => `<button class="rptile${k === r.shape ? ' on' : ''}" data-nav data-rs="${k}"><img src="${reticlePreview(retOptic, k, r.color, 96)}" alt=""><span class="at-n">${shapes[k]}</span></button>`).join('')}</div>
+      <div class="p10-k">COLOUR</div>
+      <div class="rp-cols">${Object.keys(RET_COLORS).map(k => `<button class="rpcol${k === r.color ? ' on' : ''}" data-nav data-rc="${k}" title="${RET_COLORS[k][0]}"><i style="background:${RET_COLORS[k][1]};box-shadow:0 0 10px ${RET_COLORS[k][1]}"></i><span>${RET_COLORS[k][0]}</span></button>`).join('')}</div></div>`;
+    const set = (patch, el) => {
+      settings.reticles = applyReticles({ ...settings.reticles, [retOptic]: { ...settings.reticles[retOptic], ...patch } });
+      saveSettings(settings); game.audio.play('ui', null, { ui: true });
+      const key = el.dataset.rs ? `[data-rs="${el.dataset.rs}"]` : `[data-rc="${el.dataset.rc}"]`;
+      renderEditor(); setTimeout(() => { const f = main.querySelector(key); if (f) focusEl(f); }, 0);
+    };
+    main.querySelectorAll('.rptile').forEach(b => b.addEventListener('click', () => set({ shape: b.dataset.rs }, b)));
+    main.querySelectorAll('.rpcol').forEach(b => b.addEventListener('click', () => set({ color: b.dataset.rc }, b)));
+    showDetail(id, att, { sub: 'RETICLE', desc: `Equipped sight: ${RET_OPTICS[att.optic]}` });
+    crumbs('ce-crumbs', parts);
+    return;
   } else {
     const [, which, sl] = ceView.split(':'), id = ceGun(c, which), att = clsAtt(c, id), base = weaponDef(id, att);
     parts.push(WEAPONS[id].name.toUpperCase(), SLOT_NAMES[sl].toUpperCase());
@@ -398,6 +424,11 @@ function renderEditor(focusAct) {
 }
 // LT/RT in the attachment picker steps through the gun's slots
 function ceStepSlot(dir) {
+  if (editKey && ceView[0] === 'r') {
+    const o = Object.keys(RET_OPTICS); retOptic = o[(o.indexOf(retOptic) + dir + o.length) % o.length]; renderEditor();
+    if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('ce-main').querySelector('.rptile.on')), 0);
+    return true;
+  }
   if (!editKey || ceView[0] !== 'a') return false;
   const [, which, sl] = ceView.split(':'), c = clsGet(editKey), id = ceGun(c, which), list = SLOTS.filter(s => GUNSMITH[id][s]);
   const nx = list[(list.indexOf(sl) + dir + list.length) % list.length];
