@@ -89,14 +89,14 @@ const bindings = [
   ['opt-name', 'name', 'text'], ['opt-theme', 'theme', 'str'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
-  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
+  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
-  'opt-gfxres': ['out-gfxres', v => `${v}%`],
+  'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-vmfov': ['out-vmfov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
@@ -629,6 +629,8 @@ const OPT_DESC = {
   'opt-theme': 'The accent colour of the menus, highlights, buttons and HUD details. It only changes how the game looks to you.',
   'opt-name': 'The name other players see. Signed in, this is your Name Tag: it can change once a day and friends can see your previous ones.',
   'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom. Mobile is built for phones and tablets: fast render path with MSAA, a pixel budget for high-DPI screens, low geometry, hard shadows.',
+  'opt-fsr': 'AMD FidelityFX Super Resolution 1.0. The game draws the scene at the percentage shown and FSR upscales it to your screen with edge-aware filtering and sharpening: more frames for a small loss in detail. Works on every GPU, on top of any preset; dynamic resolution moves the render scale further when frames run long.',
+  'opt-fsrsharp': 'How strongly FSR sharpens the upscaled image (RCAS).',
   'opt-gfxpath': 'Full: the post-processing chain (SMAA, bloom, ambient occlusion, colour grade). Fast: draws straight to the screen with hardware MSAA; much lighter on phones. Switching restarts the game from the menu.',
   'opt-gfxdetail': 'Low: the world uses square-edged boxes and lighter sandbags, small props stop casting shadows, and other players\' guns use simpler geometry. Rebuilds the map.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',

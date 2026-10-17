@@ -10,6 +10,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { QUALITY, qualityFrom, wantsMsaa } from './config.js';
+import { FSR } from './fsr.js';
 
 const GradeShader = {
   uniforms: {
@@ -302,10 +303,18 @@ export class Renderer {
     // pixel budget (Mobile): a 3x phone screen would otherwise render 9x the pixels of a 1x one
     const mp = this.quality && this.quality.maxPixels;
     if (mp) base = Math.min(base, Math.max(0.6, Math.sqrt(mp / Math.max(1, window.innerWidth * window.innerHeight))));
-    const pr = Math.max(0.5, base * (this.dynamic === false ? 1 : this.drs.scale));
-    this.renderer.setPixelRatio(pr);
-    this.composer.setPixelRatio(pr);
+    const drs = this.dynamic === false ? 1 : this.drs.scale;
+    const fsr = this.fsrScale();
+    // with FSR the canvas stays at full resolution and the scene renders smaller (dynamic resolution moves the
+    // render scale, FSR fills the gap); without it, dynamic resolution shrinks the canvas itself
+    this.canvasPR = Math.max(0.5, base * (fsr ? 1 : drs));
+    this.scenePR = fsr ? Math.max(0.25, this.canvasPR * fsr * drs) : this.canvasPR;
+    this.renderer.setPixelRatio(this.canvasPR);
+    this.composer.setPixelRatio(this.scenePR);
   }
+  fsrScale() { return (this.quality && this.quality.fsr) || 0; }
+  // pixels per CSS pixel the scene is actually drawn at (particle sizes depend on it)
+  renderPR() { return this.scenePR || this.renderer.getPixelRatio(); }
   resetDRS() { const d = this.drs; d.grace = 3; d.slow = d.fast = 0; d.ema = 1 / 60; d.last = 0; }
   updateDRS() {
     const d = this.drs, now = performance.now();
@@ -331,6 +340,13 @@ export class Renderer {
     this.renderer.setSize(w, h);
     // the fast path never uses the composer: don't keep its full-size float targets around
     if (this.quality && this.quality.fast) this.composer.setSize(2, 2); else this.composer.setSize(w, h);
+    if (this.quality && this.quality.fast && this.fsrScale()) {
+      const lw = Math.max(1, Math.round(w * this.scenePR)), lh = Math.max(1, Math.round(h * this.scenePR));
+      if (!this.lowRT) {
+        this.lowRT = new THREE.WebGLRenderTarget(lw, lh, { type: THREE.HalfFloatType, samples: 4 });
+        this.ldrRT = new THREE.WebGLRenderTarget(lw, lh, { depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+      } else { this.lowRT.setSize(lw, lh); this.ldrRT.setSize(lw, lh); }
+    } else if (this.lowRT) { this.lowRT.dispose(); this.ldrRT.dispose(); this.lowRT = this.ldrRT = null; }
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.vmCamera.aspect = w / h; this.vmCamera.updateProjectionMatrix();
   }
@@ -350,7 +366,17 @@ export class Renderer {
     if (this.quality && this.quality.fast) { this.renderFast(showViewmodel); return; }
     if (this.fx) this.fx.style.display = 'none';
     this.vmPass.enabled = showViewmodel;
+    const fsr = this.fsrScale();
+    this.composer.renderToScreen = !fsr;
     this.composer.render(dt);
+    if (fsr) this.upscale(this.composer.readBuffer);
+  }
+
+  // FSR 1: EASU upsampling from the low-resolution frame to the canvas, then RCAS sharpening
+  upscale(rt) {
+    if (!this.fsr) this.fsr = new FSR(this.renderer);
+    const c = this.renderer.domElement;
+    this.fsr.render(rt.texture, Math.floor(rt.width), Math.floor(rt.height), c.width, c.height, this.quality.fsrSharp ?? 0.25);
   }
 
   // Fast path: world, then the viewmodel over a cleared depth buffer, straight to the canvas (tone mapping
@@ -358,8 +384,9 @@ export class Renderer {
   // full-screen passes, which is where mobile GPUs spend their bandwidth. The colour grade's damage and
   // flash effects become a CSS overlay.
   renderFast(showViewmodel) {
-    const r = this.renderer;
-    r.setRenderTarget(null);
+    const r = this.renderer, fsr = this.fsrScale() && this.lowRT;
+    // with FSR the frame is drawn into a smaller multisampled target, tone mapped, then upscaled
+    r.setRenderTarget(fsr ? this.lowRT : null);
     r.autoClear = true;
     r.render(this.scene, this.camera);
     if (showViewmodel) {
@@ -367,6 +394,11 @@ export class Renderer {
       r.clearDepth();
       r.render(this.vmScene, this.vmCamera);
       r.autoClear = true;
+    }
+    if (fsr) {
+      this.outputPass.renderToScreen = false;
+      this.outputPass.render(r, this.ldrRT, this.lowRT);
+      this.upscale(this.ldrRT);
     }
     if (!this.fx) {
       this.fx = document.createElement('div');

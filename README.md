@@ -105,6 +105,8 @@ The Multiplayer menus use the pre-match lobby's look: plain list items, a ▸ de
 | Geometry detail (Custom) | *Low*: square-edged world boxes (12 triangles instead of ~108), 36-triangle sandbags instead of 300, a lighter distant mountain, small props stop casting sun shadows, other players' guns use flat boxes and fewer curve segments. The map rebuilds when it changes from the menu |
 | Every preset | Other players' guns are merged into one mesh per material (from 20-40 draw calls each to a handful) and no longer cast sun shadows; bloom is computed at half resolution; distant players animate at 15 Hz beyond 60 m |
 | Shadow updates | Every frame, every other frame, or every third frame |
+| **Upscaling: AMD FSR 1.0** (`js/fsr.js`) | Options → Graphics → Upscaling: Ultra Quality (77% render scale), Quality (67%), Balanced (59%), Performance (50%), plus an FSR sharpness slider. The scene renders smaller and FSR's EASU pass upscales it to the screen with edge-aware filtering, then RCAS sharpens it. Works with any preset and both render paths (on the fast path it renders into a 4× multisampled target first). With FSR on, dynamic resolution moves the render scale and the canvas stays at full resolution. FSR 1 is spatial and open source, so it runs on any GPU in any browser |
+| DLSS, FSR 2/3, MetalFX | Not available to web pages: they need motion vectors plus NVIDIA, AMD or Apple driver APIs that browsers don't expose (DLSS also needs NVIDIA tensor cores). On Macs, iPhones and iPads the game already runs on Metal: Safari and Chrome translate WebGL to Metal through ANGLE |
 
 ## Free-for-All, Gun Game and private match setup
 

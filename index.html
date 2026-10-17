@@ -417,6 +417,9 @@
             <div class="group">GRAPHICS</div>
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
               <option value="mobile">Mobile</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option><option value="custom">Custom</option></select></div>
+            <div class="row"><label for="opt-fsr">Upscaling<small>AMD FSR 1.0: renders fewer pixels and upscales them sharply</small></label><select id="opt-fsr" data-nav>
+              <option value="off">Off (native)</option><option value="ultra">FSR Ultra Quality (77%)</option><option value="quality">FSR Quality (67%)</option><option value="balanced">FSR Balanced (59%)</option><option value="performance">FSR Performance (50%)</option></select></div>
+            <div class="row"><label for="opt-fsrsharp">FSR sharpness <output id="out-fsrsharp"></output></label><input type="range" id="opt-fsrsharp" min="0" max="100" step="5" data-nav></div>
             <div class="row"><label for="opt-gfxpath">Render path<small>Fast: straight to the screen with hardware MSAA, no post effects (best for phones)</small></label><select id="opt-gfxpath" data-nav>
               <option value="post">Full post-processing</option><option value="fast">Fast (MSAA)</option></select></div>
             <div class="row"><label for="opt-gfxdetail">Geometry detail<small>Low: square-edged world and lighter player guns</small></label><select id="opt-gfxdetail" data-nav>
