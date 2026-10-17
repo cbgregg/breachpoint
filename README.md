@@ -73,6 +73,19 @@ Run `python3 tools/drivein_gen.py 90` to search again, or `--rebuild js/drivein_
 
 What you see is what stops you: an automated check casts about 100,000 rays per map against both the collision and the drawn geometry and flags any collision that isn't drawn (invisible walls, blocked gaps, bullet holes in thin air). Props have collision shaped like what's drawn (cars are a body plus a cabin, jersey barriers a wide foot and narrow top, tables only their top, stair flights only their treads). Railings, benches, shop windows, wire racks and car glass stop players but not bullets or sight. The map edges are always a visible building, wall or fence.
 
+## Menus
+
+The menus are a tree, laid out like Modern Warfare (2019):
+
+| Level | Keyboard | Controller | What it does |
+|---|---|---|---|
+| Top tabs: Play · Weapons · Options | Q / E | LB / RB | Switch section |
+| Play tiles | ↑ ↓, Enter | D-pad, A | Offline: one tile per mode, opening its match setup. Online: Quick Play (playlist + Find a match), Private Match (host / join + rules), Friends, Combat Training |
+| Options categories: General · Graphics · Controls · Audio · Account · About | Z / C | LT / RT | One list per category; the panel on the right explains the highlighted setting |
+| Back | Esc | B | Always climbs one level (page → tiles → game type → title) |
+
+A breadcrumb over each page shows where you are (PLAY › SEARCH & DESTROY, OPTIONS › GRAPHICS). The pause menu uses the same Options categories.
+
 ## Controls
 
 | Action | Keyboard & mouse | Xbox controller | Touch |

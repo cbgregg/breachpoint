@@ -248,7 +248,7 @@ export class Input {
       this.lbHeld = false;
       for (const i of edges) {
         // directions come from the D-pad / stick below (with key-repeat); bumpers switch tabs
-        const m = { [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab' }[i];
+        const m = { [PAD.A]: 'accept', [PAD.B]: 'back', [PAD.MENU]: 'start', [PAD.Y]: 'alt', [PAD.LB]: 'prevTab', [PAD.RB]: 'nextTab', [PAD.LT]: 'prevSub', [PAD.RT]: 'nextSub' }[i];
         if (m) this.onNav(m);
       }
       const sx = ax(0), sy = ax(1);
