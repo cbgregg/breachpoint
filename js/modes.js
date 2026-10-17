@@ -445,26 +445,68 @@ class RoundMode {
         for (const c of g.characters) if (c.alive && c.team === A && c.isBot) { const d = c.pos.distanceTo(bm.pos); if (d < nd) { nd = d; near = c; } }
         if (near === b) return { pos: bm.pos, kind: 'bomb' };
       }
-      if (bm.state === BOMB.planted) return { pos: this.offset(brain, bm.pos, 7), kind: 'guard' };
+      if (bm.state === BOMB.planted) return { pos: this.patrol(brain, bm.pos, 4, 12), kind: 'guard' };
       // don't all rush in one pack: each attacker waits a moment, and some take the other site / a wider route
       if (brain.gmRound !== this.round) {
         brain.gmRound = this.round;
         brain.gmDelay = Math.random() * 6;
         brain.gmSite = Math.random() < 0.65 ? this.botSite : 1 - this.botSite;
       }
-      if (g.time - (this.liveT ?? 0) < brain.gmDelay) return { pos: b.pos, kind: 'guard' };
-      return { pos: this.offset(brain, sites[brain.gmSite], 9), kind: 'push' };
+      if (g.time - (this.liveT ?? 0) < brain.gmDelay) return null;   // a beat in spawn: normal roaming/look-around
+      // push the site; once there (no bomb on us) sweep around it and the approaches instead of parking on a tile
+      const site = sites[brain.gmSite];
+      if (Math.hypot(b.pos.x - site.x, b.pos.z - site.z) < 12 || brain.gmSwept === this.round) {
+        brain.gmSwept = this.round;
+        if (Math.random() < 0.002) brain.gmSite = 1 - brain.gmSite, brain.gmSwept = -1;   // now and then rotate to the other site
+        return { pos: this.patrol(brain, site, 6, 18), kind: 'push' };
+      }
+      return { pos: this.offset(brain, site, 9), kind: 'push' };
     }
     // defenders
     if (bm.state === BOMB.planted) {
       let near = null, nd = Infinity;
       for (const c of g.characters) if (c.alive && c.team === b.team && c.isBot) { const d = c.pos.distanceTo(bm.pos); if (d < nd) { nd = d; near = c; } }
       if (near === b) return { pos: bm.pos, kind: 'defuse' };
-      return { pos: this.offset(brain, bm.pos, 6), kind: 'guard' };
+      return { pos: this.patrol(brain, bm.pos, 4, 11), kind: 'guard' };
     }
     const mates = g.characters.filter(c => c.team === b.team && c.isBot);
     const idx = mates.indexOf(b);
-    return { pos: this.offset(brain, sites[idx % 2], 7), kind: 'guard' };
+    // defenders: hold their site, but shift between angles every few seconds; one in three plays a
+    // forward/roaming role, and anyone may rotate across once in a while
+    if (brain.gmDefRound !== this.round) {
+      brain.gmDefRound = this.round;
+      brain.gmDefSite = idx % 2;
+      brain.gmLurk = Math.random() < 0.33;
+    }
+    if (Math.random() < 0.0008) brain.gmDefSite = 1 - brain.gmDefSite;
+    if (brain.gmLurk) return { pos: this.patrol(brain, sites[brain.gmDefSite], 10, 24, 8, 14), kind: 'push' };
+    return { pos: this.patrol(brain, sites[brain.gmDefSite], 3, 10), kind: 'guard' };
+  }
+
+  // a spot near p (between rMin and rMax away) that changes every few seconds: bots holding an area
+  // move between angles, crouch, look around, instead of standing on one tile all round
+  patrol(brain, p, rMin, rMax, tMin = 5, tMax = 11) {
+    const g = this.g, nav = g.world.nav;
+    if (!brain.gmPatPt) brain.gmPatPt = new THREE.Vector3();
+    const moved = brain.gmPatFor && Math.hypot(brain.gmPatFor.x - p.x, brain.gmPatFor.z - p.z) > 3;
+    if (!brain.gmPatFor || moved || g.time > (brain.gmPatT || 0)) {
+      brain.gmPatFor = (brain.gmPatFor || new THREE.Vector3()).copy(p);
+      brain.gmPatT = g.time + tMin + Math.random() * (tMax - tMin);
+      let ok = false;
+      for (let i = 0; i < 14 && !ok; i++) {
+        const a = Math.random() * Math.PI * 2, d = rMin + Math.random() * (rMax - rMin);
+        const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+        // keep spots a little apart from teammates' spots
+        if (!nav.isOpenAt(x, z)) continue;
+        let crowd = false;
+        for (const [, br] of g.brains) if (br !== brain && br.gmPatPt && br.gmPatFor && Math.hypot(br.gmPatPt.x - x, br.gmPatPt.z - z) < 3) crowd = true;
+        if (crowd && i < 10) continue;
+        brain.gmPatPt.set(x, p.y || 0, z); ok = true;
+      }
+      if (!ok) brain.gmPatPt.set(p.x, p.y || 0, p.z);
+    }
+    brain.gmAnchor = p;
+    return brain.gmPatPt;
   }
 
   // a stable spread around a point per bot, so a team doesn't stack on one tile
