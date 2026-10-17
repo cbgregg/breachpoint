@@ -525,7 +525,15 @@ export class PlayerController {
     const ip = this.inspectT > 0 ? clamp(1 - this.inspectT / (INSPECT - 0.25), 0, 1) : 0;
     const s1 = this.inspectT > 0 ? smooth(0.04, 0.25, ip) * (1 - smooth(0.42, 0.56, ip)) : 0;
     const s2 = this.inspectT > 0 ? smooth(0.42, 0.56, ip) * (1 - smooth(0.82, 0.98, ip)) : 0;
-    const mel = c.meleeT > 0 ? Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) : 0;
+    // melee (CoD style rifle butt / pistol whip): a quick wind-up back and right, the strike forward and left
+    // with the gun turned so the stock / grip leads, a short hold on impact, then an eased recovery to the hip
+    const mp = c.meleeT > 0 ? clamp(1 - c.meleeT / MELEE.time, 0, 1) : 1;
+    const mWind = c.meleeT > 0 ? smooth(0, 0.2, mp) * (1 - smooth(0.2, 0.34, mp)) : 0;
+    const mHit = c.meleeT > 0 ? smooth(0.2, 0.34, mp) * (1 - sm5((mp - 0.5) / 0.5)) : 0;
+    const mk = G.type === 'pistol' ? 0.7 : 1;
+    if (c.meleeT > 0 && mp >= 0.3 && !this.meleeHitFx) { this.meleeHitFx = true; this.addShake(0.35); J.vy -= 0.1; J.vr += 0.8; }
+    if (c.meleeT <= 0) this.meleeHitFx = false;
+    const mel = 0;
     const idle = Math.sin(this.breathT * 1.6) * 0.002 * (1 - a);
     const RP_ = RELOAD_POSES[G.type] || RELOAD_POSES.long;
     const tilt = w.reloading ? sm5(rp / 0.22) * (1 - sm5((rp - 0.8) / 0.2)) : 0;
@@ -553,6 +561,14 @@ export class PlayerController {
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6 * (1 - ae * 0.9),
     );
     // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
+    if (mWind + mHit > 0) {
+      h.position.x += (0.03 * mWind - 0.08 * mHit) * mk;
+      h.position.y += (-0.015 * mWind + 0.01 * mHit) * mk;
+      h.position.z += (0.02 * mWind - 0.15 * mHit) * mk;
+      h.rotation.x += (-0.08 * mWind + 0.15 * mHit) * mk;
+      h.rotation.y += (-0.15 * mWind + 0.3 * mHit) * mk;
+      h.rotation.z += (0.2 * mWind - 0.75 * mHit) * mk;
+    }
     if (sw > 0) {
       const pis = G.type === 'pistol';
       h.position.x += sw * 0.04;

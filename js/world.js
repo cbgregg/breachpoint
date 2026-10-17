@@ -600,9 +600,22 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
     planePiece(mat, w, d, x, z, y, ry, tint);
   };
+  // Ground overlays (sidewalks, lawns, floors, gravel) sit a few millimetres above the ground under them. At a
+  // distance the depth buffer can't tell them apart and they flicker (z-fighting), so each layer also gets a
+  // polygon offset: it always draws on top of the layers below, at any range.
+  const layered = new Map();
+  const layerMat = (mat, y) => {
+    const f = y - Math.floor(y + 1e-4);                  // height above the floor level it lies on (0 for ground, 3.6 for a roof)
+    if (f <= 0.0005 || f > 0.08) return mat;
+    const L = Math.min(10, Math.round(f / 0.004) + 1), k = mat.uuid + ':' + L;
+    let m = layered.get(k);
+    if (!m) { m = mat.clone(); m.polygonOffset = true; m.polygonOffsetFactor = -L; m.polygonOffsetUnits = -2 * L; layered.set(k, m); M[`_layer${layered.size}`] = m; }
+    return m;
+  };
   const planePiece = (mat, w, d, x, z, y, ry = 0, tint) => {
     const g = new THREE.PlaneGeometry(w, d);
     const sc = scaleOf(mat);
+    mat = layerMat(mat, y);
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / (sc || 3), uv.getY(i) * d / (sc || 3));
     put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false, tint });

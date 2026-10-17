@@ -244,7 +244,7 @@ export class Renderer {
     // maps can move the sun (a low dusk sun); the default is SUN_DIR
     const sd = L.sunElev != null ? new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAz ?? 222)) : SUN_DIR;
     u.sunPosition.value.copy(sd);
-    this.sun.position.copy(sd).multiplyScalar(80);
+    this.sun.position.copy(sd).multiplyScalar(Math.max(80, this.sun.position.length()));   // keep the distance fitShadows chose
     this.sun.intensity = L.sun; this.sun.color.set(L.sunColor);
     this.hemi.intensity = L.hemi; this.hemi.color.set(L.hemiSky); this.hemi.groundColor.set(L.ground);
     this.renderer.toneMappingExposure = L.exposure;
