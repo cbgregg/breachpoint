@@ -4,7 +4,7 @@ import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom }
 const WEAPON_IDS = Object.keys(WEAPONS);
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
-import { buildWorld, renderMinimap, MAPS, MAP_IDS } from './world.js';
+import { buildWorld, renderMinimap, MAPS, MAP_IDS, setWorldDetail, worldDetailLow } from './world.js';
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
 import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadout } from './attachments.js';
@@ -15,7 +15,7 @@ import { Effects } from './effects.js';
 import { GameAudio } from './audio.js';
 import { HUD } from './hud.js';
 import { Input } from './input.js';
-import { applySpread } from './weapons.js';
+import { applySpread, setGunDetail } from './weapons.js';
 import { Renderer, SUN_DIR } from './render.js';
 import { HostSession, GuestSession } from './online.js';
 import { Music } from './music.js';
@@ -128,7 +128,13 @@ export class Game {
 
   applySettings(s) {
     const q = qualityFrom(s), qk = JSON.stringify(q);
-    if (qk !== this.appliedQuality) { this.appliedQuality = qk; this.renderer.applyQuality(q); this.effects?.setQuality(q); }
+    if (qk !== this.appliedQuality) {
+      this.appliedQuality = qk; this.renderer.applyQuality(q); this.effects?.setQuality(q);
+      setGunDetail(q.lowPoly ? 0 : 1);
+      // world detail is baked into the map's geometry: rebuild it now from the menu, otherwise on the next map
+      if (!!q.lowPoly !== worldDetailLow()) { setWorldDetail(q.lowPoly); if (this.world && this.state === 'menu') this.loadMap(this.world.id, true); }
+    }
+    this.animLod = q.fast ? 'mobile' : 'normal';
     this.fpsCap = +s.fpsCap || 0;
     const dyn = s.dynamicRes !== false;
     if (this.renderer.dynamic !== dyn) { this.renderer.dynamic = dyn; if (!dyn) { this.renderer.drs.scale = 1; this.renderer.applyPR(); this.renderer.setSize(); } }
@@ -434,8 +440,10 @@ export class Game {
   frame(background = false) {
     const now = performance.now();
     // frame-rate cap: skip display refreshes until the next frame is due (keeps the average at the cap)
-    if (!background && this.fpsCap > 0) {
-      const iv = 1000 / this.fpsCap;
+    // the menu's live background doesn't need more than 30 fps on the Mobile path (battery, heat)
+    const cap = this.state === 'menu' && this.renderer.quality && this.renderer.quality.fast ? Math.min(this.fpsCap || 30, 30) : this.fpsCap;
+    if (!background && cap > 0) {
+      const iv = 1000 / cap;
       if (now < (this.nextFrameT || 0) - 1) return;
       this.nextFrameT = Math.max((this.nextFrameT || 0) + iv, now - iv);
     }
@@ -544,7 +552,9 @@ export class Game {
       if (c.hidden) { if (c.model) c.model.root.visible = false; continue; }
       _sph.center.set(c.pos.x, c.pos.y + 0.9, c.pos.z);
       const dist = _sph.center.distanceTo(this.camera.position);
-      const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > 22 ? 2 : 1;
+      // off screen: root only; distant: the skeleton updates at 30 Hz (Mobile: 30 Hz from 14 m, 15 Hz from 32 m)
+      const mob = this.animLod === 'mobile';
+      const lod = !_frustum.intersectsSphere(_sph) && dist > 3 ? 0 : dist > (mob ? 32 : 60) ? 3 : dist > (mob ? 14 : 22) ? 2 : 1;
       c.updateModel(dt, !this.foes(c, this.player) || c === this.aimTarget, lod);
     }
     this.updateLasers();
@@ -1215,8 +1225,8 @@ export class Game {
     this.scene.add(this.colLines);
   }
 
-  loadMap(id) {
-    if (!MAPS[id] || (this.world && this.world.id === id)) return;
+  loadMap(id, force = false) {
+    if (!MAPS[id] || (this.world && this.world.id === id && !force)) return;
     if (this.world) {
       this.scene.remove(this.world.group);
       this.world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });

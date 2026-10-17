@@ -416,13 +416,17 @@
               <option value="amber">Amber</option><option value="arctic">Arctic blue</option><option value="crimson">Crimson</option><option value="toxic">Toxic green</option><option value="royal">Royal purple</option><option value="gold">Gold</option><option value="teal">Teal</option><option value="ghost">Ghost white</option></select></div>
             <div class="group">GRAPHICS</div>
             <div class="row"><label for="opt-quality">Quality preset</label><select id="opt-quality" data-nav>
-              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option><option value="custom">Custom</option></select></div>
+              <option value="mobile">Mobile</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option><option value="custom">Custom</option></select></div>
+            <div class="row"><label for="opt-gfxpath">Render path<small>Fast: straight to the screen with hardware MSAA, no post effects (best for phones)</small></label><select id="opt-gfxpath" data-nav>
+              <option value="post">Full post-processing</option><option value="fast">Fast (MSAA)</option></select></div>
+            <div class="row"><label for="opt-gfxdetail">Geometry detail<small>Low: square-edged world and lighter player guns</small></label><select id="opt-gfxdetail" data-nav>
+              <option value="full">Full</option><option value="low">Low</option></select></div>
             <div class="row"><label for="opt-gfxres">Render resolution <output id="out-gfxres"></output><small>% of your screen's native pixels</small></label><input type="range" id="opt-gfxres" min="50" max="200" step="5" data-nav></div>
             <div class="row"><label for="opt-gfxshadows">Shadow quality</label><select id="opt-gfxshadows" data-nav>
               <option value="0">Off</option><option value="1024">Low</option><option value="2048">Medium</option><option value="4096">High</option></select></div>
             <div class="row"><label for="opt-gfxsoft">Soft shadows<small>Smoother shadow edges</small></label><input type="checkbox" id="opt-gfxsoft" data-nav></div>
             <div class="row"><label for="opt-gfxrate">Shadow updates<small>Every other frame is faster</small></label><select id="opt-gfxrate" data-nav>
-              <option value="half">Every other frame</option><option value="full">Every frame</option></select></div>
+              <option value="third">Every third frame</option><option value="half">Every other frame</option><option value="full">Every frame</option></select></div>
             <div class="row"><label for="opt-gfxao">Ambient occlusion<small>Contact shadows in corners and under objects</small></label><input type="checkbox" id="opt-gfxao" data-nav></div>
             <div class="row"><label for="opt-gfxbloom">Bloom<small>Glow on lights, muzzle flash and the sun</small></label><input type="checkbox" id="opt-gfxbloom" data-nav></div>
             <div class="row"><label for="opt-gfxaa">Anti-aliasing<small>SMAA: smooths jagged edges</small></label><input type="checkbox" id="opt-gfxaa" data-nav></div>

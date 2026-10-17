@@ -1,5 +1,6 @@
 // Maps (Tarsa Market, Shuran Yard): collision layout + dressed geometry (merged per material), spawns, pickups, nav grid
 import * as THREE from 'three';
+import { savedQuality } from './config.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Box } from './physics.js';
@@ -372,7 +373,8 @@ class Batcher {
       col[i * 3] = _c.r * f; col[i * 3 + 1] = _c.g * f; col[i * 3 + 2] = _c.b * f;
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const cast = opts.cast !== false;
+    let cast = opts.cast !== false;
+    if (cast && LOW_DETAIL) { g.computeBoundingSphere(); if (g.boundingSphere.radius < 0.3) cast = false; }
     const key = mat.uuid + (cast ? '|c' : '|n');
     if (!this.lists.has(key)) this.lists.set(key, { mat, cast, geos: [] });
     this.lists.get(key).geos.push(g);
@@ -395,8 +397,13 @@ class Batcher {
 }
 
 // Box with rounded edges and triplanar world-scale UVs (scale = metres per texture tile; 0 = one tile per face)
+// low-detail world (Mobile): square-edged boxes (12 triangles instead of ~108), lighter sandbags, and small
+// props stop casting sun shadows. Set before a map is built.
+let LOW_DETAIL = !!savedQuality().lowPoly;
+export function setWorldDetail(low) { LOW_DETAIL = !!low; }
+export const worldDetailLow = () => LOW_DETAIL;
 function worldBox(w, h, d, scale, radius) {
-  const r = radius ?? (Math.min(w, h, d) < 0.12 ? 0 : Math.min(0.05, Math.min(w, h, d) * 0.14));
+  const r = LOW_DETAIL ? 0 : radius ?? (Math.min(w, h, d) < 0.12 ? 0 : Math.min(0.05, Math.min(w, h, d) * 0.14));
   const g = r > 0.002 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d);
   const pos = g.attributes.position, nrm = g.attributes.normal, uv = g.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
@@ -1031,7 +1038,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
 
   // sandbag: a pillowy bag that pinches at the ends, so rows nest into each other
   const bagGeo = (() => {
-    const g = new RoundedBoxGeometry(0.6, 0.2, 0.36, 2, 0.09);
+    const g = LOW_DETAIL ? new THREE.BoxGeometry(0.6, 0.2, 0.36, 4, 1, 1) : new RoundedBoxGeometry(0.6, 0.2, 0.36, 2, 0.09);  // low: 36 triangles instead of 300
     const p = g.attributes.position;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -2282,7 +2289,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
 // it looms over the rooftops. The low sun behind the player lights it with alpenglow.
 function buildMountain() {
   const rnd = seeded(4392);
-  const R = 1500, H = 640, segR = 110, segA = 180;
+  const R = 1500, H = 640, segR = LOW_DETAIL ? 50 : 110, segA = LOW_DETAIL ? 90 : 180;
   const pos = [], col = [], idx = [];
   // value noise for ridges
   const N = 64, tab = Array.from({ length: N * N }, () => rnd());

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { WEAPONS, typeOf } from './config.js';
+import { WEAPONS, typeOf, savedQuality } from './config.js';
 import { weaponDef, cleanAtt } from './attachments.js';
 import { reticleMesh } from './reticles.js';
 import { BUILDS } from './gunbuilds.js';
@@ -195,6 +195,12 @@ function roundedShape(pts, rDefault = 0.004, shape = new THREE.Shape()) {
 }
 function roundedPath(pts, r) { return roundedShape(pts, r, new THREE.Path()); }
 
+// geometric detail while a gun is being built: 2 = first person / menu previews, 1 = third person,
+// 0 = third person on the Mobile preset (flat-edged boxes, fewer curve segments)
+let DETAIL = 2, GUN_DETAIL = savedQuality().lowPoly ? 0 : 1;
+export function setGunDetail(d) { GUN_DETAIL = d; }
+const curveSegs = () => DETAIL >= 2 ? 5 : DETAIL === 1 ? 3 : 2;
+const latheSegs = (n) => DETAIL >= 2 ? n : Math.max(6, Math.round(n * (DETAIL === 1 ? 0.6 : 0.45)));
 class Parts {
   constructor() { this.by = new Map(); }
   add(mat, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
@@ -210,7 +216,7 @@ class Parts {
     const shape = roundedShape(pts, r);
     for (const h of holes) shape.holes.push(roundedPath(h, r));
     const depth = Math.max(0.001, width - bevel * 2);
-    const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 2, curveSegments: 5 });
+    const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: DETAIL >= 2 ? 2 : 1, curveSegments: curveSegs() });
     g.rotateY(Math.PI / 2); // shape x (forward) -> -z, extrusion -> +x
     g.translate(x - depth / 2, 0, 0);
     return this.add(mat, g);
@@ -219,19 +225,20 @@ class Parts {
   frontal(mat, pts, f0, f1, holes = [], r = 0.004, bevel = 0.0015) {
     const shape = roundedShape(pts, r);
     for (const h of holes) shape.holes.push(roundedPath(h, r));
-    const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.001, f1 - f0 - bevel * 2), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 2, curveSegments: 6 });
+    const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.001, f1 - f0 - bevel * 2), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: DETAIL >= 2 ? 2 : 1, curveSegments: curveSegs() + 1 });
     g.translate(0, 0, -(f1 - bevel));
     return this.add(mat, g);
   }
   // surface of revolution along the barrel axis: pts = [[radius, f], ...]
   lathe(mat, pts, y = 0, x = 0, seg = 20) {
-    const g = new THREE.LatheGeometry(pts.map(([r, f]) => new THREE.Vector2(r, f)), seg);
+    const g = new THREE.LatheGeometry(pts.map(([r, f]) => new THREE.Vector2(r, f)), latheSegs(seg));
     g.rotateX(-Math.PI / 2);
     g.translate(x, y, 0);
     return this.add(mat, g);
   }
   rbox(mat, w, h, d, x, y, z, r = 0.003, rx = 0, ry = 0, rz = 0) {
-    return this.add(mat, new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2.1, h / 2.1, d / 2.1)), x, y, z, rx, ry, rz);
+    const geo = DETAIL === 0 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, DETAIL >= 2 ? 2 : 1, Math.min(r, w / 2.1, h / 2.1, d / 2.1));
+    return this.add(mat, geo, x, y, z, rx, ry, rz);
   }
   rail(mat, f0, f1, y, w = 0.021) {
     // picatinny: a narrow spine with the wide ridges on top (5 mm slots on a 10 mm pitch)
@@ -499,7 +506,8 @@ function lookMats(base, look) {
 }
 
 // Returns { group, muzzle, eject, foregrip, mag, magHome, sightY, sightZ, pump, bolt }
-export function buildGun(id, { forViewmodel = false, att = null } = {}) {
+export function buildGun(id, { forViewmodel = false, att = null, detail = null } = {}) {
+  DETAIL = detail ?? (forViewmodel ? 2 : GUN_DETAIL);
   const look = WEAPONS[id].model.look;
   const M = lookMats(mats(), look);
   const type = WEAPONS[id].model.type;
@@ -907,8 +915,9 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     foregrip.position.set(-0.004, -0.06, 0.012);
   }
 
-  p.build(g, !forViewmodel);
-  mp.build(mag, !forViewmodel);
+  p.build(g, false);
+  mp.build(mag, false);
+  DETAIL = 2;
   if (type !== 'shotgun') {
     if (A.mag === 'fast') {
       // orange pull tab on the floorplate
