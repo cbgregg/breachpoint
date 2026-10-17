@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { Net, newCode } from './net.js';
 import { Board } from './quickplay.js';
 import { safeName, cleanChat } from './names.js';
-import { PRIMARIES, PLAYER, MELEE, WEAPONS, GRENADE } from './config.js';
+import { PRIMARIES, PLAYER, MELEE, WEAPONS, GRENADE, EQUIPMENT } from './config.js';
 import { Character } from './character.js';
 import { hitPower } from './motion.js';
 import { parseLoadout, soloLoadout } from './attachments.js';
@@ -764,6 +764,7 @@ export class HostSession {
         else if (a === 'swap') c.switchTo(c.prev);
         else if (a === 'reload') { if (!(g.gm && g.gm.useZone(c))) c.reload(); }
         else if (a === 'grenade') c.throwGrenade(undefined, cmd.gk || 0);
+        else if (a === 'tactical') c.throwTactical();
         else if (a === 'melee') c.melee();
       }
     }
@@ -872,7 +873,8 @@ export class HostSession {
     const w0 = c.weapons[0], w1 = c.weapons[1];
     const me = [r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r2(c.vel.x), r2(c.vel.y), r2(c.vel.z),
       (c.onGround ? 1 : 0) | (c.sprinting ? 2 : 0) | (c.alive ? 4 : 0) | (c.spawnProtect > 0 ? 8 : 0) | (c.tacSprinting ? 16 : 0),
-      r3(c.crouchT), r3(c.slideT), Math.round(c.health), c.cur, w0.mag, w0.reserve, w1.mag, w1.reserve, c.grenades, r3(c.slideDir.x), r3(c.slideDir.z), r3(c.proneT)];
+      r3(c.crouchT), r3(c.slideT), Math.round(c.health), c.cur, w0.mag, w0.reserve, w1.mag, w1.reserve, c.grenades, r3(c.slideDir.x), r3(c.slideDir.z), r3(c.proneT),
+      c.tacticals | 0, r2(c.stunT || 0), c.mantle ? [r3(c.mantle.t), r3(c.mantle.dur), r2(c.mantle.x0), r2(c.mantle.y0), r2(c.mantle.z0), r2(c.mantle.x), r2(c.mantle.y), r2(c.mantle.z), r2(c.mantle.vx), r2(c.mantle.vz)] : 0];
     const ch = [];
     for (const o of g.characters) {
       if (o === c || !this.visible(r, o)) continue;
@@ -1055,7 +1057,11 @@ export class GuestSession {
 
   reconcile(me, ack) {
     const g = this.game, c = g.player, ctl = g.playerCtl;
-    const [x, y, z, vx, vy, vz, fl, cr, sl, hp, cur, m0, r0, m1, r1, gr, sdx, sdz, pr] = me;
+    const [x, y, z, vx, vy, vz, fl, cr, sl, hp, cur, m0, r0, m1, r1, gr, sdx, sdz, pr, tc, st, mt] = me;
+    if (fin(tc)) c.tacticals = tc | 0;
+    if (fin(st)) c.stunT = clamp(st, 0, 5);
+    // a mantle in progress on the host carries over, so replaying our inputs continues it instead of falling back
+    c.mantle = Array.isArray(mt) && mt.length === 10 && mt.every(fin) ? { t: mt[0], dur: Math.max(0.05, mt[1]), x0: mt[2], y0: mt[3], z0: mt[4], x: mt[5], y: mt[6], z: mt[7], vx: mt[8], vz: mt[9] } : null;
     const alive = !!(fl & 4);
     while (this.pending.length && this.pending[0].cmd.s <= ack) this.pending.shift();
     c.health = clamp(hp, 0, PLAYER.maxHealth);
@@ -1176,9 +1182,10 @@ export class GuestSession {
         break;
       }
       case 'gren': {
-        const [, id, ox, oy, oz, vx, vy, vz, owner, fz] = ev;
+        const [, id, ox, oy, oz, vx, vy, vz, owner, fz, ty] = ev;
         if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
-        g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), fin(fz) ? clamp(fz, 0, GRENADE.fuse) : GRENADE.fuse);
+        const type = EQUIPMENT[ty] ? ty : 'frag';
+        g.spawnGrenade(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), fin(fz) ? clamp(fz, 0, 8) : GRENADE.fuse, type);
         break;
       }
       case 'rkt': {
@@ -1195,10 +1202,10 @@ export class GuestSession {
         break;
       }
       case 'boom': {
-        const [, id, x, y, z] = ev;
+        const [, id, x, y, z, kind] = ev;
         if (![x, y, z].every(fin)) return;
-        g.removeGrenade(id);
-        g.explosionFx(new THREE.Vector3(x, y, z));
+        if (kind !== 'shock') g.removeGrenade(id);   // a shock stick pulses a few times before it's done
+        g.equipFx(EQUIPMENT[kind] ? kind : 'frag', new THREE.Vector3(x, y, z));
         break;
       }
       case 'melee': {

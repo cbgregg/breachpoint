@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, wantsMsaa } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
@@ -166,6 +166,66 @@ function checkMsaa() {
   if (game.state === 'menu' && !lobby.active) { game.hud.toast('RESTARTING TO APPLY ANTI-ALIASING'); setTimeout(() => location.reload(), 700); }
   else game.hud.toast('ANTI-ALIASING CHANGES THE NEXT TIME THE GAME STARTS');
 }
+// ---------- graphics hardware: what the GPU can handle, and a warning when there isn't one ----------
+// The renderer string tells software rendering (no hardware acceleration) from phone, integrated and discrete
+// GPUs. Presets above what the device is likely to run smoothly are marked "not recommended".
+const GPU = (() => {
+  let name = '';
+  try {
+    const gl = game.renderer.renderer.getContext();
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '';
+  } catch (_) { /* unknown */ }
+  const n = name.replace(/ANGLE \((.*)\)/, '$1');
+  const soft = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(n);
+  let tier;   // 0 software, 1 phone/tablet, 2 integrated, 3 discrete
+  if (soft) tier = 0;
+  else if (coarse || /mali|adreno|powervr|apple gpu|sgx|tegra|videocore/i.test(n)) tier = 1;
+  else if (/geforce|rtx|gtx|quadro|radeon (rx|pro)|radeon\(tm\) rx|arc a|apple m\d|nvidia/i.test(n)) tier = 3;
+  else tier = 2;   // Intel HD / UHD / Iris, Radeon integrated graphics and anything unrecognised
+  const best = ['mobile', 'mobile', 'medium', 'ultra'][tier];
+  return { name: n.split(',').slice(0, 2).join(',').trim() || 'Unknown GPU', tier, soft, best };
+})();
+const PRESET_RANK = { mobile: 0, low: 1, medium: 2, high: 3, ultra: 4 };
+function markPresets() {
+  const max = PRESET_RANK[GPU.best] + (GPU.tier === 1 ? 1 : 0);   // phones: Mobile or Low
+  for (const o of $('opt-quality').options) {
+    const r = PRESET_RANK[o.value];
+    const nr = r !== undefined && r > max;
+    o.textContent = o.textContent.replace(/ \(not recommended\)$/, '') + (nr ? ' (not recommended)' : '');
+    o.classList.toggle('nr', nr);
+  }
+  $('gpu-name').textContent = GPU.name;
+  const label = { mobile: 'Mobile', medium: 'Medium', ultra: 'High or Ultra' }[GPU.best];
+  $('gpu-note').innerHTML = GPU.soft ? 'Hardware acceleration is off: the game is running on the CPU. Turn it on in your browser settings.' : `Recommended for this device: <b>${label}</b>`;
+  $('gpu-note').closest('.row').classList.toggle('bad', GPU.soft);
+}
+markPresets();
+if (GPU.soft) {
+  const ua = navigator.userAgent;
+  const how = /Firefox/.test(ua) ? 'In Firefox: Settings → General → Performance → turn on "Use hardware acceleration when available", then restart Firefox.'
+    : /Edg\//.test(ua) ? 'In Edge: Settings → System and performance → turn on "Use graphics acceleration when available", then restart Edge.'
+    : /Safari/.test(ua) && !/Chrome/.test(ua) ? 'In Safari, hardware acceleration is always on: update macOS / iOS, or try another browser.'
+    : 'In Chrome: Settings → System → turn on "Use graphics acceleration when available", then relaunch Chrome (or open chrome://settings/system).';
+  $('gpu-warn-text').textContent = `Breachpoint is being drawn by your CPU instead of your graphics card, so it will stutter on every setting. ${how}`;
+  $('gpu-warn').hidden = false;
+  $('gpu-warn-x').addEventListener('click', () => { $('gpu-warn').hidden = true; });
+}
+// in a match: if the frame rate stays low for a while on a preset above what's recommended, say so (once)
+let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false;
+setInterval(() => {
+  if (perfShown || game.state !== 'playing' || document.hidden) { perfFrames = perfTime = 0; return; }
+  const now = performance.now();
+  if (perfNoteT) { perfFrames += game.frameCount - (perfNoteT.f || 0); perfTime += (now - perfNoteT.t) / 1000; }
+  perfNoteT = { t: now, f: game.frameCount };
+  if (perfTime < 20) return;
+  const fps = perfFrames / perfTime; perfFrames = perfTime = 0;
+  if (fps < 40) {
+    perfShown = true;
+    const cur = settings.quality, better = PRESET_RANK[cur] > PRESET_RANK[GPU.best] ? GPU.best : PRESET_RANK[cur] > 0 ? Object.keys(PRESET_RANK)[PRESET_RANK[cur] - 1] : null;
+    game.hud.toast(GPU.soft ? 'LOW FRAME RATE: TURN ON HARDWARE ACCELERATION IN YOUR BROWSER' : better ? `LOW FRAME RATE (${Math.round(fps)} FPS): TRY THE ${better.toUpperCase()} PRESET OR FSR IN OPTIONS` : `LOW FRAME RATE (${Math.round(fps)} FPS): TRY FSR PERFORMANCE IN OPTIONS`);
+  }
+}, 2000);
 // match mode: show only the settings that apply
 function syncModeRows() {
   const m = MODES[settings.mode] || MODES.tdm;
@@ -210,16 +270,16 @@ function statsOf(d) {
 // A class is { name, primary, atts: { rifle: {...}, smg: {...}, ..., pistol: {...} } }. The equipped class is
 // mirrored into settings.primary / settings.attachments, which is what the match and the network read.
 const DEFAULT_CLASSES = [
-  { name: 'ASSAULT', primary: 'rifle', secondary: 'pistol', atts: { rifle: { optic: 'holo', muzzle: 'brake', under: 'vgrip', mag: 'std', laser: 'none' } } },
-  { name: 'RUSHER', primary: 'krv45', secondary: 'mp18', atts: { krv45: { optic: 'reflex', muzzle: 'none', under: 'agrip', mag: 'fast', laser: 'laser' } } },
-  { name: 'CLOSE QUARTERS', primary: 'sa12', secondary: 'r357', atts: { sa12: { optic: 'iron', muzzle: 'choke', mag: 'std', laser: 'laser' } } },
-  { name: 'MARKSMAN', primary: 'mr14', secondary: 'd50', atts: { mr14: { optic: 'acog', muzzle: 'comp', mag: 'std', laser: 'none' } } },
-  { name: 'SNIPER', primary: 'sniper', secondary: 'pistol', atts: { sniper: { optic: 'scope', muzzle: 'brake', mag: 'std' }, pistol: { optic: 'iron', muzzle: 'sup', mag: 'std', laser: 'none' } } },
-  { name: 'DEMOLITION', primary: 'hx60', secondary: 'monte', atts: { hx60: { optic: 'reflex', muzzle: 'none', mag: 'std', laser: 'none' } } },
-  { name: 'GUERRILLA', primary: 'kv47', secondary: 'd50', atts: { kv47: { optic: 'iron', muzzle: 'comp', under: 'none', mag: 'ext', laser: 'none' } } },
+  { name: 'ASSAULT', primary: 'rifle', secondary: 'pistol', lethal: 'frag', tactical: 'stun', atts: { rifle: { optic: 'holo', muzzle: 'brake', under: 'vgrip', mag: 'std', laser: 'none' } } },
+  { name: 'RUSHER', primary: 'krv45', secondary: 'mp18', lethal: 'semtex', tactical: 'stun', atts: { krv45: { optic: 'reflex', muzzle: 'none', under: 'agrip', mag: 'fast', laser: 'laser' } } },
+  { name: 'CLOSE QUARTERS', primary: 'sa12', secondary: 'r357', lethal: 'shock', tactical: 'stun', atts: { sa12: { optic: 'iron', muzzle: 'choke', mag: 'std', laser: 'laser' } } },
+  { name: 'MARKSMAN', primary: 'mr14', secondary: 'd50', lethal: 'knife', tactical: 'stun', atts: { mr14: { optic: 'acog', muzzle: 'comp', mag: 'std', laser: 'none' } } },
+  { name: 'SNIPER', primary: 'sniper', secondary: 'pistol', lethal: 'knife', tactical: 'stun', atts: { sniper: { optic: 'scope', muzzle: 'brake', mag: 'std' }, pistol: { optic: 'iron', muzzle: 'sup', mag: 'std', laser: 'none' } } },
+  { name: 'DEMOLITION', primary: 'hx60', secondary: 'monte', lethal: 'semtex', tactical: 'stun', atts: { hx60: { optic: 'reflex', muzzle: 'none', mag: 'std', laser: 'none' } } },
+  { name: 'GUERRILLA', primary: 'kv47', secondary: 'd50', lethal: 'frag', tactical: 'stun', atts: { kv47: { optic: 'iron', muzzle: 'comp', under: 'none', mag: 'ext', laser: 'none' } } },
 ];
 const CUSTOM_N = 5;
-const clsCopy = (c, name) => ({ name, primary: PRIMARIES.includes(c.primary) ? c.primary : 'rifle', secondary: SECONDARIES.includes(c.secondary) ? c.secondary : 'pistol', atts: JSON.parse(JSON.stringify(c.atts || {})) });
+const clsCopy = (c, name) => ({ name, primary: PRIMARIES.includes(c.primary) ? c.primary : 'rifle', secondary: SECONDARIES.includes(c.secondary) ? c.secondary : 'pistol', lethal: LETHALS.includes(c.lethal) ? c.lethal : 'frag', tactical: TACTICALS.includes(c.tactical) ? c.tactical : 'stun', atts: JSON.parse(JSON.stringify(c.atts || {})) });
 (function migrateClasses() {
   let list = Array.isArray(settings.classes) ? settings.classes.filter(c => c && typeof c === 'object') : [];
   if (!list.length) {
@@ -239,6 +299,8 @@ function applyEquipped() {
   settings.primary = c.primary;
   settings.secondary = c.secondary || 'pistol';
   settings.attachments = { [c.primary]: clsAtt(c, c.primary), [settings.secondary]: clsAtt(c, settings.secondary) };
+  settings.lethal = LETHALS.includes(c.lethal) ? c.lethal : 'frag';
+  settings.tactical = TACTICALS.includes(c.tactical) ? c.tactical : 'stun';
 }
 applyEquipped();
 function attFor(id) { return clsAtt(clsGet(editKey || clsSel), id); }
@@ -304,14 +366,21 @@ function showDetail(id, att, { base = null, title = null, sub = 'GUNSMITH', desc
   $('gs-eq').innerHTML = equippedRow(id, att, hiSlot);
   preview.show(id, att);
 }
+const EQ_ICO = {
+  frag: FRAG_ICO,
+  semtex: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="20" width="36" height="22" rx="3"/><path d="M14 28h36M22 20v-6h20v6"/><circle cx="40" cy="14" r="2" fill="currentColor"/></svg>',
+  knife: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 40l30-26 14-6-6 14-26 30z"/><path d="M14 46l-6 6M20 40l6 6"/></svg>',
+  shock: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="10" width="14" height="36" rx="5"/><path d="M44 14l-6 10h8l-8 12M14 18l6 6M12 34l8-2"/></svg>',
+  stun: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="14" width="18" height="34" rx="3"/><path d="M22 22h18M26 8h10v6H26zM46 12l6-4M48 22h8M46 32l6 4"/></svg>',
+};
+const eqCard = (slot, id, act, small = '') => { const e = EQUIPMENT[id]; return `<button class="lcard small"${act ? ` data-nav data-act="${act}"` : ' tabindex="-1"'}><span class="lc-k">${slot}</span>${EQ_ICO[id] || ''}<span class="lc-n">${e.name.toUpperCase()}</span><span class="lc-a"><small>${small || `×${e.count}`}</small></span></button>`; };
 function loadoutCards(c, editable) {
   const p = c.primary, s = c.secondary || 'pistol', pa = clsAtt(c, p), sa = clsAtt(c, s);
   const card = (k, id, att, cls, act) => `<button class="lcard ${cls}"${editable ? ` data-nav data-act="${act}"` : ' tabindex="-1"'}>
       <span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span>
       <span class="lc-a">${pips(id, att)}<small>${escHtml(attSummary(id, att).join(' · ') || 'STOCK')}</small></span></button>`;
   return card('PRIMARY', p, pa, 'big', 'w:p') + card('SECONDARY', s, sa, '', 'w:s')
-    + `<div class="lcard small"><span class="lc-k">LETHAL</span>${FRAG_ICO}<span class="lc-n">FRAG GRENADE</span><span class="lc-a"><small>COOK · ×${GRENADE.start}</small></span></div>`
-    + `<div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span><span class="lc-a"><small>ONE HIT</small></span></div>`;
+    + eqCard('LETHAL', c.lethal || 'frag', editable ? 'e:l' : '') + eqCard('TACTICAL', c.tactical || 'stun', editable ? 'e:t' : '');
 }
 
 // ---- class list (MW2019 "Edit Loadouts") ----
@@ -367,10 +436,11 @@ function renderEditor(focusAct) {
     main.innerHTML = `<div class="p10">
       <div class="p10-row">${wbox('p', 'PRIMARY')}<div class="p10-atts"><div class="p10-k">PRIMARY ATTACHMENTS ${pips(c.primary, clsAtt(c, c.primary))}</div><div class="atiles">${slotTiles('p')}</div></div></div>
       <div class="p10-row">${wbox('s', 'SECONDARY')}<div class="p10-atts"><div class="p10-k">SECONDARY ATTACHMENTS ${pips(ceGun(c, 's'), clsAtt(c, ceGun(c, 's')))}</div><div class="atiles">${slotTiles('s') || '<span class="at-none">NO ATTACHMENTS FOR THIS WEAPON</span>'}</div></div></div>
-      <div class="p10-row eqp"><div class="lcard small"><span class="lc-k">LETHAL</span>${FRAG_ICO}<span class="lc-n">FRAG GRENADE</span></div><div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span></div></div>
+      <div class="p10-row eqp">${eqCard('LETHAL', c.lethal || 'frag', 'e:l')}${eqCard('TACTICAL', c.tactical || 'stun', 'e:t')}<div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span><span class="lc-a"><small>ONE HIT</small></span></div></div>
     </div>`;
     main.querySelectorAll('[data-act]').forEach(b => {
       const a = b.dataset.act, which = a.split(':')[1], id = ceGun(c, which), att = clsAtt(c, id);
+      if (a[0] === 'e') { b.addEventListener('click', () => { ceFrom = a; ceView = a; renderEditor(); }); return; }
       const hover = () => a[0] === 'r' ? showDetail(id, att, { sub: 'RETICLE', desc: `${RET_OPTICS[att.optic]}: ${shapesFor(att.optic)[settings.reticles[att.optic].shape]}, ${RET_COLORS[settings.reticles[att.optic].color][0]}. Reticles apply to that sight on every weapon.` })
         : a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: 'Choose a different weapon.' })
         : showDetail(id, att, { sub: SLOT_NAMES[a.split(':')[2]].toUpperCase(), desc: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].desc, hiSlot: a.split(':')[2] });
@@ -391,6 +461,17 @@ function renderEditor(focusAct) {
     });
     showDetail(cur, clsAtt(c, cur), { sub: WCAT[cur] });
     focusAct = focusAct || null;
+  } else if (ceView[0] === 'e') {
+    const slot = ceView[2] === 'l' ? 'lethal' : 'tactical', list = slot === 'lethal' ? LETHALS : TACTICALS, cur = c[slot] || list[0];
+    parts.push(slot.toUpperCase());
+    main.innerHTML = `<div class="apick"><div class="ap-grid">${list.map(k => `<button class="aptile${k === cur ? ' on' : ''}" data-nav data-eq="${k}">${EQ_ICO[k]}<span class="at-n">${EQUIPMENT[k].name}</span>${k === cur ? '<span class="at-eq">EQUIPPED</span>' : ''}</button>`).join('')}</div>
+      <p class="pane-note" id="eq-desc">${escHtml(EQUIPMENT[cur].desc)}</p></div>`;
+    main.querySelectorAll('.aptile').forEach(b => {
+      const k = b.dataset.eq, hover = () => { $('eq-desc').textContent = EQUIPMENT[k].desc; };
+      b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
+      b.addEventListener('click', () => { c[slot] = k; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+    });
+    showDetail(c.primary, clsAtt(c, c.primary), { sub: slot.toUpperCase(), desc: EQUIPMENT[cur].desc });
   } else if (ceView[0] === 'r') {
     const which = ceView[2], id = ceGun(c, which), att = clsAtt(c, id), r = settings.reticles[retOptic];
     parts.push(WEAPONS[id].name.toUpperCase(), 'RETICLE');

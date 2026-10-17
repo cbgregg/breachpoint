@@ -1,7 +1,7 @@
 // Local player: input -> movement/weapons, first-person camera, viewmodel (IK arms, reloads, recoil),
 // gamepad look with response curve + aim assist.
 import * as THREE from 'three';
-import { TEAMS, MELEE, GRENADE, PLAYER } from './config.js';
+import { TEAMS, MELEE, GRENADE, PLAYER, EQUIPMENT } from './config.js';
 import { buildGun } from './weapons.js';
 import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose, surfaceCloud, fitGrip } from './vmarms.js';
 
@@ -76,7 +76,7 @@ function solveElbow(S, H, a, b, pole, out) {
   return out.copy(S).addScaledVector(d, along).addScaledVector(pd, h);
 }
 
-export const VM_TUNE = { yaw: 0.16, hip: { rifle: [0.115, -0.15, -0.25], smg: [0.11, -0.135, -0.28], sniper: [0.12, -0.162, -0.25], launcher: [0.13, -0.15, -0.2] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
+export const VM_TUNE = { yaw: 0.16, yawBy: { shotgun: 0.07 }, hip: { rifle: [0.115, -0.15, -0.25], smg: [0.11, -0.135, -0.28], sniper: [0.12, -0.162, -0.25], launcher: [0.13, -0.15, -0.2], shotgun: [0.105, -0.155, -0.12] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
 const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
 
 export class PlayerController {
@@ -226,12 +226,13 @@ export class PlayerController {
     // ---- look ----
     const baseFov = vfov(s.fov);
     const zoom = lerp(1, this.adsFov(def) / baseFov, c.adsT);
-    const sens = 0.0022 * s.sensitivity * zoom;
+    const stunK = c.stunT > 0 ? 1 - 0.65 * Math.min(1, c.stunT / 1.5) : 1;   // stunned: aim drags
+    const sens = 0.0022 * s.sensitivity * zoom * stunK;
     const inv = s.invertY ? -1 : 1;
     c.yaw -= inp.mouseDX * sens;
     c.pitch -= inp.mouseDY * sens * inv;
     if (inp.lookX || inp.lookY) {
-      let rate = 3.6 * s.padSensitivity * Math.pow(zoom, 0.8);
+      let rate = 3.6 * s.padSensitivity * Math.pow(zoom, 0.8) * stunK;
       const aa = this.aimAssist(dt, s);
       rate *= aa;
       c.yaw -= inp.lookX * rate * dt;
@@ -320,16 +321,18 @@ export class PlayerController {
     // frag: hold to pull the pin and cook, release to throw. Hold past the fuse and it goes off in your hand.
     let thrownCook = null;
     const gHeld = inp.grenadeHeld;
+    const lspec = EQUIPMENT[c.lethal] || EQUIPMENT.frag;
     if (this.cookT === null) {
       if (canAct && gHeld && !this.gLatch && c.canThrow()) {
         this.cookT = 0; this.nextTick = 1; this.inspectT = 0;
         c.weapon.cancelReload();
-        g.audio.play('pin', null);
+        if (lspec.cook) g.audio.play('pin', null);
       }
     } else {
       this.cookT += dt;
-      if (this.cookT >= this.nextTick && this.cookT < GRENADE.fuse) { g.audio.play('ui', null, { ui: true, freq: 1500 + this.nextTick * 250 }); this.nextTick += this.cookT > GRENADE.fuse - 1.2 ? 0.25 : 1; }
-      if ((!gHeld || this.cookT >= GRENADE.fuse) && canAct) {
+      // only the frag cooks (ticks, and goes off in your hand if held too long); the rest throw on release
+      if (lspec.cook && this.cookT >= this.nextTick && this.cookT < lspec.fuse) { g.audio.play('ui', null, { ui: true, freq: 1500 + this.nextTick * 250 }); this.nextTick += this.cookT > lspec.fuse - 1.2 ? 0.25 : 1; }
+      if ((!gHeld || (lspec.cook && this.cookT >= lspec.fuse)) && canAct) {
         thrownCook = this.cookT;
         this.cookT = null;
         this.gLatch = gHeld;
@@ -337,6 +340,9 @@ export class PlayerController {
       } else if (!canAct) this.cookT = null;
     }
     if (!gHeld) this.gLatch = false;
+    // tactical (RB / E): thrown straight away
+    let threwTac = false;
+    if (canAct && this.cookT === null && inp.action('tactical') && c.canTactical()) { c.throwTactical(); threwTac = true; this.inspectT = 0; }
     // inspect (I / D-pad down): works during the start countdown too
     if (inp.action('inspect') && !c.weapon.reloading && c.switchT <= 0 && this.cookT === null) { this.inspectT = INSPECT; this.inspectCur = c.cur; }
     if (this.inspectT > 0) {
@@ -354,6 +360,7 @@ export class PlayerController {
     this.cmd.u = g.gm && inp.useHeld && !g.frozen ? 1 : 0;
     const acts = inp.used.filter(a => a === 'reload' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
     if (thrownCook !== null) { acts.push('grenade'); this.cmd.gk = thrownCook; }
+    if (threwTac) acts.push('tactical');
     if (acts.length) this.cmd.a = acts;
     c.adsT = clamp(c.adsT + Math.sign(adsWant - c.adsT) * dt / def.adsTime, 0, 1);
 
@@ -403,11 +410,16 @@ export class PlayerController {
     if (!best) { A.target = null; return 1; }
     best.chestPos(_c).sub(eye);
     const ty = Math.atan2(-_c.x, -_c.z), tp = Math.atan2(_c.y, Math.hypot(_c.x, _c.z));
-    if (A.target === best) {
-      // rotational assist: follow a share of the target's angular motion
-      const strength = 0.4 + 0.25 * c.adsT;
-      c.yaw += angDiff(A.yaw, ty) * strength;
-      c.pitch += (tp - A.pitch) * strength * 0.6;
+    const inp = g.input, steering = Math.abs(inp.lookX || 0) + Math.abs(inp.lookY || 0) > 0.05 || Math.abs(inp.moveX || 0) + Math.abs(inp.moveY || 0) > 0.1;
+    if (A.target === best && steering) {
+      // rotational assist: follow part of the target's angular motion, only while you're aiming or moving
+      // (never on its own), capped so it can't swing the view
+      const strength = 0.22 + 0.18 * c.adsT, cap = 1.1 * dt;
+      const dy = angDiff(A.yaw, ty), dp = tp - A.pitch;
+      if (Math.abs(dy) < 0.12 && Math.abs(dp) < 0.12) {
+        c.yaw += clamp(dy * strength, -cap, cap);
+        c.pitch += clamp(dp * strength * 0.6, -cap, cap);
+      }
     }
     A.target = best; A.yaw = ty; A.pitch = tp;
     const dist = best.pos.distanceTo(c.pos);
@@ -425,9 +437,12 @@ export class PlayerController {
       const eye = c.eyePos(_a);
       A.target.chestPos(_c).sub(eye);
       const ty = Math.atan2(-_c.x, -_c.z), tp = Math.atan2(_c.y, Math.hypot(_c.x, _c.z));
-      const k = Math.min(1, dt * 9) * 0.6;
-      c.yaw += angDiff(c.yaw, ty) * k;
-      c.pitch += (tp - c.pitch) * k;
+      // a gentle pull when you aim down sights near a target (only if they're already close to the crosshair)
+      const ey = angDiff(c.yaw, ty), ep = tp - c.pitch;
+      if (Math.abs(ey) > 0.1 || Math.abs(ep) > 0.1) { A.snapT = 0; return; }
+      const k = Math.min(1, dt * 9) * 0.35;
+      c.yaw += ey * k;
+      c.pitch += ep * k;
     }
   }
 
@@ -576,7 +591,7 @@ export class PlayerController {
     );
     h.rotation.set(
       this.kickRot * (a > 0.5 ? 0.025 : 0.07) * (G.type === 'launcher' ? 2.4 : 1) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 * (1 - ae * 0.9) + mel * 0.2 + J.r,
-      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 * (1 - ae * 0.9) + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yaw),
+      spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 * (1 - ae * 0.9) + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yawBy[G.type] ?? VM_TUNE.yaw),
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6 * (1 - ae * 0.9),
     );
     // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
@@ -595,6 +610,10 @@ export class PlayerController {
       h.rotation.y += sw * (pis ? 0.25 : 0.3);
       h.rotation.z += sw * (pis ? 0.55 : 0.4);
     }
+    // mantling: the gun dips and rolls away while the free hand pulls you up
+    if (c.mantle) { const k = Math.sin(c.mantle.t * Math.PI); h.position.y -= 0.1 * k; h.position.x += 0.03 * k; h.rotation.x -= 0.4 * k; h.rotation.z -= 0.3 * k; }
+    if (this.prevMantle && !c.mantle) { J.vy -= 0.2; J.vr += 0.8; }
+    this.prevMantle = !!c.mantle;
     if (this.prevSw > 0.02 && sw <= 0.02) { J.vy += 0.12; J.vr -= 0.7; }  // settle as it arrives
     this.prevSw = sw;
     // per-gun hip pose (the pistol is held up and turned in, both hands on it, like CoD)

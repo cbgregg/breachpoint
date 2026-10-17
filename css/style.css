@@ -265,6 +265,7 @@ body.ingame #touch.on { display: block; }
 #tb-crouch { right: 92px; bottom: 12px; }
 #tb-swap { right: 192px; bottom: 30px; }
 #tb-frag { right: 192px; bottom: 106px; }
+#tb-tac { right: 192px; bottom: 182px; }
 #tb-melee { right: 34px; bottom: 196px; }
 #tb-sprint { left: 22px; bottom: 112px; }
 #stick.sprint { border-color: rgba(var(--bo-rgb), 0.9); box-shadow: 0 0 0 2px rgba(var(--bo-rgb), 0.35); }
@@ -1592,3 +1593,17 @@ button.lcard, .wbox, .wpc { cursor: pointer; }
 .fast-fx i { position: absolute; inset: 0; opacity: 0; }
 .fast-fx .fx-dmg { background: radial-gradient(ellipse at center, rgba(97, 5, 5, 0) 38%, rgba(97, 5, 5, 0.55) 72%, rgba(70, 0, 0, 0.9) 100%); }
 .fast-fx .fx-flash { background: #fff; }
+
+/* equipment: names next to the counts; the stun overlay (blurred, washed-out edges while stunned) */
+.equip small { font-size: 9px; letter-spacing: 0.14em; color: var(--ink-dim); margin-left: 3px; }
+#stun-fx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(220, 230, 255, 0) 30%, rgba(200, 215, 255, 0.55) 80%, rgba(235, 240, 255, 0.85) 100%); backdrop-filter: blur(2px); }
+.p10-row.eqp { grid-template-columns: repeat(3, 1fr); max-width: 520px; }
+.lcard.small .ico { max-height: 44px; }
+
+.gpu-name { font-size: 12px; letter-spacing: 0.06em; color: var(--ink-dim); text-align: right; max-width: 55%; }
+.gpu-row small b { color: var(--bo-hi); }
+.gpu-row.bad small { color: #ff8a7a; }
+select option.nr { color: #9a8f80; }
+.gpu-warn { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; background: rgba(40, 10, 8, 0.94); border: 1px solid #ff6a55; color: #fff; font-size: 13px; line-height: 1.45; }
+.gpu-warn b { font-family: var(--display); letter-spacing: 0.14em; color: #ff8a7a; }
+.gpu-warn .menu-btn { align-self: flex-end; margin: 0; }

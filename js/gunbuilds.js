@@ -309,7 +309,7 @@ export const BUILDS = {
   // ---------- D-50: big-bore hand cannon, stainless, angular fixed barrel, exposed hammer ----------
   d50(k) {
     const { p, mp, g, B, A, tinted } = k;
-    const ss = tinted(B.metal, 0x8e8f8c), dark = B.steel;
+    const ss = tinted(B.metal, 0x6c6e6c), dark = B.steel;
     const SY = 0.08;
     p.profile(ss, [[-0.034, 0.03], [0.05, 0.03], [0.05, 0.07, 0.004], [-0.028, 0.07, 0.004], [-0.034, 0.062]], 0.031, { r: 0.004, bevel: 0.0018 });            // slide
     for (let i = 0; i < 9; i++) for (const s of [-1, 1]) p.rbox(B.recess, 0.0012, 0.026, 0.0016, s * 0.0155, 0.05, 0.022 - i * 0.0048, 0.0005);
@@ -326,7 +326,7 @@ export const BUILDS = {
     p.rbox(ss, 0.036, 0.006, 0.012, 0, 0.058, 0.02, 0.002);                                          // ambi safety
     notch(p, dark, -0.018, 0.072, SY, 0.02);
     p.rbox(dark, 0.0035, SY - 0.072, 0.008, 0, (SY + 0.072) / 2, -0.205, 0.001);
-    let sight = { sightY: SY - 0.0005, sightZ: 0.018, eyeRelief: -0.32, frontZ: -0.205 + 0.0045, postTop: SY };
+    let sight = { sightY: SY - 0.0005, sightZ: 0.018, eyeRelief: -0.42, frontZ: -0.205 + 0.0045, postTop: SY };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.075, 0.04, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.219, k.muzzleDevice(p, B, A.muzzle, 0.05, 0.218, 0.0095, 0.14));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, -0.002, 0.14, 0.022) : null;
@@ -364,7 +364,7 @@ export const BUILDS = {
     guard(p, blue, -0.002, 0.012, 0.07, 0.038, 0.008, dark);
     p.profile(wood, [[-0.034, 0.012], [0.02, 0.006], [0.017, -0.03, 0.01], [0.012, -0.1, 0.014], [-0.03, -0.106, 0.012], [-0.046, -0.08, 0.012], [-0.042, -0.02, 0.012]], 0.032, { bevel: 0.006, r: 0.01 });
     for (let i = 0; i < 2; i++) p.rbox(B.recess, 0.033, 0.003, 0.012, 0, -0.04 - i * 0.024, -0.016, 0.001);
-    let sight = { sightY: SY - 0.0005, sightZ: 0.0, eyeRelief: -0.32, frontZ: -0.213 + 0.0025, postTop: SY };
+    let sight = { sightY: SY - 0.0005, sightZ: 0.0, eyeRelief: -0.4, frontZ: -0.213 + 0.0025, postTop: SY };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.066, 0.03, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.226, k.muzzleDevice(p, B, A.muzzle, 0.047, 0.225, 0.0095, 0.13));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, 0.008, 0.16, 0.016) : null;
@@ -391,7 +391,7 @@ export const BUILDS = {
     p.rbox(dark, 0.004, 0.01, 0.012, -0.0158, 0.016, -0.004, 0.002);                                    // select-fire lever
     for (const x of [-0.0072, 0.0072]) p.rbox(dark, 0.0068, 0.0075, 0.007, x, 0.0665, 0.012, 0.0014);
     p.rbox(dark, 0.0038, 0.007, 0.005, 0, 0.0665, -0.215, 0.0012);
-    let sight = { sightY: 0.0695, sightZ: 0.012, eyeRelief: -0.32, frontZ: -0.215 + 0.003, postTop: 0.07 };
+    let sight = { sightY: 0.0695, sightZ: 0.012, eyeRelief: -0.4, frontZ: -0.215 + 0.003, postTop: 0.07 };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.0645, 0.035, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.236, k.muzzleDevice(p, B, A.muzzle, 0.047, 0.235, 0.0075, 0.13));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, 0.0, 0.16, 0.02) : null;

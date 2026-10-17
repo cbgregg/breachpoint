@@ -137,7 +137,7 @@ export class BotBrain {
   newAimError(t) {
     const dist = t.pos.distanceTo(this.bot.pos);
     const cover = 1 + (1 - clamp(this.expo ?? 1, 0, 1)) * 1.6; // harder to hit what you can barely see
-    const mag = this.diff.aimError * dist * rand(0.4, 1.2) * cover + 0.15;
+    const mag = (this.diff.aimError * dist * rand(0.4, 1.2) * cover + 0.15) * (this.bot.stunT > 0 ? 3 : 1);   // stunned: wild aim
     this.aimErr.set(rand(-1, 1), rand(-0.6, 0.6), rand(-1, 1)).normalize().multiplyScalar(mag);
     this.aimHead = Math.random() < this.diff.headChance;
     this.aimErrT = rand(0.25, 0.55);
@@ -438,6 +438,8 @@ export class BotBrain {
           this.grenadeT = rand(10, 20);
         }
       }
+      // tactical: stun someone they're fighting at mid range, now and then
+      if (this.grenadeT > 0 && engaging && b.tacticals > 0 && dist > 6 && dist < 20 && Math.random() < 0.12) { b.throwTactical(this.target.pos.clone()); this.grenadeT = Math.max(this.grenadeT, 6); }
     }
 
     if (!engaging || this.reactT > 0) return;

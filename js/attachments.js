@@ -1,6 +1,6 @@
 // Gunsmith: attachment slots per weapon, their stat trade-offs, and the compact loadout string
 // that travels over the network ("rifle:acog,sup,agrip,ext,laser/pistol:iron,none,std,none").
-import { WEAPONS, PRIMARIES, SECONDARIES } from './config.js';
+import { WEAPONS, PRIMARIES, SECONDARIES, LETHALS, TACTICALS } from './config.js';
 
 export const SLOTS = ['optic', 'muzzle', 'under', 'mag', 'laser'];
 export const SLOT_NAMES = { optic: 'Optic', muzzle: 'Muzzle', under: 'Underbarrel', mag: 'Magazine', laser: 'Laser' };
@@ -113,18 +113,21 @@ function parsePart(str, allowed) {
 }
 
 // "primary:atts/secondary:atts". Older clients only ever send the P-45 as the secondary, which still parses.
-export function encodeLoadout(primary, att, secAtt, secondary = 'pistol') {
+export function encodeLoadout(primary, att, secAtt, secondary = 'pistol', lethal = 'frag', tactical = 'stun') {
   const p = PRIMARIES.includes(primary) ? primary : 'rifle', q = SECONDARIES.includes(secondary) ? secondary : 'pistol';
-  return part(p, cleanAtt(p, att)) + '/' + part(q, cleanAtt(q, secAtt));
+  return part(p, cleanAtt(p, att)) + '/' + part(q, cleanAtt(q, secAtt)) + '/' + equipPart(lethal, tactical);
 }
+const equipPart = (l, t) => (LETHALS.includes(l) ? l : 'frag') + '.' + (TACTICALS.includes(t) ? t : 'stun');
 
 // accepts a loadout string or a bare weapon id (older clients); always returns something valid
 export function parseLoadout(str) {
-  const [a, b] = typeof str === 'string' ? str.split('/') : [];
+  const [a, b, e] = typeof str === 'string' ? str.split('/') : [];
+  const [le, ta] = typeof e === 'string' ? e.split('.') : [];
+  const lethal = LETHALS.includes(le) ? le : 'frag', tactical = TACTICALS.includes(ta) ? ta : 'stun';
   const any = [...PRIMARIES, ...SECONDARIES];   // Gun Game puts any gun in either slot
   const prim = parsePart(a, any) || { id: 'rifle', att: defaultsFor('rifle') };
   const sec = parsePart(b, any) || { id: 'pistol', att: defaultsFor('pistol') };
-  return { primary: prim.id, att: prim.att, secondary: sec.id, pistolAtt: sec.att, str: part(prim.id, prim.att) + '/' + part(sec.id, sec.att) };
+  return { primary: prim.id, att: prim.att, secondary: sec.id, pistolAtt: sec.att, lethal, tactical, str: part(prim.id, prim.att) + '/' + part(sec.id, sec.att) + '/' + equipPart(lethal, tactical) };
 }
 
 // Gun Game: the same gun in both slots, stock attachments
@@ -132,7 +135,7 @@ export function soloLoadout(id) { const a = cleanAtt(id, {}); return part(id, a)
 
 export function loadoutFromSettings(s) {
   const all = s.attachments || {}, sec = SECONDARIES.includes(s.secondary) ? s.secondary : 'pistol';
-  return encodeLoadout(s.primary, all[s.primary], all[sec], sec);
+  return encodeLoadout(s.primary, all[s.primary], all[sec], sec, s.lethal, s.tactical);
 }
 
 // bots: a random build, with a random handgun (never The Monte) as the sidearm
@@ -143,7 +146,7 @@ export function randomLoadout(primary, secondary) {
     return att;
   };
   const pist = secondary || ['pistol', 'pistol', 'd50', 'r357', 'mp18'][(Math.random() * 5) | 0];
-  return encodeLoadout(primary, pick(primary), pick(pist), pist);
+  return encodeLoadout(primary, pick(primary), pick(pist), pist, LETHALS[(Math.random() * LETHALS.length) | 0], 'stun');
 }
 
 // short human summary of a weapon's attachments (non-default only)
