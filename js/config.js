@@ -200,7 +200,13 @@ export function presetGfx(name) {
     gfxDust: String(q.motes), gfxAniso: String(q.aniso), gfxPath: q.fast ? 'fast' : 'post', gfxDetail: q.lowPoly ? 'low' : 'full',
   };
 }
+// FSR 1 upscaling: render scale per mode (AMD's ratios) and RCAS sharpening in stops (0 = sharpest)
+export const FSR_MODES = { off: 0, ultra: 1 / 1.3, quality: 1 / 1.5, balanced: 1 / 1.7, performance: 1 / 2 };
 export function qualityFrom(s) {
+  const fsr = { fsr: FSR_MODES[s.fsr] || 0, fsrSharp: 2 * (1 - Math.min(100, Math.max(0, s.fsrSharp ?? 80)) / 100) };
+  return { ...qualityFromGfx(s), ...fsr };
+}
+function qualityFromGfx(s) {
   if (s.quality !== 'custom') { const q = QUALITY[s.quality] || QUALITY.high, dpr = dprNow(); return { ...q, pr: Math.min(dpr, isTouch() && !q.fast ? Math.max(1.25, q.pixelRatio) : q.pixelRatio) }; }
   const d = presetGfx('high'), v = (k) => s[k] ?? d[k];
   return {
@@ -228,6 +234,8 @@ export const PUBLIC_MATCH = { fillBots: true, mode: 'tdm', teamSize: 6, difficul
 export const MUSIC_FILES = { menu: null, action: null };
 
 export const DEFAULT_SETTINGS = {
+  fsr: 'off',          // FSR 1 upscaling mode (FSR_MODES)
+  fsrSharp: 80,        // RCAS sharpening, 0-100
   vmFov: 74,           // weapon (viewmodel) field of view at the hip: wider = smaller gun
   fpsCap: 0,           // 0 = unlimited (the display's refresh rate)
   fullscreen: true,    // desktop matches go fullscreen with the keyboard locked (so Ctrl+W crouches instead of closing the tab)

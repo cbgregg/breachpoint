@@ -466,7 +466,7 @@ export class Game {
     this.music.ambient(amb ? amb.music : null);
     if (amb) this.music.ambientLevel(amb.inside(this.camera.position.x, this.camera.position.z) ? 0.85 : 0.18);
     if (this.state !== 'paused' || this.mode !== 'local') this.effects.update(dt);
-    this.effects.setScale(this.camera, window.innerHeight * this.renderer.renderer.getPixelRatio());
+    this.effects.setScale(this.camera, window.innerHeight * this.renderer.renderPR());
     // keep the viewmodel lit from the sun's direction as the camera turns
     _q.copy(this.camera.quaternion).invert();
     this.vmSun.position.copy(SUN_DIR).applyQuaternion(_q).multiplyScalar(5);
