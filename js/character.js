@@ -263,6 +263,15 @@ function aimArm(arm, S, H, pole) {
   aimLimb(arm.fore, _E, H);
 }
 
+// melee swing seen from outside: a short wind-up back, the strike, a hold, then an eased recovery (matches the
+// first-person animation's timing)
+function meleeSwing(t) {
+  const p = Math.max(0, Math.min(1, 1 - t / MELEE.time));
+  const sm = (a, b, x) => { const k = Math.max(0, Math.min(1, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+  const q = Math.max(0, Math.min(1, (p - 0.5) / 0.5)), ease = q * q * q * (q * (q * 6 - 15) + 10);
+  return -0.35 * sm(0, 0.2, p) * (1 - sm(0.2, 0.34, p)) + sm(0.2, 0.34, p) * (1 - ease);
+}
+
 // ---------- character ----------
 export class Character {
   constructor(game, { name, team, isBot, primary, remote = false, puppet = false, id }) {
@@ -609,7 +618,7 @@ export class Character {
     m.aim.rotation.y = this.sprinting ? 0.5 : 0;
     m.aim.position.z = m.kick * 0.03;
     m.head.rotation.x = this.pitch * 0.5 - m.spine.rotation.x;
-    if (this.meleeT > 0) m.aim.rotation.x -= Math.sin((1 - this.meleeT / MELEE.time) * Math.PI) * 0.8;
+    if (this.meleeT > 0) m.aim.rotation.x -= meleeSwing(this.meleeT) * 0.8;
     m.aim.rotation.z = this.weapon.reloading ? Math.sin(this.weapon.reloadProgress * Math.PI) * 0.5 : 0;
     m.nameTag.visible = false; // names are drawn by the HUD (crisp on every device)
   }
@@ -805,7 +814,7 @@ function animateSoldier(c, dt, showName) {
   m.kick = Math.max(0, m.kick - dt * 12);
   _eu.set(pitch, c.yaw + (tac ? 0.35 : c.sprinting ? 0.6 : 0), c.weapon.reloading ? Math.sin(c.weapon.reloadProgress * Math.PI) * 0.5 : 0);
   _qAim.setFromEuler(_eu);
-  if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -Math.sin((1 - c.meleeT / MELEE.time) * Math.PI) * 0.7));
+  if (c.meleeT > 0) _qAim.multiply(_qa.setFromAxisAngle(_w1.set(1, 0, 0), -meleeSwing(c.meleeT) * 0.7));
   const pistol = typeOf(m.weaponId) === 'pistol';
   B.Spine2.getWorldPosition(_w3);
   _w1.set(pistol ? 0.04 : 0.13, pistol ? 0.12 : tac ? -0.02 : 0.04, (pistol ? -0.42 : tac ? -0.2 : -0.26) + m.kick * 0.04).applyQuaternion(_qAim);

@@ -22,7 +22,7 @@ export const DRIVEIN = {
   bounds: { hx: HX, hz: HZ },
   skyline: false, mountain: false,
   // dusk: the sun just down behind the trees, a violet sky, the lot lit by lamps, neon and the screens
-  look: { dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 6, sunAz: 205,
+  look: { dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 14, sunAz: 205,
     hemi: 1.0, hemiSky: 0x7a7ab8, ground: 0x3a3028, exposure: 1.05, env: 0.55 },
   spawns: DRIVEIN_SPAWNS,
   pickups: [
@@ -265,15 +265,15 @@ function build(ctx) {
     for (const s of [-1, 1]) {
       const fg = new THREE.ExtrudeGeometry(fin, { depth: 0.08, bevelEnabled: false }); fg.translate(0, 0, -0.04);
       F.g(fg, M.gloss, 0, 0.02, s * (W / 2 - 0.06), { tint: paint });
-      F.bx(M.tail, 0.05, 0.1, 0.1, -2.33, 0.95, s * (W / 2 - 0.06));
+      F.bx(M.tail, 0.05, 0.1, 0.1, -2.38, 0.95, s * (W / 2 - 0.06));
       F.bx(M.chrome, 3.9, 0.04, 0.03, 0.0, 0.7, s * (W / 2 + 0.005), { grime: 0 });   // side spear
       F.bx(M.gloss, 2.4, 0.18, 0.02, -0.4, 0.5, s * (W / 2 + 0.005), { tint: roof, grime: 0 }); // two-tone flash
     }
     // bumpers, grille, headlights, hood ornament
     F.bx(M.chrome, 0.16, 0.18, W + 0.08, 2.36, 0.3, 0, { grime: 0 });
     F.bx(M.chrome, 0.16, 0.18, W + 0.08, -2.38, 0.3, 0, { grime: 0 });
-    F.bx(M.chrome, 0.04, 0.22, 1.1, 2.33, 0.5, 0, { grime: 0, tint: 0x9a9a9a });
-    for (const s of [-1, 1]) F.g(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 14), M.head, 2.3, 0.72, s * 0.66, { rz: Math.PI / 2 });
+    F.bx(M.chrome, 0.04, 0.22, 1.1, 2.4, 0.5, 0, { grime: 0, tint: 0x9a9a9a });
+    for (const s of [-1, 1]) F.g(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 14), M.head, 2.39, 0.72, s * 0.66, { rz: Math.PI / 2 });
     F.g(new THREE.ConeGeometry(0.03, 0.14, 6), M.chrome, 2.05, 0.95, 0, { rz: -Math.PI / 2 });
     for (const lx of [-1.35, 1.42]) for (const s of [-1, 1]) wheel(F, lx, s * 0.82);
     // collision: the body, then the cabin (mostly glass: bullets go through)
@@ -297,7 +297,7 @@ function build(ctx) {
     F.bx(M.enamel, 2.8, 0.06, W - 0.1, -1.18, 2.49, 0, { tint: 0xc8c4b8 });
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, 2.66, 0.3, 0, { grime: 0 });
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, -2.66, 0.3, 0, { grime: 0 });
-    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14), M.head, 2.56, 0.88, s * 0.7, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.16, 0.12, -2.66, 0.62, s * 0.86); }
+    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14), M.head, 2.64, 0.88, s * 0.7, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.16, 0.12, -2.66, 0.62, s * 0.86); }
     for (const lx of [-1.7, 1.75]) for (const s of [-1, 1]) wheel(F, lx, s * 0.88, 0.4, false);
     F.solid(0, 0, 5.3, W, 0.74, 0.3, 'metal');
     F.solid(-1.18, 0, 3.0, W + 0.1, 1.48, 1.04, 'metal');
@@ -318,7 +318,7 @@ function build(ctx) {
     for (const s of [-1, 1]) F.bx(M.glass, 0.7, 0.5, 0.04, 1.6, 1.6, s * (W / 2 + 0.02), { grime: 0 });
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, 2.52, 0.3, 0, { grime: 0 });
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, -2.52, 0.3, 0, { grime: 0 });
-    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 14), M.head, 2.45, 0.9, s * 0.72, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.14, 0.1, -2.5, 0.9, s * 0.86); }
+    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 14), M.head, 2.52, 0.9, s * 0.72, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.14, 0.1, -2.54, 0.9, s * 0.86); }
     for (const lx of [-1.6, 1.6]) for (const s of [-1, 1]) wheel(F, lx, s * 0.86, 0.38);
     F.solid(0, 0, 4.9, W, 2.1, 0.32, 'metal');
   }
@@ -346,7 +346,7 @@ function build(ctx) {
     } else {
       for (const s of [-1, 1]) F.bx(M.glass, 0.7, 0.5, 0.04, 1.8, 1.65, s * (W / 2 + 0.02), { grime: 0 });
     }
-    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 14), M.head, L / 2 - 0.05, 0.85, s * 0.78, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.14, 0.12, -L / 2, 0.9, s * 0.9); }
+    for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 14), M.head, L / 2 + 0.01, 0.85, s * 0.78, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.14, 0.12, -L / 2 - 0.02, 0.9, s * 0.9); }
     for (const lx of [-1.9, 1.8]) for (const s of [-1, 1]) wheel(F, lx, s * 0.95, 0.42, false);
     F.solid(-0.15, 0, L - 0.3, W, 2.3, 0.42, 'metal');
   }
@@ -420,9 +420,9 @@ function build(ctx) {
     const x = s * XS;
     // the screen face: white board, the picture on it, a dark frame
     const fx = x - s * 1.21, W = WS - 0.6, H = 10.6, yc = 3.0 + H / 2;
-    B(M.enamel, 0.02, H + 0.4, W + 0.4, fx + s * 0.01, yc - H / 2 - 0.2, 0, 0, { tint: 0x1a1c1e, grime: 0 });
+    B(M.enamel, 0.03, H + 0.4, W + 0.4, fx, yc - H / 2 - 0.2, 0, 0, { tint: 0x1a1c1e, grime: 0 });   // 2.5 cm behind the picture: no flicker from across the lot
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(W, H), screenMat);
-    scr.position.set(fx - s * 0.005, yc, 0); scr.rotation.y = face(-s, 0);
+    scr.position.set(fx - s * 0.04, yc, 0); scr.rotation.y = face(-s, 0);
     group.add(scr); signs.push(scr);
     // the theatre's name painted on the back, for the road
     signMesh(textTex('STARLITE', { bg: null, fg: '#e8e0c8', w: 1024, h: 220, font: `900 170px "Arial Black", Impact, sans-serif` }), 18, 3.9, x + s * 1.24, 10.2, 0, face(s, 0), 0.25, { transparent: true });
@@ -636,7 +636,7 @@ function build(ctx) {
     // roof slab and parapet (gaps where the stairs arrive)
     solid(0, 0, w, d, 0.3, ROOF - 0.3, 'concrete');
     B(M.concrete, w + 0.2, 0.3, d + 0.2, 0, ROOF - 0.3, 0, 0, { tint: 0xd8d0c0, grime: 0.2 });
-    plane(M.concrete, w, d, 0, 0, ROOF + 0.005, 0, 0x9a948a);
+    plane(M.concrete, w, d, 0, 0, ROOF + 0.02, 0, 0x9a948a);
     const PH = 0.95, pt = 0.25;
     for (const s of [-1, 1]) {
       // ends (x): full; sides (z): a gap at the stair head
@@ -861,7 +861,7 @@ function build(ctx) {
       flick += dt;
       if (flick > 0.07) {
         flick = 0;
-        const f = 0.9 + Math.sin(time * 37) * 0.03 + (Math.random() < 0.04 ? -0.12 : 0);
+        const f = 0.92 + Math.sin(time * 23) * 0.012;      // a faint projector shimmer (no sudden dips)
         screenMat.color.setScalar(f);
       }
       const on = Math.floor(time * 3) % 2 === 0;
