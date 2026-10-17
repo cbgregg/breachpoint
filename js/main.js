@@ -93,7 +93,7 @@ const outputs = {
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
 // the map dropdown is built from the map list, so every map shows up in the menu
-const MAP_TAGS = { shuran: '3 lanes', mart: 'indoor', pioneer: 'Underground site' };
+const MAP_TAGS = { shuran: '3 lanes', mart: 'indoor', pioneer: 'Underground site', drivein: 'night' };
 {
   const sel = $('opt-map');
   sel.innerHTML = Object.values(MAPS).map(m => `<option value="${m.id}">${m.name}${MAP_TAGS[m.id] ? ` · ${MAP_TAGS[m.id]}` : ''}</option>`).join('') + '<option value="random">Random</option>';

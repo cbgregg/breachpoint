@@ -68,7 +68,8 @@ const GUN_FILES = {
   g19: { file: 'assets/models/g19.glb', xf: { s: 0.95, ry: Math.PI, x: 0, y: 0, z: -0.043,
     keep: (x, y, z, k) => !k.includes('mm1') && z > -0.12 && z < 0.108 && y > -0.08 && y < 0.09 && !(z > 0.088 && y < -0.04) } },
 };
-const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/models/mags.glb', corkboard: 'assets/models/corkboard.glb', stairs: 'assets/models/stairs.glb', downtown: 'assets/models/downtown.glb', bin: 'assets/models/bin.glb' };
+const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/models/mags.glb', corkboard: 'assets/models/corkboard.glb', stairs: 'assets/models/stairs.glb', downtown: 'assets/models/downtown.glb', bin: 'assets/models/bin.glb',
+  fridge: 'assets/models/fridge.glb', lantern: 'assets/models/lantern.glb', cone: 'assets/models/cone.glb' };
 async function loadProps() {
   await Promise.all(Object.entries(PROP_FILES).map(async ([name, file]) => {
     try { setProp(name, (await new GLTFLoader().loadAsync(file)).scene); }

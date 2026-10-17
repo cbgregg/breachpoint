@@ -6,6 +6,7 @@ import { Box } from './physics.js';
 import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
+import { DRIVEIN } from './drivein.js';
 import { PROPS, containerVariants, buildingVariants } from './props.js';
 
 // Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
@@ -326,6 +327,7 @@ export const MAPS = {
   pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; bomb site A is down in the Underground', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_LOWER, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
+  drivein: DRIVEIN,
 };
 export const MAP_IDS = Object.keys(MAPS);
 
@@ -2203,7 +2205,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // distant city skyline beyond the perimeter (hazed by fog): real downtown buildings when the model set is
   // loaded (CC-BY 4.0, "Downtown Buildings Set - Low Poly model" by Daniel Zhabotinsky), boxes otherwise
   const BV = buildingVariants();
-  if (BV && BV.length) {
+  if (LAYOUT.skyline === false) { /* the map dresses its own horizon */ }
+  else if (BV && BV.length) {
     const R0 = Math.max(HX, HZ) + 26;
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + rnd() * 0.08;
@@ -2222,7 +2225,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
 
   batch.build(group);
-  group.add(buildMountain());
+  if (LAYOUT.mountain !== false) group.add(buildMountain());
 
   const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
   if (LAYOUT.spawns2) {
