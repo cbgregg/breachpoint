@@ -295,7 +295,7 @@
         <nav class="tabs" role="tablist">
           <span class="glyph bumper" data-act="prevTab"></span>
           <button class="tab on" data-tab="play" data-nav>PLAY</button>
-          <button class="tab" data-tab="loadout" data-nav>CREATE A CLASS</button>
+          <button class="tab" data-tab="loadout" data-nav>WEAPONS</button>
           <button class="tab" data-tab="options" data-nav>OPTIONS</button>
           <span class="glyph bumper" data-act="nextTab"></span>
         </nav>
@@ -304,26 +304,33 @@
 
       <div class="mw-body">
         <section class="pane on" id="pane-play">
-          <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
-          <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
-          <div class="sec-k mo-on">1 · GAME MODE</div>
-          <div class="mode-pick" role="radiogroup" aria-label="Game mode">
+          <div class="crumbs" id="play-crumbs"></div>
+          <!-- PLAY, level 1: playlist tiles (MW2019 style); each opens its own page -->
+          <div class="pv on" id="pv-root"><div class="tiles" id="play-tiles" role="list"></div></div>
+          <!-- level 2, online: Quick Play playlist -->
+          <div class="pv" id="pv-quick">
+            <h2 class="pane-title">QUICK PLAY</h2>
+            <p class="pane-sub">Drop into a public match. Pick the playlist; maps are voted on in the lobby between matches.</p>
+            <div class="sec-k">PLAYLIST</div>
+            <div class="mode-pick" role="radiogroup" aria-label="Game mode">
             <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
             <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
             <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
             <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Kill to get the next gun · 15 guns</small></button>
           </div>
-          <div class="sec-k mo-on">2 · QUICK MATCH <small>public · drop in</small></div>
-          <button id="quick-btn" class="menu-btn quick mo-on" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
-          <p class="pane-note mo-on">Joins a public match in the mode above. <b>Maps aren't picked here:</b> players vote on the next map in the lobby between matches.</p>
-          <div class="sec-k mo-on">OR · PRIVATE MATCH <small>play with friends</small></div>
-          <div class="online-row mo-on">
-            <button id="host-btn" class="menu-btn" data-nav>HOST <small>GET A 6-DIGIT CODE</small></button>
-            <button id="join-btn" class="menu-btn" data-nav>JOIN <small>ENTER A FRIEND'S CODE</small></button>
+            <button id="quick-btn" class="menu-btn quick" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
           </div>
-          <div class="sec-k mo-on sm">PRIVATE MATCH SETTINGS <small>used when you host</small></div>
-          <div class="rows" id="play-rows">
-            <div class="row" style="display:none"><label for="opt-mode">Mode</label><select id="opt-mode">
+          <!-- level 2: match setup (offline: the mode you picked; online: private match) -->
+          <div class="pv" id="pv-setup">
+            <h2 class="pane-title" id="play-title">TEAM DEATHMATCH</h2>
+            <p class="pane-sub">Two squads, one district. First team to the score limit wins.</p>
+            <div class="online-row mo-on">
+              <button id="host-btn" class="menu-btn" data-nav>HOST <small>GET A 6-DIGIT CODE</small></button>
+              <button id="join-btn" class="menu-btn" data-nav>JOIN <small>ENTER A FRIEND'S CODE</small></button>
+            </div>
+            <div class="sec-k">MATCH SETTINGS <small class="mo-on">used when you host</small></div>
+            <div class="rows" id="play-rows">
+            <div class="row mo-on"><label for="opt-mode">Mode</label><select id="opt-mode" data-nav>
               <option value="tdm">Team Deathmatch</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="pioneer">Pioneer Square</option><option value="mart">Freshway · indoor</option><option value="drivein">Drive-In</option><option value="random">Random</option></select></div>
@@ -338,8 +345,9 @@
               <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select></div>
             <div class="row"><label for="opt-ff">Friendly fire</label><input type="checkbox" id="opt-ff" data-nav></div>
           </div>
-          <p class="pane-note mo-on">Online play is peer-to-peer: the host's browser runs the match. Bots fill empty slots.</p>
-          <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+            <p class="pane-note mo-on">Online play is peer-to-peer: the host's browser runs the match. Bots fill empty slots.</p>
+            <div class="cf-badge online-cf" title="Sign-in, the relay and this site run on Cloudflare's network"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>PROTECTED BY <b>CLOUDFLARE</b></span></div>
+          </div>
         </section>
 
         <section class="pane" id="pane-loadout">
@@ -384,7 +392,19 @@
         </section>
 
         <section class="pane" id="pane-options">
-          <h2 class="pane-title">OPTIONS</h2>
+          <div class="crumbs" id="opt-crumbs">OPTIONS</div>
+          <nav class="subtabs" id="opt-subtabs" role="tablist">
+            <span class="glyph bumper" data-act="prevSub"></span>
+            <button class="subtab on" data-sub="general" data-nav>GENERAL</button>
+            <button class="subtab" data-sub="graphics" data-nav>GRAPHICS</button>
+            <button class="subtab" data-sub="controls" data-nav>CONTROLS</button>
+            <button class="subtab" data-sub="audio" data-nav>AUDIO</button>
+            <button class="subtab acct-tab" data-sub="account" data-nav>ACCOUNT</button>
+            <button class="subtab" data-sub="about" data-nav>ABOUT</button>
+            <span class="glyph bumper" data-act="nextSub"></span>
+          </nav>
+          <div class="opt-body">
+          
           <div class="rows two">
             <div class="group">PROFILE</div>
             <div class="row"><label for="opt-name">Name Tag<small id="opt-name-note"></small></label><input id="opt-name" maxlength="16" autocomplete="off" data-nav></div>
@@ -484,9 +504,12 @@
               </tbody>
             </table>
           </div>
+            <aside class="opt-desc" id="opt-desc" aria-live="polite"><div class="od-k" id="od-k">GENERAL</div><b id="od-title"></b><p id="od-text"></p></aside>
+          </div>
         </section>
 
         <aside class="intel">
+          <div class="intel-tile" id="intel-tile"><small id="it-k"></small><b id="it-t"></b><p id="it-d"></p></div>
           <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
           <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
           <div class="intel-k">MODE</div><div class="intel-v" id="intel-mode">TEAM DEATHMATCH</div>

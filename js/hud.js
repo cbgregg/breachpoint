@@ -9,12 +9,12 @@ export const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.fl
 
 const PAD_GLYPH = {
   accept: ['A', 'a'], back: ['B', 'b'], jump: ['A', 'a'], crouch: ['B', 'b'], reload: ['X', 'x'], swap: ['Y', 'y'],
-  grenade: ['LB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'],
+  grenade: ['LB', 'bump'], melee: ['R3', 'stick'], sprint: ['L3', 'stick'], prevTab: ['LB', 'bump'], nextTab: ['RB', 'bump'], prevSub: ['LT', 'bump'], nextSub: ['RT', 'bump'],
   pause: ['☰', 'bump'], scoreboard: ['⧉', 'bump'], alt: ['Y', 'y'],
 };
 const KEY_GLYPH = {
   accept: 'Enter', back: 'Esc', jump: 'Space', crouch: 'C', reload: 'R', swap: 'Q', grenade: 'G', melee: 'V', sprint: 'Shift',
-  prevTab: 'Q', nextTab: 'E', pause: 'Esc', scoreboard: 'Tab', alt: 'F',
+  prevTab: 'Q', nextTab: 'E', prevSub: 'Z', nextSub: 'C', pause: 'Esc', scoreboard: 'Tab', alt: 'F',
 };
 export function glyph(act, device) {
   if (device === 'pad') { const [t, c] = PAD_GLYPH[act] || ['?', '']; return `<i class="pg ${c}">${t}</i>`; }

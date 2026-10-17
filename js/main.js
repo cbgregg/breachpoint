@@ -155,7 +155,8 @@ function syncModeRows() {
   document.querySelectorAll('.mode-pick .mp').forEach(b => { const on = b.dataset.mode === m.id; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
   $('intel-mode').textContent = m.name.toUpperCase();
   $('play-title').textContent = m.name.toUpperCase();
-  document.querySelector('#pane-play .pane-sub').textContent = m.blurb;
+  document.querySelector('#pv-setup .pane-sub').textContent = m.blurb;
+  try { if (screen === 'menu' && playView === 'root') renderTiles(); } catch (_) { /* still initialising */ }
   if ($('quick-sub')) $('quick-sub').textContent = `${m.name.toUpperCase()} · PUBLIC`;
 }
 $('opt-mode').addEventListener('change', () => { syncModeRows(); if (lobby && lobby.role === 'host') lobby.broadcastLobby(); });
@@ -374,8 +375,126 @@ function setTab(t) {
   game.audio.play('ui', null, { ui: true });
   document.getElementById('menu').dataset.tab = t;
   if (t === 'loadout') { if (editKey) renderGunsmith(false); else renderClasses(); }
+  if (t === 'options') setOptSub(optSub);
+  renderHints(game.input.lastDevice);
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+// ---------- PLAY as a menu tree (MW2019 style) ----------
+// Level 1 is a column of playlist tiles; each opens its own page (Back returns). Offline the tiles are the
+// game modes and open the match setup; online they're Quick Play, Private Match, Friends and Combat Training.
+let playView = 'root', tileSel = null;
+const TILE_ART = { tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
+function playTiles() {
+  if (playMode === 'online') return [
+    { id: 'quick', k: 'PUBLIC · DROP IN', t: 'QUICK PLAY', d: 'Join a public match in the playlist you pick. Players vote on the next map in the lobby.' },
+    { id: 'private', k: 'FRIENDS · 6-DIGIT CODE', t: 'PRIVATE MATCH', d: 'Host a match and share the code, or join a friend\'s. You choose the map, mode and rules; bots fill empty slots.' },
+    { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
+    { id: 'training', k: 'OFFLINE · VERSUS BOTS', t: 'COMBAT TRAINING', d: 'Switch to offline matches against bots. No account needed.' },
+  ];
+  return [...['tdm', 'gunfight', 'snd', 'gungame'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
+    { id: 'online', k: 'ONLINE · PLAYERS', t: 'MULTIPLAYER', d: 'Quick play with anyone, or a private match with friends. Sign in with your email, no password.' }];
+}
+function tilePreview(t) {
+  if (!t) return;
+  $('it-k').textContent = t.k; $('it-t').textContent = t.t; $('it-d').textContent = t.d;
+}
+function renderTiles() {
+  const list = playTiles();
+  const cur = playMode === 'online' ? null : settings.mode;
+  $('play-tiles').innerHTML = list.map(t => `<button class="tile${t.id === cur ? ' cur' : ''}" data-tile="${t.id}" data-nav role="listitem"><i class="art" style="background-image:url('assets/loading/${TILE_ART[t.id] || 'tarsa-1'}.jpg')"></i><small>${escHtml(t.k)}</small><b>${escHtml(t.t)}</b><span>${escHtml(t.d)}</span></button>`).join('');
+  tilePreview(list.find(t => t.id === tileSel) || list.find(t => t.id === cur) || list[0]);
+}
+function crumbs(id, parts) { $(id).innerHTML = parts.map((p, i) => i === parts.length - 1 ? `<b>${escHtml(p)}</b>` : `<span>${escHtml(p)}</span>`).join('<i>›</i>'); }
+function openPlayView(v) {
+  playView = v;
+  document.querySelectorAll('#pane-play .pv').forEach(p => p.classList.toggle('on', p.id === `pv-${v}`));
+  $('menu').dataset.pv = v;
+  const name = v === 'quick' ? 'QUICK PLAY' : v === 'setup' ? (playMode === 'online' ? 'PRIVATE MATCH' : (MODES[settings.mode] || MODES.tdm).name.toUpperCase()) : null;
+  crumbs('play-crumbs', name ? ['PLAY', name] : ['PLAY']);
+  if (v === 'setup' && playMode === 'online') $('play-title').textContent = 'PRIVATE MATCH';
+  if (v === 'root') renderTiles();
+  renderHints(game.input.lastDevice);
+  if (game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
+}
+$('play-tiles').addEventListener('click', (e) => {
+  const b = e.target.closest('.tile'); if (!b) return;
+  const id = tileSel = b.dataset.tile;
+  game.audio.play('ui', null, { ui: true });
+  if (MODES[id]) { const sel = $('opt-mode'); if (sel.value !== id) { sel.value = id; sel.dispatchEvent(new Event('change')); } openPlayView('setup'); }
+  else if (id === 'quick') openPlayView('quick');
+  else if (id === 'private') openPlayView('setup');
+  else if (id === 'friends') openSide();
+  else if (id === 'training') { enterMenu('offline'); }
+  else if (id === 'online') $('mode-online').click();
+});
+const tileHover = (e) => { const b = e.target.closest('.tile'); if (b) { tileSel = b.dataset.tile; tilePreview(playTiles().find(t => t.id === tileSel)); } };
+$('play-tiles').addEventListener('mouseover', tileHover);
+$('play-tiles').addEventListener('focusin', tileHover);
+
+// ---------- OPTIONS: sub-tabs and a description panel (MW2019 style) ----------
+const OPT_SUBS = ['general', 'graphics', 'controls', 'audio', 'account', 'about'];
+const SUB_NAMES = { general: 'GENERAL', graphics: 'GRAPHICS', controls: 'CONTROLS', audio: 'AUDIO', account: 'ACCOUNT', about: 'ABOUT' };
+const GROUP_SUB = { PROFILE: 'general', GRAPHICS: 'graphics', AIMING: 'controls', 'MOUSE & KEYBOARD': 'controls', CONTROLLER: 'controls', ONLINE: 'general', ACCOUNT: 'account', AUDIO: 'audio', ABOUT: 'about' };
+{
+  let cur = 'general';
+  for (const el of document.querySelector('#pane-options .rows.two').children) {
+    if (el.classList.contains('group')) cur = GROUP_SUB[el.textContent.trim().toUpperCase()] || cur;
+    el.dataset.osub = cur;
+  }
+  document.querySelector('#pane-options .controls-ref').dataset.osub = 'controls';
+}
+const OPT_DESC = {
+  'opt-name': 'The name other players see. Signed in, this is your Name Tag: it can change once a day and friends can see your previous ones.',
+  'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom.',
+  'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
+  'opt-gfxshadows': 'Resolution of the sun\'s shadows. Higher is crisper and costs more GPU time. Off is fastest.',
+  'opt-fpscap': 'Caps the frame rate to save power and heat. Unlimited follows your display.',
+  'opt-fov': 'How wide your view is. Higher shows more around you; lower makes distant targets bigger.',
+  'opt-vmfov': 'How large your weapon looks in first person. It doesn\'t change what you can see.',
+  'opt-adsmode': 'Hold: aim while the button is held. Toggle: press once to aim, press again to stop.',
+  'opt-adszoom': 'How far the view zooms when you aim down sights. Aiming sensitivity scales with it.',
+  'opt-sightsize': 'Draws red dots, holographic sights and scopes larger while aiming.',
+  'opt-sens': 'How fast the view turns with the mouse.',
+  'opt-invert': 'Moving the mouse or stick up looks down.',
+  'opt-padsens': 'How fast the view turns with the right stick.',
+  'opt-deadzone': 'Ignores small stick movements so the view doesn\'t drift. Raise it if your controller drifts.',
+  'opt-aa': 'With a controller, your aim slows over enemies and follows them slightly. Mouse aim is never assisted.',
+  'opt-vib': 'Controller rumble on shots, hits and explosions.',
+  'opt-vol': 'Volume of everything: weapons, footsteps, voices and music.',
+  'opt-music': 'Volume of the menu and match music only.',
+  'opt-touchsize': 'Size of the on-screen buttons on phones and tablets.',
+  'opt-touchads': 'Tap: tap ADS to aim and tap again to stop. Hold: aim while your finger is on the button.',
+  'opt-autofire': 'Fires automatically while your crosshair is on an enemy (touch only).',
+};
+let optSub = 'general';
+const subsAvail = () => OPT_SUBS.filter(x => x !== 'account' || document.body.classList.contains('has-account'));
+function optDescFor(row) {
+  if (!row) return;
+  const label = row.querySelector('label'); if (!label) return;
+  const c = label.cloneNode(true); c.querySelectorAll('small, output').forEach(x => x.remove());
+  const ctl = row.querySelector('input, select, button');
+  const small = label.querySelector('small');
+  $('od-title').textContent = c.textContent.replace(/\s+/g, ' ').trim();
+  $('od-text').textContent = (ctl && OPT_DESC[ctl.id]) || (small ? small.textContent.trim() : '');
+}
+function setOptSub(sub) {
+  if (!subsAvail().includes(sub)) sub = 'general';
+  optSub = sub;
+  document.querySelectorAll('#opt-subtabs .subtab').forEach(b => b.classList.toggle('on', b.dataset.sub === sub));
+  document.querySelectorAll('#pane-options [data-osub]').forEach(el => el.classList.toggle('osub-off', el.dataset.osub !== sub));
+  $('pane-options').dataset.sub = sub;
+  crumbs('opt-crumbs', ['OPTIONS', SUB_NAMES[sub]]);
+  $('od-k').textContent = SUB_NAMES[sub];
+  optDescFor(document.querySelector(`#pane-options .row[data-osub="${sub}"]:not(.osub-off) label`)?.closest('.row'));
+  document.querySelector('#pane-options .opt-body')?.scrollTo?.({ top: 0 });
+}
+function stepOptSub(d) { const l = subsAvail(), i = Math.max(0, l.indexOf(optSub)); setOptSub(l[(i + d + l.length) % l.length]); game.audio.play('ui', null, { ui: true }); }
+document.querySelectorAll('#opt-subtabs .subtab').forEach(b => b.addEventListener('click', () => { setOptSub(b.dataset.sub); game.audio.play('ui', null, { ui: true }); }));
+const optHover = (e) => { const r = e.target.closest('#pane-options .row'); if (r) optDescFor(r); };
+$('pane-options').addEventListener('mouseover', optHover);
+$('pane-options').addEventListener('focusin', optHover);
+setOptSub('general');
 
 // ---------- screens ----------
 let screen = 'menu';
@@ -478,6 +597,7 @@ function setPauseSec(sec) {
   if (sec === 'loadout') { $('psec-loadout').appendChild($('pane-loadout')); $('pane-loadout').classList.add('on'); if (editKey) renderGunsmith(false); else renderClasses(); }
   if (sec === 'options') { $('psec-options').appendChild($('pane-options')); $('pane-options').classList.add('on'); writeForm(); }
   if (sec === 'match') renderPauseMatch();
+  renderHints(game.input.lastDevice);
 }
 const mmss = (t) => `${Math.floor(Math.max(0, t) / 60)}:${String(Math.floor(Math.max(0, t) % 60)).padStart(2, '0')}`;
 function renderPauseMatch() {
@@ -1054,8 +1174,11 @@ function focusFirst() {
     : screen === 'mode' ? $(playMode === 'online' ? 'mode-online' : 'mode-offline')
     : screen === 'signin' ? document.querySelector('#signin .si-step.on .terms, #signin .si-step.on input')
     : screen === 'feedback' ? document.querySelector('[data-fb].on')
-    : screen === 'menu' ? (tab === 'play' ? $(playMode === 'online' ? 'quick-btn' : 'play') : document.querySelector(`#pane-${tab} [data-nav]`))
-    : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
+    : screen === 'menu' && tab === 'play' ? (playView === 'root' ? ($('play-tiles').querySelector(`[data-tile="${tileSel}"]`) || $('play-tiles').querySelector('.tile.cur') || $('play-tiles').querySelector('.tile'))
+      : playView === 'quick' ? $('quick-btn') : playMode === 'online' ? $('host-btn') : $('play'))
+    : screen === 'menu' && tab === 'options' ? document.querySelector('#pane-options .row:not(.osub-off) [data-nav]')
+    : screen === 'menu' ? document.querySelector(`#pane-${tab} [data-nav]`)
+    : screen === 'pause' ? (pauseSec === 'match' ? $('resume') : pauseSec === 'options' ? document.querySelector('#pane-options .row:not(.osub-off) [data-nav]') : document.querySelector(`#psec-${pauseSec} [data-nav]`))
     : screen === 'lobby' && clEditing ? document.querySelector('#cl-editor [data-nav]')
     : screen === 'lobby' && $('lobby').classList.contains('classic') ? $('cl-menu').querySelector('[data-nav]')
     : screen === 'lobby' ? (lobby.role === 'host' ? ($('lobby-start').offsetParent ? $('lobby-start') : $('lobby-back')) : lobby.role === 'guest' ? $('lobby-leave') : $('keypad').querySelector('[data-key="1"]'))
@@ -1151,6 +1274,7 @@ game.input.onNav = (dir) => {
       if (((screen === 'menu' && tab === 'loadout') || (screen === 'pause' && pauseSec === 'loadout')) && closeEditor()) break;
       if (screen === 'pause' && pauseSec !== 'match') { setPauseSec('match'); focusEl(document.querySelector('.psec[data-sec="match"]')); }
       else if (screen === 'pause') game.resume();
+      else if (screen === 'menu' && tab === 'play' && playView !== 'root') openPlayView('root');
       else if (screen === 'menu' && tab !== 'play') { setTab('play'); focusFirst(); }
       else if (screen === 'menu') openMode();
       else if (screen === 'mode') { showScreen('title'); }
@@ -1172,6 +1296,9 @@ game.input.onNav = (dir) => {
       else if (screen === 'end') $('again').click();
       else if (screen === 'lobby' && lobby.role === 'host' && $('lobby-start').offsetParent) $('lobby-start').click();
       else if (screen === 'lobby' && !lobby.role) tryJoin();
+      break;
+    case 'prevSub': case 'nextSub':
+      if ((screen === 'menu' && tab === 'options') || (screen === 'pause' && pauseSec === 'options')) { stepOptSub(dir === 'nextSub' ? 1 : -1); focusFirst(); }
       break;
     case 'prevTab': case 'nextTab': {
       const step = dir === 'nextTab' ? 1 : -1;
@@ -1199,6 +1326,8 @@ window.addEventListener('keydown', (e) => {
   else if (!typing && screen !== 'title' && ARROWS[e.key]) { e.preventDefault(); if (!document.querySelector('.pad-focus') && document.activeElement && document.activeElement.matches('[data-nav]')) focusEl(document.activeElement); game.input.onNav(ARROWS[e.key]); }
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'q' || e.key === 'Q')) game.input.onNav('prevTab');
   else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'e' || e.key === 'E')) game.input.onNav('nextTab');
+  else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'z' || e.key === 'Z')) game.input.onNav('prevSub');
+  else if (!typing && (screen === 'menu' || screen === 'pause') && (e.key === 'c' || e.key === 'C')) game.input.onNav('nextSub');
 });
 
 const ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
@@ -1240,6 +1369,8 @@ function enterMenu(m) {
   setPlayMode(m);
   writeForm();
   setTab('play');
+  tileSel = null;
+  openPlayView('root');
   showScreen('menu');
 }
 $('mode-offline').addEventListener('click', () => enterMenu('offline'));
@@ -1963,10 +2094,13 @@ function renderHints(device) {
   const hint = (act, text) => (device === 'touch' ? '' : `<span>${glyph(act, device)} ${text}</span>`);
   const kb = (keys, text) => `<span>${keys.map(k => `<kbd>${k}</kbd>`).join('')} ${text}</span>`;
   const bumpers = (text) => `<span>${glyph('prevTab', device)}${glyph('nextTab', device)} ${text}</span>`;
+  const subs = (text) => `<span>${glyph('prevSub', device)}${glyph('nextSub', device)} ${text}</span>`;
+  let ps = 'match'; try { ps = pauseSec; } catch (_) { /* before init */ }
+  const inOpt = tab === 'options', pOpt = ps === 'options', deep = tab === 'play' && playView !== 'root';
   $('menu-hints').innerHTML = device === 'pad'
-    ? [hint('accept', 'Select'), hint('back', 'Back'), bumpers('Tabs'), hint('pause', playMode === 'online' ? 'Quick match' : 'Start match')].join('')
-    : device === 'touch' ? '' : [kb(['↑', '↓'], 'Navigate'), kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Tabs'), kb(['Esc'], 'Back')].join('');
-  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Resume'), bumpers('Sections')].join('') : device === 'touch' ? '' : [kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Sections'), kb(['Esc'], 'Resume')].join('');
+    ? [hint('accept', 'Select'), hint('back', 'Back'), bumpers('Tabs'), inOpt ? subs('Categories') : '', playMode !== 'online' && deep ? hint('pause', 'Start match') : ''].join('')
+    : device === 'touch' ? '' : [kb(['↑', '↓'], 'Navigate'), kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Tabs'), inOpt ? kb(['Z', 'C'], 'Categories') : '', kb(['Esc'], 'Back')].join('');
+  $('pause-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', ps === 'match' ? 'Resume' : 'Back'), bumpers('Sections'), pOpt ? subs('Categories') : ''].join('') : device === 'touch' ? '' : [kb(['Enter'], 'Select'), kb(['Q', 'E'], 'Sections'), pOpt ? kb(['Z', 'C'], 'Categories') : '', kb(['Esc'], ps === 'match' ? 'Resume' : 'Back')].join('');
   $('lobby-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : '<span><kbd>0</kbd>–<kbd>9</kbd> Code</span><span><kbd>Enter</kbd> Join</span>' + hint('back', 'Back');
   $('title-press').innerHTML = device === 'pad' ? `PRESS ${glyph('accept', 'pad')} TO START` : device === 'touch' ? 'TAP TO START' : 'PRESS <kbd>ENTER</kbd> TO START';
   $('mode-hints').innerHTML = device === 'pad' ? [hint('accept', 'Select'), hint('back', 'Back')].join('') : device === 'touch' ? '' : hint('back', 'Back');

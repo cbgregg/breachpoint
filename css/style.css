@@ -1275,3 +1275,78 @@ body.touch .touch-hide { display: none !important; }
 #notice .nt { gap: 14px; display: flex; flex-direction: column; }
 .nt-text { font-size: 17px; line-height: 1.5; color: var(--ink); margin: 0; }
 #notice.bad .bo-title b { color: #ff9a6a; }
+
+/* ===================== MW2019-style menu tree (Oct 2026) =====================
+   Every menu is a tree: top tabs (Q / E · LB / RB) → a column of big tiles or a category bar (Z / C · LT / RT)
+   → a page with a breadcrumb. Back (Esc / B) always climbs one level. The right column previews or explains
+   whatever is highlighted. */
+.crumbs { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: 0.22em; color: var(--bo-faint); text-transform: uppercase; min-height: 18px; }
+.crumbs i { font-style: normal; color: var(--bo-faint); }
+.crumbs b { color: var(--bo); font-weight: 700; }
+.pv { display: none; flex-direction: column; gap: 14px; min-width: 0; }
+.pv.on { display: flex; }
+/* level 1: playlist tiles */
+.tiles { display: flex; flex-direction: column; gap: 8px; }
+.tile { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; text-align: left; min-height: 86px; padding: 12px 22px 12px 20px; cursor: pointer; color: #fff; overflow: hidden;
+  background: #0b0f13; isolation: isolate;
+  border: 1px solid var(--bo-line); border-left: 4px solid transparent; transition: border-color .12s, transform .12s, filter .12s; outline: none; }
+.tile small { font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--bo); }
+.tile b { font-family: var(--display); font-weight: 700; font-size: clamp(24px, 2.6vw, 34px); letter-spacing: 0.08em; line-height: 1.02; }
+.tile span { font-size: 13px; color: var(--bo-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52ch; }
+.tile .art { position: absolute; inset: 0; z-index: -2; background: center 40% / cover no-repeat; opacity: 0.85; transition: opacity .12s, transform .3s; }
+.tile::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(8, 12, 16, 0.96) 0%, rgba(8, 12, 16, 0.84) 45%, rgba(8, 12, 16, 0.3) 100%); transition: background .12s; }
+.tile:hover, .tile.pad-focus, .tile:focus-visible { border-left-color: var(--bo); border-color: rgba(247, 148, 29, 0.55); transform: translateX(6px); }
+.tile:hover::before, .tile.pad-focus::before, .tile:focus-visible::before { background: linear-gradient(90deg, rgba(247, 148, 29, 0.34) 0%, rgba(8, 12, 16, 0.78) 50%, rgba(8, 12, 16, 0.15) 100%); }
+.tile:hover .art, .tile.pad-focus .art { opacity: 1; transform: scale(1.04); }
+.tile:hover span, .tile.pad-focus span { color: #fff; }
+.tile.cur::after { content: 'LAST PLAYED'; position: absolute; top: 10px; right: 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; color: #0e1114; background: var(--bo); padding: 2px 6px; }
+/* the preview card in the right column */
+.intel-tile { display: none; grid-column: 1 / 3; flex-direction: column; gap: 4px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--bo-line); }
+#menu[data-pv="root"] .intel-tile { display: flex; }
+.intel-tile small { font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--bo); }
+.intel-tile b { font-family: var(--display); font-size: 26px; letter-spacing: 0.08em; color: #fff; line-height: 1.05; }
+.intel-tile p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--bo-dim); }
+/* online root: the map card belongs to the match pages, not the playlist */
+body.mode-online #menu[data-pv="root"] .intel > :not(.intel-tile) { display: none; }
+/* START MATCH only on the offline match page */
+#menu[data-tab="play"] .menu-cta { display: none; }
+body.mode-offline #menu[data-tab="play"][data-pv="setup"] .menu-cta { display: flex; }
+/* level 2 pages */
+#pv-quick .mode-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#pv-quick .mode-pick .mp { min-height: 64px; }
+#pv-setup .online-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#pv-setup .online-row .menu-btn { min-height: 64px; font-size: 20px; }
+body.mode-offline #pv-setup .mo-on { display: none !important; }
+#pv-setup #play-rows { display: grid; grid-template-columns: 1fr; gap: 4px; }
+body.mode-online #pv-setup #play-rows { grid-template-columns: 1fr 1fr; }
+@media (max-width: 760px) { body.mode-online #pv-setup #play-rows, #pv-quick .mode-pick { grid-template-columns: 1fr; } }
+
+/* OPTIONS: category bar + one list + description panel */
+.subtabs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--bo-line); }
+.subtab { background: none; border: 0; border-bottom: 3px solid transparent; color: var(--bo-dim); font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.16em; padding: 8px 14px 6px; cursor: pointer; outline: none; }
+.subtab:hover, .subtab.pad-focus { color: #fff; background: rgba(255, 255, 255, 0.05); }
+.subtab.on { color: #fff; border-bottom-color: var(--bo); }
+.subtab.acct-tab { display: none; }
+body.has-account .subtab.acct-tab { display: inline-block; }
+#pane-options .osub-off { display: none !important; }
+.opt-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+#pane-options .opt-body .rows.two { grid-template-columns: 1fr; gap: 4px; }
+#pane-options .opt-body .group:first-child, #pane-options .opt-body .group:not(.osub-off) { margin-top: 4px; }
+.opt-desc { position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; background: var(--bo-panel); border: 1px solid var(--bo-line); border-top: 2px solid var(--bo); padding: 16px; min-height: 160px; }
+.opt-desc .od-k { font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--bo); }
+.opt-desc b { font-family: var(--display); font-size: 24px; letter-spacing: 0.06em; color: #fff; text-transform: uppercase; line-height: 1.1; }
+.opt-desc p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--bo-dim); }
+#pane-options .opt-body .controls-ref { grid-column: 1; }
+/* with the panel showing, the inline hints move into it */
+@media (min-width: 1001px) { #menu #pane-options .row:not(.about-row) label small { display: none; } }
+@media (max-width: 1000px) { .opt-body { grid-template-columns: minmax(0, 1fr); } .opt-desc { display: none; } }
+/* in the pause menu the panel column is narrower */
+.psec-pane .opt-body { grid-template-columns: minmax(0, 1fr); }
+.psec-pane .opt-desc { display: none; }
+.psec-pane .subtabs { margin-bottom: 4px; }
+@media (max-height: 520px) { .tile { min-height: 58px; padding: 6px 14px; } .tile span { display: none; } .tile b { font-size: 22px; } .subtab { font-size: 13px; padding: 5px 9px; } }
+/* the older single-page Play layout reordered and hid things online; the tree pages keep their own order */
+body.mode-online #pane-play .pv > * { order: 0 !important; }
+body.mode-online #pane-play .pv .pane-title, body.mode-online #pane-play .pv .pane-sub { display: block; }
+.tile { min-height: 72px; padding-top: 9px; padding-bottom: 9px; }
+body.mode-online #menu[data-pv="quick"] .intel { display: none; }
