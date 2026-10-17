@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { WEAPONS } from './config.js';
+import { WEAPONS, typeOf } from './config.js';
 import { weaponDef, cleanAtt } from './attachments.js';
+import { reticleMesh } from './reticles.js';
 
 export class WeaponState {
   constructor(id, att) {
@@ -269,14 +270,9 @@ function opticHolo(p, g, M, b, c) {
   p.rbox(M.poly, 0.012, 0.02, 0.03, 0.029, b + 0.026, -(c - 0.035), 0.004);
   p.add(M.glass, new THREE.PlaneGeometry(0.036, 0.036), 0, hy, -(c + 0.015));
   const z = -(c + 0.02);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.0032, 0.00022, 4, 40), M.reticle);
-  ring.position.set(0, hy, z);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00042, 10), M.reticle);
-  dot.position.set(0, hy, z);
-  // soft emitter glow around the ring so it reads crisply against bright skies
-  const glow = new THREE.Mesh(new THREE.RingGeometry(0.0028, 0.0037, 40), M.halo);
-  glow.position.set(0, hy, z + 0.0002);
-  g.add(ring, dot, glow);
+  const ret = reticleMesh('holo');   // customizable reticle (glow baked into the texture)
+  ret.position.set(0, hy, z);
+  g.add(ret);
   return { sightY: hy, sightZ: z };
 }
 function opticReflex(p, g, M, b, c, k = 1) {
@@ -290,11 +286,9 @@ function opticReflex(p, g, M, b, c, k = 1) {
     grp.scale.setScalar(k);
     g.add(grp);
     const ry = b + (0.0426 - 0.0035) * k, z = -c - 0.0357 * k + 0.002;
-    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00045, 12), M.reticle);
-    dot.position.set(0, ry, z);
-    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 16), M.halo);
-    glow.position.set(0, ry, z + 0.0002);
-    g.add(dot, glow);
+    const ret = reticleMesh('reflex');
+    ret.position.set(0, ry, z);
+    g.add(ret);
     return { sightY: ry, sightZ: z };
   }
   p.profile(M.poly, [[c - 0.0325 * k, b], [c + 0.0325 * k, b], [c + 0.0325 * k, b + 0.01], [c - 0.0325 * k, b + 0.01]], 0.03 * k, { r: 0.004 });
@@ -303,11 +297,9 @@ function opticReflex(p, g, M, b, c, k = 1) {
     [[[-i, ry - 0.012 * k], [i, ry - 0.012 * k], [i, ry + 0.013 * k], [-i, ry + 0.013 * k]]], 0.008 * k);
   p.add(M.glass, new THREE.PlaneGeometry(0.026 * k, 0.026 * k), 0, ry, -(c + 0.0155 * k), -0.12);
   const z = -(c - 0.0075 * k);
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.00045, 12), M.reticle);
-  dot.position.set(0, ry, z);
-  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0011, 16), M.halo);
-  glow.position.set(0, ry, z + 0.0002);
-  g.add(dot, glow);
+  const ret = reticleMesh('reflex');
+  ret.position.set(0, ry, z);
+  g.add(ret);
   return { sightY: ry, sightZ: z };
 }
 // 4x prism scope. The body is single-sided, so looking down the tube its inner walls vanish and the
@@ -326,15 +318,11 @@ function opticAcog(p, g, M, b, c, vm = false) {
   // rubber eyecup: the ring that frames the view when aiming
   p.add(M.rubber, new THREE.RingGeometry(0.0168, 0.0235, 32, 1), 0, ay, -r0 + 0.008);
   p.lathe(M.rubber, [[0.0235, r0 - 0.008], [0.0235, r0 + 0.004], [0.0195, r0 + 0.01]], ay, 0, 32);
-  // red chevron + stadia post
-  const sh = new THREE.Shape();
-  sh.moveTo(-0.0026, -0.0018); sh.lineTo(0, 0.0004); sh.lineTo(0.0026, -0.0018); sh.lineTo(0.0026, -0.0011); sh.lineTo(0, 0.0012); sh.lineTo(-0.0026, -0.0011);
-  const chev = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.reticle);
+  // customizable reticle (default: red chevron + stadia post)
   const z = -(r1 - 0.02);
-  chev.position.set(0, ay, z);
-  const post = new THREE.Mesh(new THREE.PlaneGeometry(0.0004, 0.006), M.reticle);
-  post.position.set(0, ay - 0.0046, z);
-  g.add(chev, post);
+  const ret = reticleMesh('acog');
+  ret.position.set(0, ay, z);
+  g.add(ret);
   if (vm) {
     // first person: an invisible depth mask fills the tube, so the gun behind the glass never shows
     // through and the (magnified) world fills the eyepiece
@@ -371,7 +359,7 @@ function ironSights(p, M, rearF, railY, frontF, frontY, h) {
   p.profile(M.metal, [[frontF - 0.01, frontY], [frontF + 0.01, frontY], [frontF + 0.006, frontY + 0.008], [frontF - 0.006, frontY + 0.008]], 0.022, { r: 0.002, bevel: 0.001 });
   p.rbox(M.metal, 0.0024, sy - frontY, 0.003, 0, (sy + frontY) / 2, -frontF, 0.0006);
   for (const xs of [-1, 1]) p.rbox(M.metal, 0.0022, sy - frontY + 0.004, 0.007, xs * 0.0075, (sy + frontY) / 2 + 0.002, -frontF, 0.0008);
-  return { sightY: sy, sightZ: -rearF };
+  return { sightY: sy, sightZ: -rearF, frontZ: -frontF + 0.0016, postTop: sy };
 }
 function addOptic(kind, p, g, M, vm, b, c) {
   if (kind === 'reflex') return opticReflex(p, g, M, b, c + 0.012);
@@ -516,7 +504,8 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
   const type = WEAPONS[id].model.type;
   const A = cleanAtt(id, att);
   let laser = null, eyeRelief, muzF;
-  const sight = (o) => { sightY = o.sightY; sightZ = o.sightZ; eyeRelief = o.eyeRelief; };
+  let frontZ = null, postTop = null;
+  const sight = (o) => { sightY = o.sightY; sightZ = o.sightZ; eyeRelief = o.eyeRelief; if (o.frontZ !== undefined) { frontZ = o.frontZ; postTop = o.postTop; } };
   const g = new THREE.Group();
   const p = new Parts();
   const out = { group: g };
@@ -925,6 +914,14 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
   mag.position.copy(out.magHome);
   g.add(mag);
   g.add(muzzle, eject, foregrip);
+  if (A.optic === 'iron' && (frontZ !== null || typeOf(id) === 'pistol')) {
+    // tritium insert (customizable; hidden when the plain post is chosen): on the front post when we know
+    // where it is, otherwise on the sight line just ahead of the rear sight
+    const ins = reticleMesh('iron');
+    if (frontZ !== null) ins.position.set(0, postTop - 0.0011, frontZ);
+    else ins.position.set(0, sightY - 0.0004, sightZ - 0.06);
+    g.add(ins);
+  }
   Object.assign(out, { muzzle, eject, foregrip, mag, sightY, sightZ, eyeRelief, laser, att: A });
   return out;
 }

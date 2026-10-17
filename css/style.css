@@ -1557,3 +1557,29 @@ button.lcard, .wbox, .wpc { cursor: pointer; }
 .wpc .lc-n { font-size: 14px; }
 .gs-head { padding-bottom: 2px; }
 .lcard.small .lc-n { font-size: 13px; white-space: normal; }
+/* reticle customization */
+.atiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.rtile .rprev { width: 34px; height: 34px; margin: 0 0 0; background: radial-gradient(circle, #2a2d30, #0c0d0e 70%); border-radius: 50%; }
+.rpick { display: flex; flex-direction: column; gap: 6px; }
+.rpick .ap-tabs { margin-bottom: 2px; }
+.rp-top { display: flex; gap: 14px; align-items: center; }
+.rp-view { width: 120px; height: 120px; flex: none; border-radius: 50%; overflow: hidden; display: grid; place-items: center; border: 2px solid #111;
+  background: url('../assets/loading/tarsa-1.jpg') center / 340% no-repeat; box-shadow: inset 0 0 26px 10px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--bo-line); }
+.rp-view img { width: 62%; height: 62%; }
+.rp-view.scope img { width: 100%; height: 100%; }
+.rp-view.iron img { width: 100%; height: 100%; }
+.rp-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rp-info b { font-family: var(--display); font-size: 24px; letter-spacing: 0.08em; color: #fff; text-transform: uppercase; }
+.rp-info span { font-size: 11px; letter-spacing: 0.2em; color: var(--bo); text-transform: uppercase; }
+.rp-info small { font-size: 12px; color: var(--ink-dim); }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 5px; }
+.rptile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 3px 6px; background: var(--bo-panel); border: 1px solid var(--bo-line); color: var(--ink-dim); cursor: pointer; outline: none; font: inherit; position: relative; }
+.rptile img { width: 44px; height: 44px; background: radial-gradient(circle, #24272a, #0b0c0d 72%); border-radius: 50%; }
+.rptile.on { border-color: var(--bo); box-shadow: inset 0 0 0 2px var(--bo); color: #fff; }
+.rp-cols { display: flex; flex-wrap: wrap; gap: 5px; }
+.rpcol { display: flex; align-items: center; gap: 6px; padding: 5px 9px; background: var(--bo-panel); border: 1px solid var(--bo-line); color: var(--ink-dim); cursor: pointer; outline: none; font: inherit; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; position: relative; }
+.rpcol i { width: 12px; height: 12px; border-radius: 50%; }
+.rpcol.on { border-color: var(--bo); box-shadow: inset 0 0 0 2px var(--bo); color: #fff; }
+.rptile:is(.pad-focus, :hover, :focus-visible), .rpcol:is(.pad-focus, :hover, :focus-visible) { border-color: var(--bo); background: rgba(var(--bo-rgb), 0.14); }
+#scope .lens .ret { position: absolute; inset: 0; }
+#scope .lens .ret svg { width: 100%; height: 100%; display: block; }
