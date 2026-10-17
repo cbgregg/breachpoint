@@ -1587,3 +1587,8 @@ button.lcard, .wbox, .wpc { cursor: pointer; }
 .pv-bar .menu-btn { margin: 0; padding: 6px 14px; }
 .crumbs span.link { cursor: pointer; }
 .crumbs span.link:hover { color: var(--bo); }
+/* fast (mobile) render path: the colour grade's damage + flash effects as a cheap overlay */
+.fast-fx { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+.fast-fx i { position: absolute; inset: 0; opacity: 0; }
+.fast-fx .fx-dmg { background: radial-gradient(ellipse at center, rgba(97, 5, 5, 0) 38%, rgba(97, 5, 5, 0.55) 72%, rgba(70, 0, 0, 0.9) 100%); }
+.fast-fx .fx-flash { background: #fff; }

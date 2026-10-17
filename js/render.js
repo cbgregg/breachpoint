@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { QUALITY, qualityFrom } from './config.js';
+import { QUALITY, qualityFrom, wantsMsaa } from './config.js';
 
 const GradeShader = {
   uniforms: {
@@ -110,7 +110,9 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
 export class Renderer {
   constructor(container, scene, camera, vmScene, vmCamera) {
     this.scene = scene; this.camera = camera; this.vmScene = vmScene; this.vmCamera = vmCamera;
-    const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
+    // MSAA only for the fast path (it draws to the canvas); the post-processing path anti-aliases with SMAA
+    this.msaa = wantsMsaa();
+    const r = new THREE.WebGLRenderer({ antialias: this.msaa, powerPreference: 'high-performance', stencil: false });
     r.setSize(window.innerWidth, window.innerHeight);
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 0.92;
@@ -133,6 +135,9 @@ export class Renderer {
     this.vmPass.clear = false;
     this.vmPass.clearDepth = true;
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.38, 0.55, 1.15);
+    // bloom is a soft glow: computing it at half resolution looks the same and costs a quarter of the fill
+    const bloomSize = this.bloomPass.setSize.bind(this.bloomPass);
+    this.bloomPass.setSize = (bw, bh) => bloomSize(Math.max(1, Math.round(bw / 2)), Math.max(1, Math.round(bh / 2)));
     this.outputPass = new OutputPass();
     this.gradePass = new ShaderPass(GradeShader);
     this.smaaPass = new SMAAPass(w, h);
@@ -271,9 +276,9 @@ export class Renderer {
     });
     this.applyAniso();
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
-    this.aoPass.enabled = q.ao;
-    this.bloomPass.enabled = q.bloom;
-    this.smaaPass.enabled = q.aa;
+    this.aoPass.enabled = q.ao && !q.fast;
+    this.bloomPass.enabled = q.bloom && !q.fast;
+    this.smaaPass.enabled = q.aa && !q.fast;
     this.setSize();
   }
 
@@ -293,7 +298,11 @@ export class Renderer {
   // climbs back when there's headroom. A level that keeps failing becomes the ceiling, so it doesn't
   // bounce up and down.
   applyPR() {
-    const pr = Math.max(0.5, this.basePR * (this.dynamic === false ? 1 : this.drs.scale));
+    let base = this.basePR;
+    // pixel budget (Mobile): a 3x phone screen would otherwise render 9x the pixels of a 1x one
+    const mp = this.quality && this.quality.maxPixels;
+    if (mp) base = Math.min(base, Math.max(0.6, Math.sqrt(mp / Math.max(1, window.innerWidth * window.innerHeight))));
+    const pr = Math.max(0.5, base * (this.dynamic === false ? 1 : this.drs.scale));
     this.renderer.setPixelRatio(pr);
     this.composer.setPixelRatio(pr);
   }
@@ -318,8 +327,10 @@ export class Renderer {
 
   setSize() {
     const w = window.innerWidth, h = window.innerHeight;
+    if (this.quality && this.quality.maxPixels) this.applyPR();   // the pixel budget depends on the window size
     this.renderer.setSize(w, h);
-    this.composer.setSize(w, h);
+    // the fast path never uses the composer: don't keep its full-size float targets around
+    if (this.quality && this.quality.fast) this.composer.setSize(2, 2); else this.composer.setSize(w, h);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.vmCamera.aspect = w / h; this.vmCamera.updateProjectionMatrix();
   }
@@ -336,7 +347,37 @@ export class Renderer {
     }
     this.time += dt;
     this.grade.time.value = this.time;
+    if (this.quality && this.quality.fast) { this.renderFast(showViewmodel); return; }
+    if (this.fx) this.fx.style.display = 'none';
     this.vmPass.enabled = showViewmodel;
     this.composer.render(dt);
+  }
+
+  // Fast path: world, then the viewmodel over a cleared depth buffer, straight to the canvas (tone mapping
+  // and sRGB happen in the material shaders; MSAA comes from the canvas). No float render targets or
+  // full-screen passes, which is where mobile GPUs spend their bandwidth. The colour grade's damage and
+  // flash effects become a CSS overlay.
+  renderFast(showViewmodel) {
+    const r = this.renderer;
+    r.setRenderTarget(null);
+    r.autoClear = true;
+    r.render(this.scene, this.camera);
+    if (showViewmodel) {
+      r.autoClear = false;
+      r.clearDepth();
+      r.render(this.vmScene, this.vmCamera);
+      r.autoClear = true;
+    }
+    if (!this.fx) {
+      this.fx = document.createElement('div');
+      this.fx.className = 'fast-fx';
+      this.fx.innerHTML = '<i class="fx-dmg"></i><i class="fx-flash"></i>';
+      r.domElement.parentNode.appendChild(this.fx);
+      this.fxDmg = this.fx.children[0]; this.fxFlash = this.fx.children[1];
+    }
+    this.fx.style.display = '';
+    const d = this.grade.damage.value, f = this.grade.flash.value;
+    if (d !== this.fxD) { this.fxD = d; this.fxDmg.style.opacity = Math.min(1, d).toFixed(3); }
+    if (f !== this.fxF) { this.fxF = f; this.fxFlash.style.opacity = Math.min(1, f).toFixed(3); }
   }
 }

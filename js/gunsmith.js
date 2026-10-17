@@ -44,7 +44,7 @@ export class GunPreview {
     if (key !== this.key) {
       this.key = key;
       this.pivot.clear();
-      const gun = buildGun(id, { att });
+      const gun = buildGun(id, { att, detail: 2 });
       const box = new THREE.Box3().setFromObject(gun.group);
       const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
       gun.group.position.sub(c);
@@ -111,7 +111,7 @@ export function gunThumb(id, att) {
       thumbScene.add(k, r);
       thumbCam = new THREE.PerspectiveCamera(20, 480 / 200, 0.05, 20);
     }
-    const gun = buildGun(id, { att });
+    const gun = buildGun(id, { att, detail: 2 });
     const g = new THREE.Group(); g.add(gun.group);
     g.rotation.y = -Math.PI / 2 + 0.12;
     g.updateMatrixWorld(true);

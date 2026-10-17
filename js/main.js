@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, wantsMsaa } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
@@ -18,6 +18,7 @@ import { levelOf, emblemSVG } from './career.js';
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
 
+let startCd = null; // private-match start countdown (see Start Match)
 function loadSettings() {
   try {
     const raw = localStorage.getItem(KEY);
@@ -29,6 +30,8 @@ function saveSettings(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
 }
 const settings = loadSettings();
+// phones and tablets move to the Mobile preset once (it didn't exist before; Low was the touch default)
+if (coarse && !settings.mobileOffered) { settings.mobileOffered = 1; if (settings.quality === 'low' || !settings.quality) settings.quality = 'mobile'; saveSettings(settings); }
 const applyTheme = () => { document.body.dataset.theme = settings.theme || 'amber'; };
 applyTheme();
 const account = new Account();
@@ -86,7 +89,7 @@ const bindings = [
   ['opt-name', 'name', 'text'], ['opt-theme', 'theme', 'str'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
-  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
+  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
@@ -150,10 +153,19 @@ for (const [id, key, type] of bindings) {
     saveSettings(settings);
     if (key === 'theme') applyTheme();
     game.applySettings(settings);
+    if (key === 'quality' || key.startsWith('gfx')) checkMsaa();
     if (game.settings) Object.assign(game.settings, { vmFov: settings.vmFov, sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
   });
 }
 
+// the fast path's MSAA belongs to the WebGL context: switching to or from it restarts the game from the menu
+// (in a match it applies the next time the game starts)
+function checkMsaa() {
+  const need = wantsMsaa();
+  if (need === game.renderer.msaa) return;
+  if (game.state === 'menu' && !lobby.active) { game.hud.toast('RESTARTING TO APPLY ANTI-ALIASING'); setTimeout(() => location.reload(), 700); }
+  else game.hud.toast('ANTI-ALIASING CHANGES THE NEXT TIME THE GAME STARTS');
+}
 // match mode: show only the settings that apply
 function syncModeRows() {
   const m = MODES[settings.mode] || MODES.tdm;
@@ -616,7 +628,9 @@ const GROUP_SUB = { PROFILE: 'general', GRAPHICS: 'graphics', AIMING: 'controls'
 const OPT_DESC = {
   'opt-theme': 'The accent colour of the menus, highlights, buttons and HUD details. It only changes how the game looks to you.',
   'opt-name': 'The name other players see. Signed in, this is your Name Tag: it can change once a day and friends can see your previous ones.',
-  'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom.',
+  'opt-quality': 'Sets every graphics option in this list at once. Changing any one of them switches the preset to Custom. Mobile is built for phones and tablets: fast render path with MSAA, a pixel budget for high-DPI screens, low geometry, hard shadows.',
+  'opt-gfxpath': 'Full: the post-processing chain (SMAA, bloom, ambient occlusion, colour grade). Fast: draws straight to the screen with hardware MSAA; much lighter on phones. Switching restarts the game from the menu.',
+  'opt-gfxdetail': 'Low: the world uses square-edged boxes and lighter sandbags, small props stop casting shadows, and other players\' guns use simpler geometry. Rebuilds the map.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
   'opt-gfxshadows': 'Resolution of the sun\'s shadows. Higher is crisper and costs more GPU time. Off is fastest.',
   'opt-fpscap': 'Caps the frame rate to save power and heat. Unlimited follows your display.',
@@ -1060,7 +1074,7 @@ function renderClassic() {
   setHTML('cl-code', !pub && lobby.code ? `MATCH CODE <b>${fmtCode(lobby.code)}</b>` : '');
   // menu
   const items = [];
-  if (host && !inMatch) items.push(['start', 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
+  if (host && !inMatch) items.push(['start', startCd ? `CANCEL START · ${startCd.shown}` : 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
   if (inMatch) items.push(['back', 'BACK TO MATCH', 'Return to the match in progress.']);
   const filterable = pub && (lobby.quickMode || lobby.role === 'host') && !inMatch;
   if (filterable) items.push(['modes', `GAME MODES: ${quickModesLabel()}`, 'Pick the modes you want to play. Matchmaking joins any of them.']);
@@ -1085,7 +1099,9 @@ function renderClassic() {
   // status line + map cards
   const mv = lobby.mapVote, people = clPeople();
   let status;
+  const scd = host ? (startCd ? startCd.shown : -1) : (inf && inf.cd >= 0 ? inf.cd : -1);
   if (mv) status = mv.cd >= 0 ? `The match is about to begin... <i>${mv.cd}</i>` : `Vote for the next map · ${mv.rd}/${mv.n} ready`;
+  else if (scd >= 0 && !inMatch) status = `The match is about to begin... <i>${scd}</i>`;
   else if (inMatch) status = 'Match in progress. Players you let in drop straight into it.';
   else if (host) status = settings.fillBots === false && !pub && new Set(people.map(p => p.tm)).size < 2 ? 'Need more players to balance teams...' : 'Waiting for you to start the match...';
   else if (lobby.status === 'pending') status = 'Waiting for the host to let you in...';
@@ -1317,6 +1333,28 @@ const setMapHint = () => {
 };
 for (const id of ['opt-fillbots', 'opt-team', 'opt-ff', 'opt-map', 'opt-score', 'opt-time', 'opt-diff']) $(id).addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); renderLobby(); } });
 $('opt-mode').addEventListener('change', () => { if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); } });
+// private match: Start Match runs a 5-second countdown everyone in the lobby sees (press again to cancel)
+function cancelStartCd(quiet) {
+  if (!startCd) return;
+  clearInterval(startCd.t); startCd = null;
+  if (lobby.info) { lobby.info.cd = -1; if (lobby.role === 'host') lobby.broadcastLobby(); }
+  $('lobby-start').querySelector('span').textContent = 'START MATCH';
+  if (!quiet) game.hud.toast('MATCH START CANCELLED');
+  if (screen === 'lobby') renderLobby();
+}
+function startCdTick() {
+  if (!startCd) return;
+  if (lobby.role !== 'host' || screen !== 'lobby') { cancelStartCd(true); return; }
+  const left = Math.max(0, Math.ceil((startCd.end - performance.now()) / 1000));
+  if (left !== startCd.shown) {
+    startCd.shown = left;
+    if (lobby.info) { lobby.info.cd = left; lobby.broadcastLobby(); }
+    $('lobby-start').querySelector('span').textContent = left ? `CANCEL · ${left}` : 'STARTING';
+    game.audio.play('ui', null, { ui: true, freq: left ? 900 : 1500 });
+    renderLobby();
+  }
+  if (left === 0) { clearInterval(startCd.t); startCd = null; doStartMatch(); }
+}
 $('lobby-start').addEventListener('click', () => {
   game.input.goFullscreen();
   readAll();
@@ -1324,9 +1362,18 @@ $('lobby-start').addEventListener('click', () => {
     const teams = [lobby.hostTeam, ...[...lobby.players.values()].map(p => p.team)];
     if (!teams.includes(0) || !teams.includes(1)) { game.hud.toast('BOTS ARE OFF: PUT AT LEAST ONE PLAYER ON EACH TEAM (⇄)'); return; }
   }
+  if (lobby.public || game.state !== 'menu') { doStartMatch(); return; }
+  if (startCd) { cancelStartCd(); return; }
+  startCd = { end: performance.now() + 5000, shown: -1, t: setInterval(startCdTick, 100) };
+  startCdTick();
+});
+function doStartMatch() {
+  readAll();
+  if (lobby.info) lobby.info.cd = -1;
+  $('lobby-start').querySelector('span').textContent = 'START MATCH';
   clearTimeout(nextMatchT);
   launch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
-});
+}
 $('lobby-back').addEventListener('click', () => showScreen('pause'));
 $('lobby-leave').addEventListener('click', () => {
   if (quickIntro) { quickIntro = false; showScreen('menu'); return; }

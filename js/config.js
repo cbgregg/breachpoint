@@ -181,6 +181,11 @@ export const QUALITY = {
   medium: { label: 'Medium', pixelRatio: 1, shadows: 2048, softShadows: true, shadowEvery: 2, ao: false, bloom: true, aa: true, lights: true, motes: 140, aniso: 8 },
   high: { label: 'High', pixelRatio: 1.25, shadows: 4096, softShadows: true, shadowEvery: 2, ao: true, bloom: true, aa: true, lights: true, motes: 220, aniso: 8 },
   ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, softShadows: true, shadowEvery: 1, ao: true, bloom: true, aa: true, lights: true, motes: 300, aniso: 16 },
+  // phones and tablets: draws straight to the screen with hardware MSAA (near free on mobile GPUs) instead of the
+  // post-processing chain, flat-edged world geometry, hard 1K shadows refreshed every third frame, and a pixel
+  // budget so high-DPI screens don't render 3-4x more pixels than they can show. Distant players animate at a
+  // lower rate; the menu background runs at 30 fps.
+  mobile: { label: 'Mobile', pixelRatio: 1.5, shadows: 1024, softShadows: false, shadowEvery: 3, ao: false, bloom: false, aa: true, lights: false, motes: 0, aniso: 4, fast: true, lowPoly: true, maxPixels: 1.25e6 },
 };
 // Custom graphics: each preset written out as the individual settings (render resolution is % of the
 // screen's native pixels, so it means the same thing on every display), and the reverse for 'custom'.
@@ -191,21 +196,22 @@ export function presetGfx(name) {
   const pr = Math.min(dpr, isTouch() ? Math.max(1.25, q.pixelRatio) : q.pixelRatio);
   return {
     gfxRes: Math.round(pr / dpr * 20) * 5, gfxShadows: String(q.shadows), gfxSoftShadows: q.softShadows !== false,
-    gfxShadowRate: q.shadowEvery === 1 ? 'full' : 'half', gfxAO: q.ao, gfxBloom: q.bloom, gfxAA: q.aa, gfxLights: q.lights,
-    gfxDust: String(q.motes), gfxAniso: String(q.aniso),
+    gfxShadowRate: q.shadowEvery === 1 ? 'full' : q.shadowEvery === 3 ? 'third' : 'half', gfxAO: q.ao, gfxBloom: q.bloom, gfxAA: q.aa, gfxLights: q.lights,
+    gfxDust: String(q.motes), gfxAniso: String(q.aniso), gfxPath: q.fast ? 'fast' : 'post', gfxDetail: q.lowPoly ? 'low' : 'full',
   };
 }
 export function qualityFrom(s) {
-  if (s.quality !== 'custom') { const q = QUALITY[s.quality] || QUALITY.high, dpr = dprNow(); return { ...q, pr: Math.min(dpr, isTouch() ? Math.max(1.25, q.pixelRatio) : q.pixelRatio) }; }
+  if (s.quality !== 'custom') { const q = QUALITY[s.quality] || QUALITY.high, dpr = dprNow(); return { ...q, pr: Math.min(dpr, isTouch() && !q.fast ? Math.max(1.25, q.pixelRatio) : q.pixelRatio) }; }
   const d = presetGfx('high'), v = (k) => s[k] ?? d[k];
   return {
     label: 'Custom', pr: Math.max(0.25, dprNow() * Math.min(200, Math.max(50, +v('gfxRes'))) / 100),
-    shadows: +v('gfxShadows') || 0, softShadows: !!v('gfxSoftShadows'), shadowEvery: v('gfxShadowRate') === 'full' ? 1 : 2,
+    shadows: +v('gfxShadows') || 0, softShadows: !!v('gfxSoftShadows'),
     ao: !!v('gfxAO'), bloom: !!v('gfxBloom'), aa: !!v('gfxAA'), lights: !!v('gfxLights'), motes: +v('gfxDust') || 0, aniso: +v('gfxAniso') || 1,
+    fast: v('gfxPath') === 'fast', lowPoly: v('gfxDetail') === 'low', shadowEvery: v('gfxShadowRate') === 'full' ? 1 : v('gfxShadowRate') === 'third' ? 3 : 2,
   };
 }
 
-const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+export const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 // TURN relay (hides players' IP addresses). URL of the Cloudflare Worker in cloudflare/turn-worker.js,
 // e.g. 'https://breachpoint-turn.<you>.workers.dev'. Empty = direct peer-to-peer only.
@@ -248,7 +254,7 @@ export const DEFAULT_SETTINGS = {
   showFps: false,
   friendlyFire: false,
   invertY: false,
-  quality: coarse ? 'low' : 'high',
+  quality: coarse ? 'mobile' : 'high',
   dynamicRes: true,
   padSensitivity: 1,
   padDeadzone: 0.12,
@@ -265,3 +271,16 @@ export const BOT_NAMES = [
 ];
 
 export const MAP_NAME = 'Tarsa Market';
+
+// the saved graphics settings, resolved, before the game starts (the WebGL context's MSAA and the first map's
+// geometry detail are decided at start-up)
+export function savedQuality() {
+  try {
+    const raw = localStorage.getItem('breachpoint.settings.v2');
+    const s = raw ? JSON.parse(raw) : {};
+    return qualityFrom(s.quality ? s : { quality: coarse ? 'mobile' : 'high' });
+  } catch (_) { return qualityFrom({ quality: coarse ? 'mobile' : 'high' }); }
+}
+// the fast (mobile) render path draws straight to the canvas, so its anti-aliasing is the canvas's own MSAA,
+// which can only be chosen when the WebGL context is created
+export function wantsMsaa() { const q = savedQuality(); return !!(q.fast && q.aa); }

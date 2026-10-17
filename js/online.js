@@ -543,7 +543,7 @@ export class Lobby {
           if (this.quickMode && !this.public) { this.public = true; this.board.close(); clearTimeout(this.quickTimer); }
           if (Array.isArray(m.ps)) this.roster = m.ps.slice(0, MAX_HUMANS).map(p => ({ n: cleanName(p && p.n), tm: p && p.tm === 1 ? 1 : 0, h: p && p.h ? 1 : 0, x: Math.max(0, Math.min(1e7, (p && p.x) | 0)), u: p && typeof p.u === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(p.u) ? p.u : '' }));
           const inf = m.info;
-          this.info = inf && typeof inf === 'object' ? { m: String(inf.m || '').slice(0, 12), map: String(inf.map || '').slice(0, 12), n: Math.max(1, Math.min(8, inf.n | 0)), b: inf.b !== 0, ff: !!inf.ff } : null;
+          this.info = inf && typeof inf === 'object' ? { m: String(inf.m || '').slice(0, 12), map: String(inf.map || '').slice(0, 12), n: Math.max(1, Math.min(8, inf.n | 0)), b: inf.b !== 0, ff: !!inf.ff, cd: Number.isFinite(inf.cd) ? Math.max(-1, Math.min(9, inf.cd | 0)) : -1 } : null;
           this.hostInGame = !!m.ig;
           // load the host's map while waiting, so the match starts instantly
           if (typeof m.map === 'string' && this.game.state === 'menu' && this.onMapHint) this.onMapHint(m.map);

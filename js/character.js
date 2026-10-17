@@ -209,6 +209,7 @@ function cachedGun(weaponId, att, key) {
   let tpl = GUN_CACHE.get(ck);
   if (!tpl) {
     const gun = buildGun(weaponId, { att });
+    flattenGun(gun);
     const nodes = [];
     gun.group.traverse(o => nodes.push(o));
     tpl = { gun, index: new Map(nodes.map((o, i) => [o, i])) };
@@ -225,6 +226,46 @@ function cachedGun(weaponId, att, key) {
   }
   out.group = group;
   return out;
+}
+
+// Third-person guns: every static part merged into one mesh per material (a model gun is 20-40 separate
+// meshes, which is 20-40 draw calls per player), and no sun shadow (a few pixels of shadow for thousands of
+// triangles in the shadow pass). Moving parts (magazine, pump, bolt) and anything the code points at stay separate.
+function flattenGun(gun) {
+  const g = gun.group;
+  g.updateMatrixWorld(true);
+  const keep = new Set(Object.values(gun).filter(v => v && v.isObject3D));
+  const moving = [gun.mag, gun.pump, gun.bolt].filter(Boolean);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(), rel = new THREE.Matrix4();
+  const groups = new Map(), victims = [];
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = false;
+    if (keep.has(o) || Array.isArray(o.material) || o.geometry.groups.length > 1 || o.isSkinnedMesh) return;
+    for (let p = o.parent; p && p !== g; p = p.parent) if (moving.includes(p) || keep.has(p) && p !== g && p.isMesh) return;
+    if (moving.includes(o.parent)) return;
+    rel.multiplyMatrices(inv, o.matrixWorld);
+    let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const k of Object.keys(geo.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') geo.deleteAttribute(k);
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    geo.morphAttributes = {};
+    geo.applyMatrix4(rel);
+    const k = o.material.uuid;
+    if (!groups.has(k)) groups.set(k, { mat: o.material, geos: [], order: o.renderOrder });
+    groups.get(k).geos.push(geo);
+    victims.push(o);
+  });
+  if (victims.length < 2) return;
+  for (const o of victims) o.parent.remove(o);
+  for (const { mat, geos, order } of groups.values()) {
+    const merged = mergeGeometries(geos, false);
+    geos.forEach(x => x.dispose());
+    if (!merged) continue;
+    const m = new THREE.Mesh(merged, mat);
+    m.renderOrder = order; m.castShadow = false; m.receiveShadow = true;
+    g.add(m);
+  }
 }
 
 // build a gun ahead of time (during loading) so it's ready to clone
@@ -560,7 +601,7 @@ export class Character {
         return;
       }
       // distant: the body still moves every frame, only the skeleton pose updates at ~30 Hz
-      if (lod === 2 && m.accDt < 1 / 30 && this.alive) {
+      if (((lod === 2 && m.accDt < 1 / 30) || (lod === 3 && m.accDt < 1 / 15)) && this.alive) {
         if (this.alive) { m.root.position.copy(this.pos); m.root.rotation.set(0, this.yaw, 0); }
         return;
       }
