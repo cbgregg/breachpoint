@@ -1583,3 +1583,7 @@ button.lcard, .wbox, .wpc { cursor: pointer; }
 .rptile:is(.pad-focus, :hover, :focus-visible), .rpcol:is(.pad-focus, :hover, :focus-visible) { border-color: var(--bo); background: rgba(var(--bo-rgb), 0.14); }
 #scope .lens .ret { position: absolute; inset: 0; }
 #scope .lens .ret svg { width: 100%; height: 100%; display: block; }
+.pv-bar { display: flex; align-items: center; gap: 14px; min-height: 18px; }
+.pv-bar .menu-btn { margin: 0; padding: 6px 14px; }
+.crumbs span.link { cursor: pointer; }
+.crumbs span.link:hover { color: var(--bo); }

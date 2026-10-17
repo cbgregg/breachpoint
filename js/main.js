@@ -520,11 +520,14 @@ function openPlayView(v) {
   if (v === 'browser') openBrowser(); else closeBrowser();
   const name = v === 'browser' ? 'MATCH BROWSER' : v === 'quick' ? 'QUICK PLAY' : v === 'setup' ? (playMode === 'online' ? 'PRIVATE MATCH' : (MODES[settings.mode] || MODES.tdm).name.toUpperCase()) : null;
   crumbs('play-crumbs', name ? ['PLAY', name] : ['PLAY']);
+  $('pv-back').style.display = v === 'root' ? 'none' : '';
+  const pc = $('play-crumbs').querySelector('span'); if (pc) { pc.classList.add('link'); pc.onclick = () => openPlayView('root'); }
   if (v === 'setup' && playMode === 'online') $('play-title').textContent = 'PRIVATE MATCH';
   if (v === 'root') renderTiles();
   renderHints(game.input.lastDevice);
   if (game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
+$('pv-back').addEventListener('click', () => { game.audio.play('ui', null, { ui: true }); openPlayView('root'); });
 $('play-tiles').addEventListener('click', (e) => {
   const b = e.target.closest('.tile'); if (!b) return;
   const id = tileSel = b.dataset.tile;
