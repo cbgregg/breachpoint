@@ -131,7 +131,7 @@ export const WEAPONS = {
     mag: 10, reserve: 40, reload: 3.2, spread: 0.095, adsSpread: 0.075, moveSpread: 0.02,
     recoilPitch: 0.04, recoilYaw: 0.014, range: 40, falloffStart: 6, falloffEnd: 18, falloffMin: 0.2,
     pellets: 8, adsFov: 58, adsTime: 0.22, botRange: [2, 11],
-    model: { type: 'shotgun', sight: 'iron', look: { furniture: 0x2b2d2a, drum: true } },
+    model: { type: 'rifle', sight: 'iron', look: { furniture: 0x2b2d2a, drum: true } }, // drum-fed: rifle-style mag change
   },
   d50: {
     id: 'd50', name: 'D-50 Hand Cannon', short: 'D-50', mode: 'SEMI', auto: false, rpm: 220, damage: 55, headMult: 1.8,

@@ -1133,7 +1133,8 @@ export class GuestSession {
         const wdef = (c.weapons.find(w => w.id === wid) || {}).def || WEAPONS[wid];
         g.audio.play('shot', c.pos, { weapon: wid, quiet: wdef.quiet });
         g.effects.muzzle(muzzle, dir, ['shotgun', 'sniper', 'launcher'].includes(wdef.model.type), wdef.quiet);
-        if (!c.hidden && wid !== 'sniper' && wid !== 'shotgun') g.effects.casing(c.ejectWorld(_v3), dir, new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)));
+        if (wdef.rocket && !c.hidden) g.effects.backblast(c.ejectWorld(_v3), dir);
+        else if (!c.hidden && wid !== 'sniper' && wid !== 'shotgun') g.effects.casing(c.ejectWorld(_v3), dir, new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)));
         if (!Array.isArray(ends)) return;
         let whiz = false, first = true;
         for (const e of ends.slice(0, 16)) {

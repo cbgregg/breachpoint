@@ -35,6 +35,7 @@ export const RELOAD_POSES = {
   long: { x: 0.0, y: 0.0, z: -0.03, rx: 0.05, ry: 0.2, rz: -0.7 },
   pistol: { x: 0.0, y: -0.01, z: -0.01, rx: 0.15, ry: 0.15, rz: -0.45 },
   shotgun: { x: 0.0, y: 0.0, z: -0.02, rx: 0.06, ry: 0.15, rz: -0.45 },     // loading port turned toward you
+  launcher: { x: 0.0, y: -0.07, z: 0.1, rx: 0.3, ry: 0.72, rz: -0.2 },  // muzzle up and in: you watch the rocket go into the tube
 };
 export const HANDS = { SHOULDER_R, SHOULDER_L, POLE_R, POLE_L, RH_LONG, RH_PISTOL, GRIP_F, PALM_L, PALM_R, PALM_UP, LH_PISTOL, LH_PISTOL_F, LH_PISTOL_P, VG_OFF, VG_F, SUP_OFF, SUP_F, PALM_SUP };
 const _gq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _mq = new THREE.Quaternion(), _tp = new THREE.Vector3(), _v1 = new THREE.Vector3();
@@ -53,6 +54,18 @@ const SIGHT_SIZE = { normal: 1, large: 0.8, huge: 0.64 }; // viewmodel FOV multi
 // wants the vertical angle, which is what makes players and the gun look the right size.
 export const vfov = (h) => 2 * Math.atan(Math.tan((h * Math.PI) / 360) * 0.75) * 180 / Math.PI;
 
+// time-parametrised Hermite spline through keyframes KP at times KT (Catmull-Rom tangents, still at the ends)
+const _s1 = new THREE.Vector3(), _s2 = new THREE.Vector3();
+function spline(KP, KT, n, t, out) {
+  if (t >= KT[n - 1]) return out.copy(KP[n - 1]);
+  if (t <= KT[0]) return out.copy(KP[0]);
+  let i = 0; while (i < n - 2 && t >= KT[i + 1]) i++;
+  const d = KT[i + 1] - KT[i], u = (t - KT[i]) / d, u2 = u * u, u3 = u2 * u;
+  const tan = (j, o) => (j <= 0 || j >= n - 1) ? o.set(0, 0, 0) : o.subVectors(KP[j + 1], KP[j - 1]).divideScalar(KT[j + 1] - KT[j - 1]);
+  tan(i, _s1); tan(i + 1, _s2);
+  return out.copy(KP[i]).multiplyScalar(2 * u3 - 3 * u2 + 1).addScaledVector(_s1, (u3 - 2 * u2 + u) * d)
+    .addScaledVector(KP[i + 1], -2 * u3 + 3 * u2).addScaledVector(_s2, (u3 - u2) * d);
+}
 function solveElbow(S, H, a, b, pole, out) {
   const d = _c.subVectors(H, S);
   const len = clamp(d.length(), 0.05, a + b - 0.002);
@@ -115,6 +128,8 @@ export class PlayerController {
           ? { pos: V3((box.min.x + box.max.x) / 2 - 0.004, box.min.y - 0.016, (box.min.z + box.max.z) / 2 + 0.006), f: V3(0.55, 0, -0.85), p: PALM_UP, pose: POSES.cup }
           : { pos: V3(box.min.x - 0.016, box.max.y + (box.min.y - box.max.y) * 0.6, Math.max(box.min.z + 0.046, (box.min.z + box.max.z) / 2)), f: V3(0, -0.1, -1), p: PALM_R, pose: POSES.wrap };
       }
+      // launcher: the left hand holds the warhead from the left side, fingers forward
+      if (type === 'launcher') magHold = { pos: V3(-0.072, 0.07, -0.57), f: V3(0, -0.15, -1), p: PALM_R, pose: POSES.wrap };
       // fit the hands to this gun: fingers close round the grip, handguard / foregrip and magazine until they touch
       const fit = this.fitHands(gun, type, magHold);
       return {
@@ -122,7 +137,7 @@ export class PlayerController {
         // phones: gun sits a little lower so it doesn't fill the small screen (the viewmodel FOV is wider too)
         hip: touch ? (pistol ? new THREE.Vector3(0.11, -0.13, -0.3) : new THREE.Vector3(0.12, -0.155, -0.18))
           : VM_TUNE.hip[type] ? new THREE.Vector3(...VM_TUNE.hip[type]) : pistol ? new THREE.Vector3(0.06, -0.094, -0.25) : new THREE.Vector3(0.11, -0.145, -0.21),
-        ads: new THREE.Vector3(0, -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
+        ads: new THREE.Vector3(-(gun.sightX || 0), -gun.sightY, (gun.eyeRelief ?? EYE_RELIEF) - gun.sightZ),
         // the pistol at the hip: up in front, muzzle tipped up and turned in, both hands on it (CoD style)
         hipRot: pistol && !touch ? [0.08, 0.18, -0.05] : null,
       };
@@ -538,7 +553,11 @@ export class PlayerController {
     const RP_ = RELOAD_POSES[G.type] || RELOAD_POSES.long;
     const tilt = w.reloading ? sm5(rp / 0.22) * (1 - sm5((rp - 0.8) / 0.2)) : 0;
     const slide = this.slideK;
-    if (w.reloading && G.magHold) {
+    if (w.reloading && G.magHold && G.type === 'launcher') {
+      const hit = (t) => J.prevRp < t && rp >= t;
+      if (hit(0.3)) { J.vy -= 0.08; J.vr += 0.4; }                     // weight shifts as the hand drops to the pack
+      if (hit(0.8)) { J.vz += 0.32; J.vy += 0.16; J.vr -= 1.3; }        // rocket rammed home
+    } else if (w.reloading && G.magHold) {
       const hit = (t) => J.prevRp < t && rp >= t;
       const e = !!w.emptyReload && G.type !== 'shotgun' && G.type !== 'sniper';
       if (hit(e ? 0.12 : 0.16)) { J.vy -= 0.18; J.vr += 0.9; }          // mag pulled free
@@ -553,10 +572,10 @@ export class PlayerController {
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
       lerp(G.hip.x, G.ads.x, ae) + bx + this.swayX * (1 - ae * 0.92) + tilt * RP_.x - spr * 0.06 - mel * 0.08 + slide * -0.04,
       lerp(G.hip.y, G.ads.y, ae) + by + this.swayY * (1 - ae * 0.92) + idle + tilt * RP_.y - sw * (G.type === 'pistol' ? 0.16 : 0.2) - gren * 0.22 - spr * 0.02 - this.landDip * 0.025 + slide * -0.02 + J.y,
-      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) + tilt * RP_.z - mel * 0.12 + J.z,
+      lerp(G.hip.z, G.ads.z, ae) + this.kick * (a > 0.5 ? 0.018 : 0.035) * (G.type === 'launcher' ? 2.8 : 1) + tilt * RP_.z - mel * 0.12 + J.z,
     );
     h.rotation.set(
-      this.kickRot * (a > 0.5 ? 0.025 : 0.07) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 * (1 - ae * 0.9) + mel * 0.2 + J.r,
+      this.kickRot * (a > 0.5 ? 0.025 : 0.07) * (G.type === 'launcher' ? 2.4 : 1) + tilt * RP_.rx - spr * 0.25 + this.swayY * 0.8 * (1 - ae * 0.9) + mel * 0.2 + J.r,
       spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 * (1 - ae * 0.9) + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yaw),
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6 * (1 - ae * 0.9),
     );
@@ -606,7 +625,7 @@ export class PlayerController {
     // The mag stays in the hand the whole time.
     const mag = gun.mag;
     mag.position.copy(gun.magHome);
-    mag.visible = true;
+    mag.visible = !(G.type === 'launcher' && w.mag === 0);   // the warhead leaves with the shot
     // bolt / pump cycling after a shot
     if (this.cycleT > 0) {
       this.cycleT -= dt;
@@ -655,7 +674,24 @@ export class PlayerController {
       handFrame(_tp, _tq, gun.group, _gq, MH.pos, MH.f, MH.p);
       toward(_tp, _tq, MH.pose, smooth(0.3, 0.9, s2));
     }
-    if (w.reloading && MH) {
+    if (w.reloading && MH && type === 'launcher') {
+      // The Monte: the hand drops to the pack, brings a rocket up in front of the muzzle, lines it up with
+      // the tube and slides it home, then goes back to the front grip
+      handFrame(_m0, _mq, gun.group, _gq, MH.pos, MH.f, MH.p);                                  // on the seated rocket
+      handFrame(_m1, _tq, gun.group, _gq, _a.copy(MH.pos).add(_cz.set(0, 0.004, -0.22)), MH.f, MH.p); // lined up ahead of the muzzle
+      _gl.copy(_L); _lq2.copy(_lq);
+      _pp.copy(_gl).add(_a.set(-0.12, -0.38, 0.12));
+      const KP = this.rktKeys || (this.rktKeys = Array.from({ length: 5 }, () => new THREE.Vector3()));
+      KP[0].copy(_gl); KP[1].copy(_pp); KP[2].copy(_m1); KP[3].copy(_m0); KP[4].copy(_gl);
+      spline(KP, [0, 0.3, 0.6, 0.8, 0.95], 5, rp, _L);
+      const k = sm5(rp / 0.15) * (1 - sm5((rp - 0.8) / 0.15));
+      _lq.copy(_lq2).slerp(_mq, k);
+      tPose = MH.pose; lk = k;
+      if (rp < 0.27) mag.visible = false;
+      else if (rp < 0.8) { mag.visible = true; gun.group.worldToLocal(_a.copy(_L)); mag.position.copy(gun.magHome).add(_a.sub(MH.pos)); }
+      else mag.visible = true;
+      leftFree = rp > 0.08 && rp < 0.9;
+    } else if (w.reloading && MH) {
       // magazine change: grab the mag, pull it, take it down out of view, bring a fresh one up, seat it,
       // slap it home, back to the gun. The mag rides in the hand the whole time.
       handFrame(_m0, _mq, gun.group, _gq, MH.pos, MH.f, MH.p);                 // M0: holding the seated mag

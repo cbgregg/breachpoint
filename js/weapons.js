@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { WEAPONS, typeOf } from './config.js';
 import { weaponDef, cleanAtt } from './attachments.js';
 import { reticleMesh } from './reticles.js';
+import { BUILDS } from './gunbuilds.js';
 
 export class WeaponState {
   constructor(id, att) {
@@ -514,7 +515,16 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
   const muzzle = new THREE.Object3D(), eject = new THREE.Object3D(), foregrip = new THREE.Object3D();
   let sightY = 0.09, sightZ = -0.05;
 
-  if (id === 'rifle' && GUN_MODELS.ar15) {
+  let sightX = 0;
+  if (BUILDS[id]) {
+    // the added guns: each has its own dedicated model (js/gunbuilds.js)
+    const k = { p, mp, g, B: mats(), A, vm: forViewmodel, tinted, GRIP, Parts, addOptic, ironSights, muzzleDevice, laserModule, triggerGroup, opticReflex, opticHolo, eject, foregrip };
+    const r = BUILDS[id](k);
+    muzF = r.muzF; laser = r.laser;
+    sight(r.sight); sightX = r.sight.sightX || 0;
+    muzzle.position.set(0, r.BY, -muzF);
+    out.magHome = new THREE.Vector3();
+  } else if (id === 'rifle' && GUN_MODELS.ar15) {
     // ---- the AR-15 model (CC-BY 4.0, "AR-15 (game ready)" by IVA on Sketchfab) ----
     addModelParts('ar15', g, k => k !== 'mag' && k !== 'suppressor', !forViewmodel);
     addModelParts('ar15', mag, k => k === 'mag', !forViewmodel);
@@ -910,11 +920,11 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
       mag.add(tab);
     } else if (A.mag === 'ext') mag.scale.y = type === 'sniper' ? 1.25 : 1.2;
   }
-  if (look) dressLook(look, type, g, mag, muzzle, M);
+  if (look && !BUILDS[id]) dressLook(look, type, g, mag, muzzle, M);
   mag.position.copy(out.magHome);
   g.add(mag);
   g.add(muzzle, eject, foregrip);
-  if (A.optic === 'iron' && (frontZ !== null || typeOf(id) === 'pistol')) {
+  if (A.optic === 'iron' && (frontZ !== null || (typeOf(id) === 'pistol' && !BUILDS[id]))) {
     // tritium insert (customizable; hidden when the plain post is chosen): on the front post when we know
     // where it is, otherwise on the sight line just ahead of the rear sight
     const ins = reticleMesh('iron');
@@ -922,6 +932,6 @@ export function buildGun(id, { forViewmodel = false, att = null } = {}) {
     else ins.position.set(0, sightY - 0.0004, sightZ - 0.06);
     g.add(ins);
   }
-  Object.assign(out, { muzzle, eject, foregrip, mag, sightY, sightZ, eyeRelief, laser, att: A });
+  Object.assign(out, { muzzle, eject, foregrip, mag, sightY, sightZ, sightX, eyeRelief, laser, att: A });
   return out;
 }

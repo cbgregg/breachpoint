@@ -722,6 +722,8 @@ export class Game {
     if (def.mode !== 'BOLT' && def.mode !== 'PUMP' && !def.rocket) this.effects.casing(ej, dir, _r);
     const cosmetic = this.mode === 'guest'; // guests draw their own shot instantly; the host decides what it hit
     if (def.rocket) {
+      this.effects.backblast(ej, dir);
+      if (isPlayer) this.playerCtl.addShake(0.45);
       // The Monte: a real rocket from the muzzle along the aim (the host flies it; guests get it as an event)
       if (cosmetic) return;
       applySpread(dir, spread, _d);
