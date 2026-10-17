@@ -318,6 +318,16 @@ export class Effects {
     this.smoke.spawn(pos, _v.copy(dir).multiplyScalar(1.2).add({ x: 0, y: 0.4, z: 0 }), 0xb8b2a6, 0.15, 0.6, { grow: 0.6, alpha: 0.18, drag: 2 });
   }
 
+  // launcher backblast: a flash and a cone of dust and smoke thrown out behind the tube
+  backblast(pos, dir) {
+    this.flashLight(pos, 45, 0.09, 0xffc080);
+    this.flashes.spawn(pos, _v.set(0, 0, 0), 0xffc080, 1.1, 0.08, { alpha: 1 });
+    for (let i = 0; i < 16; i++) {
+      _v.copy(dir).multiplyScalar(-rand(3, 10)).add({ x: rand(-1.6, 1.6), y: rand(-0.4, 1.4), z: rand(-1.6, 1.6) });
+      this.smoke.spawn(pos, _v, i < 5 ? 0x8a8278 : 0xc8c0b4, rand(0.25, 0.55), rand(0.9, 1.8), { grow: 1.8, alpha: 0.3, drag: 3 });
+    }
+  }
+
   casing(pos, dir, right) {
     if (this.casings.length >= 120) this.casings.shift();
     const v = new THREE.Vector3().copy(right).multiplyScalar(rand(1.5, 2.5)).add({ x: 0, y: rand(1.5, 2.5), z: 0 }).addScaledVector(dir, rand(-0.5, 0.3));
