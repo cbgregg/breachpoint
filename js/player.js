@@ -546,6 +546,13 @@ export class PlayerController {
       G.shroud.visible = o > 0.01;
       G.shroud.material.opacity = o;
     }
+    if (G.ocular === undefined) G.ocular = gun.group.getObjectByName('acogOcular') || null;
+    if (G.ocular) {
+      const k = clamp((c.adsT - 0.35) / 0.4, 0, 1), o = 1 - k * k * (3 - 2 * k);
+      G.ocular.visible = o > 0.01;
+      G.ocular.material.opacity = o;
+      G.ocular.material.depthWrite = o > 0.99;
+    }
 
     this.sprintT = clamp(this.sprintT + (c.sprinting ? dt : -dt) * 6, 0, 1);
     const spr = sm5(this.sprintT);   // eased, so going in and out of a sprint never snaps
