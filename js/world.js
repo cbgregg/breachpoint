@@ -473,7 +473,43 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   // that frame: pieces are turned and moved into place, and collision follows the turned footprint in thin strips.
   let XF = null;
   const xfPt = (x, z) => XF ? [XF.x + x * Math.cos(XF.a) + z * Math.sin(XF.a), XF.z - x * Math.sin(XF.a) + z * Math.cos(XF.a)] : [x, z];
+  // Ground overlays (sidewalks, road paint, manholes, paving, floors) sit a few millimetres above the surface
+  // under them. At a distance the depth buffer can't tell them apart and they flicker (z-fighting), so every flat
+  // overlay gets a polygon offset by height: each distinct height is its own step, so a higher layer always draws
+  // over a lower one at any range, and two overlays at the same height never pull against each other.
+  const layered = new Map();
+  const layerMat = (mat, y) => {
+    if (mat.userData.groundLayer !== undefined) return mat;
+    // just under the ground (the dirt that runs out to the horizon): pushed back, so it never shows through
+    if (y < -1e-4 && y > -0.1) {
+      const k = mat.uuid + ':under';
+      let m = layered.get(k);
+      if (!m) { m = mat.clone(); m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 8; m.userData.groundLayer = -1; layered.set(k, m); M[`_layer${layered.size}`] = m; }
+      return m;
+    }
+    const f = y - Math.floor(y + 1e-4);                  // height above the floor level it lies on (0 for ground, 3.6 for a roof)
+    if (f <= 0.0005 || f > 0.08) return mat;
+    // one copy per material and height (0.1 mm); the offsets are handed out by rank once the map is built
+    const h = Math.round(f * 10000), k = mat.uuid + ':' + h;
+    let m = layered.get(k);
+    if (!m) { m = mat.clone(); m.polygonOffset = true; m.userData.groundLayer = h; layered.set(k, m); M[`_layer${layered.size}`] = m; }
+    return m;
+  };
+  const rankGroundLayers = () => {
+    const hs = [...new Set([...layered.values()].map(m => m.userData.groundLayer).filter(h => h > 0))].sort((a, b) => a - b);
+    for (const m of layered.values()) {
+      const h = m.userData.groundLayer;
+      if (!(h > 0)) continue;
+      const i = hs.indexOf(h) + 1;
+      // units: a fixed step in depth, which separates the layers at any range; the factor adds a little at grazing angles
+      m.polygonOffsetFactor = -(1 + i * 0.5); m.polygonOffsetUnits = -2 * i;
+    }
+    return hs.length;
+  };
+  const FLAT = new Set(['PlaneGeometry', 'CircleGeometry', 'RingGeometry']);
   const put = (geo, mat, x, y, z, ry = 0, opts = {}) => {
+    // a flat piece lying face-up just above a floor: a ground overlay
+    if (opts.rx === -Math.PI / 2 && !opts.rz && FLAT.has(geo.type)) mat = layerMat(mat, y);
     if (XF) { [x, z] = xfPt(x, z); ry += XF.a; }
     _e.set(opts.rx || 0, ry, opts.rz || 0, 'YXZ');
     _q.setFromEuler(_e);
@@ -607,29 +643,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
     planePiece(mat, w, d, x, z, y, ry, tint);
   };
-  // Ground overlays (sidewalks, lawns, floors, gravel) sit a few millimetres above the ground under them. At a
-  // distance the depth buffer can't tell them apart and they flicker (z-fighting), so each layer also gets a
-  // polygon offset: it always draws on top of the layers below, at any range.
-  const layered = new Map();
-  const layerMat = (mat, y) => {
-    // just under the ground (the dirt that runs out to the horizon): pushed back, so it never shows through
-    if (y < -1e-4 && y > -0.1) {
-      const k = mat.uuid + ':under';
-      let m = layered.get(k);
-      if (!m) { m = mat.clone(); m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 8; layered.set(k, m); M[`_layer${layered.size}`] = m; }
-      return m;
-    }
-    const f = y - Math.floor(y + 1e-4);                  // height above the floor level it lies on (0 for ground, 3.6 for a roof)
-    if (f <= 0.0005 || f > 0.08) return mat;
-    const L = Math.min(10, Math.round(f / 0.004) + 1), k = mat.uuid + ':' + L;
-    let m = layered.get(k);
-    if (!m) { m = mat.clone(); m.polygonOffset = true; m.polygonOffsetFactor = -L; m.polygonOffsetUnits = -2 * L; layered.set(k, m); M[`_layer${layered.size}`] = m; }
-    return m;
-  };
   const planePiece = (mat, w, d, x, z, y, ry = 0, tint) => {
     const g = new THREE.PlaneGeometry(w, d);
     const sc = scaleOf(mat);
-    mat = layerMat(mat, y);
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / (sc || 3), uv.getY(i) * d / (sc || 3));
     put(g, mat, x, y, z, ry, { rx: -Math.PI / 2, grime: 0, cast: false, tint });
@@ -1208,7 +1224,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // frame battens
         const t = 0.08;
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(M.wood, t, h, t, cx + sx * (w / 2 - t / 2 + 0.01), y0, cz + sz * (d / 2 - t / 2 + 0.01), 0, { grime: 0.2, base: y0, tint: 0x9a7a52 });
-        B(M.dark, w + 0.02, 0.05, d + 0.02, cx, y0 + h * 0.5, cz, 0, { grime: 0, tint: 0x8a8a7a });
+        B(M.dark, w + 0.04, 0.05, d + 0.04, cx, y0 + h * 0.5, cz, 0, { grime: 0, tint: 0x8a8a7a });   // 1 cm proud of the corner posts
         break;
       }
       case 'pallet': {
@@ -1356,8 +1372,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const wallMat = stoneBody ? M.stone : M.brick;
         const tint = o.tint ?? (stoneBody ? 0xe0d6c4 : [0xffffff, 0xe9c6a8, 0xf2d9c0, 0xd8a890][Math.floor(rnd() * 4)]);
         if (!o.shop) B(M.stone, w + 0.12, G, d + 0.12, cx, y0, cz, 0, { tint: 0xa79d8c, grime: 0.55 });
-        B(wallMat, w, h - G, d, cx, y0 + G, cz, 0, { tint, grime: 0.5, base: y0 + G });
-        B(M.stone, w + 0.5, 0.35, d + 0.5, cx, y0 + G - 0.1, cz, 0, { tint: 0xc9bfae, grime: 0.15, base: y0 + G });       // belt course
+        // the upper walls start 2 cm above the ground floor: a shop's ceiling is its roof slab's underside, and a
+        // wall box flush with it z-fights there; the belt course stands 2 cm above the slab's top for the same reason
+        B(wallMat, w, h - G - 0.02, d, cx, y0 + G + 0.02, cz, 0, { tint, grime: 0.5, base: y0 + G });
+        B(M.stone, w + 0.5, 0.37, d + 0.5, cx, y0 + G - 0.1, cz, 0, { tint: 0xc9bfae, grime: 0.15, base: y0 + G });       // belt course
         B(M.stone, w + 0.9, 0.55, d + 0.9, cx, y0 + h - 0.55, cz, 0, { tint: 0xc9bfae, grime: 0.2, base: y0 + h - 1 });   // cornice
         B(M.stone, w + 0.6, 0.25, d + 0.6, cx, y0 + h - 0.85, cz, 0, { tint: 0xb9ae9c, grime: 0.2, base: y0 + h - 1 });
         B(wallMat, w + 0.2, 0.8, d + 0.2, cx, y0 + h, cz, 0, { tint, grime: 0.3, base: y0 + h });                       // parapet
@@ -1441,7 +1459,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             if (b - a < 0.05) return;
             const m = (a + b) / 2, L = b - a, x = S.ox + S.ax * m, z = S.oz + S.az * m;
             solid(x, z, S.ax ? L : T, S.az ? L : T, D, floorY, 'brick').navBlock = true;
-            put(flatBox(S.ax ? L : T, D, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + D / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
+            // 2 cm short of the street: wall tops flush with the paving above z-fight with it
+            put(flatBox(S.ax ? L : T, D - 0.02, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + (D - 0.02) / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
           };
           for (const [a, b] of gaps) { seg(cur, a); put(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI), M.brick, S.ox + S.ax * (a + b) / 2, floorY + 2.3, S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
           seg(cur, S.len / 2);
@@ -1757,8 +1776,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             const t = -L / 2 + (i + 0.5) * bw;
             const main = lvl === 2 && nx === -1 && i === mid;
             const ow = main ? bw * 0.95 : bw - 0.95, oh = main ? 3.9 : 3.0;
-            put(flatBox(ow, oh, 0.06, 0), main ? M.dim : M.glass, fx(t, 0.02), y0 + oh / 2 + 0.25, fz(t, 0.02), ry, { grime: 0, tint: main ? 0xffffff : (rnd() < 0.3 ? 0xd8c9a0 : 0xffffff) });
-            put(new THREE.CircleGeometry(ow / 2, 16, 0, Math.PI), main ? M.dim : M.glass, fx(t, 0.02), y0 + oh + 0.25, fz(t, 0.02), ry, { grime: 0 });
+            // the stone skin's face is 5 cm out: the pane stands 2 cm proud of it (flush, the two z-fight)
+            put(flatBox(ow, oh, 0.06, 0), main ? M.dim : M.glass, fx(t, 0.04), y0 + oh / 2 + 0.25, fz(t, 0.04), ry, { grime: 0, tint: main ? 0xffffff : (rnd() < 0.3 ? 0xd8c9a0 : 0xffffff) });
+            put(new THREE.CircleGeometry(ow / 2, 16, 0, Math.PI), main ? M.dim : M.glass, fx(t, 0.071), y0 + oh + 0.25, fz(t, 0.071), ry, { grime: 0 });
             put(new THREE.TorusGeometry(ow / 2 + 0.18, 0.2, 6, 18, Math.PI), M.stone, fx(t, 0.12), y0 + oh + 0.25, fz(t, 0.12), ry, { tint: STL, grime: 0.25 });
             if (!main) {
               put(flatBox(0.08, oh, 0.12, 0), M.frame, fx(t, 0.08), y0 + oh / 2 + 0.25, fz(t, 0.08), ry, { grime: 0, tint: 0x24302a });
@@ -2279,6 +2299,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(worldBox(w, h, w, 3), M.plaster, Math.cos(a) * r, h / 2, Math.sin(a) * r * 0.85, rnd() * 3, { tint: plasterTints[i % plasterTints.length], grime: 0.3, cast: false });
   }
 
+  rankGroundLayers();
   batch.build(group);
   if (LAYOUT.mountain !== false) group.add(buildMountain());
 
