@@ -92,7 +92,7 @@ export const BUILDS = {
       p.rail(steel, -0.04, 0.16, 0.06);
       sight = k.addOptic(A.optic, p, g, B, vm, 0.069, 0.06);
     }
-    underbarrel(k, 0.36, -0.006, [0, 0.0, -0.36]);
+    underbarrel(k, 0.36, -0.006, [0, -0.026, -0.35]);   // low on the handguard: the AK's sight line runs just over it, so the glove stays below
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0.031, 0.022, 0.4) : null;
     // magazine: 30-round bakelite banana curve, ribbed, with its locking lug
     mp.profile(bake, [[0.106, -0.004], [0.16, -0.004], [0.168, -0.07, 0.03], [0.196, -0.15, 0.06], [0.24, -0.214, 0.008], [0.198, -0.24, 0.008], [0.158, -0.176, 0.06], [0.128, -0.09, 0.03], [0.11, -0.03]], 0.026, { r: 0.004, bevel: 0.002 });
