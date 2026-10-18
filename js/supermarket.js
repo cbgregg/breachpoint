@@ -21,7 +21,7 @@ export const MART = {
   name: 'Freshway',
   // indoors under fluorescent tubes: a touch less exposure than the street maps, so the floor doesn't glare
   look: { exposure: 0.8, env: 0.45, hemi: 0.55 },
-  blurb: 'Indoor supermarket: aisles, deli, bakery, upstairs offices; parking lot and loading yard, broken up by walls and vehicles',
+  blurb: 'Indoor supermarket: tall aisles, frozen foods, produce, deli, bakery, upstairs offices, doors that open and close; parking lot and loading yard',
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
   spawns2: [
     [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-40, 8]],
@@ -360,8 +360,7 @@ function build(ctx) {
   if (M.whitetile) plane(M.whitetile, 5, 7, 19.5, 11.5, 0.02);  // cold storage
   if (M.octagon) plane(M.octagon, 5, 9, 19.5, 19.5, 0.02);      // locker corridor
   // coloured accent tiles: two bands down the cross aisle and a square under the promo display
-  for (const z of [-4.6, 4.6]) plane(M.accent, 24, 1.2, -3.4, z, 0.017);
-  plane(M.accent, 3.6, 3.6, -1.5, -0.8, 0.017);
+  plane(M.accent, 1.2, 31, -2.6, -6.6, 0.017);
   // front sidewalk + curb
   plane(M.tile, 3, 61, -23.9, 0, 0.02);
   B(M.concrete, 0.25, 0.14, 61, -25.5, 0, 0, 0, { grime: 0.2, cast: false });
@@ -495,17 +494,20 @@ function build(ctx) {
   for (const z of [-2.6, 2.6]) P(new THREE.CylinderGeometry(0.008, 0.008, 1.3, 4), M.dark, -16.06, 5.35, z);
   neon('CUSTOMER SERVICE', '#2ef2d0', 3.6, 0.55, -21.75, 2.7, -14.4, Math.PI / 2, true, 'bold 110px Arial');
   // shopping-cart pyramid of a display near the front: water packs
-  SB(M.cardboard, 1.6, 0.9, 1.2, -13.2, 0, -17, { grime: 0.05 }, 'wood');
-  SB(M.goodsBottle, 1.2, 0.6, 0.9, -13.2, 0.9, -17, { grime: 0 }, 'wood');
+  SB(M.cardboard, 1.6, 0.9, 1.2, -14.0, 0, -17, { grime: 0.05 }, 'wood');
+  SB(M.goodsBottle, 1.2, 0.6, 0.9, -14.0, 0.9, -17, { grime: 0 }, 'wood');
 
-  // ---------- aisles ----------
+  // ---------- center store: tall gondola runs front to back, a cross aisle through the middle ----------
+  // like a real supermarket: 4 ft sections, six shelves of stock under a row of overstock cases, endcaps
+  // at both ends. Rows at 3.3 m centres leave 2.15 m aisles.
+  const SH = 2.42, TOP = 2.98;   // shelving height, top of the overstock
   const gondola = (x0, x1, z, goods) => {
     const L = x1 - x0, cx = (x0 + x1) / 2;
-    solid(cx, z, L, 1.15, 2.05, 0, 'metal');
-    B(M.shelf, L, 0.14, 1.1, cx, 0, z, 0, { grime: 0.1 });
-    B(M.shelf, L, 2.0, 0.06, cx, 0.14, z, 0, { grime: 0 });
+    solid(cx, z, L, 1.15, TOP, 0, 'metal');
+    B(M.shelf, L, 0.14, 1.1, cx, 0, z, 0, { grime: 0.1, tint: 0x3a3e44 });            // kick base
+    B(M.shelf, L, SH - 0.14, 0.06, cx, 0.14, z, 0, { grime: 0 });                      // back panel
     let k = 0;
-    for (const y of [0.16, 0.58, 1.0, 1.42]) {
+    for (const y of [0.16, 0.58, 1.0, 1.42, 1.84]) {
       for (const s of [-1, 1]) {
         B(M.shelf, L, 0.03, 0.5, cx, y, z + s * 0.29, 0, { grime: 0 });
         face(goods[(k + (s > 0 ? 0 : 1)) % goods.length], L - 0.04, 0.38, cx, y + 0.22, z + s * 0.5, s > 0 ? 0 : Math.PI, 1);
@@ -513,60 +515,123 @@ function build(ctx) {
       }
       k++;
     }
-    // top stock on both sides
-    for (const s of [-1, 1]) B(M.cardboard, L - 0.2, 0.3, 0.45, cx, 2.14, z + s * 0.27, 0, { grime: 0.05 });
-    // end caps with a promo stack
+    // top shelf: bulk packs; then cases of overstock up to the top
+    for (const s of [-1, 1]) {
+      B(M.shelf, L, 0.03, 0.45, cx, 2.26, z + s * 0.31, 0, { grime: 0 });
+      face(goods[(k + 1) % goods.length], L - 0.04, 0.16, cx, 2.36, z + s * 0.5, s > 0 ? 0 : Math.PI, 1);
+      for (let x = x0 + 0.35; x < x1 - 0.3; x += 0.66) B(M.cardboard, 0.6, 0.38 + ((x * 13) % 0.18), 0.48, x, SH, z + s * 0.27, 0, { grime: 0.05, tint: (x * 7 | 0) % 2 ? 0xffffff : 0xd8ccb8 });
+    }
+    // upright at every 4 ft section
+    for (let x = x0; x <= x1 + 0.01; x += L / Math.max(1, Math.round(L / 1.22))) B(M.shelf, 0.04, SH, 1.14, x, 0, z, 0, { grime: 0, tint: 0xb8bcc2 });
+    // endcaps: a promo stack with a header card
     for (const e of [x0, x1]) {
-      const ex = e + Math.sign(e - cx) * 0.3;
-      SB(M.shelf, 0.6, 1.5, 1.1, ex, 0, z, { grime: 0 }, 'metal');
-      for (const y of [0.3, 0.8]) face(GOODS[(k++) % 4], 1.0, 0.36, ex + Math.sign(e - cx) * 0.31, y + 0.22, z, Math.sign(e - cx) > 0 ? Math.PI / 2 : -Math.PI / 2, 1);
+      const sg = Math.sign(e - cx), ex = e + sg * 0.3;
+      SB(M.shelf, 0.6, 1.95, 1.1, ex, 0, z, { grime: 0 }, 'metal');
+      for (const y of [0.3, 0.8, 1.3]) face(GOODS[(k++) % 4], 1.0, 0.36, ex + sg * 0.31, y + 0.22, z, sg > 0 ? Math.PI / 2 : -Math.PI / 2, 1);
+      B(M.paint, 0.04, 0.32, 1.05, ex + sg * 0.27, 1.98, z, 0, { tint: (k % 3) ? 0xc8322b : 0xe8b62a, grime: 0 });
     }
   };
-  const rows = [-18.5, -13, -7.5, 7.5, 13];
-  rows.forEach((z, i) => {
+  // reach-in freezers back to back: glass doors with lit mullions, frost-blue light inside
+  const freezerRun = (x0, x1, z) => {
+    const L = x1 - x0, cx = (x0 + x1) / 2;
+    solid(cx, z, L, 1.6, 2.35, 0, 'metal');
+    B(M.shelf, L, 2.35, 1.48, cx, 0, z, 0, { tint: 0x2a2c30, grime: 0 });
+    for (const s of [-1, 1]) {
+      const fz = z + s * 0.81;
+      face(GOODS[Math.abs(x0 * 3 + s + 9 | 0) % 4], L - 0.1, 1.55, cx, 1.1, fz - s * 0.04, s > 0 ? 0 : Math.PI, 1);
+      face(M.clearGlass, L - 0.06, 1.85, cx, 1.12, fz + s * 0.005, s > 0 ? 0 : Math.PI, 3);
+      for (let x = x0; x <= x1 + 0.01; x += L / Math.round(L / 0.76)) {
+        B(M.steelK, 0.05, 1.9, 0.03, x, 0.18, fz, 0, { grime: 0 });
+        if (x < x1 - 0.1) B(M.steelK, 0.03, 0.5, 0.04, x + 0.1, 0.95, fz + s * 0.03, 0, { grime: 0 });   // door handle
+      }
+      P(new THREE.BoxGeometry(L - 0.1, 0.05, 0.04), M.frost, cx, 2.12, fz - s * 0.03);
+      B(M.paint, L, 0.3, 0.03, cx, 2.08, fz + s * 0.01, 0, { tint: 0x1f4e8a, grime: 0 });
+    }
+  };
+  const ROWS = [-19.6, -16.3, -13.0, -9.7, -6.4, -3.1, 0.2, 3.5, 6.8];
+  const LX = [-11.2, -4.4], RX = [-0.8, 6.2];
+  ROWS.forEach((z, i) => {
+    if (i === 2 || i === 3) { freezerRun(LX[0] - 0.45, LX[1] + 0.45, z); freezerRun(RX[0] - 0.45, RX[1] + 0.45, z); return; }
     const goods = [GOODS[i % 4], GOODS[(i + 1) % 4], GOODS[(i + 2) % 4]];
-    gondola(-11, -3.9, z, goods);
-    gondola(-1.1, 6.6, z, goods);
+    gondola(LX[0], LX[1], z, goods);
+    gondola(RX[0], RX[1], z, goods);
   });
-  // aisle signs hanging from the ceiling
-  const aisleNames = [['1', 'FROZEN · ICE CREAM'], ['2', 'CEREAL · BREAKFAST'], ['3', 'CANNED · SOUP'], ['4', 'SNACKS · SODA'], ['5', 'BAKING · SPICES'], ['6', 'WEEKLY DEALS']];
-  [-21.2, -15.75, -10.25, 10.25, 15.75, 3.3].forEach((z, i) => {
-    const tex = signTex([`AISLE ${aisleNames[i][0]}`, aisleNames[i][1]], { bg: i === 5 ? '#c8322b' : '#1f4e8a', fg: '#ffffff', font: 'bold 44px Arial', w: 512, h: 160 });
-    for (const s of [0, Math.PI]) signMesh(tex, 2.2, 0.69, 1.5 + (s ? -0.01 : 0.01), 3.9, z, s + Math.PI / 2, 0.6, { noMinimap: true });
-    P(new THREE.CylinderGeometry(0.01, 0.01, 1.6, 4), M.dark, 1.5, 5.0, z);
+  // aisle markers: double-sided signs hanging over the cross aisle
+  const aisleNames = ['DAIRY · EGGS', 'BREAD · CEREAL', 'FROZEN MEALS', 'FROZEN FOODS', 'ICE CREAM · PIZZA', 'CANNED · SOUP', 'PASTA · RICE', 'SNACKS · SODA', 'BAKING · SPICES', 'HOUSEHOLD'];
+  [-21.6, -17.95, -14.65, -11.35, -8.05, -4.75, -1.45, 1.85, 5.15, 8.0].forEach((z, i) => {
+    if (i === 2 || i === 4) return;   // the freezer runs: one sign for the frozen aisle between them
+    const tex = signTex([`${i + 1}`, aisleNames[i]], { bg: i === 3 ? '#2a6aa8' : '#1f4e8a', fg: '#ffffff', font: 'bold 44px Arial', w: 512, h: 160 });
+    for (const s of [0, Math.PI]) signMesh(tex, 2.0, 0.62, -2.6 + (s ? -0.01 : 0.01), 3.85, z, s + Math.PI / 2, 0.6, { noMinimap: true });
+    P(new THREE.CylinderGeometry(0.01, 0.01, 1.7, 4), M.dark, -2.6, 5.0, z);
   });
-  // wall freezers along the south wall
+  // dairy wall along the south side: tall open multideck coolers with a lit canopy
   for (let x = -11; x < 7; x += 3) {
     if (x === 1) continue; // fire exit
-    SB(M.shelf, 3, 2.25, 0.95, x + 1.5, 0, -23.45, { tint: 0x2a2c30, grime: 0 }, 'metal');
-    face(GOODS[(x + 11) / 3 % 4 | 0], 2.8, 1.7, x + 1.5, 1.1, -23.0, 0, 1);
-    face(M.clearGlass, 2.9, 1.9, x + 1.5, 1.15, -22.94, 0, 3);
-    for (const dx of [0, 1, 2, 3]) B(M.steelK, 0.05, 1.95, 0.05, x + dx, 0.2, -22.93, 0, { grime: 0 });
-    P(new THREE.BoxGeometry(2.8, 0.04, 0.04), M.coolLight, x + 1.5, 2.08, -22.95);
+    SB(M.shelf, 3, 2.35, 0.95, x + 1.5, 0, -23.45, { tint: 0x2a2c30, grime: 0 }, 'metal');
+    for (const y of [0.35, 0.8, 1.25, 1.7]) {
+      B(M.steelK, 2.9, 0.025, 0.55, x + 1.5, y, -23.2, 0, { grime: 0 });
+      face(y < 1 ? M.goodsBottle : GOODS[(x + 11 + y * 10 | 0) % 4], 2.85, 0.38, x + 1.5, y + 0.21, -23.0, 0, 1);
+    }
+    P(new THREE.BoxGeometry(2.8, 0.04, 0.04), M.coolLight, x + 1.5, 2.18, -22.95);
+    B(M.paint, 3, 0.3, 0.06, x + 1.5, 2.2, -22.96, 0, { tint: 0x2a6aa8, grime: 0 });
   }
-  // produce: angled bins on the north side, a misted wall case behind
-  for (const x of [-10, -6, -2, 2, 6]) for (const z of [17.3, 20.5]) {
-    SB(M.woodOld, 2.6, 0.85, 1.6, x, 0, z, { tint: 0x8a6a4a, grime: 0.1 }, 'wood');
-    const g = new THREE.PlaneGeometry(2.5, 1.5); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2.5, uv.getY(i) * 1.5);
-    P(g, M.produce, x, 0.98, z, 0, { rx: -Math.PI / 2 + 0.25, cast: false });
+  signMesh(signTex('DAIRY', { bg: '#2a6aa8', font: 'bold 80px Arial', w: 512, h: 128 }), 3.2, 0.8, -2.6, 3.4, -23.9, 0, 0.6, { noMinimap: true });
+
+  // ---------- produce: islands of loose fruit and veg, a misted wet rack along the wall ----------
+  const fruit = makeProduce(group, M, ctx.low);
+  // angled display table: wooden bins tipped toward the shopper, each section a different fruit
+  const produceTable = (x, z, ry, kinds, w = 2.4, d = 1.3) => {
+    SB(M.woodOld, w, 0.72, d, x, 0, z, { tint: 0x7a5a3a, grime: 0.1 }, 'wood');
+    solid(x, z, w, d, 1.0, 0, 'wood');
+    const n = kinds.length, sw = w / n;
+    for (let i = 0; i < n; i++) {
+      const sx = x - w / 2 + sw * (i + 0.5);
+      fruit.bed(kinds[i], sx, 0.74, z, sw - 0.06, d - 0.08, 0.18);
+      if (i) B(M.woodOld, 0.03, 0.18, d, x - w / 2 + sw * i, 0.72, z, 0, { tint: 0x5a3e28, grime: 0 });
+    }
+    for (const s of [-1, 1]) B(M.woodOld, w, 0.16, 0.04, x, 0.72 + (s > 0 ? 0.12 : 0), z + s * d / 2, 0, { tint: 0x5a3e28, grime: 0 });
+    for (const s of [-1, 1]) B(M.paint, 0.35, 0.18, 0.01, x - w / 2 + 0.3 + (s > 0 ? w - 0.6 : 0), 0.62, z - d / 2 - 0.005, 0, { tint: 0xf4f0e0, grime: 0 });  // price cards
+  };
+  produceTable(-10.6, 11.4, 0, ['apple', 'apple2', 'pear']);
+  produceTable(-10.6, 15.2, 0, ['orange', 'lemon', 'lime']);
+  produceTable(-6.6, 11.4, 0, ['tomato', 'pepper', 'pepper2']);
+  produceTable(-6.6, 15.2, 0, ['avocado', 'onion', 'potato']);
+  produceTable(1.4, 11.4, 0, ['peach', 'apple', 'grapefruit']);
+  produceTable(1.4, 15.2, 0, ['potato', 'onion', 'orange']);
+  produceTable(5.6, 11.4, 0, ['pepper2', 'tomato', 'lemon']);
+  produceTable(5.6, 15.2, 0, ['apple2', 'pear', 'peach']);
+  // banana tree stand and watermelon / pineapple bins on the cross aisle
+  SB(M.woodOld, 1.6, 0.5, 1.0, -2.6, 0, 18.6, { tint: 0x7a5a3a }, 'wood');
+  SB(M.woodOld, 1.2, 0.45, 0.7, -2.6, 0.5, 18.75, { tint: 0x6a4a2e }, 'wood');
+  fruit.bed('banana', -2.6, 0.52, 18.3, 1.5, 0.35, 0.3);
+  fruit.bed('banana', -2.6, 0.97, 18.75, 1.1, 0.6, 0.15);
+  for (const [x, z, k] of [[-2.6, 11.6, 'melon'], [-2.6, 14.6, 'pineapple']]) {
+    SB(M.cardboard, 1.1, 0.75, 1.1, x, 0, z, { tint: 0x9a7a52, grime: 0.05 }, 'wood');
+    B(M.paint, 1.12, 0.22, 1.12, x, 0.3, z, 0, { tint: 0x2f8a4a, grime: 0 });
+    fruit.bed(k, x, 0.75, z, 1.0, 1.0, 0);
   }
+  // wet rack against the north wall: tiered, misted, leafy greens under a lit canopy
+  const greens = [['lettuce', 'broccoli', 'carrot'], ['carrot', 'lettuce', 'pepper'], ['broccoli', 'lettuce', 'tomato'], ['lettuce', 'carrot', 'broccoli'], ['pepper2', 'broccoli', 'lettuce'], ['lettuce', 'carrot', 'broccoli']];
+  let gi = 0;
   for (let x = -11; x < 7; x += 3) {
     if (x === -5) continue; // fire exit
-    SB(M.shelf, 3, 2.0, 0.9, x + 1.5, 0, 23.5, { tint: 0x2a3a2a, grime: 0 }, 'metal');
-    face(M.produce, 2.9, 1.4, x + 1.5, 1.0, 23.04, Math.PI, 1.5);
-    P(new THREE.BoxGeometry(2.8, 0.04, 0.04), M.coolLight, x + 1.5, 1.85, 23.0);
+    SB(M.shelf, 3, 0.75, 1.0, x + 1.5, 0, 23.5, { tint: 0x2a3a2a, grime: 0 }, 'metal');
+    B(M.shelf, 3, 2.2, 0.12, x + 1.5, 0, 23.95, 0, { tint: 0x2a3a2a, grime: 0 });
+    const rk = greens[gi++ % greens.length];
+    rk.forEach((k, j) => fruit.bed(k, x + 1.5, 0.76 + j * 0.36, 23.35 + j * 0.2, 2.9, 0.38, 0.32));
+    for (const j of [1, 2]) B(M.shelf, 3, 0.03, 0.42, x + 1.5, 0.74 + j * 0.36, 23.35 + j * 0.2, 0, { tint: 0x2a3a2a, grime: 0 });
+    P(new THREE.BoxGeometry(2.8, 0.04, 0.04), M.coolLight, x + 1.5, 2.05, 23.6);
+    B(M.paint, 3, 0.25, 0.5, x + 1.5, 2.1, 23.7, 0, { tint: 0x2f6a2a, grime: 0 });
   }
   const prodSign = signTex('FRESH PRODUCE', { bg: '#2f6a2a', font: 'bold 64px Arial' });
-  signMesh(prodSign, 4, 1, -2, 3.6, 23.9, Math.PI, 0.6, { noMinimap: true });
-  // middle of the floor: staggered displays so the centre aisle isn't a straight shot
-  SB(M.cardboard, 2.2, 1.9, 2.2, -8, 0, 0.6, { grime: 0.05 }, 'wood');
-  for (const s of [-1, 1]) face(M.goodsCan, 2.1, 0.5, -8, 0.95, 0.6 + s * 1.11, s > 0 ? 0 : Math.PI, 1);
-  SB(M.shelf, 4, 2.0, 1.7, -1.5, 0, -0.8, { tint: 0x2a2c30, grime: 0 }, 'metal'); // cooler island
-  for (const s of [-1, 1]) { face(M.goodsBottle, 3.8, 1.5, -1.5, 1.0, -0.8 + s * 0.8, s > 0 ? 0 : Math.PI, 1); face(M.clearGlass, 3.9, 1.7, -1.5, 1.0, -0.8 + s * 0.86, s > 0 ? 0 : Math.PI, 4); }
-  SB(M.cardboard, 1.8, 1.9, 1.8, 4.5, 0, 1.6, { grime: 0.05 }, 'wood');
-  face(M.goodsBox, 1.7, 0.6, 4.5, 0.6, 2.51, 0, 1);
-  SB(M.cardboard, 1.4, 1.5, 1.4, -13, 0, 2.5, {}, 'wood');
-  SB(M.cardboard, 1.4, 1.5, 1.4, -13, 0, 17, {}, 'wood');
+  signMesh(prodSign, 4, 1, -2.6, 3.6, 23.9, Math.PI, 0.6, { noMinimap: true });
+  for (const s of [0, Math.PI]) signMesh(signTex('PRODUCE', { bg: '#2f6a2a', font: 'bold 70px Arial', w: 512, h: 128 }), 2.2, 0.55, -2.6, 3.9, 13.1 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true });
+  fruit.flush();
+  // front "action alley": a few promo pallets, staggered so the front isn't one long lane
+  SB(M.cardboard, 1.4, 1.5, 1.4, -14.2, 0, 2.5, {}, 'wood');
+  SB(M.cardboard, 1.2, 1.2, 1.2, -14.0, 0, 17.6, {}, 'wood');
+  SB(M.cardboard, 1.4, 1.3, 1.2, -13.9, 0, -8.5, {}, 'wood');
+  face(M.goodsBox, 1.3, 0.6, -13.9, 0.7, -7.89, 0, 1);
 
   // ---------- bakery (back left) ----------
   // display counter with bread and pastries under glass, a gap at the end into the kitchen
@@ -645,10 +710,6 @@ function build(ctx) {
   wallLine(15, -6, 15, 6, H, 0.25, [[5, 7, 2.6]], M.plaster, inner);                // double swing doors into the store
   wallLine(15, -6, 22, -6, H, 0.25, [[3, 4.6, 2.3]], M.plaster, inner);             // to the bakery kitchen
   wallLine(15, 6, 22, 6, H, 0.25, [[4, 5.6, 2.3]], M.plaster, inner);               // to the office corridor
-  for (const s of [-1, 1]) {
-    // swing doors propped open
-    P(new THREE.BoxGeometry(0.06, 2.4, 0.95), M.steelK, 15.5, 1.25, s * 1.4, s * 0.9);
-  }
   const rack = (x0, x1, z) => {
     const L = x1 - x0, cx = (x0 + x1) / 2;
     solid(cx, z, L, 1.0, 3.6, 0, 'metal').pass = true;   // open racking with cardboard: you can see and shoot through the gaps
@@ -1038,12 +1099,6 @@ function build(ctx) {
   SB(M.paint, 2.5, 2.6, 6.1, 38.6, 0, 8.5, { tint: 0x8a3d2c, grime: 0.35 }, 'metal');
   for (let i = 0; i < 12; i++) B(M.paint, 0.04, 2.4, 0.08, 37.32, 0.1, 5.8 + i * 0.5, 0, { tint: 0x6a2d1c, grime: 0.2 });
   wallSeg(30.5, -2.8, 3.2, 0.4, 2.4, 0xd8d0c4);
-  // inside: tall seasonal racks along the front corridor, so the checkout side isn't one long lane
-  for (const z of [-8.5, 9.5]) {
-    SB(M.shelf, 1.2, 2.1, 1.2, -13, 0, z, { tint: 0x8a2f2a, grime: 0 }, 'metal');
-    for (const [dx, dz, ry] of [[0.61, 0, Math.PI / 2], [-0.61, 0, -Math.PI / 2], [0, 0.61, 0], [0, -0.61, Math.PI]]) for (const y of [0.5, 1.15]) face(GOODS[(y * 10 | 0) % 4], 1.1, 0.5, -13 + dx, y, z + dz, ry, 1);
-  }
-
   // ---------- the smoker ----------
   const smoker = makeSmoker(group, 23.25, 19.2, -Math.PI / 2 + 0.3); // facing out into the yard
 
@@ -1051,7 +1106,7 @@ function build(ctx) {
   const inside = (x, z) => x > X0 && x < X1 && z > Z0 && z < Z1;
   return {
     // S&D: sites each team defends ([x, z]); placed near the middle so both teams get there at about the same time
-    sites: [[[-5.5, -16], [-6, 15.5]], [[5, -16], [8.6, 10.6]]],
+    sites: [[[-2.6, -16.3], [-4.3, 13.3]], [[8.2, -16.3], [8.6, 10.6]]],
     flagPos: [-2.5, 4.2],
     // upstairs offices for the bots: the floor at 3.2 m, the inside stair (deli side) and the outside fire stair
     upper: {
@@ -1062,11 +1117,193 @@ function build(ctx) {
       ],
     },
     ambient: { music: 'muzak', inside },
+    // doors (js/doors.js): x, z = middle of the doorway; axis = the wall's direction
+    doors: [
+      { kind: 'slide', x: X0 - T / 2, z: -19, axis: 'z', w: 4, h: 2.6, glass: true },          // front entrances
+      { kind: 'slide', x: X0 - T / 2, z: 18.6, axis: 'z', w: 4, h: 2.6, glass: true },
+      { kind: 'traffic', x: 15, z: 0, axis: 'z', w: 2, h: 2.5 },                                 // stockroom <-> sales floor
+      { kind: 'traffic', x: 18.8, z: -6, axis: 'x', w: 1.6, h: 2.25 },                           // stockroom <-> bakery
+      { kind: 'traffic', x: 12, z: 10.2, axis: 'z', w: 1.6, h: 2.25 },                           // kitchen
+      { kind: 'traffic', x: 12, z: 19.8, axis: 'z', w: 1.6, h: 2.25 },
+      { kind: 'swing', x: X1 + T / 2, z: -18.6, axis: 'z', w: 1.6, h: 2.25, tint: 0x5a6a5a },   // bakery back door
+      { kind: 'swing', x: X1 + T / 2, z: 17.8, axis: 'z', w: 1.6, h: 2.25, tint: 0x5a6a5a },    // staff door to the smoking area
+      { kind: 'swing', x: -2.8, z: Z1 + T / 2, axis: 'x', w: 1.6, h: 2.25, tint: 0x8a2a24 },    // fire exits
+      { kind: 'swing', x: 3.2, z: Z0 - T / 2, axis: 'x', w: 1.6, h: 2.25, tint: 0x8a2a24 },
+      { kind: 'swing', x: 19.8, z: 6, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },              // stockroom -> office corridor
+      { kind: 'swing', x: 14.8, z: 8, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },
+      { kind: 'swing', x: 17, z: 20.25, axis: 'z', w: 1.5, h: 2.25, tint: 0x6a7a8a },             // back corridor
+      { kind: 'swing', x: 12, z: 16.7, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // upstairs: office off the stair landing
+      { kind: 'swing', x: X1 + T / 2, z: 9.3, y: UP, axis: 'z', w: 1.8, h: 2.15, tint: 0x5a6a5a },// ... and out to the fire stair
+      { kind: 'swing', x: 14.6, z: 18, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // manager's office
+    ],
     menuCam(t, cam) {
       cam.position.set(Math.cos(t) * 44 - 4, 13 + Math.sin(t * 0.7) * 2, Math.sin(t) * 38);
       cam.lookAt(0, 1.5, 0);
     },
     update(dt, time) { if (smoker) smoker.update(dt, time); },
+  };
+}
+
+// ---------- produce: loose fruit and vegetables ----------
+// Each kind is one small low-poly shape drawn as an InstancedMesh, with a per-piece colour and size spread,
+// stacked as a heap on a sloped bed (a coloured mound underneath fills the gaps). On Low detail only a
+// sparse top layer is drawn.
+function makeProduce(group, M, low) {
+  const col = (geo, c) => {
+    const n = geo.attributes.position.count, a = new Float32Array(n * 3), cc = new THREE.Color(c);
+    for (let i = 0; i < n; i++) { a[i * 3] = cc.r; a[i * 3 + 1] = cc.g; a[i * 3 + 2] = cc.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    return geo;
+  };
+  const clean = (g) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g; };
+  const merge = (parts) => { const g = mergeGeometries(parts.map(([geo, c]) => col(clean(geo), c))); g.computeBoundingSphere(); return g; };
+  const seg = low ? [6, 4] : [9, 6];
+  // a round fruit, squashed / stretched, with a dimple at the stem end
+  const round = (r, sy = 1, sx = 1, dimple = 0.25, c = 0xffffff, stem = 0x4a3a1a) => {
+    const g = new THREE.SphereGeometry(r, seg[0], seg[1]);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i) / r, d = Math.max(0, y - 0.7) / 0.3;
+      p.setXYZ(i, p.getX(i) * sx, (p.getY(i) - d * d * dimple * r) * sy, p.getZ(i));
+    }
+    g.computeVertexNormals();
+    const parts = [[g, c]];
+    if (stem !== null && !low) parts.push([new THREE.CylinderGeometry(r * 0.06, r * 0.05, r * 0.4, 4).translate(0, r * sy * (1 - dimple * 0.8) + r * 0.1, 0), stem]);
+    return merge(parts);
+  };
+  const lemon = (r, c) => {
+    const g = new THREE.SphereGeometry(r, seg[0], seg[1]);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i) / r; const tip = Math.pow(Math.abs(x), 6) * 0.25; p.setX(i, p.getX(i) * (1.35 + tip)); }
+    g.computeVertexNormals();
+    return merge([[g, c]]);
+  };
+  const banana = () => {
+    const parts = [];
+    for (let k = 0; k < (low ? 3 : 5); k++) {
+      const off = (k - 2) * 0.026;
+      const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(off, 0.02, -0.02), new THREE.Vector3(off * 1.4, 0.06, 0.08), new THREE.Vector3(off * 1.8, 0.02, 0.18));
+      const tube = new THREE.TubeGeometry(curve, low ? 4 : 7, 0.017, low ? 4 : 6, false);
+      parts.push([tube, 0xffffff]);
+      parts.push([new THREE.SphereGeometry(0.008, 4, 3).translate(off * 1.8, 0.02, 0.185), 0x3a2a12]);
+    }
+    parts.push([new THREE.CylinderGeometry(0.02, 0.024, 0.05, 6).rotateX(Math.PI / 2).translate(0, 0.02, -0.04), 0x6a7a3a]);
+    return merge(parts);
+  };
+  const pineapple = () => {
+    const body = new THREE.SphereGeometry(0.065, seg[0], seg[1]).scale(1, 1.6, 1).translate(0, 0.1, 0);
+    const parts = [[body, 0xc89a3a]];
+    for (let k = 0; k < (low ? 4 : 8); k++) parts.push([new THREE.ConeGeometry(0.018, 0.16, 3).rotateZ((k % 2 ? 0.35 : 0.15)).rotateY(k * 0.8).translate(0, 0.26, 0), 0x3a6a2a]);
+    return merge(parts);
+  };
+  const broccoli = () => {
+    const parts = [[new THREE.CylinderGeometry(0.018, 0.025, 0.12, 6).translate(0, 0.05, 0), 0x7aa05a]];
+    for (let k = 0; k < (low ? 3 : 6); k++) { const a = k * 1.2; parts.push([new THREE.IcosahedronGeometry(0.04, 0).translate(Math.cos(a) * 0.035, 0.12 + (k % 2) * 0.02, Math.sin(a) * 0.035), 0x2f5a24]); }
+    return merge(parts);
+  };
+  const lettuce = () => {
+    const g = new THREE.IcosahedronGeometry(0.085, low ? 0 : 1);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const n = Math.sin(p.getX(i) * 90) * Math.cos(p.getZ(i) * 80) * 0.012; p.setXYZ(i, p.getX(i) + n, p.getY(i) * 0.75 + n, p.getZ(i) - n); }
+    g.computeVertexNormals();
+    return merge([[g, 0xffffff]]);
+  };
+  const carrot = () => {
+    const parts = [];
+    for (let k = 0; k < (low ? 3 : 5); k++) {
+      const a = (k - 2) * 0.08;
+      parts.push([new THREE.ConeGeometry(0.014, 0.17, 5).rotateX(Math.PI / 2).rotateY(a).translate(k * 0.012 - 0.024, 0.015, 0.05), 0xffffff]);
+      parts.push([new THREE.ConeGeometry(0.02, 0.12, 4).rotateX(-Math.PI / 2 - 0.4).rotateY(a).translate(k * 0.012 - 0.024, 0.04, -0.07), 0x3a7a2a]);
+    }
+    return merge(parts);
+  };
+  const melonTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const x = c.getContext('2d'); x.fillStyle = '#2d5a24'; x.fillRect(0, 0, 64, 64);
+    x.fillStyle = '#4f8a3a'; for (let i = 0; i < 8; i++) { x.beginPath(); for (let y = 0; y <= 64; y += 4) x.lineTo(i * 8 + Math.sin(y * 0.3 + i) * 1.5 + 2, y); for (let y = 64; y >= 0; y -= 4) x.lineTo(i * 8 + Math.sin(y * 0.3 + i) * 1.5 - 1.5, y); x.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const melonGeo = col(new THREE.SphereGeometry(0.14, seg[0] + 2, seg[1] + 1).scale(1, 0.85, 1.25), 0xffffff);
+  // kind: geometry, colour spread [hex...], size jitter, spacing (m), roughness, mound colour, layers
+  const KINDS = {
+    apple: { geo: round(0.04, 0.92, 1, 0.3), cols: [0xb81c1c, 0xc8281e, 0x9a1414, 0xd0402a], rough: 0.38, gap: 0.082, bed: 0x6a1410 },
+    apple2: { geo: round(0.04, 0.92, 1, 0.3), cols: [0x8ab83a, 0x9ac848, 0x7aa832], rough: 0.4, gap: 0.082, bed: 0x4a6a1a },
+    pear: { geo: round(0.038, 1.35, 1, 0.1, 0xffffff), cols: [0xc8b83a, 0xb8a832, 0xa8a83a], rough: 0.5, gap: 0.08, bed: 0x6a6a1a },
+    peach: { geo: round(0.038, 0.95, 1, 0.2, 0xffffff, null), cols: [0xf0905a, 0xe87048, 0xf0a868], rough: 0.8, gap: 0.08, bed: 0x8a4a2a },
+    orange: { geo: round(0.042, 0.96, 1, 0.08, 0xffffff, null), cols: [0xf08a1a, 0xe87a12, 0xf89a28], rough: 0.72, gap: 0.086, bed: 0x8a4a0a },
+    grapefruit: { geo: round(0.052, 0.95, 1, 0.08, 0xffffff, null), cols: [0xf0c050, 0xf0a860, 0xe8c868], rough: 0.7, gap: 0.104, bed: 0x8a6a2a },
+    lemon: { geo: lemon(0.03, 0xffffff), cols: [0xf2d82a, 0xe8cc20, 0xf8e040], rough: 0.6, gap: 0.085, bed: 0x8a7a10 },
+    lime: { geo: round(0.029, 0.95, 1, 0.05, 0xffffff, null), cols: [0x4a9a2a, 0x5aa830, 0x3a8a22], rough: 0.5, gap: 0.06, bed: 0x2a5a14 },
+    tomato: { geo: round(0.036, 0.82, 1, 0.15, 0xffffff, 0x2a6a1a), cols: [0xd8281a, 0xc81e14, 0xe83a22], rough: 0.25, gap: 0.074, bed: 0x7a1410 },
+    pepper: { geo: round(0.04, 1.05, 1, 0.35, 0xffffff, 0x2a6a1a), cols: [0xd81e14, 0xc81810], rough: 0.2, gap: 0.085, bed: 0x6a1010 },
+    pepper2: { geo: round(0.04, 1.05, 1, 0.35, 0xffffff, 0x2a6a1a), cols: [0xf2c018, 0xf08a10, 0x3a8a22], rough: 0.2, gap: 0.085, bed: 0x6a5a10 },
+    avocado: { geo: round(0.034, 1.4, 1, 0, 0xffffff, null), cols: [0x2a3a1a, 0x34401e, 0x22301a], rough: 0.85, gap: 0.075, bed: 0x1a2410 },
+    onion: { geo: round(0.04, 0.9, 1, -0.3, 0xffffff, 0x8a6a3a), cols: [0xb88a4a, 0xa87a3a, 0xc89a5a], rough: 0.6, gap: 0.084, bed: 0x6a4a22 },
+    potato: { geo: round(0.036, 0.75, 1.4, 0, 0xffffff, null), cols: [0x9a7a52, 0x8a6a48, 0xa88a5a], rough: 0.95, gap: 0.09, bed: 0x5a4430 },
+    banana: { geo: banana(), cols: [0xf2d02a, 0xe8c820, 0xd8c838], rough: 0.55, gap: 0.2, gapZ: 0.16, bed: 0x6a5a1a, layers: 1, flat: true },
+    melon: { geo: melonGeo, map: melonTex, cols: [0xffffff, 0xe8f0e0, 0xd8e8d0], rough: 0.4, gap: 0.3, gapZ: 0.36, bed: 0x2a4a1a, layers: 2 },
+    pineapple: { geo: pineapple(), cols: [0xffffff, 0xf0e0c8], rough: 0.85, gap: 0.16, bed: 0x5a4a1a, layers: 1, flat: true },
+    lettuce: { geo: lettuce(), cols: [0x8ac848, 0x7ab83a, 0x9ad058], rough: 0.7, gap: 0.16, bed: 0x3a6a1a, layers: 1, flat: true },
+    broccoli: { geo: broccoli(), cols: [0xffffff, 0xe8f0e0], rough: 0.85, gap: 0.12, bed: 0x2a4a1a, layers: 1, flat: true },
+    carrot: { geo: carrot(), cols: [0xf07818, 0xe86a12], rough: 0.7, gap: 0.13, gapZ: 0.3, bed: 0x6a3a0a, layers: 1, flat: true },
+  };
+  const inst = {}, mounds = new Map();
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  let seed = 1;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  return {
+    // a heap of `kind` on a w x d bed centred at (x, z), top surface at y, rising by `tilt` per metre toward +z
+    bed(kind, x, y, z, w, d, tilt = 0) {
+      const K = KINDS[kind]; if (!K) return;
+      // the mound: a sloped coloured block that fills the gaps between pieces
+      const mh = 0.05, mg = new THREE.BoxGeometry(w, mh, d);
+      const p = mg.attributes.position;
+      for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + (p.getZ(i) + d / 2) * tilt);
+      mg.translate(x, y + mh / 2 - 0.02, z);
+      if (!mounds.has(K.bed)) mounds.set(K.bed, []);
+      mounds.get(K.bed).push(mg);
+      const list = inst[kind] || (inst[kind] = []);
+      const gx = K.gap, gz = K.gapZ || K.gap;
+      const nx = Math.max(1, Math.floor(w / gx)), nz = Math.max(1, Math.floor(d / gz));
+      const layers = low ? 1 : K.layers || 1;
+      for (let L = 0; L < layers; L++) {
+        const shrink = L * gx * 0.9;   // upper layer sits inset, a heap rather than a slab
+        for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+          const u = -w / 2 + (i + 0.5 + (L ? 0.5 : 0)) * (w / nx), t = -d / 2 + (k + 0.5 + (L ? 0.5 : 0)) * (d / nz);
+          if (L && (Math.abs(u) > w / 2 - shrink || Math.abs(t) > d / 2 - shrink)) continue;
+          if (low && (i + k) % 2) continue;
+          const jx = (rnd() - 0.5) * gx * 0.25, jz = (rnd() - 0.5) * gz * 0.25;
+          const px = x + u + jx, pz = z + t + jz;
+          const py = y + (t + d / 2) * tilt + L * gx * 0.62 + mh * 0.4;
+          const s = 0.88 + rnd() * 0.24;
+          e.set(K.flat ? (rnd() - 0.5) * 0.3 : (rnd() - 0.5) * 1.4, rnd() * Math.PI * 2, K.flat ? (rnd() - 0.5) * 0.3 : (rnd() - 0.5) * 1.4);
+          if (K.flat) e.x += -Math.atan(tilt);
+          q.setFromEuler(e); sc.set(s, s, s); v.set(px, py, pz);
+          list.push([m4.compose(v, q, sc).clone(), K.cols[(rnd() * K.cols.length) | 0], 0.92 + rnd() * 0.12]);
+        }
+      }
+    },
+    flush() {
+      for (const [kind, list] of Object.entries(inst)) {
+        const K = KINDS[kind];
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: K.rough, metalness: 0, map: K.map || null });
+        M['fruit_' + kind] = mat;
+        const im = new THREE.InstancedMesh(K.geo, mat, list.length);
+        const c = new THREE.Color();
+        list.forEach(([m, hex, b], i) => { im.setMatrixAt(i, m); im.setColorAt(i, c.setHex(hex).multiplyScalar(b)); });
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.computeBoundingSphere();
+        im.castShadow = false; im.receiveShadow = true; im.userData.noMinimap = true;
+        group.add(im);
+      }
+      for (const [hex, list] of mounds) {
+        const mat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9 });
+        M['mound_' + hex] = mat;
+        const m = new THREE.Mesh(mergeGeometries(list), mat);
+        m.receiveShadow = true; m.userData.noMinimap = true;
+        group.add(m);
+      }
+    },
   };
 }
 

@@ -147,6 +147,7 @@ export class HUD {
     // prompt
     let key = '', html = '', warn = false;
     if (p.alive && this.objPrompt) { key = 'obj' + this.objPrompt; html = this.objPrompt; }
+    else if (p.alive && this.doorPrompt) { key = 'door' + this.doorPrompt; html = this.doorPrompt; }
     else if (p.alive && !w.reloading) {
       if (w.mag === 0 && w.reserve === 0) { key = 'noammo'; html = 'NO AMMO'; warn = true; }
       else if ((w.mag === 0 || (w.def.mag >= 4 && w.mag <= Math.ceil(w.def.mag * 0.25))) && w.reserve > 0) { key = 'reload' + this.device; html = `${glyph('reload', this.device)} RELOAD`; }

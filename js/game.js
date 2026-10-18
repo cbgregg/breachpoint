@@ -4,6 +4,7 @@ import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom, 
 const WEAPON_IDS = Object.keys(WEAPONS);
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
+import { Doors } from './doors.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS, setWorldDetail, worldDetailLow } from './world.js';
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
@@ -567,6 +568,7 @@ export class Game {
       if (this.session) this.session.update(dt);
     }
     if (this.gm) this.gm.frame(dt);
+    if (this.doors) this.doors.update(dt, !guest);
 
     this.updateAimTarget();
     this.camera.updateMatrixWorld();
@@ -1413,8 +1415,11 @@ export class Game {
       for (const m of Object.values(this.world.materials)) m.dispose();
       for (const set of Object.values(this.world.textures)) for (const t of Object.values(set)) if (t && t.isTexture && !t.userData.keep) t.dispose();
     }
+    if (this.doors) { this.doors.dispose(); this.doors = null; }
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
+    // doors come after the nav grid, so bots path through doorways (and open them on the way)
+    if (this.world.doors) this.doors = new Doors(this, this.world.doors);
     setCharacterDetail(this.world.textures.fabric);
     const lit = !this.renderer.quality || this.renderer.quality.lights !== false;
     const lamps = !!this.renderer.quality && this.renderer.quality.lights !== false;

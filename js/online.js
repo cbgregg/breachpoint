@@ -767,7 +767,7 @@ export class HostSession {
         if (a === 'slot1') c.switchTo(0);
         else if (a === 'slot2') c.switchTo(1);
         else if (a === 'swap') c.switchTo(c.prev);
-        else if (a === 'reload') { if (!(g.gm && g.gm.useZone(c))) c.reload(); }
+        else if (a === 'reload') { if (!(g.gm && g.gm.useZone(c)) && !(g.doors && g.doors.use(c))) c.reload(); }
         else if (a === 'grenade') c.throwGrenade(undefined, cmd.gk || 0);
         else if (a === 'tactical') c.throwTactical();
         else if (a === 'melee') c.melee();
@@ -890,6 +890,7 @@ export class HostSession {
     }
     const msg = { t: 's', tm: r3(g.time), ack: r.ack, sc: [...g.scores], tl: r2(g.timeLeft), cd: r2(Math.max(0, g.countdownT)), me, ch, pk };
     if (g.gm) msg.gm = g.gm.netState();
+    if (g.doors && g.doors.list.length) msg.dr = g.doors.netState();
     if (r.ev.length) { msg.ev = r.ev; r.ev = []; }
     if (r.pv.length) { msg.pv = r.pv; r.pv = []; }
     if (sb) msg.sb = sb;
@@ -1023,6 +1024,7 @@ export class GuestSession {
     if (fin(m.tl)) g.timeLeft = m.tl;
     if (fin(m.cd)) g.countdownT = m.cd;
     if (m.gm && g.gm) g.gm.applyNet(m.gm);
+    if (m.dr && g.doors) g.doors.applyNet(m.dr);
     this.curTm = m.tm;
     if (Array.isArray(m.ev)) for (const ev of m.ev) if (Array.isArray(ev)) this.event(ev);
     if (Array.isArray(m.pv)) for (const ev of m.pv) if (Array.isArray(ev)) this.personal(ev);
