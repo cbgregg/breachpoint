@@ -14,3 +14,7 @@ kv_namespaces = [
 [vars]
 MAIL_FROM = "Breachpoint <login@breach-point.net>"
 APP_URL = "https://breach-point.net"
+
+# Workers Logs: console output and errors kept in the Cloudflare dashboard (free plan: 3 days)
+[observability]
+enabled = true
