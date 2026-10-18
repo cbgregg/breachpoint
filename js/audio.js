@@ -239,6 +239,11 @@ export class GameAudio {
       }
       case 'bounce': this.tone(dry(0.1), t, { freq: 1100 + Math.random() * 400, type: 'triangle', decay: 0.05, gain: 0.2 }); break;
       case 'pin': this.click(dry(0), t, 5000, 0.25); break;
+      // doors: latch click and a hinge creak; a bang when one is shoulder-barged; the shut thud; sliding glass hiss
+      case 'door': { const o = dry(0.15); this.click(o, t, 1800, 0.22); this.noiseBurst(o, t + 0.04, { type: 'bandpass', freq: 700, q: 3, decay: 0.35, gain: 0.08, attack: 0.08 }); break; }
+      case 'doorshut': { const o = dry(0.2); this.tone(o, t, { freq: 110, end: 70, decay: 0.12, gain: 0.35 }); this.click(o, t + 0.01, 1500, 0.25); break; }
+      case 'doorbash': { const o = dry(0.25); this.tone(o, t, { freq: 150, end: 55, decay: 0.2, gain: 0.7 }); this.noiseBurst(o, t, { freq: 900, decay: 0.16, gain: 0.45 }); this.noiseBurst(o, t + 0.25, { type: 'bandpass', freq: 600, q: 1, decay: 0.15, gain: 0.2 }); break; }
+      case 'doorslide': this.noiseBurst(dry(0.1), t, { type: 'bandpass', freq: 2400, q: 0.8, decay: 0.5, gain: 0.07, attack: 0.15 }); break;
       case 'melee': this.noiseBurst(dry(0), t, { type: 'bandpass', freq: 600, q: 1, decay: 0.18, gain: 0.35, attack: 0.03 }); break;
       case 'meleehit': { const o = dry(0.1); this.tone(o, t, { freq: 140, end: 60, decay: 0.15, gain: 0.7 }); this.noiseBurst(o, t, { freq: 1200, decay: 0.08, gain: 0.4 }); break; }
       case 'pickup': { const o = dry(0); this.click(o, t, 2000, 0.3); this.click(o, t + 0.08, 2600, 0.25); break; }

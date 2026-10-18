@@ -457,7 +457,7 @@ class RoundMode {
       const site = sites[brain.gmSite];
       if (Math.hypot(b.pos.x - site.x, b.pos.z - site.z) < 12 || brain.gmSwept === this.round) {
         brain.gmSwept = this.round;
-        if (Math.random() < 0.002) brain.gmSite = 1 - brain.gmSite, brain.gmSwept = -1;   // now and then rotate to the other site
+        if (Math.random() < 0.0004) brain.gmSite = 1 - brain.gmSite, brain.gmSwept = -1;   // now and then rotate to the other site
         return { pos: this.patrol(brain, site, 6, 18), kind: 'push' };
       }
       return { pos: this.offset(brain, site, 9), kind: 'push' };
@@ -478,7 +478,7 @@ class RoundMode {
       brain.gmDefSite = idx % 2;
       brain.gmLurk = Math.random() < 0.33;
     }
-    if (Math.random() < 0.0008) brain.gmDefSite = 1 - brain.gmDefSite;
+    if (Math.random() < 0.0003) brain.gmDefSite = 1 - brain.gmDefSite;
     if (brain.gmLurk) return { pos: this.patrol(brain, sites[brain.gmDefSite], 10, 24, 8, 14), kind: 'push' };
     return { pos: this.patrol(brain, sites[brain.gmDefSite], 3, 10), kind: 'guard' };
   }

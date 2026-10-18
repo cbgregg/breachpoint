@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { TEAMS, MELEE, GRENADE, PLAYER, EQUIPMENT } from './config.js';
 import { buildGun } from './weapons.js';
+import { glyph } from './hud.js';
 import { createVmArms, poseArm, handFrame, POSES, blendPose, clonePose, surfaceCloud, fitGrip } from './vmarms.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -310,12 +311,19 @@ export class PlayerController {
     this.wasGround = c.onGround;
 
     // ---- weapons ----
+    if (!canAct) g.hud.doorPrompt = '';
     if (canAct) {
       if (inp.action('slot1')) c.switchTo(0);
       if (inp.action('slot2')) c.switchTo(1);
       if (inp.action('swap') || inp.wheel !== 0) c.switchTo(c.prev);
       // in a plant / defuse zone the reload button is the use button
-      if (inp.action('reload') && !(g.gm && (g.gm.authority ? g.gm.useZone(c) : g.gm.guestZone(c)))) { c.reload(); this.padSprint = false; }
+      // the reload button also opens / closes the door you're at (the host decides for guests)
+      const atDoor = g.doors && g.doors.near(c);
+      g.hud.doorPrompt = atDoor ? `${glyph('reload', g.hud.device)} ${atDoor.target ? 'CLOSE' : 'OPEN'} DOOR` : '';
+      if (inp.action('reload') && !(g.gm && (g.gm.authority ? g.gm.useZone(c) : g.gm.guestZone(c)))) {
+        if (atDoor) { if (g.mode !== 'guest') g.doors.use(c); }
+        else { c.reload(); this.padSprint = false; }
+      }
       if (inp.action('melee')) c.melee();
     }
     // frag: hold to pull the pin and cook, release to throw. Hold past the fuse and it goes off in your hand.
