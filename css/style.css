@@ -1,3 +1,5 @@
+/* the hidden attribute always wins over a component's display rule */
+[hidden] { display: none !important; }
 /* Breachpoint — UI styles (menus, HUD, touch). Single dark look over the live 3D scene. */
 :root {
   color-scheme: dark;

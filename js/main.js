@@ -258,8 +258,9 @@ if (GPU.soft) {
     : /Safari/.test(ua) && !/Chrome/.test(ua) ? 'In Safari, hardware acceleration is always on: update macOS / iOS, or try another browser.'
     : 'In Chrome: Settings → System → turn on "Use graphics acceleration when available", then relaunch Chrome (or open chrome://settings/system).';
   $('gpu-warn-text').textContent = `Breachpoint is being drawn by your CPU instead of your graphics card, so it will stutter on every setting. ${how}`;
-  $('gpu-warn').hidden = false;
-  $('gpu-warn-x').addEventListener('click', () => { $('gpu-warn').hidden = true; });
+  let seen = false; try { seen = localStorage.getItem('breachpoint.gpuwarn') === GPU.name; } catch (_) { /* private mode */ }
+  $('gpu-warn').hidden = seen;
+  $('gpu-warn-x').addEventListener('click', () => { $('gpu-warn').hidden = true; try { localStorage.setItem('breachpoint.gpuwarn', GPU.name); } catch (_) { /* private mode */ } });
 }
 // in a match: if the frame rate stays low for a while on a preset above what's recommended, say so (once)
 let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false;
@@ -1155,7 +1156,7 @@ function renderLobby() {
     for (const p of lobby.players.values()) rows.push(playerRow(p, swap(p.peerId) + `<button class="warn" data-kick="${esc(p.peerId)}" data-nav>KICK</button>`));
     setHTML('host-players', rows.join(''));
     $('host-count').textContent = `${lobby.players.size + 1}/${MAX_HUMANS}`;
-    $('lobby-start').style.display = inMatch ? 'none' : '';
+    $('lobby-start').style.display = inMatch || lobby.public || lobby.quickMode ? 'none' : '';
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
@@ -1230,7 +1231,7 @@ function renderClassic() {
   setHTML('cl-code', !pub && lobby.code ? `MATCH CODE <b>${fmtCode(lobby.code)}</b>` : '');
   // menu
   const items = [];
-  if (host && !inMatch) items.push(['start', startCd ? `CANCEL START · ${startCd.shown}` : 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
+  if (host && !inMatch && !pub) items.push(['start', startCd ? `CANCEL START · ${startCd.shown}` : 'START MATCH', settings.fillBots === false && !pub ? 'Start with the players in the lobby. No bots: each team needs at least one player.' : 'Start the match. Bots fill any empty slots.']);
   if (inMatch) items.push(['back', 'BACK TO MATCH', 'Return to the match in progress.']);
   const filterable = pub && (lobby.quickMode || lobby.role === 'host') && !inMatch;
   if (filterable) items.push(['modes', `GAME MODES: ${quickModesLabel()}`, 'Pick the modes you want to play. Matchmaking joins any of them.']);
@@ -1429,7 +1430,7 @@ $('quick-btn').addEventListener('click', () => {
 });
 $('quick-go').addEventListener('click', () => { try { localStorage.setItem(ACK, '1'); } catch (_) { /* ignore */ } startQuick(); });
 // public matches use fixed rules, but in the game mode you picked (players are matched by mode)
-const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || settings.mode || 'tdm', map: lobby.nextMap && MAPS[lobby.nextMap] ? lobby.nextMap : PUBLIC_MATCH.map });
+const publicSettings = () => ({ ...settings, ...PUBLIC_MATCH, mode: lobby.quickGm || (settings.quickModes || []).find(m => MODES[m]) || 'tdm', map: lobby.nextMap && MAPS[lobby.nextMap] ? lobby.nextMap : PUBLIC_MATCH.map });
 // nobody's lobby to join: this one opens, and its countdown (with the map vote) starts right away; anyone
 // searching in the meantime drops in, and bots fill the rest when it hits zero
 lobby.onQuickHost = () => {
@@ -1512,6 +1513,8 @@ function startCdTick() {
   if (left === 0) { clearInterval(startCd.t); startCd = null; doStartMatch(); }
 }
 $('lobby-start').addEventListener('click', () => {
+  // public matches start themselves when the map vote's countdown ends (in the voted map and the lobby's mode)
+  if (lobby.public || lobby.quickMode) return;
   game.input.goFullscreen();
   readAll();
   if (!lobby.public && settings.fillBots === false && !(MODES[settings.mode] || {}).ffa) {

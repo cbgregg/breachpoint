@@ -139,6 +139,14 @@ export class Renderer {
     // bloom is a soft glow: computing it at half resolution looks the same and costs a quarter of the fill
     const bloomSize = this.bloomPass.setSize.bind(this.bloomPass);
     this.bloomPass.setSize = (bw, bh) => bloomSize(Math.max(1, Math.round(bw / 2)), Math.max(1, Math.round(bh / 2)));
+    // a NaN / Inf pixel from any shader would be smeared over the whole frame by the bloom blur (a black
+    // screen): the bloom's bright-pass drops such pixels
+    {
+      const hp = this.bloomPass.materialHighPassFilter;
+      hp.fragmentShader = hp.fragmentShader.replace('vec4 texel = texture2D( tDiffuse, vUv );',
+        'vec4 texel = texture2D( tDiffuse, vUv ); if (any(isnan(texel)) || any(isinf(texel))) texel = vec4(0.0); texel = clamp(texel, 0.0, 6.0e4);');
+      hp.needsUpdate = true;
+    }
     this.outputPass = new OutputPass();
     this.gradePass = new ShaderPass(GradeShader);
     this.smaaPass = new SMAAPass(w, h);

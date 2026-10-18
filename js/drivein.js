@@ -200,20 +200,21 @@ function build(ctx) {
     beam: new THREE.ShaderMaterial({
       uniforms: { time: { value: 0 }, color: { value: new THREE.Color(1.0, 0.94, 0.8) } },
       vertexShader: `attribute float along; varying float vAlong; varying vec3 vW; varying vec3 vN; varying vec3 vV;
-        void main() { vAlong = along; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal);
-          vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`,
+        void main() { vAlong = along; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = mat3(modelMatrix) * normal;
+          vV = cameraPosition - w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
       fragmentShader: `uniform float time; uniform vec3 color; varying float vAlong; varying vec3 vW; varying vec3 vN; varying vec3 vV;
         float h(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
         float n3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y),
                      mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z); }
         void main() {
-          float fade = pow(1.0 - vAlong, 1.6) * 0.85 + 0.15;
-          float face = 0.35 + 0.65 * abs(dot(normalize(vN), normalize(vV)));          // soft where the sheet turns edge-on
+          float a = clamp(vAlong, 0.0, 1.0);   // interpolation can overshoot 1: pow() of a negative is NaN, and bloom spreads one NaN over the whole screen
+          float fade = pow(1.0 - a, 1.6) * 0.85 + 0.15;
+          float face = 0.35 + 0.65 * abs(dot(vN / max(length(vN), 1e-4), vV / max(length(vV), 1e-4)));          // soft where the sheet turns edge-on
           float dust = 0.6 + 0.4 * n3(vW * 1.4 + vec3(time * 0.12, time * 0.05, -time * 0.09)) + 0.25 * n3(vW * 5.0 + vec3(0.0, time * 0.3, time * 0.2));
           float rays = 0.8 + 0.2 * sin(vW.y * 2.3 + vW.z * 1.7 + time * 0.6);       // the picture's brighter and darker areas
           float flick = 0.95 + 0.05 * sin(time * 150.8) * sin(time * 3.1);           // 24 fps shutter
-          float k = fade * face * dust * rays * flick * 0.16;
+          float k = clamp(fade * face * dust * rays * flick * 0.16, 0.0, 1.0);
           gl_FragColor = vec4(color * k, 1.0);
         }`,
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
