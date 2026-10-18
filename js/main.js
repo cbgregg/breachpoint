@@ -1,4 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
+import './adminlog.js';   // owner's admin log (Ctrl+Shift+L): starts recording before anything else loads
 import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';

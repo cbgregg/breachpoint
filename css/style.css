@@ -1632,3 +1632,25 @@ select option.nr { color: #9a8f80; }
 #mv-end { display: none; }
 .end-next { text-align: center; margin: 6px 0 0; font-size: 12px; letter-spacing: 0.22em; color: var(--ink-dim); }
 .end-next b { color: var(--bo-hi); font-size: 15px; }
+
+/* ---------- owner's admin log (js/adminlog.js) ---------- */
+#admin-log { position: fixed; inset: 4vh 4vw; z-index: 400; display: flex; flex-direction: column; background: rgba(10, 12, 14, 0.97); border: 1px solid #3a4048; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); color: #d8dde2; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#admin-log .al-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid #2a2f36; }
+#admin-log .al-head b { font-family: var(--display); letter-spacing: 0.16em; color: #f2c63a; margin-right: 10px; }
+#admin-log button { background: #1c2026; border: 1px solid #343a42; color: #d8dde2; font: inherit; font-size: 11px; letter-spacing: 0.08em; padding: 5px 10px; cursor: pointer; }
+#admin-log button:hover, #admin-log button.on { background: #f2c63a; color: #111; border-color: #f2c63a; }
+#admin-log .al-sp { flex: 1; }
+#admin-log .al-tools { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #2a2f36; }
+#admin-log input, #admin-log select { background: #12151a; border: 1px solid #343a42; color: #e8ecef; font: inherit; padding: 5px 8px; }
+#admin-log .al-q { flex: 1; }
+#admin-log .al-body { flex: 1; overflow: auto; padding: 10px 12px; }
+#admin-log pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+#admin-log table { border-collapse: collapse; width: 100%; }
+#admin-log th { text-align: left; color: #8a96a3; font-weight: normal; padding: 3px 14px 3px 0; white-space: nowrap; vertical-align: top; }
+#admin-log td { padding: 3px 0; word-break: break-word; }
+#admin-log .al-error { color: #ff7a6a; }
+#admin-log .al-warn { color: #f2c63a; }
+#admin-log.locked .al-head button:not([data-al="close"]), #admin-log.locked .al-body { visibility: hidden; }
+#admin-log .al-gate { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 8px; width: min(360px, 80vw); }
+#admin-log .al-gate span { color: #8a96a3; }
+#admin-log .al-err { color: #ff7a6a; font-style: normal; min-height: 1em; }

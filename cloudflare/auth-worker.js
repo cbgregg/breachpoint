@@ -69,6 +69,7 @@ export default {
     try {
       if (request.method === 'GET' && path === '/pubkey') return json({ jwk: (await signingKey(env)).pub }, 200, { ...cors, 'Cache-Control': 'public, max-age=3600' });
       if (request.method === 'GET' && path === '/admin') return await admin(env, new URL(request.url));
+      if (request.method === 'GET' && path === '/admin/log') return await adminLog(env, request, cors);
       if (request.method !== 'POST') return json({ error: 'not found' }, 404, cors);
       if (!okOrigin) return json({ error: 'origin not allowed' }, 403, cors);
       const body = await request.json().catch(() => ({}));
@@ -97,6 +98,8 @@ export default {
         default: return json({ error: 'not found' }, 404, cors);
       }
     } catch (err) {
+      console.error(path, err && err.stack || err);
+      await slog(env, 'error', `${request.method} ${path}: ${err && err.message || err}`).catch(() => {});
       return json({ error: 'Server error. Try again in a moment.' }, 500, cors);
     }
   },
@@ -164,6 +167,7 @@ async function verify({ env, body, cors }) {
     uid = rand(12);
     user = { id: uid, email: rec.email, tag: null, created: now() };
     await env.ACCOUNTS.put(`email:${eh}`, uid);
+    await slog(env, 'account', `new account ${uid}`);
   }
   await ensureCode(env, user);
   await env.ACCOUNTS.put(`user:${uid}`, JSON.stringify(user));
@@ -363,6 +367,7 @@ async function report({ env, body, request, cors }, user) {
   const tuser = target ? await getUser(env, target) : null;
   const rec = { reason, target, targetTag: tuser ? tuser.tag : tname, targetHist: tuser ? (tuser.hist || []).map(h => h.t).slice(0, 5) : [], by: user.id, byTag: user.tag, details, meta, at: new Date().toISOString() };
   await env.ACCOUNTS.put(`rep:${rec.at}:${rand(4)}`, JSON.stringify(rec), { expirationTtl: 365 * 86400 });
+  await slog(env, 'report', `${user.tag || user.id} reported ${rec.targetTag || target || '?'}: ${REPORT_REASONS[reason]}`);
   if (target) await allow(env, `repc:${target}`, 1e9, 30 * 86400); // running count per reported account (30 days)
   if (env.FEEDBACK_TO && env.RESEND_API_KEY && env.MAIL_FROM) {
     const count = target ? parseInt(await env.ACCOUNTS.get(`repc:${target}`) || '1', 10) : 1;
@@ -442,6 +447,7 @@ async function matchResult({ env, body, request, cors }, user) {
   if (rows.length < 2) return json({ ok: true, counted: 0 }, 200, cors);   // XP needs at least two real players
   const origin = new URL(request.url).origin;
   for (const r of rows) await award(env, origin, r, { secs, mode, room, host: user, players: rows.length });
+  await slog(env, 'match', `${mode} · ${Math.round(secs)}s · ${rows.length} signed-in players · host ${user.tag || user.id}`);
   return json({ ok: true, counted: rows.length }, 200, cors);
 }
 
@@ -480,7 +486,7 @@ async function award(env, origin, r, m) {
   // checkpoint: the XP after a clean day
   if (!p.rev && !p.sus.some(x => t - x.at < PROG.cleanFor) && t - (p.cp.at || 0) >= PROG.cleanFor) p.cp = { xp: before, at: t };
   await progPut(env, r.uid, p);
-  if (mail) await progMail(env, origin, r.uid, p, mail, [...hard, ...soft], r, m);
+  if (mail) { await progMail(env, origin, r.uid, p, mail, [...hard, ...soft], r, m); await slog(env, 'review', `${r.uid} ${mail}: ${[...hard, ...soft].join('; ')}`); }
 }
 
 async function adminSig(env, uid, act) {
@@ -522,7 +528,62 @@ async function admin(env, url) {
   if (a === 'ban') { const u = await getUser(env, uid); if (u) { u.banned = true; await saveUser(env, u); } p.held = 0; }
   await progPut(env, uid, p);
   const u = await getUser(env, uid);
+  await slog(env, 'admin', `${a} for ${u ? u.tag : uid}`);
   return page(`Done: <b>${a}</b> for ${u ? u.tag : uid}. XP is now ${p.xp}${a === 'ban' ? ' and the account can\'t play online.' : '.'}`);
+}
+
+// ---------- server log + the owner's admin log (GET /admin/log with the ADMIN_KEY secret) ----------
+// Notable events and errors are kept in KV under log: for 14 days. Writes are capped per Worker instance so
+// a burst of errors can't eat the KV free-plan write budget.
+let logBudget = { min: 0, n: 0 };
+async function slog(env, kind, msg) {
+  const m = Math.floor(Date.now() / 60000);
+  if (logBudget.min !== m) logBudget = { min: m, n: 0 };
+  if (++logBudget.n > 30) return;
+  const at = new Date().toISOString();
+  await env.ACCOUNTS.put(`log:${at}:${rand(3)}`, JSON.stringify({ at, kind, msg: String(msg).slice(0, 300) }), { expirationTtl: 14 * 86400 });
+}
+const sameStr = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+async function keysOf(env, prefix, cap = 5000) {
+  const out = []; let cursor;
+  do {
+    const r = await env.ACCOUNTS.list({ prefix, cursor, limit: 1000 });
+    for (const k of r.keys) out.push(k.name);
+    cursor = r.list_complete ? null : r.cursor;
+  } while (cursor && out.length < cap);
+  return out;
+}
+const latest = async (env, keys, n) => (await Promise.all(keys.sort().slice(-n).reverse().map(k => getJSON(env, k)))).filter(Boolean);
+async function adminLog(env, request, cors) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'local';
+  if (!env.ADMIN_KEY) return json({ error: 'ADMIN_KEY is not set on the Worker (Cloudflare dashboard → breachpoint-auth → Settings → Variables and Secrets → add a Secret named ADMIN_KEY).' }, 503, cors);
+  const got = ((request.headers.get('Authorization') || '').match(/^Bearer (.{8,200})$/) || [])[1] || '';
+  if (!sameStr(got, env.ADMIN_KEY)) {
+    await allow(env, `rl:adm:${await sha(ip)}`, 1e9, 3600);
+    if (parseInt(await env.ACCOUNTS.get(`rl:adm:${await sha(ip)}`) || '0', 10) > 10) return json({ error: 'Too many tries. Wait an hour.' }, 429, cors);
+    return json({ error: 'Wrong key.' }, 401, cors);
+  }
+  const [users, sess, pres, fb, rep, prog, logs] = await Promise.all(['user:', 'sess:', 'pres:', 'fb:', 'rep:', 'prog:', 'log:'].map(p => keysOf(env, p)));
+  // accounts under review / banned (reads every progress record: fine while the game is small)
+  const flagged = [];
+  for (const k of prog.slice(0, 400)) {
+    const p = await getJSON(env, k);
+    if (p && (p.rev || p.held || (p.sus && p.sus.length))) {
+      const u = await getUser(env, k.slice(5));
+      flagged.push({ id: k.slice(5), tag: u ? u.tag : '?', banned: !!(u && u.banned), xp: p.xp, held: p.held || 0, review: !!p.rev, flags: (p.sus || []).map(x => `${new Date(x.at * 1000).toISOString().slice(0, 16)} ${x.why}`) });
+    }
+  }
+  return json({
+    server: {
+      time: new Date().toISOString(), worker: 'breachpoint-auth', terms: TERMS_VERSION, colo: (request.cf && request.cf.colo) || '', yourCountry: (request.cf && request.cf.country) || '',
+      mail: !!(env.RESEND_API_KEY && env.MAIL_FROM), feedbackMail: !!env.FEEDBACK_TO, origins: env.ALLOWED_ORIGINS || 'https://breach-point.net,https://www.breach-point.net', appUrl: env.APP_URL || '',
+    },
+    counts: { accounts: users.length, activeSessions: sess.length, onlineLast15min: pres.length, feedback: fb.length, reports: rep.length, withProgress: prog.length, logEntries: logs.length },
+    flagged,
+    reports: await latest(env, rep, 40),
+    feedback: await latest(env, fb, 40),
+    log: await latest(env, logs, 300),
+  }, 200, cors);
 }
 
 // ---------- feedback form (no sign-in needed) ----------
@@ -543,6 +604,7 @@ async function feedback({ env, body, request, cors }) {
   for (const k of ['device', 'mode', 'map', 'screen', 'ua']) if (typeof body[k] === 'string') meta[k] = body[k].slice(0, k === 'ua' ? 200 : 40);
   const rec = { kind, text, contact, who, meta, at: new Date().toISOString(), country: (request.cf && request.cf.country) || '' };
   await env.ACCOUNTS.put(`fb:${rec.at}:${rand(4)}`, JSON.stringify(rec), { expirationTtl: 365 * 86400 });
+  await slog(env, 'feedback', `${FB_KINDS[kind]}: ${text.slice(0, 80)}`);
   if (env.FEEDBACK_TO && env.RESEND_API_KEY && env.MAIL_FROM) {
     const lines = [`${FB_KINDS[kind]}`, '', text, '', `Contact: ${contact || '(none)'}`, `Player: ${who || '(not signed in)'}`, `Where: ${Object.entries(meta).map(([k, v]) => `${k}=${v}`).join(' · ')}`, `Country: ${rec.country}`, `Time: ${rec.at}`];
     await fetch('https://api.resend.com/emails', {

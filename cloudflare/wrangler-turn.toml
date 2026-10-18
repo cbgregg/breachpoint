@@ -6,3 +6,7 @@ main = "turn-worker.js"
 compatibility_date = "2024-09-23"
 workers_dev = true
 keep_vars = true
+
+# Workers Logs: console output and errors kept in the Cloudflare dashboard (free plan: 3 days)
+[observability]
+enabled = true
