@@ -328,6 +328,11 @@ function opticAcog(p, g, M, b, c, vm = false) {
   p.lathe(M.rubber, [[0.0235, r0 - 0.008], [0.0235, r0 + 0.004], [0.0195, r0 + 0.01]], ay, 0, 32);
   // customizable reticle (default: red chevron + stadia post)
   const z = -(r1 - 0.02);
+  if (!vm) {
+    // seen from outside (other players, Create a Class): coated glass closes both ends of the tube
+    p.add(M.lens, new THREE.CircleGeometry(0.0212, 28).rotateY(Math.PI), 0, ay, -(r1 - 0.002));   // objective, facing forward
+    p.add(M.lens, new THREE.CircleGeometry(0.0172, 28), 0, ay, -(r0 + 0.004));                      // ocular, facing the eye
+  }
   const ret = reticleMesh('acog');
   ret.position.set(0, ay, z);
   g.add(ret);
@@ -351,6 +356,13 @@ function opticAcog(p, g, M, b, c, vm = false) {
     shroud.renderOrder = 2;
     shroud.visible = false;
     g.add(shroud);
+    // the eyepiece glass: dark coated lens at the hip, so you don't see the world through the scope; it
+    // clears as the sight comes up to the eye (the viewmodel fades it opposite the shroud)
+    const ocular = new THREE.Mesh(new THREE.CircleGeometry(0.0172, 28), ocularMat());
+    ocular.name = 'acogOcular';
+    ocular.position.set(0, ay, -r0 + 0.004);
+    ocular.renderOrder = 1;
+    g.add(ocular);
   }
   return { sightY: ay, sightZ: -r0, eyeRelief: -0.05 };
 }
@@ -425,6 +437,10 @@ function laserModule(p, g, M, x, y, f, w = 0.016) {
 let tabMat = null, mask = null;
 // the housing seen round a scope's eyepiece: near-black at the rim, a faint lit edge on the inside of the
 // eyecup, then the dark body falling away into a soft vignette
+let ocularM = null;
+function ocularMat() {
+  return ocularM || (ocularM = new THREE.MeshStandardMaterial({ color: 0x0b1620, roughness: 0.05, metalness: 1, envMapIntensity: 2.2, transparent: true, opacity: 1 }));
+}
 let shroudM = null;
 function shroudMat() {
   if (shroudM) return shroudM;
