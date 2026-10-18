@@ -539,6 +539,13 @@ export class PlayerController {
     const w = c.weapon;
     const scoped = !!w.def.scope && c.adsT > 0.85;
     this.vmRoot.visible = !scoped;
+    // prism scope: the housing closes in round the eyepiece as the sight comes up to the eye
+    if (G.shroud === undefined) G.shroud = gun.group.getObjectByName('acogShroud') || null;
+    if (G.shroud) {
+      const k = clamp((c.adsT - 0.55) / 0.35, 0, 1), o = k * k * (3 - 2 * k);
+      G.shroud.visible = o > 0.01;
+      G.shroud.material.opacity = o;
+    }
 
     this.sprintT = clamp(this.sprintT + (c.sprinting ? dt : -dt) * 6, 0, 1);
     const spr = sm5(this.sprintT);   // eased, so going in and out of a sprint never snaps
