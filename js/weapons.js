@@ -343,6 +343,14 @@ function opticAcog(p, g, M, b, c, vm = false) {
     lens.position.set(0, ay, -r1);
     liner.renderOrder = lens.renderOrder = -1;
     g.add(liner, lens);
+    // looking into the eyepiece, the scope's housing fills everything round it: a dark shroud behind the
+    // eyecup (faded in by the viewmodel as you aim), so the magnified world only shows through the glass
+    const shroud = new THREE.Mesh(new THREE.RingGeometry(0.0232, 0.32, 48, 1), shroudMat());
+    shroud.name = 'acogShroud';
+    shroud.position.set(0, ay, -r0 + 0.0085);
+    shroud.renderOrder = 2;
+    shroud.visible = false;
+    g.add(shroud);
   }
   return { sightY: ay, sightZ: -r0, eyeRelief: -0.05 };
 }
@@ -415,6 +423,22 @@ function laserModule(p, g, M, x, y, f, w = 0.016) {
   return emit;
 }
 let tabMat = null, mask = null;
+// the housing seen round a scope's eyepiece: near-black at the rim, a faint lit edge on the inside of the
+// eyecup, then the dark body falling away into a soft vignette
+let shroudM = null;
+function shroudMat() {
+  if (shroudM) return shroudM;
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d'), R = 128, k = 0.0232 / 0.32;
+  const gr = x.createRadialGradient(R, R, R * k, R, R, R);
+  gr.addColorStop(0, '#2a2e33'); gr.addColorStop(0.035, '#08090b'); gr.addColorStop(0.12, '#121417');
+  gr.addColorStop(0.3, '#191b1f'); gr.addColorStop(0.65, '#0d0e10'); gr.addColorStop(1, '#050506');
+  x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  shroudM = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, depthWrite: true, toneMapped: false });
+  shroudM.userData.keep = true;
+  return shroudM;
+}
 
 // Real 3D gun models (loaded by assets.js). Each model is baked once into this file's gun frame (top of the
 // pistol grip at the origin, barrel toward -z, metres): xf = { s: scale, ry: yaw, x, y, z: offset,
