@@ -291,7 +291,6 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/drivein.js` | Drive-In: the theatre built from the generated layout (screens and the projected feature, 50s cars, vans, pickups, step vans, speaker posts, snack bar and booth, playground, marquee), dusk sky and stars |
 | `js/drivein_layout.js`, `tools/drivein_gen.py` | The generated Drive-In layout and the generator that makes it |
 | `js/supermarket.js` | Freshway: the indoor map, its textures (goods, floor, signs), the instanced produce and the smoking soldier |
-| `js/adminlog.js` | Owner's admin log (Ctrl+Shift+L or F10, locked by the server's ADMIN_KEY): live connection info, this session's client log, and the account server's stats, reports, feedback, flagged accounts and log |
 | `js/doors.js` | Doors that open and close (swing, traffic and sliding doors), their collision and network sync |
 | `js/modes.js` | Gun Game ladder; Gunfight and Search & Destroy: rounds, bomb, sites, overtime flag, bot objectives, HUD |
 | `js/main.js` | Boot, title screen, Offline/Online, sign-in screens, menu tabs, controller/keyboard menu navigation, settings persistence |
@@ -381,13 +380,6 @@ From the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sampl
 - Traffic Cone (entrance cones): CC BY 4.0, mesh by [hinndia](https://sketchfab.com/3d-models/traffic-cone-573feef839d7450cb3e12da9986e7a98), textures CC0 (Poly Haven), edits CC0 by Ed Mackey
 - Lantern (lot lamp posts): CC0, Microsoft
 
-## Admin log (owner only)
+## Server logs
 
-Press **Ctrl+Shift+L** (or **F10**) anywhere in the game. It asks once per device for the account server's admin key and checks it with the server; without the key it shows nothing.
-
-- **Overview**: browser, GPU, frame rate, graphics, game and match state, account server and TURN relay status, lobby, peers and their ping, the Nostr relays and the public lobbies seen.
-- **Client log**: everything this browser session recorded from page load (console output, uncaught errors, failed requests, peer-to-peer events, game state changes, frame-rate samples). It stays in memory only, nothing is uploaded, and it can be filtered.
-- **Server**: from `GET /admin/log` on the account Worker: settings, counts (accounts, active sessions, online in the last 15 minutes, feedback, reports), accounts under review or flagged, the latest reports and feedback, and the server log (errors, new accounts, matches, reports, feedback, reviews, admin actions; kept 14 days).
-- **Copy all / Download** saves everything as one text file. **Lock** forgets the key on that device.
-
-Setup: in the Cloudflare dashboard, `breachpoint-auth` → Settings → Variables and Secrets → add a **Secret** named `ADMIN_KEY` (a long random password). Workers Logs are also turned on for both Workers (`[observability]` in the wrangler files), so crash traces show in the dashboard as well.
+Both Cloudflare Workers have **Workers Logs** turned on (`[observability]` in `cloudflare/wrangler-*.toml`). In the Cloudflare dashboard open **Workers & Pages → breachpoint-auth (or breachpoint-turn) → Logs** to see every request, crash traces, and the account server's own events as JSON lines (`error`, `account`, `match`, `report`, `feedback`, `review`, `admin`). The free plan keeps them for 3 days.
