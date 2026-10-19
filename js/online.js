@@ -542,6 +542,7 @@ export class Lobby {
     switch (m.t) {
       case 'lobby': {
         const st = m.st;
+        if (st === 'pending' && this.quickMode && !this.public) return this.fail(); // public lobbies don't make you wait: try the next one
         if (st === 'pending') this.status = 'pending';
         else if (st === 'accepted') {
           this.status = this.game.mode === 'guest' && this.game.live ? 'ingame' : 'accepted';
@@ -552,8 +553,7 @@ export class Lobby {
           this.hostInGame = !!m.ig;
           // load the host's map while waiting, so the match starts instantly
           if (typeof m.map === 'string' && this.game.state === 'menu' && this.onMapHint) this.onMapHint(m.map);
-        } else if (st === 'pending' && this.quickMode && !this.public) return this.fail(); // public lobbies don't make you wait
-        else if (st === 'denied') return this.fail('The host declined your request.');
+        } else if (st === 'denied') return this.fail('The host declined your request.');
         else if (st === 'kicked') return this.close('You were removed from the match by the host.');
         else if (st === 'full') return this.fail('That match is full.');
         else if (st === 'signin') return this.fail(this.account && this.account.enabled && !this.account.signedIn ? 'Sign in to play online.' : 'The host couldn\'t verify your account. Sign out and back in, then try again.');

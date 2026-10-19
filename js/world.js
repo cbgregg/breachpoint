@@ -120,8 +120,8 @@ const TARSA_SPAWNS = [[54, -32], [54, -21], [54, -10], [54, 0], [54, 10], [54, 2
 
 const TARSA_PICKUPS = [
   { type: 'health', pos: [0, 3.45, 0] },
-  { type: 'health', pos: [18.5, 0, 17.5] },
-  { type: 'health', pos: [-18.5, 0, -17.5] },
+  { type: 'health', pos: [19.25, 0, 17.5] },
+  { type: 'health', pos: [-17.75, 0, -17.5] },
   { type: 'health', pos: [31, 0, -8.5] },
   { type: 'health', pos: [-31, 0, 8.5] },
   { type: 'ammo', pos: [6.5, 0, -17.5] },
@@ -207,8 +207,8 @@ const SHURAN_PICKUPS = [
   { type: 'health', pos: [0, 0, -20] },
   { type: 'health', pos: [0, 0, 3.4] },
   { type: 'health', pos: [0, 0, -3.4] },
-  { type: 'ammo', pos: [14.5, 0, 9] },
-  { type: 'ammo', pos: [-14.5, 0, -9] },
+  { type: 'ammo', pos: [14.5, 0, 9.75] },
+  { type: 'ammo', pos: [-14.5, 0, -8.25] },
   { type: 'ammo', pos: [11, 0, -9] },
   { type: 'ammo', pos: [-11, 0, 9] },
 ];
@@ -251,7 +251,7 @@ const PIONEER_CENTER = [
   [-1.5, -6, 0, 0, 9, 0, 'tree'], [6.5, -6.5, 0, 0, 9.5, 0, 'tree'], [-1.5, -14, 0, 0, 10, 0, 'tree'], [5, -14.5, 0, 0, 9, 0, 'tree'], [-1.8, -27, 0, 0, 9, 0, 'tree'],
   [2.2, -9.5, 1.8, 0.6, 0.95, 0, 'bench'], [-2.4, -19, 1.8, 0.6, 0.95, 0, 'bench'], [9.5, -1.8, 1.8, 0.6, 0.95, 0, 'bench'],
   [-3.2, -2.5, 0, 0, 0, 0, 'vlamp'], [11, -5, 0, 0, 0, 0, 'vlamp'], [-3.2, -23, 0, 0, 0, 0, 'vlamp'], [4.5, -0.6, 0, 0, 0, 0, 'vlamp'],
-  [8.5, -10.5, 2.2, 1.6, 2.6, 0, 'kiosk'],
+  [8.5, -10.5, 2.2, 1.6, 2.6, 0, 'infokiosk'],
   [1.5, -2, 1.3, 1.3, 0.75, 0, 'planter'], [-1, -31.5, 1.3, 1.3, 0.75, 0, 'planter'], [11.5, -0.5, 1.3, 1.3, 0.75, 0, 'planter'],
   // cover in the plaza: a coffee cart, crates by the kiosk
   [2.5, -15.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [5.2, -2.6, 1.6, 1.6, 1.6, 0, 'crate'],
@@ -318,8 +318,8 @@ const PIONEER_ROADS = [
 const PIONEER_SPAWNS = [[50, -34], [50, -26], [50, -16], [50, -6], [50, 2], [50, 12], [50, 20], [48, 27], [47, 35], [51, -1]];
 const PIONEER_PICKUPS = [
   { type: 'health', pos: [1.5, 0, -11] },
-  { type: 'health', pos: [6.25, -3.24, 4.6] },
-  { type: 'health', pos: [-31, 0, -15] },
+  { type: 'health', pos: [6.75, -3.24, 4.6] },
+  { type: 'health', pos: [-31, 0, -14] },
   { type: 'health', pos: [29, 0, 33] },
   { type: 'ammo', pos: [18, 0, 35] },
   { type: 'ammo', pos: [-15, 0, 0.5] },
@@ -589,7 +589,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (!XF) return solidAA(cx, cz, w, d, h, y0, surface);
     return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
   };
-  const SURFACE = { bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
+  const SURFACE = { infokiosk: 'wood', bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
   const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- shared decals / glows ----------
@@ -1638,7 +1638,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
         break;
       }
-      case 'kiosk': {
+      case 'infokiosk': {
         // the green information kiosk by the pergola: panelled booth, roof with a deep overhang, signboards
         B(M.paint, w, h, d, cx, 0, cz, 0, { tint: 0x2f5a3c, grime: 0.35 });
         for (const [nx, nz, L] of [[1, 0, d], [-1, 0, d], [0, 1, w], [0, -1, w]]) {

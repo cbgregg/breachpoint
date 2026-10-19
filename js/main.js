@@ -91,13 +91,13 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
   ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxmsaa', 'gfxMsaa', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
-  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
+  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
   ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
-  'opt-fov': ['out-fov', v => `${v}°`], 'opt-vmfov': ['out-vmfov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
+  'opt-fov': ['out-fov', v => `${v}°`], 'opt-vmfov': ['out-vmfov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-adssens': ['out-adssens', v => `${Math.round(v * 100)}%`], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
   'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
 // the map dropdown is built from the map list, so every map shows up in the menu
@@ -147,12 +147,26 @@ const optState = () => JSON.stringify(Object.fromEntries([...new Set(OPT_KEYS)].
 let optBase = optState();
 const optDirty = () => optState() !== optBase;
 function syncApplyBar() { $('opt-apply').hidden = !optDirty(); }
+// options that take effect mid-match (the match keeps its own copy of the settings)
+const LIVE_KEYS = ['vmFov', 'sensitivity', 'padSensitivity', 'fov', 'invertY', 'aimAssist', 'showFps', 'adsZoom', 'sightSize', 'adsSens', 'autoSprint', 'adsMode', 'padDeadzone', 'vibration'];
+function syncLive() { if (game.settings) for (const k of LIVE_KEYS) if (settings[k] !== undefined) game.settings[k] = settings[k]; }
+// Reset tab to defaults: puts this tab's options back to their defaults, staged like any change (Apply / X)
+$('opt-reset').addEventListener('click', () => {
+  const keys = bindings.filter(([id]) => { const r = $(id).closest('.row'); return r && r.dataset.osub === optSub && $(id).closest('#pane-options'); }).map(([, key]) => key);
+  if (!keys.length) return;
+  for (const k of keys) if (k !== 'name' && DEFAULT_SETTINGS[k] !== undefined) settings[k] = DEFAULT_SETTINGS[k];
+  if (keys.includes('quality')) { settings.quality = GPU.best; Object.assign(settings, presetGfx(settings.quality)); }   // graphics: the preset recommended for this device
+  writeForm();
+  syncApplyBar();
+  game.audio.play('ui', null, { ui: true });
+  game.hud.toast(optDirty() ? 'DEFAULTS SET: PRESS APPLY TO KEEP THEM' : 'ALREADY ON THE DEFAULTS');
+});
 function applyOptions() {
   if (!optDirty()) return;
   saveSettings(settings);
   applyTheme();
   game.applySettings(settings);
-  if (game.settings) Object.assign(game.settings, { vmFov: settings.vmFov, sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
+  syncLive();
   const gfx = JSON.parse(optBase);
   const gfxChanged = Object.keys(gfx).some(k => (k === 'quality' || k.startsWith('gfx')) && gfx[k] !== settings[k]);
   optBase = optState();
@@ -204,7 +218,7 @@ for (const [id, key, type] of bindings) {
     if (key === 'theme') applyTheme();
     game.applySettings(settings);
     if (key === 'quality' || key.startsWith('gfx')) checkMsaa();
-    if (game.settings) Object.assign(game.settings, { vmFov: settings.vmFov, sensitivity: settings.sensitivity, padSensitivity: settings.padSensitivity, fov: settings.fov, invertY: settings.invertY, aimAssist: settings.aimAssist, showFps: settings.showFps, adsZoom: settings.adsZoom, sightSize: settings.sightSize });
+    syncLive();
   });
 }
 
@@ -772,6 +786,7 @@ const OPT_DESC = {
   'opt-gfxdetail': 'Low: the world uses square-edged boxes and lighter sandbags, small props stop casting shadows, and other players\' guns use simpler geometry. Rebuilds the map.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
   'opt-gfxshadows': 'Resolution of the sun\'s shadows. Higher is crisper and costs more GPU time. Off is fastest.',
+  'opt-fps': 'Shows frames per second in the corner (and your ping when you join someone\'s online match).',
   'opt-fpscap': 'Caps the frame rate to save power and heat. Unlimited follows your display.',
   'opt-fov': 'How wide your view is. Higher shows more around you; lower makes distant targets bigger.',
   'opt-vmfov': 'How large your weapon looks in first person. It doesn\'t change what you can see.',
@@ -780,6 +795,8 @@ const OPT_DESC = {
   'opt-sightsize': 'Draws red dots, holographic sights and scopes larger while aiming.',
   'opt-sens': 'How fast the view turns with the mouse.',
   'opt-invert': 'Moving the mouse or stick up looks down.',
+  'opt-adssens': 'How fast the view turns while aiming down sights, compared with the hip (mouse and stick). Lower it for steadier long-range aim.',
+  'opt-autosprint': 'Sprint automatically whenever you push fully forward. Aiming, firing or crouching stops it; tactical sprint still works.',
   'opt-padsens': 'How fast the view turns with the right stick.',
   'opt-deadzone': 'Ignores small stick movements so the view doesn\'t drift. Raise it if your controller drifts.',
   'opt-aa': 'With a controller, your aim slows over enemies and follows them slightly. Mouse aim is never assisted.',

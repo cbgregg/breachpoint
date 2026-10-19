@@ -1633,3 +1633,6 @@ select option.nr { color: #9a8f80; }
 .end-next { text-align: center; margin: 6px 0 0; font-size: 12px; letter-spacing: 0.22em; color: var(--ink-dim); }
 .end-next b { color: var(--bo-hi); font-size: 15px; }
 
+
+/* Options: reset the open tab to its defaults */
+.opt-desc .od-reset { margin-top: 18px; align-self: flex-start; }

@@ -269,6 +269,8 @@ export const DEFAULT_SETTINGS = {
   primary: 'rifle',
   sensitivity: 1,
   adsMode: 'hold', // 'hold' or 'toggle'
+  adsSens: 1,       // look sensitivity while aiming, relative to the hip (mouse and stick)
+  autoSprint: false, // sprint whenever you push fully forward (not crouched / aiming / firing)
   fov: 80,
   volume: 0.7,
   showFps: false,

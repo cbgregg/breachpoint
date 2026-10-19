@@ -228,12 +228,13 @@ export class PlayerController {
     const baseFov = vfov(s.fov);
     const zoom = lerp(1, this.adsFov(def) / baseFov, c.adsT);
     const stunK = c.stunT > 0 ? 1 - 0.65 * Math.min(1, c.stunT / 1.5) : 1;   // stunned: aim drags
-    const sens = 0.0022 * s.sensitivity * zoom * stunK;
+    const adsK = lerp(1, clamp(Number(s.adsSens) || 1, 0.2, 2), c.adsT);   // aim sensitivity
+    const sens = 0.0022 * s.sensitivity * zoom * stunK * adsK;
     const inv = s.invertY ? -1 : 1;
     c.yaw -= inp.mouseDX * sens;
     c.pitch -= inp.mouseDY * sens * inv;
     if (inp.lookX || inp.lookY) {
-      let rate = 3.6 * s.padSensitivity * Math.pow(zoom, 0.8) * stunK;
+      let rate = 3.6 * s.padSensitivity * Math.pow(zoom, 0.8) * stunK * adsK;
       const aa = this.aimAssist(dt, s);
       rate *= aa;
       c.yaw -= inp.lookX * rate * dt;
@@ -266,7 +267,8 @@ export class PlayerController {
     const at = g.aimTarget;
     const autoOn = canAct && inp.isTouch && s.touchAutoFire !== false && !inp.fire && !!at && at.alive && !at.hidden
       && at.pos.distanceTo(c.pos) < def.range * 0.9;
-    const sprintWant = canAct && (shift || this.padSprint || inp.touchSprint) && f > 0.4 && !inp.ads && !inp.fire && !autoOn;
+    const autoSprint = s.autoSprint && !inp.isTouch && f > 0.9 && Math.abs(r) < 0.6 && !this.proneOn && !this.crouchToggle && !inp.down('ControlLeft');
+    const sprintWant = canAct && (shift || this.padSprint || inp.touchSprint || autoSprint) && f > 0.4 && !inp.ads && !inp.fire && !autoOn;
     if (sprintWant && sprintPress && c.weapon.reloading) c.weapon.cancelReload();
     const sprint = sprintWant && !c.weapon.reloading;
     // tactical sprint: double-tap Shift, click L3 again while sprinting, or push the touch stick to

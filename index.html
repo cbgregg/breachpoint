@@ -459,6 +459,8 @@
             <div class="row"><label for="opt-adsmode">Aim down sights</label><select id="opt-adsmode" data-nav>
               <option value="hold">Hold</option><option value="toggle">Toggle</option></select></div>
             <div class="row"><label for="opt-adszoom">ADS zoom <output id="out-adszoom"></output></label><input type="range" id="opt-adszoom" min="0.5" max="1.6" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-adssens">Aim sensitivity <output id="out-adssens"></output></label><input type="range" id="opt-adssens" min="0.3" max="1.5" step="0.05" data-nav></div>
+            <div class="row"><label for="opt-autosprint">Auto sprint</label><input type="checkbox" id="opt-autosprint" data-nav></div>
             <div class="row"><label for="opt-sightsize">Sight size when aiming</label><select id="opt-sightsize" data-nav>
               <option value="normal">Normal</option><option value="large">Large</option><option value="huge">Huge</option></select></div>
             <div class="row touch-only"><label for="opt-touchsize">Touch: button size</label><select id="opt-touchsize" data-nav>
@@ -527,7 +529,7 @@
               </tbody>
             </table>
           </div>
-            <aside class="opt-desc" id="opt-desc" aria-live="polite"><div class="od-k" id="od-k">GENERAL</div><b id="od-title"></b><p id="od-text"></p></aside>
+            <aside class="opt-desc" id="opt-desc" aria-live="polite"><div class="od-k" id="od-k">GENERAL</div><b id="od-title"></b><p id="od-text"></p><button id="opt-reset" class="menu-btn small od-reset" data-nav>RESET TAB TO DEFAULTS</button></aside>
           </div>
         </section>
 
