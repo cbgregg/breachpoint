@@ -1,8 +1,9 @@
-// Freshway: an indoor map. A big neighbourhood supermarket under one roof: neon-lit checkout lanes
-// and customer service along the front windows, grocery aisles 1-6 through the middle with a promo display,
-// the deli and a large bakery with its ovens in the back, the stockroom with the loading bay and receiving
-// doors, an employees-only kitchen and cold storage, and upstairs offices and a break room reached by a
-// staircase inside the store and a metal fire stair outside. Skylights in the roof.
+// Freshway: an indoor map, laid out from the concept art. A big neighbourhood supermarket under one roof:
+// neon-lit checkout lanes and customer service along the front windows, upstairs offices and a break room
+// on a mezzanine over the front corner (a stair inside, a metal stair outside up the service-alley wall),
+// grocery aisles through the middle, the deli & bakery counter in front of the employees-only kitchen and
+// cold storage in the back corner, and a strip of receiving, storage and racking rooms along the back wall
+// with roll-up doors onto the loading yard. Skylights in the roof.
 // Outside: the parking lot out front (team A spawn), the right lane parking strip with planters, the
 // left lane service alley with transformers and HVAC units, and the back loading yard (team B spawn) with
 // a semi at the dock, a forklift, dumpsters and the staff smoking area, where a soldier on his break
@@ -28,9 +29,9 @@ export const MART = {
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
   bounds: { hx: 42, hz: 34 },   // wider side lanes: the parking strip (+z) and the service alley (-z)
   spawns2: [
-    // tight two-by-four blocks, like a real FPS spawn: A by the street at the far end of the lot, B in the yard
+    // tight two-by-four blocks, like a real FPS spawn: A by the street at the far end of the lot, B in the loading yard by the stockroom roll-up
     [[-40.6, -3.3], [-40.6, -1.1], [-40.6, 1.1], [-40.6, 3.3], [-38.6, -3.3], [-38.6, -1.1], [-38.6, 1.1], [-38.6, 3.3]],
-    [[39.6, -4.6], [39.6, -2.4], [39.6, -0.2], [39.6, 2.0], [37.6, -4.6], [37.6, -2.4], [37.6, -0.2], [37.6, 2.0]],
+    [[38.5, 14.6], [38.5, 16.8], [38.5, 19.0], [38.5, 21.2], [36.5, 14.6], [36.5, 16.8], [36.5, 19.0], [36.5, 21.2]],
   ],
   pickups: [
     { type: 'health', pos: [-2.5, 0, 3] },
@@ -40,7 +41,7 @@ export const MART = {
     { type: 'ammo', pos: [9, 0, 6.5] },
     { type: 'ammo', pos: [-2.5, 0, -21] },
     { type: 'ammo', pos: [0, 0, 22.2] },
-    { type: 'ammo', pos: [14.3, 3.2, 11.9] },   // upstairs office
+    { type: 'ammo', pos: [-14.6, 3.2, -18.3] },   // upstairs break room
   ],
   build,
 };
@@ -395,12 +396,7 @@ function build(ctx) {
   plane(M.concrete, 20, 69, 32.4, 0, 0.004);                  // delivery yard
   for (const sz of [-1, 1]) plane(M.concrete, 44.8, 10, 0, sz * 29.2, 0.003);  // side lanes
   plane(M.storeFloor, 44, 48, 0, 0, 0.01, 0, 0x9c978e);        // sales floor (toned down: it read as blinding white)
-  plane(M.bakeryFloor, 11.2, 18, 16.4, -15, 0.014);            // bakery: terracotta diamonds
   if (M.marble) { plane(M.marble, 3.6, 7.2, -20.2, -19, 0.016); plane(M.marble, 3.6, 7.2, -20.2, 18.6, 0.016); } // entrance halls
-  if (M.hexblack) plane(M.hexblack, 4.3, 10, 12.85, 0, 0.015);  // behind the deli counter
-  if (M.hexblack) plane(M.hexblack, 5, 16, 14.5, 16, 0.02);     // kitchen
-  if (M.whitetile) plane(M.whitetile, 5, 7, 19.5, 11.5, 0.02);  // cold storage
-  if (M.octagon) plane(M.octagon, 5, 9, 19.5, 19.5, 0.02);      // locker corridor
   // coloured accent tiles: two bands down the cross aisle and a square under the promo display
   plane(M.accent, 1.2, 31, -2.6, -6.6, 0.017);
   // front sidewalk + curb
@@ -451,11 +447,11 @@ function build(ctx) {
   wallLine(X0 - T / 2, Z0 - T, X0 - T / 2, Z1 + T, H, T, [
     [3.4, 7.4, 3.2], [9.5, 14.5, 3.4, 0.7, true], [15.5, 23.9, 3.4, 0.7, true], [24.9, 33.9, 3.4, 0.7, true], [34.9, 38.9, 3.4, 0.7, true], [41, 45, 3.2],
   ], M.concrete, shellTint);
-  // back: stockroom roll-up door, bakery back door, staff door to the smoking area
-  wallLine(X1 + T / 2, Z0 - T, X1 + T / 2, Z1 + T, H, T, [[5.0, 6.6, 2.3], [21.4, 25.6, 3.6], [32.8, 34.6, 5.4, 3.2], [41.4, 43, 2.3]], M.concrete, shellTint);
+  // back: the kitchen's staff door, the receiving dock roll-up, the stockroom roll-up onto the yard
+  wallLine(X1 + T / 2, Z0 - T, X1 + T / 2, Z1 + T, H, T, [[5.0, 6.6, 2.3], [21.4, 25.6, 3.6], [41.4, 45.4, 3.2]], M.concrete, shellTint);
   // sides: a fire exit each
-  wallLine(X0, Z1 + T / 2, X1, Z1 + T / 2, H, T, [[18.4, 20, 2.3], [34.6, 36.2, 5.4, 3.2]], M.concrete, shellTint);   // + the manager's office door to the outside stair
-  wallLine(X0, Z0 - T / 2, X1, Z0 - T / 2, H, T, [[24.4, 26, 2.3]], M.concrete, shellTint);
+  wallLine(X0, Z1 + T / 2, X1, Z1 + T / 2, H, T, [[18.4, 20, 2.3]], M.concrete, shellTint);
+  wallLine(X0, Z0 - T / 2, X1, Z0 - T / 2, H, T, [[8.2, 9.8, 5.4, 3.2], [24.4, 26, 2.3]], M.concrete, shellTint);   // + the break room's door to the outside stair
   // brick wainscot outside, metal coping at the top
   for (const [x, z, w, d] of [[X0 - T - 0.03, 0, 0.06, 48.8], [X1 + T + 0.03, 0, 0.06, 48.8], [0, Z1 + T + 0.03, 44.8, 0.06], [0, Z0 - T - 0.03, 44.8, 0.06]]) {
     B(M.metal, w + 0.06, 0.25, d + 0.06, x, H - 0.25, z, 0, { tint: 0x5a5e62, grime: 0 });
@@ -476,11 +472,11 @@ function build(ctx) {
   };
   const doorsOn = {
     F: [[-21, -17], [16.6, 20.6]],
-    K: [[-20.8, -17], [-2.6, 1.6], [17, 18.6]],
+    K: [[-19.4, -17.8], [-2.6, 1.6], [17, 21]],
     R: [[-3.6, -2]],
     L: [[2.4, 4]],
   };
-  const upperDoors = { K: [[8.4, 10.2]], R: [[12.6, 14.2]] };
+  const upperDoors = { L: [[-13.8, -12.2]] };
   const spanOf = { F: [-24.4, 24.4], K: [-24.4, 24.4], R: [-22.4, 22.4], L: [-22.4, 22.4] };
   for (const side of ['F', 'K', 'R', 'L']) {
     const [a0, a1] = spanOf[side], wh = side === 'F' ? 0.7 : 1.1;
@@ -538,9 +534,9 @@ function build(ctx) {
   for (let x = -18; x <= 18; x += 6) { const g = new THREE.BoxGeometry(0.25, 0.5, 48); g.translate(x, H - 0.25, 0); ceilGeo.push(g); }
   for (const z of [-12, 12]) { const g = new THREE.CylinderGeometry(0.35, 0.35, 32, 12); g.rotateZ(Math.PI / 2); g.translate(-5, H - 0.9, z); ceilGeo.push(g); }
   const fixGeo = [];
-  for (let x = -19; x <= 7; x += 4.3) for (let z = -21; z <= 21; z += 5.4) { const g = new THREE.BoxGeometry(2.4, 0.06, 0.32); g.translate(x, H - 1.25, z); fixGeo.push(g); }
-  for (const [x, z] of [[11, -20], [11, -13], [16, -20], [16, -13], [11, 0], [17, 0], [14.5, 12], [19.5, 11.5], [14.5, 20], [19.5, 20]]) { const g = new THREE.BoxGeometry(1.2, 0.06, 0.6); g.translate(x, x > 12 && z > 6 ? 2.98 : H - 1.25, z); fixGeo.push(g); }
-  for (const [x, z] of [[14.5, 10.5], [14.5, 14.5], [14.5, 21], [19.5, 12], [19.5, 20]]) { const g = new THREE.BoxGeometry(1.2, 0.06, 0.6); g.translate(x, H - 0.62, z); fixGeo.push(g); } // upstairs
+  for (let x = -19; x <= 7; x += 4.3) for (let z = -21; z <= 21; z += 5.4) { if (x < -12 && z < -16) continue; const g = new THREE.BoxGeometry(2.4, 0.06, 0.32); g.translate(x, H - 1.25, z); fixGeo.push(g); }
+  for (const [x, z] of [[10, -20], [10, -13], [14.5, -12], [19.5, -11.5], [14.5, -20], [19.5, -20], [18.5, -1], [18.5, 10], [18.5, 19], [11, 4], [11, 16]]) { const g = new THREE.BoxGeometry(1.2, 0.06, 0.6); g.translate(x, x > 12 && z < -7 ? 2.98 : H - 1.25, z); fixGeo.push(g); }
+  for (const [x, z] of [[-19.5, -21.5], [-19.5, -18.5], [-14.5, -21.5], [-14.5, -18.5]]) { const g = new THREE.BoxGeometry(1.2, 0.06, 0.6); g.translate(x, H - 0.62, z); fixGeo.push(g); } // upstairs
   const roofMesh = new THREE.Mesh(mergeGeometries(roofGeo), std({ color: 0x4a4c50, roughness: 0.9 }));
   const ceilMesh = new THREE.Mesh(mergeGeometries(ceilGeo), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.7 }));
   const fixMesh = new THREE.Mesh(mergeGeometries(fixGeo), M.coolLight);
@@ -548,7 +544,7 @@ function build(ctx) {
   for (const m of [roofMesh, ceilMesh, fixMesh]) { m.userData.noMinimap = true; m.castShadow = m !== fixMesh; m.receiveShadow = true; group.add(m); }
   M.roofMat = roofMesh.material; M.ceilMat = ceilMesh.material;
   // store lights (off on Low, like the other maps' lamps)
-  for (const [x, z, y = H - 1.5, col = 0xf2f6ff, I = 22, R = 20] of [[-14, -11], [-14, 11], [-1, -12], [-1, 12], [15, -15], [16, 15, H - 1.0, 0xfff4e4, 16, 12], [14.5, 16, 2.6, 0xf4f6ff, 10, 10], [19.5, 11.5, 2.6, 0xcfe6ff, 7, 8]]) {
+  for (const [x, z, y = H - 1.5, col = 0xf2f6ff, I = 22, R = 20] of [[-14, -11], [-14, 11], [-1, -12], [-1, 12], [10, -15, H - 1.0, 0xfff4e4, 16, 12], [18.5, 8, H - 1.5, 0xf2f6ff, 14, 16], [14.5, -16, 2.6, 0xf4f6ff, 10, 10], [19.5, -11.5, 2.6, 0xcfe6ff, 7, 8]]) {
     const L = new THREE.PointLight(col, I, R, 1.3);
     L.position.set(x, y, z);
     L.userData.mapLight = true;
@@ -675,7 +671,7 @@ function build(ctx) {
     P(new THREE.CylinderGeometry(0.01, 0.01, 1.7, 4), M.dark, -2.6, 5.0, z);
   });
   // dairy wall along the south side: tall open multideck coolers with a lit canopy
-  for (let x = -11; x < 7; x += 3) {
+  for (let x = -5; x < 7; x += 3) {
     if (x === 1) continue; // fire exit
     SB(M.shelf, 3, 2.35, 0.95, x + 1.5, 0, -23.45, { tint: 0x2a2c30, grime: 0 }, 'metal');
     for (const y of [0.35, 0.8, 1.25, 1.7]) {
@@ -743,83 +739,7 @@ function build(ctx) {
   SB(M.cardboard, 1.4, 1.3, 1.2, -13.9, 0, -8.5, {}, 'wood');
   face(M.goodsBox, 1.3, 0.6, -13.9, 0.7, -7.89, 0, 1);
 
-  // ---------- bakery (back left) ----------
-  // display counter with bread and pastries under glass, a gap at the end into the kitchen
-  for (const [z0, z1] of [[-22.5, -11]]) {
-    const L = z1 - z0, cz = (z0 + z1) / 2;
-    SB(M.woodOld, 1.0, 1.0, L, 10.2, 0, cz, { tint: 0x9a7a5a }, 'wood');
-    B(M.steelK, 1.05, 0.04, L, 10.2, 1.0, cz, 0, { grime: 0 });
-    face(M.clearGlass, L, 0.45, 9.69, 1.25, cz, -Math.PI / 2, 3);
-    solid(10.2, cz, 1.0, L, 1.48, 0, 'glass').pass = true;   // the glass case: bullets go through
-    for (let z = z0 + 0.4; z < z1 - 0.3; z += 0.42) {
-      P(new RoundedBoxGeometry(0.3, 0.12, 0.16, 2, 0.05), M.bread, 10.15, 1.1, z, 0.3);
-      if ((z * 10 | 0) % 3 === 0) P(new THREE.SphereGeometry(0.07, 10, 6), M.crust, 10.4, 1.09, z + 0.1);
-    }
-  }
-  neon('BAKERY', '#ff4fa8', 4.4, 0.95, 9.6, 3.7, -17, -Math.PI / 2, true, 'italic bold 140px Georgia');
-  for (const z of [-20.6, -13.4]) P(new THREE.CylinderGeometry(0.008, 0.008, 1.9, 4), M.dark, 9.6, 5.1, z);
-  // rack ovens and a deck oven along the back wall, glowing through their windows
-  const rackOven = (x, z) => {
-    SB(M.steelK, 1.5, 2.6, 1.5, x, 0, z, { grime: 0 }, 'metal');
-    P(new THREE.BoxGeometry(0.02, 1.4, 0.7), M.ovenGlow, x - 0.76, 1.3, z);
-    P(new THREE.BoxGeometry(0.06, 0.4, 0.3), M.dark, x - 0.77, 2.25, z + 0.4);
-    B(M.steelK, 1.8, 0.5, 1.8, x, 2.95, z, 0, { grime: 0.2 });
-  };
-  rackOven(16.2, -22.6); rackOven(16.2, -20.8);
-  // deck oven: three glowing decks
-  SB(M.steelK, 1.3, 2.0, 3.0, 16.2, 0, -16.6, { grime: 0 }, 'metal');
-  for (const y of [0.6, 1.1, 1.6]) P(new THREE.BoxGeometry(0.02, 0.18, 2.4), M.ovenGlow, 15.54, y, -16.6);
-  B(M.steelK, 1.5, 0.6, 3.2, 16.2, 2.0, -16.6, 0, { grime: 0.2 });
-  rackOven(16.2, -13.4);
-  signMesh(signTex('CAUTION · HOT OVENS', { bg: '#e8c020', fg: '#1a1a1a', font: 'bold 50px Arial' }), 1.4, 0.35, 16.86, 3.1, -16.6, -Math.PI / 2, 0.3, { noMinimap: true });
-  // work tables with dough and loaves, a mixer, bread carts, flour
-  const worktable = (x, z, w, d) => {
-    SB(M.steelK, w, 0.9, d, x, 0, z, { grime: 0 }, 'metal');
-    for (let i = 0; i < 6; i++) P(new RoundedBoxGeometry(0.26, 0.1, 0.16, 2, 0.05), M.bread, x + (i % 3 - 1) * 0.5, 0.95, z + ((i / 3) | 0) * 0.35 - 0.17, i * 0.4, { tint: i % 2 ? 0xf0dcc0 : 0xffffff });
-  };
-  worktable(13.2, -20.5, 2.4, 1.2); worktable(13.2, -14.5, 2.4, 1.2);
-  SB(M.steelK, 0.9, 1.3, 0.9, 13, 0, -9, { grime: 0 }, 'metal');
-  P(new THREE.CylinderGeometry(0.35, 0.3, 0.45, 16), M.steelK, 13, 1.5, -9);
-  const breadCart = (x, z) => {
-    solid(x, z, 0.7, 0.9, 1.8, 0, 'metal').pass = true;   // open wire rack: blocks you, not bullets
-    for (const dx of [-0.33, 0.33]) for (const dz of [-0.43, 0.43]) P(new THREE.CylinderGeometry(0.015, 0.015, 1.8, 5), M.steelK, x + dx, 0.9, z + dz);
-    for (let y = 0.25; y < 1.8; y += 0.3) { B(M.steelK, 0.66, 0.02, 0.86, x, y, z, 0, { grime: 0 }); for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.22, 0.1, 0.14, 2, 0.045), M.bread, x, y + 0.07, z - 0.28 + i * 0.28, 0.1, { tint: 0xffe8c8 }); }
-  };
-  breadCart(15.6, -7.2); breadCart(12.4, -17.3);
-  for (let i = 0; i < 6; i++) ctx.bag(12.4 + (i % 3) * 0.62, 0.12 + ((i / 3) | 0) * 0.2, -23.3, 0, 0xe8e0d0);
-  solid(13.0, -23.3, 2, 0.5, 0.5, 0, 'dirt');
-  // tiled walls behind the ovens (herringbone) and behind the deli (white grid), up to 2.4 m
-  const wallTiles = (mat, x, z0, z1, gaps = []) => {
-    if (!mat) return;
-    let cur = z0;
-    for (const [a, b] of [...gaps, [z1, z1]]) {
-      if (a - cur > 0.05) { const g = new THREE.PlaneGeometry(a - cur, 2.4); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (a - cur) / ctx.S[mat === M.subway ? 'subway' : 'whitetile'], uv.getY(i) * 2.4 / ctx.S[mat === M.subway ? 'subway' : 'whitetile']); P(g, mat, x, 1.2, (a + cur) / 2, -Math.PI / 2, { cast: false }); }
-      cur = b;
-    }
-  };
-  wallTiles(M.subway, 16.86, -24, -6, [[-11.4, -9.8]]);
-  wallTiles(M.whitetile, 14.86, -6, 6, [[-1, 1]]);
-  // the bakery back door has a scuffed kick plate; dumpsters wait outside
-
-  // ---------- deli ----------
-  for (const [z0, z1] of [[-5, -1.7], [1.7, 5]]) {
-    const L = z1 - z0, cz = (z0 + z1) / 2;
-    SB(M.paint, 1.0, 1.0, L, 10.2, 0, cz, { tint: 0xe8e4dc }, 'metal');
-    face(M.clearGlass, L, 0.5, 9.69, 1.25, cz, -Math.PI / 2, 3);
-    face(M.goodsCan, L - 0.1, 0.3, 9.72, 0.75, cz, -Math.PI / 2, 1);
-    solid(10.2, cz, 1.0, L, 1.5, 0, 'glass').pass = true;
-  }
-  SB(M.steelK, 1.0, 0.9, 2.4, 12.6, 0, -3.4, { grime: 0 }, 'metal');
-  SB(M.steelK, 1.0, 0.9, 2.4, 12.6, 0, 3.4, { grime: 0 }, 'metal');
-  P(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 18), M.steelK, 12.6, 1.05, -3.6, 0, { rz: 1.2 });
-  neon('DELI', '#3ae0ff', 3.0, 0.8, 9.6, 3.7, 0, -Math.PI / 2, true, 'bold 150px Georgia');
-  for (const z of [-1.3, 1.3]) P(new THREE.CylinderGeometry(0.008, 0.008, 1.9, 4), M.dark, 9.6, 5.1, z);
-
-  // ---------- stockroom (x 15..22, z -6..6) ----------
   const inner = 0xe0dcd2;
-  wallLine(15, -6, 15, 6, H, 0.25, [[5, 7, 2.6]], M.plaster, inner);                // double swing doors into the store
-  wallLine(15, -6, 22, -6, H, 0.25, [[3, 4.6, 2.3]], M.plaster, inner);             // to the bakery kitchen
-  wallLine(15, 6, 22, 6, H, 0.25, [[4, 5.6, 2.3]], M.plaster, inner);               // to the office corridor
   const rack = (x0, x1, z) => {
     const L = x1 - x0, cx = (x0 + x1) / 2;
     solid(cx, z, L, 1.0, 3.6, 0, 'metal').pass = true;   // open racking with cardboard: you can see and shoot through the gaps
@@ -830,9 +750,6 @@ function build(ctx) {
       for (let x = x0 + 0.35; x < x1 - 0.2; x += 0.62) { const hh = 0.5 + ((x * 7) % 0.4); B(M.cardboard, 0.55, hh, 0.8, x, y + 0.22, z, 0, { grime: 0.1 }); }
     }
   };
-  // racking either side of the doors to the bakery side and the office corridor (never across them)
-  rack(15.6, 17.6, -5.2); rack(20.4, 21.8, -5.2); rack(15.6, 18.4, 5.2);
-  // pallets of stock in the middle break the line from the dock door into the store
   // a wooden pallet: three stringers under seven top boards and three bottom boards
   const pallet = (x, y, z, ry = 0, tint = 0xb89a6a) => {
     const c = Math.cos(ry), sn = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
@@ -865,55 +782,60 @@ function build(ctx) {
     if (kind === 2 || kind === 0) for (const dx of [-0.3, 0.3]) B(M.dark, 0.035, 0.012, 0.99, x + dx, 0.15 + h, z, 0, { tint: 0x2a5aa8, grime: 0 });
     B(M.paint, 0.2, 0.14, 0.008, x + 0.25, 0.15 + Math.min(h - 0.2, 0.9), z + 0.487, 0, { tint: 0xf4f4f0, grime: 0 });
   };
+  // ---------- the back strip (x 15..22, z -8..24): receiving, storage and racking along the back wall ----------
+  // receiving takes the dock roll-up; the racking room at the parking-strip end has its own roll-up onto the
+  // loading yard. Doors into the store by aisle 7 and by the wine aisle.
+  plane(M.concrete, 7, 32, 18.5, 8, 0.016, 0, 0xb8b4ac);
+  wallLine(15, -8, 15, 24, H, 0.25, [[7, 9, 2.6], [24.6, 26.2, 2.3]], M.plaster, inner);
+  wallLine(15, 6, 22, 6, H, 0.25, [[3, 4.6, 2.3]], M.plaster, inner);       // receiving | storage
+  wallLine(15, 14, 22, 14, H, 0.25, [[4.2, 5.8, 2.3]], M.plaster, inner);   // storage | racking
+  // receiving (z -8..6): racking either side of the doors, pallets in off the dock
+  rack(15.6, 18.2, -7.2); rack(15.6, 17.6, 5.2); rack(20.4, 21.8, 5.2);
   palletStack(18.6, -0.6, 1.6); palletStack(18.6, 0.8, 1.1); palletStack(20.5, 2.8, 1.4);
-  signMesh(signTex(['EMPLOYEES', 'ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 54px Arial', w: 256, h: 160 }), 0.8, 0.5, 14.84, 2.9, -2.2, -Math.PI / 2, 0.3, { noMinimap: true });
+  signMesh(signTex(['RECEIVING'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 128 }), 0.8, 0.4, 14.84, 2.9, -2.2, -Math.PI / 2, 0.3, { noMinimap: true });
+  // storage (z 6..14): crates, drums, a pallet
+  addKind(21.2, 7.4, 1.4, 1.4, 1.4, 0, 'crate'); addKind(21.2, 7.4, 1.2, 1.2, 1.2, 1.4, 'crate'); addKind(21.3, 9.1, 1.4, 1.4, 1.4, 0, 'crate');
+  palletStack(21.2, 11.2, 1.3);
+  for (const [x, z] of [[15.9, 12.9], [16.55, 13.2], [16.0, 7.0], [16.6, 6.9]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
+  // racking (z 14..24): the end wall rack, a free-standing run, pallets in from the yard
+  rack(15.6, 21.4, 23.3); rack(16.2, 19.2, 20.4);
+  palletStack(16.4, 22.0, 1.5); palletStack(17.0, 15.2, 1.0);
+  signMesh(signTex(['STOCKROOM', 'STAFF ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 14.84, 2.9, 15.8, -Math.PI / 2, 0.3, { noMinimap: true });
+  // a pallet jack in receiving
+  SB(M.paint, 0.55, 0.35, 0.5, 20.6, 0, -4.4, { tint: 0xc8322b, grime: 0.3 }, 'metal');
+  for (const dz of [-0.17, 0.17]) B(M.steelK, 1.1, 0.08, 0.16, 19.7, 0, -4.4 + dz, 0, { grime: 0.3 });
+  P(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 6), M.dark, 20.9, 0.8, -4.4, 0, { rz: -0.35 });
 
-  // ---------- back storage + receiving (x 17..22, z -24..-6), behind the bakery ----------
-  plane(M.concrete, 4.9, 18, 19.55, -15, 0.018, 0, 0xb8b4ac);
-  // the back door off the yard, racking on the end wall, a mid rack you go round, pallets in from the dock
-  wallLine(17, -24, 17, -6, H, 0.25, [[12.6, 14.2, 2.3]], M.plaster, 0xe0dcd2);
-  rack(17.7, 21.7, -23.4);                 // along the end wall
-  rack(19.0, 21.9, -14.0);                 // the mid rack: go round it on the bakery side
-  palletStack(19.0, -20.6, 1.4); palletStack(19.2, -9.0, 1.1); palletStack(20.6, -8.6, 1.6);
-  for (const [x, z] of [[21.4, -11.0], [21.3, -11.7], [20.7, -11.3]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
-  // a pallet jack parked by the door
-  SB(M.paint, 0.55, 0.35, 0.5, 20.3, 0, -17.1, { tint: 0xc8322b, grime: 0.3 }, 'metal');
-  for (const dz of [-0.17, 0.17]) B(M.steelK, 1.1, 0.08, 0.16, 19.4, 0, -17.1 + dz, 0, { grime: 0.3 });
-  P(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 6), M.dark, 20.6, 0.8, -17.1, 0, { rz: -0.35 });
-  B(M.paint, 0.12, 0.012, 13.5, 17.55, 0.005, -15.5, 0, { tint: 0xe8c020, grime: 0.2 });   // floor line along the walkway
-  signMesh(signTex(['RECEIVING', 'STORAGE'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 160 }), 0.8, 0.5, 16.86, 2.6, -10.6, -Math.PI / 2, 0.3, { noMinimap: true });
-  { const L = new THREE.PointLight(0xf2f6ff, 10, 12, 1.3); L.position.set(19.5, H - 1.5, -15); L.userData.mapLight = true; group.add(L); }
-
-  // ---------- employees only: kitchen + cold storage (x 12..22, z 8..24) under a slab at 3 m ----------
+  // ---------- employees only: kitchen + cold storage (x 12..22, z -24..-8) under a slab at 3 m ----------
   const OH = 3.0, UP = 3.2, UH = H - UP;
-  wallLine(12, 8, 12, 24, OH, 0.2, [[1.4, 3, 2.3], [11, 12.6, 2.3]], M.plaster, inner);   // into the store: by the stairs, by produce
-  wallLine(12, 8, 22, 8, OH, 0.2, [[2, 3.6, 2.3], [7, 8.5, 2.3]], M.plaster, inner);      // from the stockroom corridor
-  wallLine(17, 8, 17, 24, OH, 0.2, [[11.5, 13, 2.3]], M.plaster, inner);                  // kitchen | cold room + back corridor
-  wallLine(17, 15, 22, 15, OH, 0.25, [[2, 3.6, 2.3]], M.coldPanel, 0xffffff, 'metal');   // walk-in cooler door
-  const ceil = new THREE.BoxGeometry(10, 0.2, 16); ceil.translate(17, OH + 0.1, 16);
+  wallLine(12, -24, 12, -8, OH, 0.2, [[3.4, 5.0, 2.3], [13, 14.6, 2.3]], M.plaster, inner);   // from behind the deli & bakery counters
+  wallLine(12, -8, 22, -8, OH, 0.2, [[0.6, 2.2, 2.3], [7, 8.5, 2.3]], M.plaster, inner);      // to the sales floor, cold room to receiving
+  wallLine(17, -24, 17, -8, OH, 0.2, [[3, 4.5, 2.3]], M.plaster, inner);                      // kitchen | back corridor + cold room
+  wallLine(17, -15, 22, -15, OH, 0.25, [[2, 3.6, 2.3]], M.coldPanel, 0xffffff, 'metal');     // walk-in cooler door
+  const ceil = new THREE.BoxGeometry(10, 0.2, 16); ceil.translate(17, OH + 0.1, -16);
   const ceilM = new THREE.Mesh(ceil, new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.9 }));
   ceilM.userData.noMinimap = true; ceilM.castShadow = true; ceilM.receiveShadow = true; group.add(ceilM); M.officeCeil = ceilM.material;
-  solid(17, 16, 10, 16, 0.2, OH, 'concrete');
+  solid(17, -16, 10, 16, 0.2, OH, 'concrete');
+  if (M.hexblack) plane(M.hexblack, 5, 16, 14.5, -16, 0.02);     // kitchen
+  if (M.whitetile) plane(M.whitetile, 5, 7, 19.5, -11.5, 0.02);  // cold storage
+  if (M.octagon) plane(M.octagon, 5, 9, 19.5, -19.5, 0.02);      // locker corridor
   // kitchen (x 12..17): range under a hood, fryer, prep island, sinks, dish shelving
-  SB(M.steelK, 3.0, 0.9, 0.85, 14.6, 0, 23.35, { grime: 0 }, 'metal');
-  for (let i = 0; i < 4; i++) P(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 14), M.dark, 13.6 + (i % 2) * 0.7 + ((i / 2) | 0) * 1.4, 0.92, 23.35);
-  P(new THREE.BoxGeometry(2.8, 0.25, 0.02), M.dark, 14.6, 0.5, 22.91);
-  SB(M.steelK, 3.3, 0.6, 1.1, 14.6, 2.1, 23.3, { grime: 0.15 }, 'metal');                 // hood
-  B(M.steelK, 0.5, 0.4, 0.4, 14.6, 2.7, 23.5, 0, { grime: 0.1 });
-  SB(M.steelK, 0.8, 1.0, 0.85, 12.6, 0, 23.35, { grime: 0 }, 'metal');                    // fryer
-  P(new THREE.BoxGeometry(0.6, 0.02, 0.6), M.ovenGlow, 12.6, 1.01, 23.35, 0);
-  SB(M.steelK, 1.0, 0.9, 4.0, 14.6, 0, 15.6, { grime: 0 }, 'metal');                      // prep island
-  for (let i = 0; i < 5; i++) P(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 14), M.wood, 14.5, 0.91, 14.1 + i * 0.7, 0, { tint: 0xd8b888 });
-  P(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 18), M.steelK, 14.7, 1.05, 17.1, 0, { rz: 1.2 });
-  SB(M.steelK, 0.7, 0.9, 2.2, 16.55, 0, 10.2, { grime: 0 }, 'metal');                     // sinks
-  for (const z of [9.6, 10.8]) P(new THREE.BoxGeometry(0.45, 0.02, 0.5), M.dark, 16.5, 0.91, z);
-  for (const z of [9.6, 10.8]) P(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 6), M.steelK, 16.8, 1.08, z);
-  SB(M.steelK, 0.5, 1.9, 2.0, 16.65, 0, 16.6, { grime: 0 }, 'metal');                     // dish shelving
-  for (const y of [0.4, 0.9, 1.4]) for (let i = 0; i < 6; i++) P(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 12), M.paint, 16.6, y + 0.05, 15.8 + i * 0.32, 0, { tint: 0xf4f2ec });
-  signMesh(signTex(['EMPLOYEES ONLY', 'KITCHEN'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 11.88, 2.6, 10.2, -Math.PI / 2, 0.3, { noMinimap: true });
-  signMesh(signTex(['EMPLOYEES', 'ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 54px Arial', w: 256, h: 160 }), 0.8, 0.5, 11.88, 2.6, 19.8, -Math.PI / 2, 0.3, { noMinimap: true });
-  // cold storage (x 17..22, z 8..15): insulated walls, wire shelving with crates, frosty light
-  for (const [x0, z0, w, d] of [[17.1, 8.1, 0.06, 6.8], [21.9, 8.1, 0.06, 6.8]]) B(M.coldPanel, w, 2.95, d, x0 + w / 2, 0, z0 + d / 2, 0, { grime: 0 });
+  SB(M.steelK, 3.0, 0.9, 0.85, 14.6, 0, -23.35, { grime: 0 }, 'metal');
+  for (let i = 0; i < 4; i++) P(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 14), M.dark, 13.6 + (i % 2) * 0.7 + ((i / 2) | 0) * 1.4, 0.92, -23.35);
+  P(new THREE.BoxGeometry(2.8, 0.25, 0.02), M.dark, 14.6, 0.5, -22.91);
+  SB(M.steelK, 3.3, 0.6, 1.1, 14.6, 2.1, -23.3, { grime: 0.15 }, 'metal');                 // hood
+  SB(M.steelK, 0.8, 1.0, 0.85, 12.6, 0, -23.35, { grime: 0 }, 'metal');                    // fryer
+  P(new THREE.BoxGeometry(0.6, 0.02, 0.6), M.ovenGlow, 12.6, 1.01, -23.35, 0);
+  SB(M.steelK, 1.0, 0.9, 4.0, 14.6, 0, -15.6, { grime: 0 }, 'metal');                      // prep island
+  for (let i = 0; i < 5; i++) P(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 14), M.wood, 14.5, 0.91, -14.1 - i * 0.7, 0, { tint: 0xd8b888 });
+  P(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 18), M.steelK, 14.7, 1.05, -17.1, 0, { rz: 1.2 });
+  SB(M.steelK, 0.7, 0.9, 2.2, 16.55, 0, -10.6, { grime: 0 }, 'metal');                     // sinks
+  for (const z of [-10.0, -11.2]) { P(new THREE.BoxGeometry(0.45, 0.02, 0.5), M.dark, 16.5, 0.91, z); P(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 6), M.steelK, 16.8, 1.08, z); }
+  SB(M.steelK, 0.5, 1.9, 2.0, 16.65, 0, -17.6, { grime: 0 }, 'metal');                     // dish shelving
+  for (const y of [0.4, 0.9, 1.4]) for (let i = 0; i < 6; i++) P(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 12), M.paint, 16.6, y + 0.05, -16.8 - i * 0.32, 0, { tint: 0xf4f2ec });
+  signMesh(signTex(['EMPLOYEES ONLY', 'KITCHEN'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 13.4, 2.6, -7.88, 0, 0.3, { noMinimap: true });
+  // cold storage (x 17..22, z -15..-8): insulated walls, wire shelving with crates, frosty light
+  for (const x0 of [17.1, 21.9]) B(M.coldPanel, 0.06, 2.95, 6.8, x0 + 0.03, 0, -11.5, 0, { grime: 0 });
   const wireShelf = (x, z, len) => {
     SB(M.steelK, 0.6, 2.0, len, x, 0, z, { grime: 0 }, 'metal');
     for (const y of [0.1, 0.65, 1.2, 1.75]) {
@@ -921,28 +843,89 @@ function build(ctx) {
       face(M.produce, len - 0.1, 0.3, x + Math.sign(19.5 - x) * 0.31, y + 0.2, z, Math.sign(19.5 - x) > 0 ? Math.PI / 2 : -Math.PI / 2, 1.2);
     }
   };
-  wireShelf(17.5, 11.5, 4.6); wireShelf(21.5, 12.6, 4.2);
-  for (const x of [17.6, 21.4]) P(new THREE.BoxGeometry(0.04, 0.04, 4), M.frost, x + (x < 19 ? 0.35 : -0.35), 2.8, 11.5);
-  for (let i = 0; i < 6; i++) P(new THREE.BoxGeometry(0.22, 2.2, 0.01), M.clearGlass, 19.15 + i * 0.25, 1.15, 14.85, 0, { cast: false, tint: 0xd8eef8 }); // strip curtain
-  signMesh(signTex(['COLD STORAGE', '2°C'], { bg: '#2a6aa8', fg: '#ffffff', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 19.75, 2.55, 7.88, Math.PI, 0.35, { noMinimap: true });
-  // back corridor (x 17..22, z 15..24): lockers, a time clock, the staff door to the smoking area
-  for (let i = 0; i < 6; i++) SB(M.paint, 0.5, 1.9, 0.5, 21.5, 0, 22.9 - i * 0.52, { tint: 0x4a6a8a }, 'metal');
-  P(new THREE.BoxGeometry(0.3, 0.4, 0.12), M.dark, 17.18, 1.4, 17.8, Math.PI / 2);
-  SB(M.wood, 0.4, 0.45, 2.0, 18.0, 0, 22.4, { tint: 0x9a7a5a }, 'wood');
+  wireShelf(17.5, -11.6, 4.4); wireShelf(21.5, -11.6, 4.4);
+  for (const x of [17.6, 21.4]) P(new THREE.BoxGeometry(0.04, 0.04, 4), M.frost, x + (x < 19 ? 0.35 : -0.35), 2.8, -11.5);
+  for (let i = 0; i < 6; i++) P(new THREE.BoxGeometry(0.22, 2.2, 0.01), M.clearGlass, 19.15 + i * 0.25, 1.15, -14.85, 0, { cast: false, tint: 0xd8eef8 }); // strip curtain
+  signMesh(signTex(['COLD STORAGE', '2°C'], { bg: '#2a6aa8', fg: '#ffffff', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 19.75, 2.55, -7.88, 0, 0.35, { noMinimap: true });
+  // back corridor (x 17..22, z -24..-15): lockers, a time clock, the staff door out to the smoking area
+  for (let i = 0; i < 6; i++) SB(M.paint, 0.5, 1.9, 0.5, 21.5, 0, -23.4 + i * 0.52, { tint: 0x4a6a8a }, 'metal');
+  P(new THREE.BoxGeometry(0.3, 0.4, 0.12), M.dark, 17.18, 1.4, -16.2, Math.PI / 2);
+  SB(M.wood, 0.4, 0.45, 2.0, 18.0, 0, -22.6, { tint: 0x9a7a5a }, 'wood');
 
-  // ---------- upstairs: offices + break room (floor at 3.2 m) ----------
-  // walls: windows over the sales floor and the deli, a door onto the interior stair landing
-  wallLine(12, 8, 12, 24, UH, 0.2, [[0.6, 6.4, 2.1, 0.95], [7.9, 9.5, 2.2], [12.4, 14.6, 2.1, 0.95]], M.plaster, inner, 'concrete', null, UP);
-  wallLine(12, 8, 22, 8, UH, 0.2, [[0.6, 2.8, 2.1, 0.95]], M.plaster, inner, 'concrete', null, UP);
-  wallLine(17, 8, 17, 24, UH, 0.15, [[2.5, 4.1, 2.2], [11, 12.6, 2.2]], M.plaster, 0xd8e0d8, 'concrete', null, UP);
-  wallLine(12, 18, 17, 18, UH, 0.15, [[1.8, 3.4, 2.2]], M.plaster, inner, 'concrete', null, UP);
-  wallLine(17, 16, 22, 16, UH, 0.15, [[2, 3.6, 2.2]], M.plaster, 0xd8e0d8, 'concrete', null, UP);
-  // window sills
-  for (const [x, z, w, d] of [[11.95, 11.5, 0.32, 5.8], [11.95, 21.5, 0.32, 2.2], [13.7, 7.95, 2.2, 0.32]]) UB(M.wood, w, 0.04, d, x, UP + 0.95, z, 0xc8a878);
-  UF(M.wood, 5, 10, 14.5, UP + 0.006, 13, ctx.scaleOf(M.wood) || 2);
-  UF(M.wood, 5, 6, 14.5, UP + 0.006, 21, ctx.scaleOf(M.wood) || 2);
-  UF(M.checker || M.tile, 5, 8, 19.5, UP + 0.006, 12, M.checker ? 3.0 : (ctx.scaleOf(M.tile) || 1));
-  UF(M.octagon || M.tile, 5, 8, 19.5, UP + 0.006, 20, M.octagon ? 1.8 : (ctx.scaleOf(M.tile) || 1));
+  // ---------- deli & bakery: one long service counter facing the aisles, ovens and the slicer behind ----------
+  plane(M.bakeryFloor, 3.0, 16, 10.55, -16, 0.014);
+  const rackOven = (x, z) => {   // facing -x
+    SB(M.steelK, 1.5, 2.6, 1.5, x, 0, z, { grime: 0 }, 'metal');
+    P(new THREE.BoxGeometry(0.02, 1.4, 0.7), M.ovenGlow, x - 0.76, 1.3, z);
+    P(new THREE.BoxGeometry(0.06, 0.4, 0.3), M.dark, x - 0.77, 2.25, z + 0.4);
+    B(M.steelK, 1.6, 0.4, 1.6, x, 2.6, z, 0, { grime: 0.2 });
+  };
+  // bakery counter (z -22.6..-16.6): bread and pastries under glass
+  {
+    const z0 = -22.6, z1 = -16.6, L = z1 - z0, cz = (z0 + z1) / 2;
+    SB(M.woodOld, 1.0, 1.0, L, 8.6, 0, cz, { tint: 0x9a7a5a }, 'wood');
+    B(M.steelK, 1.05, 0.04, L, 8.6, 1.0, cz, 0, { grime: 0 });
+    face(M.clearGlass, L, 0.45, 8.09, 1.25, cz, -Math.PI / 2, 3);
+    solid(8.6, cz, 1.0, L, 1.48, 0, 'glass').pass = true;
+    for (let z = z0 + 0.4; z < z1 - 0.3; z += 0.42) {
+      P(new RoundedBoxGeometry(0.3, 0.12, 0.16, 2, 0.05), M.bread, 8.55, 1.1, z, 0.3);
+      if ((z * 10 | 0) % 3 === 0) P(new THREE.SphereGeometry(0.07, 10, 6), M.crust, 8.8, 1.09, z + 0.1);
+    }
+  }
+  // deli counter (z -15.4..-9): a refrigerated case
+  {
+    const z0 = -15.4, z1 = -9.0, L = z1 - z0, cz = (z0 + z1) / 2;
+    SB(M.paint, 1.0, 1.0, L, 8.6, 0, cz, { tint: 0xe8e4dc }, 'metal');
+    face(M.clearGlass, L, 0.5, 8.09, 1.25, cz, -Math.PI / 2, 3);
+    face(M.goodsCan, L - 0.1, 0.3, 8.12, 0.75, cz, -Math.PI / 2, 1);
+    solid(8.6, cz, 1.0, L, 1.5, 0, 'glass').pass = true;
+  }
+  // behind the counters: ovens and the bread racks on the bakery side, a slicer bench on the deli side
+  rackOven(11.2, -22.9); rackOven(11.2, -21.3);
+  SB(M.steelK, 1.2, 2.0, 2.4, 11.35, 0, -17.4, { grime: 0 }, 'metal');            // deck oven
+  for (const y of [0.6, 1.1, 1.6]) P(new THREE.BoxGeometry(0.02, 0.18, 2.0), M.ovenGlow, 10.74, y, -17.4);
+  SB(M.steelK, 0.9, 0.9, 2.4, 11.5, 0, -13.2, { grime: 0 }, 'metal');             // slicer bench
+  P(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 18), M.steelK, 11.4, 1.05, -13.6, 0, { rz: 1.2 });
+  for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.3, 0.16, 0.2, 2, 0.05), M.paint, 11.5, 0.98, -12.6 - i * 0.35, 0, { tint: [0xc8705a, 0xe8c8a0, 0xa04a3a][i] });
+  signMesh(signTex('CAUTION · HOT OVENS', { bg: '#e8c020', fg: '#1a1a1a', font: 'bold 50px Arial' }), 1.4, 0.35, 11.86, 3.0 - 0.3, -22.1, -Math.PI / 2, 0.3, { noMinimap: true });
+  // tiles on the wall behind (herringbone), around the two kitchen doors
+  {
+    let cur = -24;
+    for (const [a, b] of [[-20.6, -19], [-11, -9.4], [-8, -8]]) {
+      if (a - cur > 0.05 && M.subway) { const g = new THREE.PlaneGeometry(a - cur, 2.4); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (a - cur) / ctx.S.subway, uv.getY(i) * 2.4 / ctx.S.subway); P(g, M.subway, 11.88, 1.2, (a + cur) / 2, -Math.PI / 2, { cast: false }); }
+      cur = b;
+    }
+  }
+  neon('BAKERY', '#ff4fa8', 4.4, 0.95, 8.0, 3.7, -19.6, -Math.PI / 2, true, 'italic bold 140px Georgia');
+  neon('DELI', '#3ae0ff', 3.0, 0.8, 8.0, 3.7, -12.2, -Math.PI / 2, true, 'bold 150px Georgia');
+  for (const z of [-21.8, -17.4, -13.5, -10.9]) P(new THREE.CylinderGeometry(0.008, 0.008, 1.9, 4), M.dark, 8.0, 5.1, z);
+  for (let i = 0; i < 6; i++) ctx.bag(9.6 + (i % 2) * 0.62, 0.12 + ((i / 2) | 0) * 0.2, -23.55, 0, 0xe8e0d0);   // flour sacks at the end of the counter
+  solid(9.9, -23.55, 1.3, 0.5, 0.7, 0, 'dirt');
+
+  // ---------- the open floor between the aisles and the back strip: seasonal pallets, beer & wine ----------
+  palletStack(11.6, -5.4, 1.2); palletStack(12.9, 4.6, 1.4); palletStack(11.0, 8.2, 0.9);
+  SB(M.cardboard, 1.2, 1.4, 1.2, 12.6, 0, -1.2, { grime: 0.05 }, 'wood'); face(M.goodsBox, 1.1, 0.6, 12.6, 0.8, -0.59, 0, 1);
+  gondola(8.8, 12.6, 14.0, [M.goodsBottle, M.goodsBottle, M.goodsCan]);
+  gondola(8.8, 12.6, 18.4, [M.goodsBottle, M.goodsCan, M.goodsBottle]);
+  for (const s of [0, Math.PI]) signMesh(signTex('BEER & WINE', { bg: '#6a1a2a', font: 'bold 64px Arial', w: 512, h: 128 }), 2.2, 0.55, 10.7, 3.6, 16.2 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true });
+
+  // ---------- upstairs: offices + break room on a mezzanine over the front corner (floor at 3.2 m) ----------
+  // under it: the entrance, customer service and the carts. Inside stair from the dairy end, outside stair
+  // up the service-alley wall.
+  {
+    const mz = new THREE.BoxGeometry(10, 0.2, 8); mz.translate(-17, OH + 0.1, -20);
+    const mm = new THREE.Mesh(mz, M.officeCeil); mm.userData.noMinimap = true; mm.castShadow = true; mm.receiveShadow = true; group.add(mm);
+  }
+  solid(-17, -20, 10, 8, 0.2, OH, 'concrete');
+  B(M.paint, 10, 0.4, 0.3, -17, OH - 0.4, -16.15, 0, { tint: 0x30363c, grime: 0 });        // edge beam
+  B(M.paint, 0.3, 0.4, 8, -12.15, OH - 0.4, -20, 0, { tint: 0x30363c, grime: 0 });
+  for (const [x, z] of [[-12.3, -16.2], [-17, -16.2]]) SB(M.paint, 0.35, OH - 0.4, 0.35, x, 0, z, { tint: 0x30363c, grime: 0.1 }, 'metal');
+  wallLine(-12, -24, -12, -16, UH, 0.2, [[0.6, 2.2, 2.15], [3.2, 7.4, 2.1, 0.95]], M.plaster, inner, 'concrete', null, UP);   // stair door, window over the store
+  wallLine(-22, -16, -12, -16, UH, 0.2, [[1.0, 4.4, 2.1, 0.95], [6.0, 9.2, 2.1, 0.95]], M.plaster, inner, 'concrete', null, UP); // windows over the checkouts
+  wallLine(-17, -24, -17, -16, UH, 0.15, [[3.2, 4.8, 2.15]], M.plaster, 0xd8e0d8, 'concrete', null, UP);                     // office | break room
+  for (const [x, z, w, d] of [[-11.95, -18.7, 0.32, 4.2], [-19.3, -15.95, 3.4, 0.32], [-14.4, -15.95, 3.2, 0.32]]) UB(M.wood, w, 0.04, d, x, UP + 0.95, z, 0xc8a878);
+  UF(M.wood, 5, 8, -19.5, UP + 0.006, -20, ctx.scaleOf(M.wood) || 2);
+  UF(M.checker || M.tile, 5, 8, -14.5, UP + 0.006, -20, M.checker ? 3.0 : (ctx.scaleOf(M.tile) || 1));
   const SU = (mat, w, h, d, x, y, z, tint, surf = 'wood') => { solid(x, z, w, d, h, y, surf); UB(mat, w, h, d, x, y, z, tint); };
   const desk = (x, z, y = UP) => {
     SU(M.wood, 1.6, 0.06, 0.8, x, y + 0.72, z, 0xc8a878);
@@ -953,56 +936,59 @@ function build(ctx) {
     SU(M.fabric, 0.5, 0.5, 0.5, x + 0.1, y, z + 0.7, 0xffffff, 'cloth');
     U(new THREE.BoxGeometry(0.5, 0.55, 0.08), M.fabric, x + 0.1, y + 0.8, z + 0.95);
   };
-  // open office (x 12..17, z 8..18): two desks behind a partition, copier, water cooler
-  desk(14.8, 9.4); desk(14.8, 12.9);
-  SU(M.fabric, 2.8, 1.3, 0.06, 14.4, UP, 11.2, 0x6a7078, 'cloth');
-  SU(M.fabric, 0.06, 1.3, 2.4, 13.0, UP, 13.4, 0x6a7078, 'cloth');
-  SU(M.paint, 0.7, 1.1, 0.6, 16.5, UP, 15.4, 0xd8d8d4, 'metal');
-  SU(M.paint, 0.35, 1.2, 0.35, 16.7, UP, 17.4, 0x3a6ab0, 'metal');
-  // manager's office (x 12..17, z 18..24): desk, filing cabinets, whiteboard
-  desk(14.6, 21.4);
-  for (let i = 0; i < 3; i++) SU(M.paint, 0.5, 1.3, 0.6, 16.5, UP, 23.4 - i * 0.55, 0x8a8e92, 'metal');
-  U(new THREE.PlaneGeometry(1.2, 0.9), M.paint, 16.2, UP + 1.6, 18.09, 0, 0xf4f4f0);
-  // break room (x 17..22, z 8..16): table and chairs, vending machine, fridge, counter with a microwave
-  SU(M.wood, 1.8, 0.75, 1.0, 19.4, UP, 12.4, 0xd8c8a8);
-  for (const [dx, dz] of [[-0.6, -0.8], [0.6, -0.8], [-0.6, 0.8], [0.6, 0.8]]) SU(M.fabric, 0.45, 0.45, 0.45, 19.4 + dx, UP, 12.4 + dz, 0x8a3a3a, 'cloth');
-  SU(M.paint, 0.9, 1.9, 0.8, 21.4, UP, 14.9, 0x8a1a1a, 'metal');
-  U(new THREE.BoxGeometry(0.02, 1.4, 0.6), M.coolLight, 20.94, UP + 1.1, 14.9);
-  SU(M.paint, 0.8, 1.8, 0.7, 21.45, UP, 11.6, 0xe8e8e4, 'metal');
-  SU(M.woodOld, 1.9, 0.9, 0.6, 18.3, UP, 8.45, 0x8a7a6a);
-  U(new THREE.BoxGeometry(0.45, 0.3, 0.35), M.dark, 18.0, UP + 1.05, 8.45);
-  signMesh(signTex(['BREAK ROOM'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 128 }), 0.7, 0.35, 17.09, UP + 2.35, 11.3, Math.PI / 2, 0.3, { noMinimap: true });
-  // staff room (x 17..22, z 16..24): lockers and a bench
-  for (let i = 0; i < 8; i++) SU(M.paint, 0.5, 1.9, 0.5, 21.5, UP, 23.5 - i * 0.52, 0x4a6a8a, 'metal');
-  SU(M.wood, 0.4, 0.45, 2.4, 19.6, UP, 20.6, 0x9a7a5a);
+  // office (x -22..-17): two desks, filing cabinets, a whiteboard
+  desk(-19.6, -22.9); desk(-19.6, -19.3);
+  for (let i = 0; i < 3; i++) SU(M.paint, 0.5, 1.3, 0.6, -21.6, UP, -17.0 - i * 0.62, 0x8a8e92, 'metal');
+  U(new THREE.PlaneGeometry(1.4, 0.9), M.paint, -17.09, UP + 1.6, -22.6, -Math.PI / 2, 0xf4f4f0);
+  // break room (x -17..-12): table and chairs, vending machine, fridge, counter with a microwave
+  SU(M.wood, 1.0, 0.75, 1.8, -14.0, UP, -20.6, 0xd8c8a8);
+  for (const [dx, dz] of [[-0.8, -0.6], [-0.8, 0.6], [0.8, -0.6], [0.8, 0.6]]) SU(M.fabric, 0.45, 0.45, 0.45, -14.0 + dx, UP, -20.6 + dz, 0x8a3a3a, 'cloth');
+  SU(M.paint, 0.9, 1.9, 0.8, -15.8, UP, -23.5, 0x8a1a1a, 'metal');
+  U(new THREE.BoxGeometry(0.6, 1.4, 0.02), M.coolLight, -15.8, UP + 1.1, -23.09);
+  SU(M.paint, 0.8, 1.8, 0.7, -16.45, UP, -17.0, 0xe8e8e4, 'metal');
+  SU(M.woodOld, 2.4, 0.9, 0.6, -13.6, UP, -16.45, 0x8a7a6a);
+  U(new THREE.BoxGeometry(0.45, 0.3, 0.35), M.dark, -13.0, UP + 1.05, -16.45);
+  signMesh(signTex(['BREAK ROOM'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 128 }), 0.7, 0.35, -16.91, UP + 2.35, -18.0, Math.PI / 2, 0.3, { noMinimap: true });
+  signMesh(signTex(['OFFICE'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 56px Arial', w: 256, h: 128 }), 0.7, 0.35, -17.09, UP + 2.35, -18.0, -Math.PI / 2, 0.3, { noMinimap: true });
+  { const L = new THREE.PointLight(0xfff4e4, 9, 10, 1.3); L.position.set(-17, UP + 2.2, -20); L.userData.mapLight = true; group.add(L); }
 
   // ---------- stairs ----------
-  // inside: a concrete flight along the kitchen wall from the deli up to a landing at the office door
-  flight(11.25, 11.6, 'z', 10, 0.32, 0.42, 1.5, false);
-  SB(M.concrete, 1.5, UP, 1.8, 11.25, 0, 16.7, { tint: 0xc8c4bc, grime: 0.15 });
-  for (const [x, z, w, d] of [[10.52, 16.7, 0.05, 1.8], [11.25, 17.58, 1.5, 0.05]]) { solid(x, z, w, d, 1.0, UP, 'metal'); UB(M.steelK, w, 0.05, d, x, UP + 0.95, z, 0x9aa0a6); }
-  for (const [x, z] of [[10.52, 15.85], [10.52, 17.58], [11.9, 17.58]]) U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
-  signMesh(signTex(['OFFICES', 'STAFF ONLY ↑'], { bg: '#1f4e8a', fg: '#ffffff', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 11.25, 1.9, 11.55, Math.PI, 0.4, { noMinimap: true });
-  // outside: a galvanised fire stair up the back wall to the break room door
-  flight(23.1, 3.9, 'z', 10, 0.32, 0.44, 1.3, true);
-  solid(23.15, 9.3, 1.5, 2.0, 0.1, UP - 0.1, 'metal');
-  UB(M.steelK, 1.5, 0.08, 2.0, 23.15, UP - 0.08, 9.3, 0x6a6e72);
-  for (const [x, z, w, d] of [[23.88, 9.3, 0.05, 2.0], [23.15, 10.28, 1.5, 0.05]]) { solid(x, z, w, d, 1.0, UP, 'metal'); UB(M.steelK, w, 0.05, d, x, UP + 0.95, z, 0x9aa0a6); }
-  for (const [x, z] of [[23.85, 8.35], [23.85, 10.25], [22.5, 10.25]]) {
-    U(new THREE.CylinderGeometry(0.05, 0.05, UP, 8), M.paint, x, UP / 2, z, 0, 0x5a5e62);
-    U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
+  // a flight climbing toward -x from (x, z) at its foot: concrete (solid under) or galvanised open treads
+  const flightNX = (x, z, n, rise, run, w, metal) => {
+    const L = n * run, ang = Math.atan2(rise, run), slope = Math.hypot(L, n * rise);
+    for (let k = 1; k <= n; k++) {
+      const cx = x - (k - 0.5) * run, top = k * rise;
+      if (metal) {
+        solid(cx, z, run, w, 0.08, top - 0.08, 'metal');
+        U(new THREE.BoxGeometry(run, 0.05, w), M.steelK, cx, top - 0.025, z, 0, 0x6a6e72);
+        U(new THREE.BoxGeometry(0.03, 0.04, w), M.paint, cx - run / 2 + 0.02, top - 0.02, z, 0, 0xe8c020);
+      } else {
+        solid(cx, z, run, w, top, 0, 'concrete');
+        B(M.concrete, run, top, w, cx, 0, z, 0, { tint: 0xc8c4bc, grime: 0.15 });
+        B(M.paint, 0.05, 0.012, w, cx - run / 2 + 0.03, top, z, 0, { tint: 0xe8c020, grime: 0 });
+      }
+    }
+    for (const s of [-1, 1]) {
+      const rail = (th, y, mat, tint) => { const g = new THREE.BoxGeometry(slope, th, th); g.rotateZ(-ang); U(g, mat, x - L / 2, y, z + s * w / 2, 0, tint); };
+      if (metal) rail(0.06, n * rise / 2 - 0.1, M.paint, 0x3a4048);
+      rail(0.045, n * rise / 2 + 0.95, M.steelK, 0x9aa0a6);
+      for (let k = 0; k <= n; k += Math.max(2, n >> 2)) U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x - (k + 0.5) * run, (k + 0.5) * rise + 0.47, z + s * w / 2, 0, 0x9aa0a6);
+    }
+  };
+  // inside: up from the dairy end of the front aisle to the break room door
+  flightNX(-7.8, -22.9, 10, 0.32, 0.42, 1.5, false);
+  signMesh(signTex(['OFFICES', 'STAFF ONLY ↑'], { bg: '#1f4e8a', fg: '#ffffff', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, -7.74, 1.4, -22.9, Math.PI / 2, 0.4, { noMinimap: true });
+  // outside: a galvanised stair up the service-alley wall to a landing at the break room's side door
+  flightNX(-6.0, -25.05, 10, 0.32, 0.42, 1.3, true);
+  solid(-12.1, -25.3, 3.8, 1.8, 0.1, UP - 0.1, 'metal');
+  UB(M.steelK, 3.8, 0.08, 1.8, -12.1, UP - 0.08, -25.3, 0x6a6e72);
+  for (const [x, z, w, d] of [[-12.1, -26.18, 3.8, 0.05], [-13.98, -25.3, 0.05, 1.8]]) { solid(x, z, w, d, 1.0, UP, 'metal'); UB(M.steelK, w, 0.05, d, x, UP + 0.95, z, 0x9aa0a6); UB(M.steelK, w, 0.04, d, x, UP + 0.5, z, 0x9aa0a6); }
+  for (const [x, z] of [[-13.95, -26.15], [-10.25, -26.15], [-13.95, -24.5], [-8.1, -25.7]]) {
+    const hh = x > -9 ? UP * 0.5 : UP;
+    U(new THREE.CylinderGeometry(0.05, 0.05, hh, 8), M.paint, x, hh / 2, z, 0, 0x5a5e62);
+    if (x < -9) U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
   }
-
-  // the side stair: a galvanised flight up the +z wall to a landing at the manager's office door
-  flight(8.2, 25.05, 'x', 10, 0.32, 0.42, 1.3, true);
-  solid(13.4, 25.3, 2.0, 1.8, 0.1, UP - 0.1, 'metal');
-  UB(M.steelK, 2.0, 0.08, 1.8, 13.4, UP - 0.08, 25.3, 0x6a6e72);
-  for (const [x, z, w, d] of [[13.4, 26.18, 2.0, 0.05], [14.38, 25.3, 0.05, 1.8]]) { solid(x, z, w, d, 1.0, UP, 'metal'); UB(M.steelK, w, 0.05, d, x, UP + 0.95, z, 0x9aa0a6); UB(M.steelK, w, 0.04, d, x, UP + 0.5, z, 0x9aa0a6); }
-  for (const [x, z] of [[12.45, 26.15], [14.35, 26.15], [14.35, 24.5], [10.3, 25.7]]) {
-    U(new THREE.CylinderGeometry(0.05, 0.05, x < 12 ? UP * 0.5 : UP, 8), M.paint, x, (x < 12 ? UP * 0.5 : UP) / 2, z, 0, 0x5a5e62);
-    if (x > 12) U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
-  }
-  signMesh(signTex(['OFFICE', 'NO ENTRY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 50px Arial', w: 256, h: 160 }), 0.7, 0.44, 15.0, UP + 1.6, Z1 + T + 0.04, 0, 0.3);
+  signMesh(signTex(['STAFF ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 50px Arial', w: 256, h: 128 }), 0.7, 0.35, -15.0, UP + 1.6, Z0 - T - 0.04, Math.PI, 0.3);
 
   // ---------- outside: parking lot ----------
   const parked = [[-30.2, -22.8], [-30.2, -17.2], [-30.2, -8.8], [-30.2, 2.4], [-30.2, 10.8], [-30.2, 19.2], [-34.8, -20], [-34.8, -6], [-34.8, 5.2], [-34.8, 16.4], [-34.8, 24.8], [-30.2, 25]];
@@ -1059,7 +1045,7 @@ function build(ctx) {
     B(M.paint, 0.02, 3.7, 0.12, X1 + T + 0.04, 0, z0 - 0.06, 0, { tint: 0xe8c020, grime: 0.2 });
     B(M.paint, 0.02, 3.7, 0.12, X1 + T + 0.04, 0, z1 + 0.06, 0, { tint: 0xe8c020, grime: 0.2 });
   };
-  dockDoor(-13.4, -10.6, false); dockDoor(-9.8, -7.0, false); dockDoor(-3.0, 1.2, true);
+  dockDoor(-13.4, -10.6, false); dockDoor(-9.8, -7.0, false); dockDoor(-3.0, 1.2, true); dockDoor(17, 21, true);
   signMesh(signTex('LOADING BAY & RECEIVING', { bg: '#1a1c20', fg: '#f2c63a', font: 'bold 52px Arial', w: 1024, h: 128 }), 5.6, 0.7, X1 + T + 0.04, 4.6, -5.9, Math.PI / 2, 0.6);
   for (const [z, n] of [[-12, '1'], [-8.4, '2'], [-0.9, '3']]) signMesh(signTex(n, { bg: '#f2c63a', fg: '#1a1a1a', font: 'bold 100px Arial', w: 128, h: 128 }), 0.5, 0.5, X1 + T + 0.04, 3.95, z, Math.PI / 2, 0.4);
   // semi: a long box trailer backed up to door 2, the tractor almost at the back fence
@@ -1126,17 +1112,17 @@ function build(ctx) {
   SB(M.woodOld, 1.4, 1.4, 1.4, 34, 0, 18, { tint: 0x9a8a6a }, 'wood');
   SB(M.woodOld, 1.4, 1.4, 1.4, 34.2, 1.4, 18.2, { tint: 0x8a7a5a }, 'wood');
   // smoking area: canopy, bench, ash urn, sign; a soldier on his break
-  for (const [x, z] of [[26.6, 13.2], [26.6, 21.2]]) P(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 8), M.dark, x, 1.4, z);
-  B(M.metal, 4.6, 0.08, 8.6, 24.6, 2.8, 17.2, 0, { tint: 0x7a8088, grime: 0.2 });
-  SB(M.wood, 0.5, 0.45, 2.2, 22.85, 0, 14.6, { tint: 0x9a7a5a }, 'wood');
-  B(M.wood, 0.08, 0.5, 2.2, 22.66, 0.45, 14.6, 0, { tint: 0x9a7a5a });
-  SB(M.metal, 0.38, 0.95, 0.38, 24.6, 0, 20.3, { tint: 0x3a3c40 }, 'metal');
-  P(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 14), M.dirt, 24.6, 0.97, 20.3);
-  signMesh(signTex(['DESIGNATED', 'SMOKING AREA'], { bg: '#e8e4dc', fg: '#2a2a2a', font: 'bold 46px Arial', w: 512, h: 200, border: '#c8322b' }), 1.0, 0.4, X1 + T + 0.03, 2.3, 20.2, Math.PI / 2, 0.3);
+  for (const [x, z] of [[26.6, -22.4], [26.6, -14.4]]) P(new THREE.CylinderGeometry(0.05, 0.05, 2.8, 8), M.dark, x, 1.4, z);
+  B(M.metal, 4.6, 0.08, 8.6, 24.6, 2.8, -18.4, 0, { tint: 0x7a8088, grime: 0.2 });
+  SB(M.wood, 0.5, 0.45, 2.2, 22.85, 0, -21.4, { tint: 0x9a7a5a }, 'wood');
+  B(M.wood, 0.08, 0.5, 2.2, 22.66, 0.45, -21.4, 0, { tint: 0x9a7a5a });
+  SB(M.metal, 0.38, 0.95, 0.38, 24.6, 0, -15.4, { tint: 0x3a3c40 }, 'metal');
+  P(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 14), M.dirt, 24.6, 0.97, -15.4);
+  signMesh(signTex(['DESIGNATED', 'SMOKING AREA'], { bg: '#e8e4dc', fg: '#2a2a2a', font: 'bold 46px Arial', w: 512, h: 200, border: '#c8322b' }), 1.0, 0.4, X1 + T + 0.03, 2.3, -16.2, Math.PI / 2, 0.3);
   const butts = new THREE.MeshBasicMaterial({ color: 0xe8e0c8 });
-  for (let i = 0; i < 18; i++) P(new THREE.CylinderGeometry(0.006, 0.006, 0.03, 4), butts, 23.2 + Math.random() * 2.4, 0.01, 16 + Math.random() * 5, Math.random() * 3, { rz: Math.PI / 2 });
+  for (let i = 0; i < 18; i++) P(new THREE.CylinderGeometry(0.006, 0.006, 0.03, 4), butts, 23.2 + Math.random() * 2.4, 0.01, -21 + Math.random() * 5, Math.random() * 3, { rz: Math.PI / 2 });
   // wall packs over the back doors
-  for (const [z, tz] of [[-18.2, -18.2], [-0.5, -0.5], [17.8, 17.8]]) {
+  for (const [z, tz] of [[-18.2, -18.2], [-0.5, -0.5], [19, 19]]) {
     P(new THREE.BoxGeometry(0.3, 0.25, 0.35), M.dark, X1 + T + 0.15, 3.4, z);
     P(new THREE.BoxGeometry(0.02, 0.15, 0.25), M.lamp, X1 + T + 0.31, 3.35, z);
     glows.push([X1 + T + 0.34, 3.35, z, 0.9]);
@@ -1179,7 +1165,7 @@ function build(ctx) {
     hedge(x0 + 0.5, z + 0.35, x1 - 0.5, z + 0.35, 0.4, 0.5, false, 0.55);   // a lower, lighter row in front
     for (let t = -w / 2 + 0.7; t <= w / 2 - 0.6; t += 0.9) for (let k = 0; k < 3; k++) P(new THREE.BoxGeometry(0.06, 0.06, 0.06), M.paint, x + t + k * 0.13, 1.0 + (k % 2) * 0.03, z + 0.2 + k * 0.1, k, { tint: [0xe8d040, 0xf0f0e8, 0xd8508a][(k + Math.round(t * 3)) % 3] });   // flowers
   };
-  for (const [x0, x1] of [[-21.5, -15], [-13.5, -6.5], [-0.5, 6.5], [16, 21.5]]) bed(x0, x1, 25.6);
+  for (const [x0, x1] of [[-21.5, -15], [-13.5, -6.5], [-0.5, 6.5], [8, 14.5], [16, 21.5]]) bed(x0, x1, 25.6);
   plane(M.tile, 46, 1.8, -1, 27.5, 0.018);                                         // sidewalk
   B(M.concrete, 46, 0.14, 0.25, -1, 0, 28.45, 0, { grime: 0.2, cast: false });     // kerb
   plane(M.asphalt, 66.6, 5.6, 8.3, 31.2, 0.008);                                   // the street
@@ -1211,7 +1197,7 @@ function build(ctx) {
   };
   hvac(-4.8, -27.2); hvac(7.6, -27.2); hvac(11.2, -27.2);
   // meters and electrical panels on the wall, conduit to the roof
-  for (const [x, w, h] of [[-21, 0.9, 1.3], [-19.8, 0.6, 0.9], [-8.2, 0.9, 1.3], [-7.0, 0.5, 0.7]]) {
+  for (const [x, w, h] of [[6.4, 0.9, 1.3], [7.6, 0.6, 0.9], [10.2, 0.9, 1.3], [11.4, 0.5, 0.7]]) {
     P(new THREE.BoxGeometry(w, h, 0.25), M.paint, x, 1.3 + h / 2, -24.53, 0, { tint: 0x8a9096 });
     P(new THREE.CylinderGeometry(0.04, 0.04, H - 1.3 - h, 6), M.steelK, x, (H + 1.3 + h) / 2, -24.5);
   }
@@ -1299,7 +1285,7 @@ function build(ctx) {
   // tall stuff in the parking rows (cars alone are below eye height): a delivery van and head-high pallet runs
   addKind(-30.2, 6.6, 4.6, 2.2, 2.6, 0, 'truck', {});
   for (const sz of [-1, 1]) { palletStack(-37, sz * 13, 1.8); palletStack(-35, sz * 13, 1.6); palletStack(-33.4, sz * 12.9, 1.7); }
-  palletStack(-25, -2, 1.8); palletStack(40.6, -9, 1.8); palletStack(-24.6, 24.9, 1.2); palletStack(26.4, 24.9, 1.4);
+  palletStack(-25, -2, 1.8); palletStack(40.6, -9, 1.8); palletStack(-24.6, 24.9, 1.8); palletStack(26.4, 24.9, 1.8); palletStack(7.25, 25.1, 1.8); planter(-5.6, 25.0, 1.2, 0.9);
   // the storefront: neon over the windows like the sign inside, brick cladding on the corners
   for (let z = -30; z <= 30; z += 7.5) addKind(-44.6, z, 0, 0, 9 + (z % 2), 0, 'tree');                  // trees along the street out front
   // inside the doors: a promo pallet just past each entrance, so the lot can't see straight down an aisle
@@ -1327,13 +1313,13 @@ function build(ctx) {
   }
 
   // ---------- the smoker ----------
-  const smoker = makeSmoker(group, 23.25, 19.2, -Math.PI / 2 + 0.3); // facing out into the yard
+  const smoker = makeSmoker(group, 23.3, -16.4, -Math.PI / 2 - 0.3); // by the kitchen's staff door, facing out into the yard
 
   flushOver();
   const inside = (x, z) => x > X0 && x < X1 && z > Z0 && z < Z1;
   return {
     // S&D: sites each team defends ([x, z]); placed near the middle so both teams get there at about the same time
-    sites: [[[-2.6, -16.3], [-4.3, 13.3]], [[8.2, -16.3], [8.6, 10.6]]],
+    sites: [[[-2.6, -16.3], [-4.3, 13.3]], [[10.6, -3.0], [8.6, 10.6]]],
     flagPos: [-2.5, 4.2],
     // upstairs offices for the bots: the floor at 3.2 m, the inside stair (deli side) and the outside fire stair
     upper: {
@@ -1348,22 +1334,21 @@ function build(ctx) {
     doors: [
       { kind: 'slide', x: X0 - T / 2, z: -19, axis: 'z', w: 4, h: 2.6, glass: true },          // front entrances
       { kind: 'slide', x: X0 - T / 2, z: 18.6, axis: 'z', w: 4, h: 2.6, glass: true },
-      { kind: 'traffic', x: 15, z: 0, axis: 'z', w: 2, h: 2.5 },                                 // stockroom <-> sales floor
-      { kind: 'traffic', x: 18.8, z: -6, axis: 'x', w: 1.6, h: 2.25 },                           // stockroom <-> bakery
-      { kind: 'traffic', x: 12, z: 10.2, axis: 'z', w: 1.6, h: 2.25 },                           // kitchen
-      { kind: 'traffic', x: 12, z: 19.8, axis: 'z', w: 1.6, h: 2.25 },
-      { kind: 'swing', x: X1 + T / 2, z: -18.6, axis: 'z', w: 1.6, h: 2.25, tint: 0x5a6a5a },   // bakery back door
-      { kind: 'swing', x: X1 + T / 2, z: 17.8, axis: 'z', w: 1.6, h: 2.25, tint: 0x5a6a5a },    // staff door to the smoking area
+      { kind: 'traffic', x: 15, z: 0, axis: 'z', w: 2, h: 2.5 },                                 // sales floor <-> receiving
+      { kind: 'traffic', x: 15, z: 17.4, axis: 'z', w: 1.6, h: 2.25 },                           // sales floor <-> racking
+      { kind: 'swing', x: 18.8, z: 6, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },              // receiving | storage
+      { kind: 'swing', x: 20.0, z: 14, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },             // storage | racking
+      { kind: 'traffic', x: 12, z: -19.8, axis: 'z', w: 1.6, h: 2.25 },                          // behind the counters -> kitchen
+      { kind: 'traffic', x: 12, z: -10.2, axis: 'z', w: 1.6, h: 2.25 },
+      { kind: 'swing', x: 13.4, z: -8, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },             // kitchen -> sales floor
+      { kind: 'swing', x: 19.75, z: -8, axis: 'x', w: 1.5, h: 2.25, tint: 0x6a7a8a },            // cold room -> receiving
+      { kind: 'swing', x: 17, z: -20.25, axis: 'z', w: 1.5, h: 2.25, tint: 0x6a7a8a },           // kitchen | back corridor
+      { kind: 'swing', x: X1 + T / 2, z: -18.6, axis: 'z', w: 1.6, h: 2.25, tint: 0x5a6a5a },   // staff door to the smoking area
       { kind: 'swing', x: -2.8, z: Z1 + T / 2, axis: 'x', w: 1.6, h: 2.25, tint: 0x8a2a24 },    // fire exits
       { kind: 'swing', x: 3.2, z: Z0 - T / 2, axis: 'x', w: 1.6, h: 2.25, tint: 0x8a2a24 },
-      { kind: 'swing', x: 19.8, z: 6, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },              // stockroom -> office corridor
-      { kind: 'swing', x: 14.8, z: 8, axis: 'x', w: 1.6, h: 2.25, tint: 0x6a7a8a },
-      { kind: 'swing', x: 17, z: 20.25, axis: 'z', w: 1.5, h: 2.25, tint: 0x6a7a8a },             // back corridor
-      { kind: 'swing', x: 12, z: 16.7, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // upstairs: office off the stair landing
-      { kind: 'swing', x: X1 + T / 2, z: 9.3, y: UP, axis: 'z', w: 1.8, h: 2.15, tint: 0x5a6a5a },// ... and out to the fire stair
-      { kind: 'swing', x: 14.6, z: 18, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // manager's office
-      { kind: 'swing', x: 13.4, z: Z1 + T / 2, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x5a6a5a },// ... and out to the side stair
-      { kind: 'traffic', x: 17, z: -10.6, axis: 'z', w: 1.6, h: 2.25 },                          // bakery <-> back storage
+      { kind: 'swing', x: -12, z: -22.6, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },   // upstairs: break room off the stair
+      { kind: 'swing', x: -17, z: -20.0, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },   // break room | office
+      { kind: 'swing', x: -13.0, z: Z0 - T / 2, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x5a6a5a }, // out to the alley stair
     ],
     menuCam(t, cam) {
       cam.position.set(Math.cos(t) * 44 - 4, 13 + Math.sin(t * 0.7) * 2, Math.sin(t) * 38);
