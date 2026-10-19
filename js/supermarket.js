@@ -24,8 +24,8 @@ export const MART = {
   blurb: 'Indoor supermarket: tall aisles, frozen foods, produce, deli, bakery, upstairs offices, doors that open and close; parking lot and loading yard',
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
   spawns2: [
-    [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-40, 8]],
-    [[37, -20], [37, -12], [36, -3.5], [37, 5], [37, 12], [38, 20], [39, -11.5], [39, 9]],
+    [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-41.4, 8.6]],   // clear of the cart shelter
+    [[36, -20], [37, -12], [36, -3.5], [37, 5], [37, 12], [38, 20], [39, -11.5], [40.5, 9]],   // clear of the box van and the container
   ],
   pickups: [
     { type: 'health', pos: [-2.5, 0, 3] },
@@ -35,7 +35,7 @@ export const MART = {
     { type: 'ammo', pos: [9, 0, 6.5] },
     { type: 'ammo', pos: [-2.5, 0, -21] },
     { type: 'ammo', pos: [0, 0, 22.2] },
-    { type: 'ammo', pos: [14.6, 3.2, 12.6] },   // upstairs office
+    { type: 'ammo', pos: [14.3, 3.2, 11.9] },   // upstairs office
   ],
   build,
 };
