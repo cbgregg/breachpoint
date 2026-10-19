@@ -2057,6 +2057,28 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       }
       for (const lz of [-1, 1]) box(0.14, 0.08, 0.14, 0.75, 1.0, lz * (W / 2 + 0.06), bodyMat, paintTint);
       box(0.02, 0.12, 0.4, 2.31, 0.42, 0, M.paint, 0xe8e2d0);
+      box(0.02, 0.12, 0.4, -2.31, 0.5, 0, M.paint, 0xe8e2d0);                                  // rear plate
+      // door shut lines, handles, rubbing strip and sill, fuel flap: both sides
+      for (const s2 of [-1, 1]) {
+        const sz2 = s2 * (W / 2 + 0.005);
+        for (const lx of [0.95, -0.35, -1.0]) box(0.018, 0.56, 0.012, lx, 0.62, sz2, M.dark, 0x141414);
+        box(1.95, 0.012, 0.012, -0.03, 0.93, sz2, M.dark, 0x141414);                         // window line
+        for (const lx of [0.55, -0.75]) box(0.16, 0.035, 0.03, lx, 0.82, s2 * (W / 2 + 0.02), M.metal, 0xb8b8b8);  // handles
+        box(2.6, 0.045, 0.02, -0.05, 0.56, s2 * (W / 2 - 0.005), M.dark, 0x202020);             // rubbing strip
+        box(1.7, 0.06, 0.03, 0.0, 0.34, s2 * (W / 2 - 0.03), M.dark, 0x1c1c1c);                 // sill
+        if (s2 < 0) box(0.14, 0.12, 0.02, -1.75, 0.74, s2 * (W / 2 + 0.01), bodyMat, paintTint); // fuel flap
+        box(0.02, 0.28, 0.02, 0.75, 0.92, s2 * (W / 2 + 0.02), M.dark, 0x1a1a1a);              // mirror stalk
+      }
+      // through the glass: seats, headrests, dash, steering wheel, rear-view mirror
+      for (const lz of [-0.42, 0.42]) { box(0.5, 0.12, 0.5, 0.05, 0.62, lz, M.dark, 0x2a2a2e); box(0.12, 0.55, 0.5, -0.2, 0.68, lz, M.dark, 0x2a2a2e); box(0.08, 0.16, 0.26, -0.24, 1.1, lz, M.dark, 0x2a2a2e); }
+      box(0.5, 0.12, 1.5, -0.95, 0.62, 0, M.dark, 0x2a2a2e); box(0.12, 0.5, 1.5, -1.2, 0.68, 0, M.dark, 0x2a2a2e);
+      box(0.4, 0.22, W - 0.2, 0.85, 0.82, 0, M.dark, 0x18181a);                                // dash
+      { const [x, , z] = P(0.6, 0, 0.42); put(new THREE.TorusGeometry(0.17, 0.025, 6, 16), M.dark, x, 0.98, z, ry + Math.PI / 2, { rx: -0.45, grime: 0, tint: 0x111111 }); }
+      box(0.04, 0.05, 0.18, 0.5, 1.3, 0, M.dark, 0x111111);
+      // wipers, a roof antenna, the exhaust
+      for (const lz of [-0.4, 0.3]) box(0.03, 0.02, 0.6, 1.12, 0.95, lz, M.dark, 0x0a0a0a);
+      { const [x, , z] = P(-0.75, 0, -0.5); put(new THREE.CylinderGeometry(0.008, 0.012, 0.42, 4), M.dark, x, 1.6, z, ry, { rz: -0.35, grime: 0 }); }
+      { const [x, , z] = P(-2.24, 0, 0.55); put(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), M.metal, x, 0.26, z, ry, { rz: Math.PI / 2, grime: 0.2, tint: 0x8a8a8a }); }
     }
     // wheels: tyre + rim
     for (const lx of [-1.4, 1.4]) for (const lz of [-0.8, 0.8]) {
@@ -2065,6 +2087,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       put(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 18), M.rubber, x, y, z, ry, { rx: Math.PI / 2, grime: 0 });
       const [rx2, , rz2] = P(lx, 0, lz + Math.sign(lz) * 0.12);
       put(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 14), M.metal, rx2, y, rz2, ry, { rx: Math.PI / 2, grime: 0, tint: 0x9a9a9a });
+      if (!burnt && !LOW_DETAIL) {   // spokes and the centre cap
+        for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; const [sx2, , sz3] = P(lx + Math.cos(a) * 0.1, 0, lz + Math.sign(lz) * 0.135); put(new THREE.BoxGeometry(0.04, 0.17, 0.015), M.metal, sx2, y + Math.sin(a) * 0.1, sz3, ry, { rx: 0, rz: a + Math.PI / 2, grime: 0, tint: 0x6a6a6a }); }
+        const [cx3, , cz3] = P(lx, 0, lz + Math.sign(lz) * 0.14); put(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 10), M.dark, cx3, y, cz3, ry, { rx: Math.PI / 2, grime: 0 });
+      }
     }
   }
 
@@ -2282,7 +2308,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
   // custom maps build themselves with the same helpers
   let custom = null;
-  if (!street) custom = LAYOUT.build({ low: LOW_DETAIL, THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
+  if (!street) custom = LAYOUT.build({ addKind: add, low: LOW_DETAIL, THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
 
   // street lamps and power poles inside the map edge
   if (street) for (const sz of [-1, 1]) for (let x = -(HX - 18); x <= HX - 18; x += 16) {
