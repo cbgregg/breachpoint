@@ -113,6 +113,13 @@ const loadPhoto = (src) => photoCache[src] || (photoCache[src] = new Promise(res
 // the detail rows always show what's in effect: the preset's values, or the player's custom ones
 if (settings.quality !== 'custom') Object.assign(settings, presetGfx(settings.quality));
 else Object.assign(settings, { ...presetGfx('high'), ...Object.fromEntries(Object.entries(settings).filter(([k, v]) => k.startsWith('gfx') && v !== undefined)) });
+// a saved value that isn't one of its dropdown's choices (an older version, a hand-edited save) would show as a
+// blank box and still be used: put it back to the default
+for (const [id, key] of bindings) {
+  const el = $(id);
+  if (el.tagName !== 'SELECT' || settings[key] === undefined) continue;
+  if (![...el.options].some(o => o.value === String(settings[key]))) settings[key] = DEFAULT_SETTINGS[key] ?? el.options[0]?.value;
+}
 function writeGfx() {
   for (const [id, key, type] of bindings) {
     if (!key.startsWith('gfx')) continue;
