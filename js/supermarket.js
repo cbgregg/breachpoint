@@ -20,12 +20,17 @@ export const MART = {
   id: 'mart',
   name: 'Freshway',
   // indoors under fluorescent tubes: a touch less exposure than the street maps, so the floor doesn't glare
-  look: { exposure: 0.8, env: 0.45, hemi: 0.55 },
+  // a heavy haze outside, and no city skyline: the store sits in a ring of trees on the edge of town
+  look: { exposure: 0.8, env: 0.45, hemi: 0.55, fog: 0.013, fogColor: 0xbcc6cc },
+  skyline: false,
+  mountain: false,
   blurb: 'Indoor supermarket: tall aisles, frozen foods, produce, deli, bakery, upstairs offices, doors that open and close; parking lot and loading yard',
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
+  bounds: { hx: 42, hz: 34 },   // wider side lanes: the parking strip (+z) and the service alley (-z)
   spawns2: [
-    [[-38, -20], [-38, -12], [-38, -4], [-38, 4], [-38, 12], [-38, 20], [-40, -8], [-41.4, 8.6]],   // clear of the cart shelter
-    [[36, -20], [37, -12], [36, -3.5], [37, 5], [37, 12], [38, 20], [39, -11.5], [40.5, 9]],   // clear of the box van and the container
+    // tight two-by-four blocks, like a real FPS spawn: A by the street at the far end of the lot, B in the yard
+    [[-40.6, -3.3], [-40.6, -1.1], [-40.6, 1.1], [-40.6, 3.3], [-38.6, -3.3], [-38.6, -1.1], [-38.6, 1.1], [-38.6, 3.3]],
+    [[39.6, -4.6], [39.6, -2.4], [39.6, -0.2], [39.6, 2.0], [37.6, -4.6], [37.6, -2.4], [37.6, -0.2], [37.6, 2.0]],
   ],
   pickups: [
     { type: 'health', pos: [-2.5, 0, 3] },
@@ -50,6 +55,28 @@ function canvasTex(w, h, draw, srgb = true) {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 8;
   return t;
+}
+// clipped privet/boxwood: a dense mat of small leaves in mixed greens with darker gaps
+function hedgeTex() {
+  const r = rng(77);
+  return canvasTex(256, 256, (g, W, Hh) => {
+    g.fillStyle = '#1f3315'; g.fillRect(0, 0, W, Hh);
+    const cols = ['#2f4f1f', '#3b5f26', '#4a7030', '#55803a', '#3f6a2a', '#6a8f45', '#2a4419'];
+    for (let i = 0; i < 2600; i++) {
+      const x = r() * W, y = r() * Hh, a = r() * Math.PI, l = 3 + r() * 5;
+      g.fillStyle = cols[(r() * cols.length) | 0];
+      for (const dx of [-W, 0, W]) for (const dy of [-Hh, 0, Hh]) { g.beginPath(); g.ellipse(x + dx, y + dy, l, l * 0.45, a, 0, Math.PI * 2); g.fill(); }
+    }
+  });
+}
+// frosted glass: a soft milky gradient with faint streaks
+function frostTex() {
+  const r = rng(5);
+  return canvasTex(256, 256, (g, W, Hh) => {
+    const gr = g.createLinearGradient(0, 0, 0, Hh); gr.addColorStop(0, '#eef3f6'); gr.addColorStop(1, '#d4dde2');
+    g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${0.05 + r() * 0.12})`; g.fillRect(r() * W, r() * Hh, 1 + r() * 3, 1 + r() * 3); }
+  });
 }
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 const PACK = ['#c8322b', '#e8b62a', '#2f6db0', '#2f8a4a', '#e8e2d2', '#f07a1e', '#6a3a8a', '#1c1c1c', '#3aa0c8', '#b8a07a', '#d84a7a', '#8ab83a'];
@@ -213,7 +240,7 @@ function accentTex() {
 
 // ---------- the build ----------
 function build(ctx) {
-  const { M, B, put, solid, plane, decal, glows, group, buildCar, physics } = ctx;
+  const { M, B, put, solid, plane, decal, glows, group, buildCar, physics, addKind } = ctx;
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   // materials for this map (added to M so they're disposed with the map)
   Object.assign(M, {
@@ -238,9 +265,12 @@ function build(ctx) {
     roofGlass: new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.08, metalness: 0.6, envMapIntensity: 2 }),
     coldPanel: std({ color: 0xe4ecef, roughness: 0.4, metalness: 0.15 }),
     frost: new THREE.MeshStandardMaterial({ color: 0xd8f0ff, emissive: 0x9ad0ff, emissiveIntensity: 2.2 }),
+    hedge: std({ map: hedgeTex(), roughness: 0.95 }),
+    // shop windows: frosted, lit a little from inside, armoured (bullets stop)
+    frostGlass: new THREE.MeshStandardMaterial({ vertexColors: true, map: frostTex(), color: 0xe4ecf0, transparent: true, opacity: 0.86, roughness: 0.6, metalness: 0.05, emissive: 0x8a9aa4, emissiveIntensity: 0.25 }),
   });
   ctx.S.accent = 1.2;
-  ctx.S.vinyl = 1.2; // metres per floor texture (4 x 4 tiles of 30 cm)
+  ctx.S.vinyl = 1.2; ctx.S.hedge = 1.4; ctx.S.frostGlass = 3.0; // metres per floor texture (4 x 4 tiles of 30 cm)
   // photo tile sets (uploaded) where available, procedural otherwise
   const T_ = ctx.tex, tile = (k, o = {}) => (T_[k] && T_[k].photo ? ctx.pbr(T_[k], { roughness: 1, ...o }) : null);
   M.storeFloor = tile('storefloor', { roughness: 1, color: 0xc4bfb6 }) || M.vinyl;
@@ -256,6 +286,18 @@ function build(ctx) {
   // solid + dressed box (bottom at y)
   const SB = (mat, w, h, d, x, y, z, opts = {}, surf = 'concrete') => { solid(x, z, w, d, h, y, surf); B(mat, w, h, d, x, y, z, 0, opts); };
   const P = (geo, mat, x, y, z, ry = 0, opts = {}) => put(geo, mat, x, y, z, ry, { grime: 0, ...opts });
+  // a clipped hedge from (x0,z0) to (x1,z1): soft-edged box with a leaf texture and a slightly uneven top
+  const hedge = (x0, z0, x1, z1, h = 1.1, t = 0.8, col = false, y0 = 0) => {
+    const L = Math.hypot(x1 - x0, z1 - z0), ry = -Math.atan2(z1 - z0, x1 - x0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const n = Math.max(1, Math.round(L / 3));
+    for (let i = 0; i < n; i++) {
+      const f = (i + 0.5) / n, seg = L / n + 0.05, hh = h * (0.96 + ((i * 37) % 7) * 0.012);
+      const g = new RoundedBoxGeometry(seg, hh, t, 2, Math.min(0.14, t * 0.2));
+      const uv = g.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * seg / 1.4, uv.getY(k) * hh / 1.4);
+      P(g, M.hedge, x0 + (x1 - x0) * f, y0 + hh / 2, z0 + (z1 - z0) * f, ry, { cast: true, tint: [0xffffff, 0xeef4e8, 0xf4f8ee][i % 3] });
+    }
+    if (col) solid(cx, cz, Math.abs(x1 - x0) || t, Math.abs(z1 - z0) || t, h, 0, 'cloth').pass = false;
+  };
   // vertical textured plane facing +z (ry rotates it), uv tiled every `tile` metres
   const face = (mat, w, h, x, y, z, ry, tile = 1) => {
     const g = new THREE.PlaneGeometry(w, h);
@@ -349,9 +391,9 @@ function build(ctx) {
 
   // ---------- ground ----------
   plane(M.dirt, 300, 300, 0, 0, -0.01);
-  plane(M.asphalt, 20.4, 61, -32.2, 0, 0.0);                 // parking lot
-  plane(M.concrete, 20, 61, 32.4, 0, 0.004);                  // delivery yard
-  for (const sz of [-1, 1]) plane(M.concrete, 44.8, 6.6, 0, sz * 27.4, 0.003); // side alleys
+  plane(M.asphalt, 20.4, 69, -32.2, 0, 0.0);                 // parking lot
+  plane(M.concrete, 20, 69, 32.4, 0, 0.004);                  // delivery yard
+  for (const sz of [-1, 1]) plane(M.concrete, 44.8, 10, 0, sz * 29.2, 0.003);  // side lanes
   plane(M.storeFloor, 44, 48, 0, 0, 0.01, 0, 0x9c978e);        // sales floor (toned down: it read as blinding white)
   plane(M.bakeryFloor, 11.2, 18, 16.4, -15, 0.014);            // bakery: terracotta diamonds
   if (M.marble) { plane(M.marble, 3.6, 7.2, -20.2, -19, 0.016); plane(M.marble, 3.6, 7.2, -20.2, 18.6, 0.016); } // entrance halls
@@ -362,8 +404,8 @@ function build(ctx) {
   // coloured accent tiles: two bands down the cross aisle and a square under the promo display
   plane(M.accent, 1.2, 31, -2.6, -6.6, 0.017);
   // front sidewalk + curb
-  plane(M.tile, 3, 61, -23.9, 0, 0.02);
-  B(M.concrete, 0.25, 0.14, 61, -25.5, 0, 0, 0, { grime: 0.2, cast: false });
+  plane(M.tile, 3, 69, -23.9, 0, 0.02);
+  B(M.concrete, 0.25, 0.14, 49, -25.5, 0, 0, 0, { grime: 0.2, cast: false });
   // parking stall lines: two rows, cars nose-in
   for (let z = -27; z <= 27; z += 2.8) for (const x of [-30.2, -34.8]) P(new THREE.PlaneGeometry(4.6, 0.12), M.line, x, 0.02, z, 0, { rx: -Math.PI / 2, cast: false, tint: 0xe8e4d8 });
   for (const x of [-27.4, -37.6]) P(new THREE.PlaneGeometry(0.15, 58), M.line, x, 0.02, 0, 0, { rx: -Math.PI / 2, cast: false, tint: 0xd8c050 });
@@ -379,7 +421,7 @@ function build(ctx) {
       const x = alongX ? x0 + sgn * mid : x0, z = alongX ? z0 : z0 + sgn * mid;
       const w = alongX ? b - a : t, d = alongX ? t : b - a;
       const sb = solid(x, z, w, d, y1 - y0, y0 + base, s);
-      if (s === 'glass' && sb) sb.pass = true;   // shop windows: you can shoot (and see) through them
+      // shop windows are frosted armoured glass: they stop bullets and sight
       B(m, w, y1 - y0, d, x, y0 + base, z, 0, { tint: tn, grime: base ? 0.1 : 0.25, base });
     };
     let cur = 0;
@@ -388,7 +430,7 @@ function build(ctx) {
       piece(a, b, top, h);
       if (bottom > 0) piece(a, b, 0, bottom);
       if (glass) {
-        piece(a, b, bottom, top, M.clearGlass, 'glass', 0xffffff);
+        piece(a, b, bottom, top, M.frostGlass, 'glass', 0xffffff);
         // mullions every ~1.5 m
         const n = Math.max(1, Math.round((b - a) / 1.5));
         for (let i = 0; i <= n; i++) {
@@ -412,14 +454,82 @@ function build(ctx) {
   // back: stockroom roll-up door, bakery back door, staff door to the smoking area
   wallLine(X1 + T / 2, Z0 - T, X1 + T / 2, Z1 + T, H, T, [[5.0, 6.6, 2.3], [21.4, 25.6, 3.6], [32.8, 34.6, 5.4, 3.2], [41.4, 43, 2.3]], M.concrete, shellTint);
   // sides: a fire exit each
-  wallLine(X0, Z1 + T / 2, X1, Z1 + T / 2, H, T, [[18.4, 20, 2.3]], M.concrete, shellTint);
+  wallLine(X0, Z1 + T / 2, X1, Z1 + T / 2, H, T, [[18.4, 20, 2.3], [34.6, 36.2, 5.4, 3.2]], M.concrete, shellTint);   // + the manager's office door to the outside stair
   wallLine(X0, Z0 - T / 2, X1, Z0 - T / 2, H, T, [[24.4, 26, 2.3]], M.concrete, shellTint);
   // brick wainscot outside, metal coping at the top
   for (const [x, z, w, d] of [[X0 - T - 0.03, 0, 0.06, 48.8], [X1 + T + 0.03, 0, 0.06, 48.8], [0, Z1 + T + 0.03, 44.8, 0.06], [0, Z0 - T - 0.03, 44.8, 0.06]]) {
     B(M.metal, w + 0.06, 0.25, d + 0.06, x, H - 0.25, z, 0, { tint: 0x5a5e62, grime: 0 });
   }
-  for (const sz of [-1, 1]) B(M.brick, 44.8, 1.1, 0.06, 0, 0, sz * (Z1 + T + 0.03), 0, { grime: 0.3 });
-  B(M.brick, 0.06, 1.1, 2.6, X1 + T + 0.03, 0, -22.7, 0, { grime: 0.3 });
+  // ---------- the outside of the building ----------
+  // brick base (stopping at every door), brick piers, a stone cap, a dark fascia band with a green stripe
+  // and a raised parapet out front, wall lights, downspouts
+  const OUT = 0.03;
+  const outerRun = (side, a0, a1, gaps, fn) => {   // side: 'F' front (-x), 'K' back (+x), 'R' +z, 'L' -z; a = coordinate along the wall
+    let cur = a0;
+    for (const [g0, g1] of [...gaps].sort((p, q) => p[0] - q[0]).concat([[a1, a1]])) { if (g0 - cur > 0.05) fn(cur, g0); cur = Math.max(cur, g1); }
+  };
+  const along = (side, a0, a1, h, y, mat, opts, depth = 0.06) => {
+    const L = a1 - a0, c = (a0 + a1) / 2;
+    if (side === 'F') B(mat, depth, h, L, X0 - T - depth / 2 + 0.005, y, c, 0, opts);
+    else if (side === 'K') B(mat, depth, h, L, X1 + T + depth / 2 - 0.005, y, c, 0, opts);
+    else B(mat, L, h, depth, c, y, (side === 'R' ? Z1 + T + depth / 2 - 0.005 : Z0 - T - depth / 2 + 0.005), 0, opts);
+  };
+  const doorsOn = {
+    F: [[-21, -17], [16.6, 20.6]],
+    K: [[-20.8, -17], [-2.6, 1.6], [17, 18.6]],
+    R: [[-3.6, -2]],
+    L: [[2.4, 4]],
+  };
+  const upperDoors = { K: [[8.4, 10.2]], R: [[12.6, 14.2]] };
+  const spanOf = { F: [-24.4, 24.4], K: [-24.4, 24.4], R: [-22.4, 22.4], L: [-22.4, 22.4] };
+  for (const side of ['F', 'K', 'R', 'L']) {
+    const [a0, a1] = spanOf[side], wh = side === 'F' ? 0.7 : 1.1;
+    outerRun(side, a0, a1, doorsOn[side], (p, q) => {
+      along(side, p, q, wh, 0, M.brick, { grime: 0.3 }, 0.08);
+      along(side, p, q, 0.08, wh, M.concrete, { tint: 0xd8d2c4, grime: 0.15 }, 0.14);   // stone cap
+    });
+    // fascia band and stripe up top
+    outerRun(side, a0, a1, upperDoors[side] || [], (p, q) => {
+      along(side, p, q, 0.9, H - 0.95, M.paint, { tint: 0x30363c, grime: 0.05 }, 0.1);
+      along(side, p, q, 0.12, H - 1.1, M.paint, { tint: 0x2f8a4a, grime: 0 }, 0.12);
+    });
+    // brick piers every ~6 m (skipping openings)
+    for (let a = a0 + 0.3; a <= a1 - 0.2; a += (a1 - a0 - 0.6) / 8) {
+      if (doorsOn[side].concat(upperDoors[side] || []).some(([g0, g1]) => a > g0 - 0.5 && a < g1 + 0.5)) continue;
+      if (side === 'F' && Math.abs(a) < 15.3 && Math.abs(a) > 0) continue;   // not across the shop windows
+      along(side, a - 0.3, a + 0.3, H - 1.1, 0, M.brick, { grime: 0.25 }, 0.2);
+    }
+  }
+  // front parapet: raised 1 m over the entrances with the store name on it
+  for (const z of [-19, 18.6]) {
+    B(M.paint, 0.3, 1.1, 6.2, X0 - T - 0.15, H - 0.1, z, 0, { tint: 0x30363c, grime: 0.05 });
+    B(M.metal, 0.4, 0.1, 6.3, X0 - T - 0.15, H + 1.0, z, 0, { tint: 0x5a5e62, grime: 0 });
+    // steel canopy over the doors, hung on tie rods
+    const cw = 6.0, cd = 2.2, cy = 4.0;
+    solid(X0 - T - cd / 2, z, cd, cw, 0.18, cy, 'metal');
+    B(M.paint, cd, 0.18, cw, X0 - T - cd / 2, cy, z, 0, { tint: 0x30363c, grime: 0.1 });
+    B(M.paint, 0.05, 0.08, cw, X0 - T - cd + 0.03, cy + 0.18, z, 0, { tint: 0x2f8a4a, grime: 0 });
+    for (const dz of [-2.4, 0, 2.4]) {
+      P(new THREE.BoxGeometry(0.3, 0.02, 0.3), M.lamp, X0 - T - cd / 2, cy - 0.01, z + dz);
+      glows.push([X0 - T - cd / 2, cy - 0.05, z + dz, 0.5]);
+    }
+    for (const dz of [-2.6, 2.6]) {
+      const g = new THREE.CylinderGeometry(0.02, 0.02, Math.hypot(cd, 1.9), 5); g.rotateZ(Math.atan2(cd, 1.9));
+      P(g, M.steelK, X0 - T - cd / 2, cy + 1.0, z + dz);
+    }
+  }
+  // wall packs on the sides and back, downspouts at the corners
+  for (const a of [-16, -6, 6, 16]) for (const side of ['R', 'L']) {
+    const z = side === 'R' ? Z1 + T + 0.15 : Z0 - T - 0.15;
+    P(new THREE.BoxGeometry(0.4, 0.3, 0.25), M.dark, a, 4.1, z);
+    P(new THREE.BoxGeometry(0.32, 0.03, 0.18), M.lamp, a, 3.94, z);
+    glows.push([a, 3.9, z, 0.6]);
+  }
+  for (const z of [-12, 8, 22]) { P(new THREE.BoxGeometry(0.25, 0.3, 0.4), M.dark, X1 + T + 0.15, 4.4, z); glows.push([X1 + T + 0.2, 4.25, z, 0.6]); }
+  for (const [x, z] of [[X0 - T - 0.1, Z0 - T - 0.1], [X0 - T - 0.1, Z1 + T + 0.1], [X1 + T + 0.1, Z0 - T - 0.1], [X1 + T + 0.1, Z1 + T + 0.1]]) {
+    P(new THREE.BoxGeometry(0.12, H, 0.12), M.paint, x, H / 2, z, 0, { tint: 0x5a5e62 });
+    P(new THREE.BoxGeometry(0.3, 0.1, 0.12), M.paint, x + Math.sign(-x) * 0.12, 0.05, z, 0, { tint: 0x5a5e62 });
+  }
   // roof: its own meshes (cast shadows, hidden on the minimap)
   const roofGeo = [], ceilGeo = [];
   const rb = new THREE.BoxGeometry(44.8, 0.35, 48.8); rb.translate(0, H + 0.175, 0); roofGeo.push(rb);
@@ -655,19 +765,19 @@ function build(ctx) {
     P(new THREE.BoxGeometry(0.06, 0.4, 0.3), M.dark, x - 0.77, 2.25, z + 0.4);
     B(M.steelK, 1.8, 0.5, 1.8, x, 2.95, z, 0, { grime: 0.2 });
   };
-  rackOven(20.8, -22.6); rackOven(20.8, -20.8);
+  rackOven(16.2, -22.6); rackOven(16.2, -20.8);
   // deck oven: three glowing decks
-  SB(M.steelK, 1.3, 2.0, 3.0, 21.1, 0, -14.6, { grime: 0 }, 'metal');
-  for (const y of [0.6, 1.1, 1.6]) P(new THREE.BoxGeometry(0.02, 0.18, 2.4), M.ovenGlow, 20.44, y, -14.6);
-  B(M.steelK, 1.5, 0.6, 3.2, 21.1, 2.0, -14.6, 0, { grime: 0.2 });
-  rackOven(20.8, -10.4);
-  signMesh(signTex('CAUTION · HOT OVENS', { bg: '#e8c020', fg: '#1a1a1a', font: 'bold 50px Arial' }), 1.4, 0.35, 22.0 - 0.03, 3.1, -14.6, -Math.PI / 2, 0.3, { noMinimap: true });
+  SB(M.steelK, 1.3, 2.0, 3.0, 16.2, 0, -16.6, { grime: 0 }, 'metal');
+  for (const y of [0.6, 1.1, 1.6]) P(new THREE.BoxGeometry(0.02, 0.18, 2.4), M.ovenGlow, 15.54, y, -16.6);
+  B(M.steelK, 1.5, 0.6, 3.2, 16.2, 2.0, -16.6, 0, { grime: 0.2 });
+  rackOven(16.2, -13.4);
+  signMesh(signTex('CAUTION · HOT OVENS', { bg: '#e8c020', fg: '#1a1a1a', font: 'bold 50px Arial' }), 1.4, 0.35, 16.86, 3.1, -16.6, -Math.PI / 2, 0.3, { noMinimap: true });
   // work tables with dough and loaves, a mixer, bread carts, flour
   const worktable = (x, z, w, d) => {
     SB(M.steelK, w, 0.9, d, x, 0, z, { grime: 0 }, 'metal');
     for (let i = 0; i < 6; i++) P(new RoundedBoxGeometry(0.26, 0.1, 0.16, 2, 0.05), M.bread, x + (i % 3 - 1) * 0.5, 0.95, z + ((i / 3) | 0) * 0.35 - 0.17, i * 0.4, { tint: i % 2 ? 0xf0dcc0 : 0xffffff });
   };
-  worktable(15, -20.5, 3, 1.2); worktable(15, -14.5, 3, 1.2);
+  worktable(13.2, -20.5, 2.4, 1.2); worktable(13.2, -14.5, 2.4, 1.2);
   SB(M.steelK, 0.9, 1.3, 0.9, 13, 0, -9, { grime: 0 }, 'metal');
   P(new THREE.CylinderGeometry(0.35, 0.3, 0.45, 16), M.steelK, 13, 1.5, -9);
   const breadCart = (x, z) => {
@@ -675,9 +785,9 @@ function build(ctx) {
     for (const dx of [-0.33, 0.33]) for (const dz of [-0.43, 0.43]) P(new THREE.CylinderGeometry(0.015, 0.015, 1.8, 5), M.steelK, x + dx, 0.9, z + dz);
     for (let y = 0.25; y < 1.8; y += 0.3) { B(M.steelK, 0.66, 0.02, 0.86, x, y, z, 0, { grime: 0 }); for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.22, 0.1, 0.14, 2, 0.045), M.bread, x, y + 0.07, z - 0.28 + i * 0.28, 0.1, { tint: 0xffe8c8 }); }
   };
-  breadCart(17.6, -9); breadCart(12.4, -17.3); breadCart(18.6, -9);
-  for (let i = 0; i < 6; i++) ctx.bag(18.3 + (i % 3) * 0.62, 0.12 + ((i / 3) | 0) * 0.2, -23.1, 0, 0xe8e0d0);
-  solid(18.9, -23.1, 2, 0.5, 0.5, 0, 'dirt');
+  breadCart(15.6, -7.2); breadCart(12.4, -17.3);
+  for (let i = 0; i < 6; i++) ctx.bag(12.4 + (i % 3) * 0.62, 0.12 + ((i / 3) | 0) * 0.2, -23.3, 0, 0xe8e0d0);
+  solid(13.0, -23.3, 2, 0.5, 0.5, 0, 'dirt');
   // tiled walls behind the ovens (herringbone) and behind the deli (white grid), up to 2.4 m
   const wallTiles = (mat, x, z0, z1, gaps = []) => {
     if (!mat) return;
@@ -687,7 +797,7 @@ function build(ctx) {
       cur = b;
     }
   };
-  wallTiles(M.subway, 21.98, -24, -6, [[-19.4, -17.8]]);
+  wallTiles(M.subway, 16.86, -24, -6, [[-11.4, -9.8]]);
   wallTiles(M.whitetile, 14.86, -6, 6, [[-1, 1]]);
   // the bakery back door has a scuffed kick plate; dumpsters wait outside
 
@@ -720,14 +830,59 @@ function build(ctx) {
       for (let x = x0 + 0.35; x < x1 - 0.2; x += 0.62) { const hh = 0.5 + ((x * 7) % 0.4); B(M.cardboard, 0.55, hh, 0.8, x, y + 0.22, z, 0, { grime: 0.1 }); }
     }
   };
-  rack(16, 21.5, -5.2); rack(16, 21.5, 5.2);
+  // racking either side of the doors to the bakery side and the office corridor (never across them)
+  rack(15.6, 17.6, -5.2); rack(20.4, 21.8, -5.2); rack(15.6, 18.4, 5.2);
   // pallets of stock in the middle break the line from the dock door into the store
+  // a wooden pallet: three stringers under seven top boards and three bottom boards
+  const pallet = (x, y, z, ry = 0, tint = 0xb89a6a) => {
+    const c = Math.cos(ry), sn = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
+    for (const lz of [-0.44, 0, 0.44]) { const [px, pz] = at(0, lz); B(M.wood, 1.2, 0.09, 0.1, px, y + 0.02, pz, ry, { tint: 0x9a7c52, grime: 0.3 }); }
+    for (const lx of [-0.55, 0, 0.55]) { const [px, pz] = at(lx, 0); B(M.wood, 0.1, 0.02, 1.0, px, y, pz, ry, { tint: 0x8a6e48, grime: 0.35 }); }
+    for (let i = 0; i < 7; i++) { const [px, pz] = at(-0.54 + i * 0.18, 0); B(M.wood, 0.13, 0.025, 1.0, px, y + 0.11, pz, ry, { tint, grime: 0.25 }); }
+  };
+  // a shipped pallet: cases stacked in layers (with gaps and a ragged top), stretch wrap, corner boards,
+  // a shipping label; some tied with a strap. Collision is the whole block.
+  let palN = 0;
   const palletStack = (x, z, h, sh = 'wood') => {
-    SB(M.wood, 1.2, 0.15, 1.0, x, 0, z, { tint: 0xb89a6a }, sh);
-    SB(M.cardboard, 1.15, h, 0.95, x, 0.15, z, { grime: 0.05 }, 'wood');
+    const k = palN++, rnd2 = (i) => ((Math.sin((k * 13 + i) * 91.7) * 43758.5) % 1 + 1) % 1;
+    solid(x, z, 1.2, 1.0, 0.15, 0, sh);
+    solid(x, z, 1.15, 0.95, h, 0.15, 'wood');
+    pallet(x, 0, z);
+    const kind = k % 4, caseMat = kind === 1 ? M.goodsBox : kind === 2 ? M.goodsBox2 : M.cardboard;
+    const layer = kind === 3 ? 0.42 : 0.3, nl = Math.max(1, Math.round(h / layer)), lh = h / nl;
+    for (let l = 0; l < nl; l++) {
+      const y = 0.15 + l * lh, top = l === nl - 1;
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+        if (top && rnd2(l * 6 + i * 2 + j) < 0.22) continue;                 // a few cases already taken off the top
+        const bx = x - 0.385 + i * 0.385 + (rnd2(i + l) - 0.5) * 0.03, bz = z - 0.237 + j * 0.474;
+        B(caseMat, 0.37, lh - 0.012, 0.46, bx, y, bz, (rnd2(l + i * 3 + j) - 0.5) * 0.04, { tint: caseMat === M.cardboard ? [0xffffff, 0xe8dcc8, 0xd8c8b0][(i + j + l) % 3] : 0xffffff, grime: 0.08 });
+      }
+    }
+    // stretch wrap over everything but the top layer, corner boards, label
+    const wh = h - lh * 0.6;
+    if (kind !== 1) for (const [w, d, dx, dz] of [[1.17, 0.005, 0, 0.48], [1.17, 0.005, 0, -0.48], [0.005, 0.96, 0.585, 0], [0.005, 0.96, -0.585, 0]]) B(M.clearGlass, w, wh, d, x + dx, 0.15, z + dz, 0, { cast: false, tint: 0xe8f0f4 });
+    for (const [dx, dz] of [[0.58, 0.475], [-0.58, 0.475], [0.58, -0.475], [-0.58, -0.475]]) B(M.cardboard, 0.05, wh, 0.05, x + dx, 0.15, z + dz, 0, { tint: 0xc8b08a, grime: 0.1 });
+    if (kind === 2 || kind === 0) for (const dx of [-0.3, 0.3]) B(M.dark, 0.035, 0.012, 0.99, x + dx, 0.15 + h, z, 0, { tint: 0x2a5aa8, grime: 0 });
+    B(M.paint, 0.2, 0.14, 0.008, x + 0.25, 0.15 + Math.min(h - 0.2, 0.9), z + 0.487, 0, { tint: 0xf4f4f0, grime: 0 });
   };
   palletStack(18.6, -0.6, 1.6); palletStack(18.6, 0.8, 1.1); palletStack(20.5, 2.8, 1.4);
   signMesh(signTex(['EMPLOYEES', 'ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 54px Arial', w: 256, h: 160 }), 0.8, 0.5, 14.84, 2.9, -2.2, -Math.PI / 2, 0.3, { noMinimap: true });
+
+  // ---------- back storage + receiving (x 17..22, z -24..-6), behind the bakery ----------
+  plane(M.concrete, 4.9, 18, 19.55, -15, 0.018, 0, 0xb8b4ac);
+  // the back door off the yard, racking on the end wall, a mid rack you go round, pallets in from the dock
+  wallLine(17, -24, 17, -6, H, 0.25, [[12.6, 14.2, 2.3]], M.plaster, 0xe0dcd2);
+  rack(17.7, 21.7, -23.4);                 // along the end wall
+  rack(19.0, 21.9, -14.0);                 // the mid rack: go round it on the bakery side
+  palletStack(19.0, -20.6, 1.4); palletStack(19.2, -9.0, 1.1); palletStack(20.6, -8.6, 1.6);
+  for (const [x, z] of [[21.4, -11.0], [21.3, -11.7], [20.7, -11.3]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
+  // a pallet jack parked by the door
+  SB(M.paint, 0.55, 0.35, 0.5, 20.3, 0, -17.1, { tint: 0xc8322b, grime: 0.3 }, 'metal');
+  for (const dz of [-0.17, 0.17]) B(M.steelK, 1.1, 0.08, 0.16, 19.4, 0, -17.1 + dz, 0, { grime: 0.3 });
+  P(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 6), M.dark, 20.6, 0.8, -17.1, 0, { rz: -0.35 });
+  B(M.paint, 0.12, 0.012, 13.5, 17.55, 0.005, -15.5, 0, { tint: 0xe8c020, grime: 0.2 });   // floor line along the walkway
+  signMesh(signTex(['RECEIVING', 'STORAGE'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 160 }), 0.8, 0.5, 16.86, 2.6, -10.6, -Math.PI / 2, 0.3, { noMinimap: true });
+  { const L = new THREE.PointLight(0xf2f6ff, 10, 12, 1.3); L.position.set(19.5, H - 1.5, -15); L.userData.mapLight = true; group.add(L); }
 
   // ---------- employees only: kitchen + cold storage (x 12..22, z 8..24) under a slab at 3 m ----------
   const OH = 3.0, UP = 3.2, UH = H - UP;
@@ -807,7 +962,7 @@ function build(ctx) {
   // manager's office (x 12..17, z 18..24): desk, filing cabinets, whiteboard
   desk(14.6, 21.4);
   for (let i = 0; i < 3; i++) SU(M.paint, 0.5, 1.3, 0.6, 16.5, UP, 23.4 - i * 0.55, 0x8a8e92, 'metal');
-  U(new THREE.PlaneGeometry(1.8, 1.0), M.paint, 14.5, UP + 1.6, 23.88, Math.PI, 0xf4f4f0);
+  U(new THREE.PlaneGeometry(1.2, 0.9), M.paint, 16.2, UP + 1.6, 18.09, 0, 0xf4f4f0);
   // break room (x 17..22, z 8..16): table and chairs, vending machine, fridge, counter with a microwave
   SU(M.wood, 1.8, 0.75, 1.0, 19.4, UP, 12.4, 0xd8c8a8);
   for (const [dx, dz] of [[-0.6, -0.8], [0.6, -0.8], [-0.6, 0.8], [0.6, 0.8]]) SU(M.fabric, 0.45, 0.45, 0.45, 19.4 + dx, UP, 12.4 + dz, 0x8a3a3a, 'cloth');
@@ -837,6 +992,17 @@ function build(ctx) {
     U(new THREE.CylinderGeometry(0.05, 0.05, UP, 8), M.paint, x, UP / 2, z, 0, 0x5a5e62);
     U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
   }
+
+  // the side stair: a galvanised flight up the +z wall to a landing at the manager's office door
+  flight(8.2, 25.05, 'x', 10, 0.32, 0.42, 1.3, true);
+  solid(13.4, 25.3, 2.0, 1.8, 0.1, UP - 0.1, 'metal');
+  UB(M.steelK, 2.0, 0.08, 1.8, 13.4, UP - 0.08, 25.3, 0x6a6e72);
+  for (const [x, z, w, d] of [[13.4, 26.18, 2.0, 0.05], [14.38, 25.3, 0.05, 1.8]]) { solid(x, z, w, d, 1.0, UP, 'metal'); UB(M.steelK, w, 0.05, d, x, UP + 0.95, z, 0x9aa0a6); UB(M.steelK, w, 0.04, d, x, UP + 0.5, z, 0x9aa0a6); }
+  for (const [x, z] of [[12.45, 26.15], [14.35, 26.15], [14.35, 24.5], [10.3, 25.7]]) {
+    U(new THREE.CylinderGeometry(0.05, 0.05, x < 12 ? UP * 0.5 : UP, 8), M.paint, x, (x < 12 ? UP * 0.5 : UP) / 2, z, 0, 0x5a5e62);
+    if (x > 12) U(new THREE.CylinderGeometry(0.022, 0.022, 0.95, 6), M.steelK, x, UP + 0.47, z, 0, 0x9aa0a6);
+  }
+  signMesh(signTex(['OFFICE', 'NO ENTRY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 50px Arial', w: 256, h: 160 }), 0.7, 0.44, 15.0, UP + 1.6, Z1 + T + 0.04, 0, 0.3);
 
   // ---------- outside: parking lot ----------
   const parked = [[-30.2, -22.8], [-30.2, -17.2], [-30.2, -8.8], [-30.2, 2.4], [-30.2, 10.8], [-30.2, 19.2], [-34.8, -20], [-34.8, -6], [-34.8, 5.2], [-34.8, 16.4], [-34.8, 24.8], [-30.2, 25]];
@@ -870,12 +1036,12 @@ function build(ctx) {
   for (const z of [-21, -13, -9, 9, 13, 21]) { P(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10), M.paint, -24.8, 0.45, z, 0, { tint: 0xe8c020 }); solid(-24.8, z, 0.25, 0.25, 0.9, 0, 'metal'); }
   // store sign
   const logo = signTex('FRESHWAY', { bg: null, fg: '#e8402a', font: 'bold 92px Arial', w: 1024, h: 160 });
-  signMesh(logo, 12, 1.9, X0 - T - 0.08, 4.65, 0, -Math.PI / 2, 2.2, { transparent: true });
+  signMesh(logo, 12, 1.9, X0 - T - 0.14, 4.3, 0, -Math.PI / 2, 2.2, { transparent: true });
   for (const z of [-19, 19]) signMesh(signTex('ENTRANCE', { bg: '#2f5a3a', font: 'bold 64px Arial', w: 512, h: 128 }), 1.6, 0.4, X0 - T - 0.06, 3.5, z, -Math.PI / 2, 0.8);
   // street beyond the lot, low wall + hedge at the map edge
   plane(M.asphalt, 30, 80, -57, 0, -0.005);
-  SB(M.concrete, 0.4, 0.8, 61, -42.2, 0, 0, { tint: 0xc8c0b0 });
-  for (let z = -29; z <= 29; z += 1.6) P(new THREE.SphereGeometry(0.75, 8, 6), M.leaf, -42.6, 1.0, z, z, { sy: 0.8, cast: true, tint: 0xb8c8a0 });
+  SB(M.concrete, 0.4, 0.8, 69, -42.2, 0, 0, { tint: 0xc8c0b0 });
+  hedge(-42.7, -33.6, -42.7, 33.6, 1.5, 0.9);
 
   // ---------- outside: delivery yard and smoking area ----------
   // ---------- loading bay & receiving ----------
@@ -986,32 +1152,47 @@ function build(ctx) {
     P(g, M.fence, (x0 + x1) / 2, 1.2, (z0 + z1) / 2, ry, { cast: false, tint: 0xffffff });
     for (let t = 0; t <= L + 0.01; t += 3) P(new THREE.CylinderGeometry(0.035, 0.035, 2.5, 6), M.steelK, x0 + (x1 - x0) * t / L, 1.25, z0 + (z1 - z0) * t / L);
   };
-  fence(41.6, -30, 41.6, 30);
-  fence(-24, 30, 41.6, 30); fence(-24, -30, 41.6, -30);
+  fence(41.6, -34, 41.6, 34);
+  fence(-24, 34, 41.6, 34); fence(-24, -34, 41.6, -34);
   // ...and round the front lot too, so the edge of the map is always something you can see
-  fence(-42.2, -30, -42.2, 30); fence(-42.2, 30, -24, 30); fence(-42.2, -30, -24, -30);
-  for (let z = -28; z <= 28; z += 3.3) P(new THREE.SphereGeometry(1.6, 8, 6), M.leaf, 45 + Math.sin(z) * 1.2, 2.4, z, z, { sy: 1.3, cast: true, tint: 0x9ab080 });
-  // ---------- right lane (+z): the parking strip, cars along the fence between hedge planters ----------
-  plane(M.asphalt, 46, 6.2, -1, 27.3, 0.006);
-  P(new THREE.PlaneGeometry(44, 0.14), M.line, -1, 0.02, 27.15, 0, { rx: -Math.PI / 2, cast: false, tint: 0xd8c050 });
-  for (const x of [-20, -9.6, -6.4, 4, 7.2, 18.4]) P(new THREE.PlaneGeometry(0.12, 2.6), M.line, x, 0.02, 28.6, 0, { rx: -Math.PI / 2, cast: false, tint: 0xe8e4d8 });
-  for (const [x, ry] of [[-14.8, 0], [-1.2, Math.PI], [12.8, 0]]) { buildCar(x, 28.6, ry, 0); carSolid(x, 28.6); }
-  const planter = (x, z, w, d) => {
-    SB(M.concrete, w, 0.6, d, x, 0, z, { tint: 0xc8c0b0, grime: 0.3 });
-    plane(M.dirt, w - 0.2, d - 0.2, x, z, 0.61);
-    for (let t = -w / 2 + 0.5; t <= w / 2 - 0.4; t += 0.75) P(new THREE.SphereGeometry(0.5, 8, 6), M.leaf, x + t, 0.95, z, t * 3, { sy: 0.8, cast: true, tint: 0xa8c090 });
-    solid(x, z, w - 0.1, d - 0.1, 1.35, 0, 'dirt');
-  };
-  planter(-8, 28.9, 2.6, 1.1); planter(5.6, 28.9, 2.6, 1.1); planter(19.8, 28.9, 2.6, 1.1);
-  planter(-15, 25.1, 3.6, 0.9); planter(9, 25.1, 3.6, 0.9);
-  // a delivery van at the back end of the strip
-  SB(M.paint, 5.0, 2.2, 2.0, 32.5, 0.35, 28.2, { tint: 0xe8e8e4, grime: 0.15 }, 'metal');
-  solid(32.5, 28.2, 5.0, 2.0, 0.35, 0, 'metal');
-  P(new THREE.BoxGeometry(0.04, 0.7, 1.8), M.glass, 35.02, 1.9, 28.2, 0, { tint: 0xffffff });
-  for (const s of [-1, 1]) {
-    face(M.paint, 3.2, 0.45, 31.8, 1.4, 28.2 + s * 1.005, s > 0 ? 0 : Math.PI, 3.2);
-    for (const dx of [-1.6, 1.7]) P(new THREE.CylinderGeometry(0.36, 0.36, 0.24, 14), M.rubber, 32.5 + dx, 0.36, 28.2 + s * 0.9, 0, { rx: Math.PI / 2 });
+  fence(-42.2, -34, -42.2, 34); fence(-42.2, 34, -24, 34); fence(-42.2, -34, -24, -34);
+  hedge(43.2, -34, 43.2, 34, 2.4, 1.2);
+  for (let z = -30; z <= 30; z += 7.5) addKind(46 + Math.sin(z) * 1.2, z, 0, 0, 9, 0, 'tree');
+  // the horizon: two staggered rows of trees all the way round, fading into the haze
+  {
+    let k = 0; const j = () => (Math.sin(k++ * 12.9898) * 43758.5453 % 1 + 1) % 1;
+    for (const r of [0, 1]) {
+      const ox = 50 + r * 7, oz = 41 + r * 7;
+      for (let z = -oz; z <= oz; z += 5.5) for (const sx of [-1, 1]) addKind(sx * (ox + j() * 2.5), z + j() * 2, 0, 0, 10 + j() * 5, 0, 'tree');
+      for (let x = -ox + 4; x <= ox - 4; x += 5.5) for (const sz of [-1, 1]) addKind(x + j() * 2, sz * (oz + j() * 2.5), 0, 0, 10 + j() * 5, 0, 'tree');
+    }
   }
+  // ---------- right lane (+z): the parking strip ----------
+  // along the store wall a run of raised garden beds (hedges and lush planting, crouch-high cover), a sidewalk
+  // with lamps and a bench, cars parallel-parked at the kerb, then the drive lane with a delivery van
+  const bed = (x0, x1, z, d = 2.0) => {
+    const w = x1 - x0, x = (x0 + x1) / 2;
+    SB(M.concrete, w, 0.55, d, x, 0, z, { tint: 0xc8c0b0, grime: 0.3 });
+    plane(M.dirt, w - 0.2, d - 0.2, x, z, 0.56);
+    solid(x, z, w - 0.1, d - 0.1, 1.2, 0, 'dirt');
+    hedge(x0 + 0.35, z - d / 2 + 0.5, x1 - 0.35, z - d / 2 + 0.5, 0.75, 0.6, false, 0.55);   // low box hedge along the back, ferns and grasses in front
+    hedge(x0 + 0.5, z + 0.35, x1 - 0.5, z + 0.35, 0.4, 0.5, false, 0.55);   // a lower, lighter row in front
+    for (let t = -w / 2 + 0.7; t <= w / 2 - 0.6; t += 0.9) for (let k = 0; k < 3; k++) P(new THREE.BoxGeometry(0.06, 0.06, 0.06), M.paint, x + t + k * 0.13, 1.0 + (k % 2) * 0.03, z + 0.2 + k * 0.1, k, { tint: [0xe8d040, 0xf0f0e8, 0xd8508a][(k + Math.round(t * 3)) % 3] });   // flowers
+  };
+  for (const [x0, x1] of [[-21.5, -15], [-13.5, -6.5], [-0.5, 6.5], [16, 21.5]]) bed(x0, x1, 25.6);
+  plane(M.tile, 46, 1.8, -1, 27.5, 0.018);                                         // sidewalk
+  B(M.concrete, 46, 0.14, 0.25, -1, 0, 28.45, 0, { grime: 0.2, cast: false });     // kerb
+  plane(M.asphalt, 66.6, 5.6, 8.3, 31.2, 0.008);                                   // the street
+  for (let x = -22; x < 40; x += 3) P(new THREE.PlaneGeometry(1.6, 0.12), M.line, x, 0.022, 31.4, 0, { rx: -Math.PI / 2, cast: false, tint: 0xe8e4d8 });
+  for (const [x, ry] of [[-19.5, 0], [-9.5, Math.PI], [0.5, 0], [17.5, Math.PI]]) { buildCar(x, 29.6, ry, 0); carSolid(x, 29.6); }
+  addKind(10, 29.7, 6.2, 2.3, 2.9, 0, 'truck', { back: 1 });                       // a box van at the kerb
+  addKind(-4, 32.7, 7, 2.4, 3.3, 0, 'truck', {});                                   // delivery truck in the drive lane
+  addKind(26, 31.8, 6.5, 2.4, 3.1, 0, 'truck', { food: 2 });                        // a food truck at the yard end
+  addKind(-12.5, 27.5, 0, 0, 0, 0, 'vlamp'); addKind(5.5, 27.5, 0, 0, 0, 0, 'vlamp');
+  addKind(-1.5, 27.6, 1.8, 0.6, 0.95, 0, 'bench');
+  addKind(14.8, 27.4, 2.4, 1.4, 2.6, 0, 'kiosk');                                   // newsstand
+  for (const [x, z, h] of [[-23.4, 25.4, 1.0], [-23.2, 26.6, 0.6], [7.25, 27.2, 0.8]]) SB(M.paint, 0.9, h, 0.9, x, 0, z, { tint: 0x2a62b8, grime: 0.2 }, 'metal');   // blue bulk crates
+  for (const x of [-30, -6, 20, 36]) addKind(x, 36.5, 0, 0, 9, 0, 'tree');           // street trees past the fence
 
   // ---------- left lane (-z): service alley with the transformers and HVAC ----------
   const transformer = (x, z) => {
@@ -1041,33 +1222,19 @@ function build(ctx) {
     U(ctx.worldBox(2.6, 1.4, 1.8, 1), M.paint, x, H + 0.35 + 0.7, z, 0, 0x9aa0a6);
     U(new THREE.CylinderGeometry(0.55, 0.55, 0.1, 18), M.dark, x + 0.5, H + 1.8, z);
   }
-  // graffiti on the outside walls and the compactor (made-up tags)
-  const graf = (word, seed, w, x, y, z, ry) => { const m = signMesh(graffitiTex(word, seed), w, w * 0.375, x, y, z, ry, 0.06, { transparent: true }); m.material.depthWrite = false; m.material.polygonOffset = true; m.material.polygonOffsetFactor = -2; };
-  graf('KRWZ', 11, 5, -15, 2.4, Z0 - T - 0.05, Math.PI);
-  graf('SNAX', 23, 4, 16, 2.0, Z0 - T - 0.05, Math.PI);
-  graf('DUSK', 31, 4.4, 2.6, 2.6, Z1 + T + 0.05, 0);
-  graf('FRSH', 47, 3.6, X1 + T + 0.05, 2.2, -21.6, Math.PI / 2);
-  graf('BP43', 59, 2.6, 33.5, 1.3, -20.88, 0);
   // hedges beyond the side fences
-  for (let x = -22; x <= 40; x += 2.2) for (const s of [-1, 1]) P(new THREE.SphereGeometry(1.0, 8, 6), M.leaf, x, 0.9, s * 31.3, x, { sy: 0.9, cast: true, tint: 0x9ab080 });
+  for (const s of [-1, 1]) hedge(-40, s * 35.3, 41, s * 35.3, 2.2, 1.2);
   // map edge: right behind the fences
-  solid(-42.8, 0, 1, 64, 10, 0, 'concrete');
-  solid(42.3, 0, 1, 64, 10, 0, 'concrete');
-  solid(0, 30.6, 86, 1, 10, 0, 'concrete');
-  solid(0, -30.6, 86, 1, 10, 0, 'concrete');
-  // distant town for the horizon
-  const r = rng(91);
-  for (let i = 0; i < 40; i++) {
-    const a = (i / 40) * Math.PI * 2, d = 75 + r() * 60, h = 6 + r() * 16, w = 10 + r() * 14;
-    B(M.plaster, w, h, w, Math.cos(a) * d, 0, Math.sin(a) * d * 0.85, r() * 3, { tint: ctx.plasterTints[i % ctx.plasterTints.length], grime: 0.3, cast: false });
-  }
+  solid(-42.8, 0, 1, 72, 10, 0, 'concrete');
+  solid(42.3, 0, 1, 72, 10, 0, 'concrete');
+  solid(0, 34.6, 86, 1, 10, 0, 'concrete');
+  solid(0, -34.6, 86, 1, 10, 0, 'concrete');
 
   // ---------- flow: break up the long lines outside (alleys, lot lanes, yard) and inside (front corridor) ----------
   const wallSeg = (x, z, w, d, h = 2.6, tint = 0xffffff) => { SB(M.brick, w, h, d, x, 0, z, { tint, grime: 0.45 }, 'brick'); B(M.concrete, w + 0.12, 0.12, d + 0.12, x, h, z, 0, { tint: 0xc8c0b0, grime: 0.1 }); };
   // side alleys: staggered brick screen walls make a chicane instead of an 80 m corridor
-  wallSeg(-6, 26.4, 0.4, 3.6); wallSeg(16, 28.8, 0.4, 3.6, 2.6, 0xe0c0a8);
-  wallSeg(-2, -26.4, 0.4, 3.6, 2.6, 0xe0c0a8); wallSeg(14, -28.8, 0.4, 3.6);
-  wallSeg(30, 26.0, 0.4, 2.8); wallSeg(28, -27.6, 0.4, 3.0);
+    wallSeg(-2, -26.4, 0.4, 3.6, 2.6, 0xe0c0a8); wallSeg(14, -28.8, 0.4, 3.6);
+  wallSeg(28, -27.6, 0.4, 3.0);
   // lot lanes: cart corral shelters, a box van and an ice / propane merchandiser in the driving lanes
   const shelter = (x, z) => {
     SB(M.paint, 2.4, 1.2, 0.08, x, 0, z - 1.6, { tint: 0x2f5a3a, grime: 0.2 }, 'metal');
@@ -1099,6 +1266,66 @@ function build(ctx) {
   SB(M.paint, 2.5, 2.6, 6.1, 38.6, 0, 8.5, { tint: 0x8a3d2c, grime: 0.35 }, 'metal');
   for (let i = 0; i < 12; i++) B(M.paint, 0.04, 2.4, 0.08, 37.32, 0.1, 5.8 + i * 0.5, 0, { tint: 0x6a2d1c, grime: 0.2 });
   wallSeg(30.5, -2.8, 3.2, 0.4, 2.4, 0xd8d0c4);
+  // ---------- the concept-art pass: a busier lot, a working service alley, a cluttered loading yard ----------
+  // front: merchandise out on the sidewalk under the windows, cart corrals by both entrances, delivery pallets
+  // among the cars, an extra row of cars and pallets on the widened lot ends
+  SB(M.steelK, 1.0, 1.7, 2.2, -23.0, 0, -12.4, { tint: 0x9aa4ac, grime: 0.1 }, 'metal');            // propane exchange cage
+  for (const dz of [-0.6, 0, 0.6]) P(new THREE.CylinderGeometry(0.16, 0.16, 0.6, 10), M.paint, -23.0, 0.35, -12.4 + dz, 0, { tint: 0xe8e8e4 });
+  signMesh(signTex(['PROPANE', 'EXCHANGE'], { bg: '#1f4e8a', font: 'bold 44px Arial', w: 256, h: 128 }), 0.9, 0.45, -23.52, 1.95, -12.4, -Math.PI / 2, 0.5);
+  for (const z of [-3.2, 3.6]) { SB(M.cardboard, 1.1, 0.15, 1.1, -23.7, 0, z, { tint: 0xb89a6a }, 'wood'); SB(M.goodsBottle, 1.05, 1.25, 1.05, -23.7, 0.15, z, { grime: 0 }, 'wood'); }   // water pallets
+  SB(M.paint, 1.1, 1.0, 1.6, -23.7, 0, 12.4, { tint: 0x5a3e28, grime: 0.2 }, 'wood');                // bagged mulch
+  const corral = (x, z) => {
+    solid(x, z, 2.6, 1.2, 1.0, 0, 'metal').pass = true;
+    for (const s2 of [-1, 1]) B(M.steelK, 2.6, 0.05, 0.05, x, 0.95, z + s2 * 0.55, 0, { grime: 0 });
+    for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x - 0.8 + i * 0.4, 0.75, z, 0);
+  };
+  corral(-26.8, -20); corral(-26.8, 21.2);
+  palletStack(-39.6, -15.5, 1.3); palletStack(-39.6, 15.8, 1.0); palletStack(-27, -9.4, 1.4); palletStack(-27, 9, 1.1);
+  for (const sz of [-1, 1]) {
+    for (const x of [-37.5, -28.5]) { buildCar(x, sz * 31.6, sz > 0 ? 0 : Math.PI, 0); carSolid(x, sz * 31.6); }
+    palletStack(-33, sz * 31.8, 1.4); palletStack(-33, sz * 30.5, 0.9);
+  }
+  // long planters down the outer edge of the lot and along the right-side wall, so nobody gets a clean lane end to end
+  const planter = (x, z, w, d) => {
+    SB(M.concrete, w, 0.75, d, x, 0, z, { grime: 0.3 });
+    solid(x, z, w * 0.9, d * 0.8, 1.2, 0.75, 'wood').pass = false;
+    hedge(w > d ? x - w / 2 + 0.2 : x, w > d ? z : z - d / 2 + 0.2, w > d ? x + w / 2 - 0.2 : x, w > d ? z : z + d / 2 - 0.2, 1.55, Math.min(w, d) - 0.3);
+  };
+  for (const z of [-27, 27]) planter(-39.8, z, 4.4, 1.2);
+
+  // delivery clutter breaking up the lot lengthwise
+  palletStack(-29, -25, 1.6); palletStack(-24.6, -27.5, 1.3); palletStack(-35.6, -25, 1.0); palletStack(-26.4, 26.4, 1.5); addKind(-32.5, 26.6, 1.3, 1.3, 1.3, 0, 'crate');
+  palletStack(-28, 0, 1.5); palletStack(-36, -8, 1.2); palletStack(-36, 8, 1.4);
+  // tall stuff in the parking rows (cars alone are below eye height): a delivery van and head-high pallet runs
+  addKind(-30.2, 6.6, 4.6, 2.2, 2.6, 0, 'truck', {});
+  for (const sz of [-1, 1]) { palletStack(-37, sz * 13, 1.8); palletStack(-35, sz * 13, 1.6); palletStack(-33.4, sz * 12.9, 1.7); }
+  palletStack(-25, -2, 1.8); palletStack(40.6, -9, 1.8); palletStack(-24.6, 24.9, 1.2); palletStack(26.4, 24.9, 1.4);
+  // the storefront: neon over the windows like the sign inside, brick cladding on the corners
+  for (let z = -30; z <= 30; z += 7.5) addKind(-44.6, z, 0, 0, 9 + (z % 2), 0, 'tree');                  // trees along the street out front
+  // inside the doors: a promo pallet just past each entrance, so the lot can't see straight down an aisle
+  for (const z of [-18.8, 18.6]) { SB(M.cardboard, 1.2, 1.5, 1.2, -18.6, 0, z, { grime: 0.05 }, 'wood'); face(M.goodsBox2, 1.1, 0.7, -19.21, 0.9, z, -Math.PI / 2, 1); }
+  // service alley (-z): green dumpsters, a box truck at the kerb, pallets and crates on the widened outer side
+  dumpster(-20, -31.6, 0x2f5a3a); dumpster(-17.6, -31.8, 0x2f5a3a); dumpster(19, -31.8, 0x3d4f63);
+  addKind(4, -31.9, 7, 2.4, 3.3, 0, 'truck', { back: 1 });
+  palletStack(-8, -31.6, 1.3); palletStack(-6.6, -31.9, 0.9); palletStack(11, -32, 1.5);
+  addKind(-12.5, -32.2, 1.6, 1.6, 1.6, 0, 'crate'); addKind(-12.3, -32.2, 1.4, 1.4, 1.4, 1.6, 'crate'); addKind(26, -32.4, 1.6, 1.6, 1.6, 0, 'crate');
+  for (const x of [-32, -10, 14, 34]) addKind(x, -36.6, 0, 0, 9, 0, 'tree');
+  // loading yard: blue drums, crate stacks, a second forklift, and a fenced pallet compound on the +z end
+  for (const [x, z] of [[29.5, -13.5], [30.2, -13.1], [29.8, -12.4], [33.6, 15.4], [34.2, 15.9], [24.8, -27.6], [25.5, -28]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
+  addKind(28.6, 20.6, 1.6, 1.6, 1.6, 0, 'crate'); addKind(28.8, 20.6, 1.4, 1.4, 1.4, 1.6, 'crate'); addKind(30.3, 20.9, 1.6, 1.6, 1.6, 0, 'crate');
+  forklift(31.5, -28.5);
+  palletStack(36.5, -29.5, 1.6); palletStack(36.5, -31.2, 1.1); palletStack(27.5, -31.5, 1.2);
+  {
+    // the compound: chain-link panels (you can see and shoot through), a gap to walk in, pallets stacked inside
+    const cx0 = 31, cx1 = 37.5, cz0 = 25.5, cz1 = 32;
+    for (const [x0, z0, x1, z1] of [[cx0, cz0, cx1, cz0], [cx0, cz1, cx1, cz1], [cx1, cz0, cx1, cz1], [cx0, cz0, cx0, cz0 + 2.5], [cx0, cz0 + 4.5, cx0, cz1]]) {
+      fence(x0, z0, x1, z1);
+      solid((x0 + x1) / 2, (z0 + z1) / 2, Math.max(0.08, x1 - x0), Math.max(0.08, z1 - z0), 2.4, 0, 'metal').pass = true;
+    }
+    palletStack(33, 27.5, 1.5); palletStack(34.3, 27.6, 1.0); palletStack(35.8, 30.2, 1.6); palletStack(33.2, 30.4, 1.2);
+    hedge(cx0 + 0.3, cz1 + 0.45, cx1 - 0.3, cz1 + 0.45, 1.6, 0.6);   // a hedge along the back fence
+  }
+
   // ---------- the smoker ----------
   const smoker = makeSmoker(group, 23.25, 19.2, -Math.PI / 2 + 0.3); // facing out into the yard
 
@@ -1135,6 +1362,8 @@ function build(ctx) {
       { kind: 'swing', x: 12, z: 16.7, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // upstairs: office off the stair landing
       { kind: 'swing', x: X1 + T / 2, z: 9.3, y: UP, axis: 'z', w: 1.8, h: 2.15, tint: 0x5a6a5a },// ... and out to the fire stair
       { kind: 'swing', x: 14.6, z: 18, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x8a6a4a },      // manager's office
+      { kind: 'swing', x: 13.4, z: Z1 + T / 2, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x5a6a5a },// ... and out to the side stair
+      { kind: 'traffic', x: 17, z: -10.6, axis: 'z', w: 1.6, h: 2.25 },                          // bakery <-> back storage
     ],
     menuCam(t, cam) {
       cam.position.set(Math.cos(t) * 44 - 4, 13 + Math.sin(t * 0.7) * 2, Math.sin(t) * 38);
