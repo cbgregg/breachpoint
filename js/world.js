@@ -255,6 +255,9 @@ const PIONEER_CENTER = [
   [1.5, -2, 1.3, 1.3, 0.75, 0, 'planter'], [-1, -31.5, 1.3, 1.3, 0.75, 0, 'planter'], [11.5, -0.5, 1.3, 1.3, 0.75, 0, 'planter'],
   // cover in the plaza: a coffee cart, crates by the kiosk
   [2.5, -15.5, 2.4, 0.9, 0.9, 0, 'stall', 0], [5.2, -2.6, 1.6, 1.6, 1.6, 0, 'crate'],
+  // a food truck parked on the plaza and the First Thursday art-walk tents
+  [14.5, -6.5, 6.5, 2.4, 3.1, 0, 'truck', { food: 1 }],
+  [-4.5, -10, 2.4, 1.0, 0.95, 0, 'tent', 0], [9.5, -24.5, 2.4, 1.0, 0.95, 0, 'tent', 1], [4.5, -28.5, 2.4, 1.0, 0.95, 0, 'tent', 2],
   // bollards across the end of James St, where it meets the plaza
   ...[1.5, 3.4, 5.3, 7.2, 9.1].map(sp => { const [x, z] = psAt(sp, -0.5); return [x, z, 0, 0, 0, 0, 'bollard']; }),
   // ---- the Pioneer Building (rotated to the downtown grid) and James St beside it
@@ -273,21 +276,34 @@ const PIONEER_CENTER = [
   [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 29.5, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
   [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
   // ---- Yesler Way: parked cars, a streetcar at its stop, a work zone, sandbags
-  [-38, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-30, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [3, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [-44, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-42, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [3, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
   [31, 10.5, 10, 2.4, 3, 0, 'tram'], [31, 10.5, 10, 1.6, 0, 0, 'tracks'],
   [-1, 14.5, 3.2, 0.9, 1.1, 0, 'jersey'], [6, 16.5, 3.2, 0.9, 1.1, 0, 'jersey'], [2.5, 15.5, 1.6, 1.6, 1.6, 0, 'crate'],
   [18, 19.5, 0.8, 3, 1.1, 0, 'sand'], [-40, 16, 2, 2, 1.2, 0, 'pallet'], [40, 17, 2, 2.5, 1.8, 0, 'crate'],
   [-14.5, 26.5, 0.7, 0.5, 1, 0, 'aframe', 2], [-24.8, 2.5, 0.7, 0.5, 1, 0, 'aframe', 1],
+  // traffic and a utility dig, staggered across the lanes so Yesler is never one long line from end to end:
+  // a Metro bus at its stop, box trucks loading, a site container and barriers round the dig
+  [10, 18.8, 12, 2.6, 3.2, 0, 'bus', { livery: 0 }],
+  [-3, 10.6, 7, 2.4, 3.3, 0, 'truck', {}], [-36, 10.6, 7, 2.4, 3.3, 0, 'truck', { back: 1 }],
+  [-30, 19, 7, 2.4, 3.3, 0, 'truck', { back: 1 }],
+  [-30, 13.3, 6, 2.4, 2.6, 0, 'container', 0x3e5d74], [14, 15.8, 6, 2.4, 2.6, 0, 'container', 0x6b7a3a], [-14, 15.8, 6, 2.4, 2.6, 0, 'container', 0x8a3d2c],
+  [-24.5, 12.6, 0.9, 3.2, 1.1, 0, 'jersey'], [-19.5, 13.4, 0.9, 3.2, 1.1, 0, 'jersey'], [-35.5, 16.4, 0.9, 3.2, 1.1, 0, 'jersey'], [19.5, 16.4, 0.9, 3.2, 1.1, 0, 'jersey'],
+  // newsstands break up the sidewalks along Yesler
+  [-30, 5.75, 2.6, 2.7, 2.8, 0, 'kiosk'], [26, 5.75, 2.6, 2.7, 2.8, 0, 'kiosk'], [-3, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'], [-38, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'], [32, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'],
+  [24, 21.3, 7, 2.4, 3.3, 0, 'truck', {}], [-20, 21.3, 7, 2.4, 3.3, 0, 'truck', { food: 2 }],
+  [12, 8.2, 7, 2.4, 3.3, 0, 'truck', { back: 1 }], [-18, 8.2, 7, 2.4, 3.3, 0, 'truck', {}],
+  [-11, -0.6, 2.4, 7, 3.3, 0, 'truck', {}], [-10.2, 30, 2.6, 12, 3.2, 0, 'bus', { livery: 1, back: 1 }], [-10.3, -29, 2.4, 7, 3.3, 0, 'truck', { back: 1 }], [36, 3.2, 7, 2.4, 3.3, 0, 'truck', {}], [21.8, 2.8, 1.6, 1.6, 2.8, 0, 'kiosk'], [-6, -17, 2.6, 1.8, 2.8, 0, 'kiosk'], [23.5, -3.5, 2.6, 1.8, 2.8, 0, 'kiosk'],
+  [2, 13.3, 7, 2.4, 3.3, 0, 'truck', { food: 0 }], [31, 13.6, 6, 2.4, 2.6, 0, 'container', 0x4d6b54],
   // ---- 1st Avenue: parked cars both curbs, a delivery truck's crates, a work zone up north
-  [-21, -6, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, -20, 2.0, 4.4, 1.45, 0, 'car', 1], [-21, -30, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, 31, 2.0, 4.4, 1.45, 0, 'car', 0],
+  [-21, -6, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, -20, 2.0, 4.4, 1.45, 0, 'car', 1], [-21, -30, 2.0, 4.4, 1.45, 0, 'car', 0],
   [-21, 34, 2.0, 4.4, 1.45, 0, 'car', 1],
   [-15, -27, 0.9, 3.2, 1.1, 0, 'jersey'], [-13, -33, 1.6, 1.6, 1.6, 0, 'crate'], [-16.5, 29, 0.8, 3, 1.1, 0, 'sand'],
   [-25, -21, 1.6, 1.6, 1.6, 0, 'crate'], [-5.5, -36.5, 2, 2, 1.2, 0, 'pallet'],
   // ---- James St and the garage side
   [32, -9.5, 2.0, 2.5, 1.8, 0, 'crate'], [27, 6.2, 0.62, 0.62, 0.9, 0, 'barrel'], [37.5, -12, 0.8, 3, 1.1, 0, 'sand'],
   // ---- spawn lots at both ends (past the map's built edge): staggered HESCO
-  [46, 18, 1, 4, 3.5, 0, 'hesco'], [46, -2, 1, 4, 3.5, 0, 'hesco'], [46, -22, 1, 4, 3.5, 0, 'hesco'], [48, 30, 3, 1, 3.5, 0, 'hesco'], [48, -34, 3, 1, 3.5, 0, 'hesco'], [51, 8, 2, 2, 1.2, 0, 'ammo'],
-  [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
+  [44, -28, 1, 4, 3.5, 0, 'hesco'], [43, 10, 1, 4, 3.5, 0, 'hesco'], [46, 18, 1, 4, 3.5, 0, 'hesco'], [46, -2, 1, 4, 3.5, 0, 'hesco'], [46, -22, 1, 4, 3.5, 0, 'hesco'], [48, 30, 3, 1, 3.5, 0, 'hesco'], [48, -34, 3, 1, 3.5, 0, 'hesco'], [51, 8, 2, 2, 1.2, 0, 'ammo'],
+  [-44, 28, 1, 4, 3.5, 0, 'hesco'], [-43, -10, 1, 4, 3.5, 0, 'hesco'], [-43, 14, 1, 4, 3.5, 0, 'hesco'], [43, -14, 1, 4, 3.5, 0, 'hesco'], [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
   // ---- Smith Tower, up Yesler to the east
   [96, -14, 12, 12, 62, 0, 'tower'],
   // ---- perimeter
@@ -573,7 +589,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (!XF) return solidAA(cx, cz, w, d, h, y0, surface);
     return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
   };
-  const SURFACE = { kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
+  const SURFACE = { bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
   const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- shared decals / glows ----------
@@ -1697,6 +1713,52 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (let i = 0; i < 4; i++) put(flatBox(w, 0.04, 0.09, 1.2), M.wood, cx, 0.45, cz - d / 2 + 0.06 + i * 0.12, 0, { grime: 0.2, tint: 0x8a6a48 });
         for (let i = 0; i < 3; i++) put(flatBox(w, 0.09, 0.04, 1.2), M.wood, cx, 0.65 + i * 0.12, cz + d / 2 - 0.03, 0, { grime: 0.2, tint: 0x8a6a48 });
         for (const sx of [-1, 1]) put(flatBox(0.06, 0.9, d, 0), M.iron, cx + sx * (w / 2 - 0.1), 0.45, cz, 0, { grime: 0.1 });
+        break;
+      }
+      case 'bus': case 'truck': {
+        // city traffic: a Metro bus at its stop (extra = livery) or a box truck / food truck ('truck', extra 'food')
+        // long axis along whichever side of the box is longer; the cab / front at the +end unless extra.back
+        const along = d >= w, L = along ? d : w, W = along ? w : d, fr = extra && extra.back ? -1 : 1;
+        const P = (a, b) => [cx + (along ? b : a), cz + (along ? a : b)];            // a along the length, b across
+        const box = (mat, a0, a1, b0, b1, y, hh, o) => { const [x, z] = P((a0 + a1) / 2 * fr, (b0 + b1) / 2); const la = Math.abs(a1 - a0), lb = Math.abs(b1 - b0); B(mat, along ? lb : la, hh, along ? la : lb, x, y0 + y, z, 0, o); };
+        const wheel = (a, s2) => { const [x, z] = P(a * fr, s2 * (W / 2 - 0.12)); put(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16), M.rubber, x, y0 + 0.5, z, 0, { rz: along ? Math.PI / 2 : 0, rx: along ? 0 : Math.PI / 2, grime: 0.2 }); };
+        if (kind === 'bus') {
+          // low-floor transit bus: two-tone body, a band of dark windows, roof pods, the destination sign
+          const tint = [0x2f6a3a, 0x1f4e8a, 0xd8a028][(extra && extra.livery) || 0];
+          box(M.paint, -L / 2, L / 2, -W / 2, W / 2, 0.35, h - 0.6, { tint: 0xe8e6e0, grime: 0.15 });
+          box(M.paint, -L / 2 + 0.05, L / 2 - 0.05, -W / 2 - 0.01, W / 2 + 0.01, 0.35, 0.75, { tint, grime: 0.2 });
+          for (const s2 of [-1, 1]) box(M.glass, -L / 2 + 0.6, L / 2 - 0.9, s2 * (W / 2 + 0.005) - 0.005, s2 * (W / 2 + 0.005) + 0.005, 1.2, 1.15, { grime: 0, tint: 0x6a7480 });
+          box(M.glass, L / 2 - 0.02, L / 2 + 0.01, -W / 2 + 0.15, W / 2 - 0.15, 1.0, 1.5, { grime: 0, tint: 0x6a7480 });       // windscreen
+          box(M.dark, L / 2 - 0.03, L / 2 + 0.02, -0.7, 0.7, h - 0.55, 0.25, { grime: 0 });                                    // destination sign
+          box(M.paint, -L / 2 + 1.5, -L / 2 + 5, -W / 2 + 0.3, W / 2 - 0.3, h - 0.25, 0.3, { tint: 0xd8d8d4, grime: 0.2 }); // roof pods
+          box(M.paint, 1.5, 3.5, -W / 2 + 0.4, W / 2 - 0.4, h - 0.25, 0.25, { tint: 0xd8d8d4, grime: 0.2 });
+          for (const a of [L / 2 - 2.4, -L / 2 + 2.6]) for (const s2 of [-1, 1]) wheel(a, s2);
+        } else {
+          const food = extra && extra.food;
+          const cab = 2.2, bodyT = food ? [0xd8382a, 0xf2c018, 0x2a8a8a][(extra.food | 0) % 3] : 0xeceae4;
+          box(M.paint, -L / 2, L / 2 - cab, -W / 2, W / 2, 0.75, h - 0.75, { tint: bodyT, grime: 0.18 });                // box body
+          box(M.paint, L / 2 - cab + 0.05, L / 2, -W / 2 + 0.05, W / 2 - 0.05, 0.6, 1.75, { tint: food ? 0xf0eee8 : 0x2a62b8, grime: 0.2 }); // cab
+          box(M.glass, L / 2 - 0.02, L / 2 + 0.01, -W / 2 + 0.2, W / 2 - 0.2, 1.4, 0.8, { grime: 0, tint: 0x6a7480 });
+          box(M.dark, -L / 2, L / 2, -W / 2 + 0.2, W / 2 - 0.2, 0.35, 0.4, { grime: 0.3 });                                  // chassis
+          if (food) {
+            // serving hatch with its awning propped open on the kerb side, a menu board
+            box(M.dark, -L / 2 + 1, L / 2 - cab - 0.6, W / 2 - 0.01, W / 2 + 0.01, 1.35, 1.0, { grime: 0 });
+            const [x, z] = P(fr * (-L / 2 + (L - cab) / 2 + 0.2), W / 2 + 0.45);
+            put(new THREE.PlaneGeometry(along ? 0.9 : L - cab - 1.4, along ? L - cab - 1.4 : 0.9), M.paint, x, y0 + 2.45, z, 0, { rx: -Math.PI / 2 + 0.35 * (along ? 0 : 1), rz: along ? -0.35 : 0, grime: 0, tint: 0xf2e8d0, cast: false });
+          } else box(M.paint, -L / 2 - 0.01, -L / 2 + 0.01, -W / 2 + 0.1, W / 2 - 0.1, 0.8, h - 0.9, { tint: 0xc8c8c4, grime: 0.3 }); // roll-up door
+          for (const a of [L / 2 - 1.2, -L / 2 + 1.3]) for (const s2 of [-1, 1]) wheel(a, s2);
+        }
+        break;
+      }
+      case 'tent': {
+        // pop-up market tent (the First Thursday art walk): a table of wares under a peaked canopy on four legs
+        B(M.wood, w - 0.2, 0.06, d - 0.2, cx, h - 0.06, cz, 0, { grime: 0.05, tint: 0xc8a878 });
+        B(M.cloth, w - 0.25, h - 0.08, 0.02, cx, 0, cz + d / 2 - 0.12, 0, { grime: 0, tint: 0xe8e4dc });
+        for (let i = 0; i < 5; i++) put(worldBox(0.3 + (i % 3) * 0.08, 0.2 + (i % 2) * 0.2, 0.25, 0), M.paint, cx - w / 2 + 0.4 + i * (w - 0.8) / 4, h + 0.12, cz + ((i * 7) % 3 - 1) * 0.15, (i * 0.7) % 1, { grime: 0, tint: [0xc8322b, 0x2f6db0, 0xe8b62a, 0x2f8a4a, 0x6a3a8a][(i + (extra | 0)) % 5] });
+        const tw = w + 0.4, td = d + 1.6, tz = cz - 0.3, ct = [0xf2f2ee, 0x2a4a7a, 0x2f6a3a, 0xc8322b][(extra | 0) % 4];
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(new THREE.CylinderGeometry(0.022, 0.022, 2.35, 6), M.metal, cx + sx * tw / 2, 1.18, tz + sz * td / 2, 0, { grime: 0, tint: 0xd8dade });
+        const top = new THREE.ConeGeometry(Math.hypot(tw, td) / 2, 0.45, 4, 1, true); top.rotateY(Math.PI / 4); top.scale(tw / Math.hypot(tw, td) * Math.SQRT2, 1, td / Math.hypot(tw, td) * Math.SQRT2);
+        put(top, M.cloth, cx, 2.58, tz, 0, { grime: 0, tint: ct });
         break;
       }
       case 'tram': {
