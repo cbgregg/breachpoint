@@ -126,7 +126,7 @@ function tileTex() {
 }
 
 export function buildStation(ctx) {
-  const { put, flatBox, solid, physics, group, M, glowsHot } = ctx;
+  const { put, flatBox, solid, physics, group, M } = ctx;
   // underground: the sky's image-based light mostly shut out (it read as blue sheen on every floor)
   const ENV = 0.25;
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, envMapIntensity: ENV, ...o });
@@ -135,6 +135,7 @@ export function buildStation(ctx) {
   const steel = std({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.8 });
   const yellow = std({ color: 0xe8c020, roughness: 0.6 });
   const lamp = new THREE.MeshStandardMaterial({ color: 0xf4f8ff, emissive: 0xeaf2ff, emissiveIntensity: 3 });
+  const marker = new THREE.MeshStandardMaterial({ color: 0x4a8cff, emissive: 0x4a8cff, emissiveIntensity: 4 });   // tunnel wall lights
   const unlit = new THREE.MeshBasicMaterial({ color: 0x0b0c0e });   // tunnel beyond the sun's shadow map: stays dark
   // box helpers: B(mat, w, h, d, x, y, z) has its base at y; tiles wrap every 1.2 m
   const B = (mat, w, h, d, x, y, z, opts = {}) => put(flatBox(w, h, d, mat === tile ? 0.8 : 2), mat, x, y + h / 2, z, 0, { grime: 0, ...opts });
@@ -146,8 +147,9 @@ export function buildStation(ctx) {
   };
   const light = (x, y, z, i = 10, d = 16) => { const L = new THREE.PointLight(0xeef4ff, i, d, 1.4); L.position.set(x, y, z); L.userData.mapLight = true; group.add(L); };
   const strip = (x, y, z, len, along = 'z') => {
+    // emissive only (bloom glows it): the map's glow sprites are drawn at their centre's depth, so one just
+    // under a floor or the street shows through it at a glancing angle
     put(flatBox(along === 'z' ? 0.18 : len, 0.05, along === 'z' ? len : 0.18, 0), lamp, x, y, z, 0, { grime: 0, cast: false });
-    for (let t = -len / 2 + 1; t < len / 2; t += 2.5) glowsHot.push([x + (along === 'z' ? 0 : t), y - 0.05, z + (along === 'z' ? t : 0), 0.7]);
   };
 
   // ---------- the concourse: the hall model, its collision, the floor slab with the two stair wells ----------
@@ -171,13 +173,24 @@ export function buildStation(ctx) {
     if (!model && h > 1.3) B(tile, x1 - x0, h, z1 - z0, (x0 + x1) / 2 + DX, YC, (z0 + z1) / 2 + DZ);
   }
   if (model) {
-    for (const { mat } of model.parts) { mat.envMapIntensity = ENV; mat.roughness = Math.max(mat.roughness, 0.75); mat.metalness = 0; }
+    // its walls are one-sided (seen from the platforms, the stair enclosures were see-through): draw both sides
+    for (const { mat } of model.parts) { mat.envMapIntensity = ENV; mat.roughness = Math.max(mat.roughness, 0.75); mat.metalness = 0; mat.side = THREE.DoubleSide; }
     const m = new THREE.Matrix4().makeTranslation(DX, DY, DZ);
-    for (const { geo, mat } of model.parts) { const g = geo.clone(); g.applyMatrix4(m); put(g, mat, 0, 0, 0, 0, { grime: 0 }); }
+    for (const { name, geo, mat } of model.parts) {
+      if (name === 'BackSide_0') continue;    // its material is fully transparent: never meant to show
+      if (name === 'FrontSide_3') {           // soft stains and contact shadows laid over the floor: blended, not cut out
+        Object.assign(mat, { transparent: true, alphaTest: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      }
+      const g = geo.clone(); g.applyMatrix4(m);
+      put(g, mat, 0, 0, 0, 0, { grime: 0, cast: name !== 'FrontSide_3' });
+    }
   } else {
     for (const [a, b, c, d] of minus(HALL, holes)) put(new THREE.PlaneGeometry(c - a, d - b), concrete, (a + c) / 2, YC + 0.01, (b + d) / 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x9a968e });
     put(new THREE.PlaneGeometry(HALL[2] - HALL[0], HALL[1] - HALL[3]), dark, (HALL[0] + HALL[2]) / 2, -0.4, (HALL[1] + HALL[3]) / 2, 0, { rx: Math.PI / 2, grime: 0, cast: false });
   }
+  // a ceiling over the whole hall just above the model's own (its entrance has none, and the street surface
+  // is drawn from above only, so you'd see the sky through it)
+  put(new THREE.PlaneGeometry(HALL[2] - HALL[0], HALL[3] - HALL[1]), dark, (HALL[0] + HALL[2]) / 2, -0.27, (HALL[1] + HALL[3]) / 2, 0, { rx: Math.PI / 2, grime: 0, cast: false });
   // the far stair (another line, not built): a shutter across it
   wall(dark, 1.6, -37.75, 6.6, -37.45, YC, -0.4);
   sign(plainTex('NO ENTRY · STAFF ONLY', '#8a1a1a', '#fff'), 2.6, 0.65, 4.1, YC + 2.4, -37.43, 0, 0.6);
@@ -185,7 +198,7 @@ export function buildStation(ctx) {
   // wayfinding over the two stairs down
   sign(wayTex(['Northgate', 'Northbound trains'], '↓'), 3.2, 0.8, STAIRS[0].cx, YC + 3.1, STAIRS[0].top - 0.4, Math.PI, 0.9);
   sign(wayTex(['Angle Lake', 'Southbound trains'], '↓'), 3.2, 0.8, STAIRS[1].cx, YC + 3.1, STAIRS[1].top - 0.4, Math.PI, 0.9);
-  for (const z of [-28, -10]) light(4, YC + 3.2, z, 11, 18);   // few real lights: each one costs every lit surface on the map
+  for (const z of [-28, -10]) light(4, YC + 2.3, z, 5, 20);   // mid-height and soft: up by the ceiling they blew out its white panels   // few real lights: each one costs every lit surface on the map
 
   // ---------- the passage from the plaza stairwells ----------
   {
@@ -198,7 +211,7 @@ export function buildStation(ctx) {
     wall(tile, -6.2, z0, x0, z0 + T, YC, H);                     // and closing the hall's west corner
     for (const x of [x0, x1 - T]) { wall(tile, x, z0, x + T, 2.3, YC, H); wall(tile, x, 4.7, x + T, z1, YC, H); wall(tile, x, 2.3, x + T, 4.7, YC + 2.4, H); }
     strip((x0 + x1) / 2, H - 0.06, 1.6, x1 - x0 - 1, 'x'); strip((x0 + x1) / 2, H - 0.06, 5.0, x1 - x0 - 1, 'x');
-    light(6.25, H - 0.5, 3.25, 8, 12);
+    light(6.25, H - 1.2, 3.25, 5, 12);
     sign(nameTex(), 4.2, 0.79, 6.25, YC + 2.2, z1 - T - 0.02, Math.PI, 0.9);
     sign(wayTex(['To trains', 'Northgate · Angle Lake'], '↑'), 2.6, 0.65, 4.25, YC + 2.95, 0.32, 0, 0.9);   // read from the passage
     // fare readers (ORCA): a row of posts by the hall
@@ -233,7 +246,7 @@ export function buildStation(ctx) {
   // columns between the tracks, light strips over the platforms, a few real lights
   for (let z = PL.z0 + 4.5; z < PL.z1; z += 9) wall(tile, 3.75, z - 0.25, 4.25, z + 0.25, PIT, CEIL_P);
   for (const x of [-3.1, 11.1]) strip(x, CEIL_P - 0.05, (PL.z0 + PL.z1) / 2, PL.z1 - PL.z0 - 2);
-  for (const z of [-20, 8]) light(4, CEIL_P - 0.6, z, 14, 26);
+  for (const z of [-20, 8]) light(4, CEIL_P - 1.5, z, 9, 26);
   // benches and bins on the platforms
   for (const [x, z] of [[-5.4, -28], [-5.4, 12], [13.4, -28], [13.4, 12]]) {
     B(M.wood, 0.5, 0.45, 1.8, x, YP, z, { tint: 0x8a6a4a });
@@ -273,7 +286,7 @@ export function buildStation(ctx) {
       g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, L, 0, Hh, 0, 0, 0, 0, 0, Hh, 0, 0, 0, L], 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, L / 1.2, 0, 0, Hh / 1.2, 0, 0, 0, Hh / 1.2, L / 1.2, 0], 2));
       g.computeVertexNormals();
-      put(g, tile, x, YP, s.top, 0, { grime: 0 });
+      put(g, tile, x + (x === s.x0 ? -0.1 : 0.1), YP, s.top, 0, { grime: 0 });   // just outside the model's own stair walls (no flicker)
     }
     put(new THREE.PlaneGeometry(s.x1 - s.x0, YC - YP), tile, (s.x0 + s.x1) / 2, (YC + YP) / 2, s.top - 0.005, Math.PI, { grime: 0 });
   }
@@ -300,7 +313,7 @@ export function buildStation(ctx) {
     }
     const c0 = Math.max(z0, -40.5), c1 = Math.min(z1, 40.5);   // nobody gets further than the end walls below
     for (const x of [PIT_X[0], PIT_X[1]]) solid(x + (x ? 0.15 : -0.15), (c0 + c1) / 2, 0.3, c1 - c0, TUN_TOP - PIT, PIT, 'concrete');
-    for (let z = z0 + 5; z < z1; z += 10) for (const x of [PIT_X[0] + 0.02, PIT_X[1] - 0.02]) glowsHot.push([x, PIT + 1.2, z, 0.35]);
+    for (let z = z0 + 5; z < z1; z += 10) for (const x of [PIT_X[0] + 0.03, PIT_X[1] - 0.03]) put(flatBox(0.04, 0.08, 0.08, 0), marker, x, PIT + 1.2, z, 0, { grime: 0, cast: false });
   }
   // the end of the line for anyone walking the tunnels (trains carry on through)
   for (const z of [-39.5, 39.5]) solid((PIT_X[0] + PIT_X[1]) / 2, z, PIT_X[1] - PIT_X[0], 0.4, TUN_TOP - PIT, PIT, 'concrete').pass = true;
