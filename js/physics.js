@@ -11,6 +11,7 @@ export class Box {
   }
 }
 
+const _d = new THREE.Vector3();
 let _axis = -1;
 let _sign = 0;
 
@@ -45,21 +46,71 @@ export function rayBox(ox, oy, oz, dx, dy, dz, minx, miny, minz, maxx, maxy, max
   return tmin;
 }
 
+// Broad phase: a grid over x/z (4 m cells) listing the boxes in each cell, so a query only tests the boxes
+// near it instead of every box on the map (Pioneer Square has ~1800). Huge boxes (the ground slabs) and moving
+// ones (box.dynamic: the station's trains) sit on a short list every query checks. Doors only change a box's
+// height, so the grid holds; it rebuilds itself whenever the box list changes.
+const CELL = 4, BIG = 64;
+const ckey = (i, k) => (i + 4096) * 8192 + (k + 4096);
+let _stamp = 1;
+
 export class Physics {
   constructor() {
     this.boxes = [];
+    this.grid = null; this.gridN = -1; this.gridLast = null;
   }
 
   addBox(b) { this.boxes.push(b); return b; }
 
+  index() {
+    const B = this.boxes;
+    if (this.grid && this.gridN === B.length && this.gridLast === B[B.length - 1]) return this.grid;
+    const cells = new Map(), always = [];
+    for (const b of B) {
+      const i0 = Math.floor(b.minx / CELL), i1 = Math.floor(b.maxx / CELL), k0 = Math.floor(b.minz / CELL), k1 = Math.floor(b.maxz / CELL);
+      if (b.dynamic || (i1 - i0 + 1) * (k1 - k0 + 1) > BIG) { always.push(b); continue; }
+      for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) {
+        const key = ckey(i, k);
+        let c = cells.get(key); if (!c) cells.set(key, c = []);
+        c.push(b);
+      }
+    }
+    this.grid = { cells, always };
+    this.gridN = B.length; this.gridLast = B[B.length - 1];
+    return this.grid;
+  }
+
+  // every box a ray from o along unit d might hit within maxT, nearest cells first: calls visit(box) once per
+  // box; visit returns the distance to stop at (the best hit so far), so cells beyond it are skipped
+  walk(o, d, maxT, visit) {
+    const G = this.index(), st = ++_stamp;
+    let best = maxT;
+    for (const b of G.always) best = Math.min(best, visit(b));
+    // 2D DDA over the cells the ray crosses (t in the ray's own 3D units)
+    let i = Math.floor(o.x / CELL), k = Math.floor(o.z / CELL);
+    const si = d.x > 0 ? 1 : -1, sk = d.z > 0 ? 1 : -1;
+    const di = Math.abs(d.x) > 1e-9 ? CELL / Math.abs(d.x) : Infinity, dk = Math.abs(d.z) > 1e-9 ? CELL / Math.abs(d.z) : Infinity;
+    let ti = Math.abs(d.x) > 1e-9 ? ((d.x > 0 ? (i + 1) * CELL - o.x : o.x - i * CELL) / Math.abs(d.x)) : Infinity;
+    let tk = Math.abs(d.z) > 1e-9 ? ((d.z > 0 ? (k + 1) * CELL - o.z : o.z - k * CELL) / Math.abs(d.z)) : Infinity;
+    let t0 = 0;
+    for (let n = 0; n < 4096 && t0 <= best; n++) {
+      const c = G.cells.get(ckey(i, k));
+      if (c) for (const b of c) { if (b._q === st) continue; b._q = st; best = Math.min(best, visit(b)); }
+      if (ti < tk) { t0 = ti; ti += di; i += si; } else { t0 = tk; tk += dk; k += sk; }
+      if (t0 > maxT) break;
+    }
+    return best;
+  }
+
   // Returns {t, point, normal, box} or null
   raycast(o, d, maxDist) {
     let best = maxDist, bestBox = null, axis = -1, sign = 0;
-    for (const b of this.boxes) {
-      if (b.pass) continue;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
+    this.walk(o, d, maxDist, (b) => {
+      if (b.pass) return best;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
       const t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, best);
       if (t < best) { best = t; bestBox = b; axis = _axis; sign = _sign; }
-    }
+      return best;
+    });
     if (!bestBox) return null;
     const normal = new THREE.Vector3();
     if (axis >= 0) normal.setComponent(axis, sign); else normal.copy(d).negate();
@@ -71,21 +122,38 @@ export class Physics {
     const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
     const len = Math.hypot(dx, dy, dz);
     if (len < 1e-6) return false;
-    const ix = dx / len, iy = dy / len, iz = dz / len;
     const max = len - 0.05;
-    for (const bx of this.boxes) {
-      if (bx.pass) continue;
-      if (rayBox(a.x, a.y, a.z, ix, iy, iz, bx.minx, bx.miny, bx.minz, bx.maxx, bx.maxy, bx.maxz, max) < max) return true;
-    }
-    return false;
+    _d.set(dx / len, dy / len, dz / len);
+    let hit = false;
+    this.walk(a, _d, max, (bx) => {
+      if (hit) return 0;
+      if (!bx.pass && rayBox(a.x, a.y, a.z, _d.x, _d.y, _d.z, bx.minx, bx.miny, bx.minz, bx.maxx, bx.maxy, bx.maxz, max) < max) { hit = true; return 0; }
+      return max;
+    });
+    return hit;
   }
 
   // Cylinder approximated by an AABB with feet at y
   overlap(x, y, z, r, h) {
-    for (const b of this.boxes) {
-      if (x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz) return b;
+    const G = this.index();
+    const test = (b) => x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz;
+    for (const b of G.always) if (test(b)) return b;
+    const i0 = Math.floor((x - r) / CELL), i1 = Math.floor((x + r) / CELL), k0 = Math.floor((z - r) / CELL), k1 = Math.floor((z + r) / CELL);
+    for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) {
+      const c = G.cells.get(ckey(i, k));
+      if (c) for (const b of c) if (test(b)) return b;
     }
     return null;
+  }
+
+  // every box overlapping an x/z rectangle (once each)
+  near(x0, z0, x1, z1, fn) {
+    const G = this.index(), st = ++_stamp;
+    for (const b of G.always) fn(b);
+    for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let k = Math.floor(z0 / CELL); k <= Math.floor(z1 / CELL); k++) {
+      const c = G.cells.get(ckey(i, k));
+      if (c) for (const b of c) { if (b._q === st) continue; b._q = st; fn(b); }
+    }
   }
 
   moveEntity(e, dt) {
@@ -141,10 +209,10 @@ export class Physics {
     if (!e.onGround && wasGround && e.vel.y <= 0 && !e.noSnap) {
       let top = -Infinity;
       const rr = r * 0.95, lim = p.y - STEP_DOWN;
-      for (const b of this.boxes) {
-        if (b.maxy > p.y + 1e-3 || b.maxy < lim || b.maxy <= top) continue;
+      this.near(p.x - rr, p.z - rr, p.x + rr, p.z + rr, (b) => {
+        if (b.maxy > p.y + 1e-3 || b.maxy < lim || b.maxy <= top) return;
         if (p.x - rr < b.maxx && p.x + rr > b.minx && p.z - rr < b.maxz && p.z + rr > b.minz) top = b.maxy;
-      }
+      });
       if (top > -Infinity && !this.overlap(p.x, top + 0.001, p.z, r, h)) {
         e.stepOff = (e.stepOff || 0) + (p.y - top);
         p.y = top;

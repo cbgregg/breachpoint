@@ -133,6 +133,10 @@ export class Renderer {
     this.aoPass.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 8 });
     this.aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
     this.aoPass.blendIntensity = 0.9;
+    // ambient occlusion is soft too: its normal/depth pass, the occlusion and the denoise all run at half
+    // resolution (a quarter of the pixels; the composite reads it back filtered)
+    const aoSize = this.aoPass.setSize.bind(this.aoPass);
+    this.aoPass.setSize = (aw, ah) => aoSize(Math.max(1, Math.round(aw / 2)), Math.max(1, Math.round(ah / 2)));
     this.vmPass = new RenderPass(vmScene, vmCamera);
     this.vmPass.clear = false;
     this.vmPass.clearDepth = true;
@@ -288,9 +292,10 @@ export class Renderer {
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao && !q.fast;
     this.bloomPass.enabled = q.bloom && !q.fast;
-    this.smaaPass.enabled = q.aa && !q.fast;
     // MSAA on the post-processing path: the composer's render targets are multisampled
     const ms = q.fast ? 0 : Math.min(q.msaa || 0, this.renderer.capabilities.maxSamples || 4);
+    // SMAA on top of MSAA smooths the same edges twice (three more full-screen passes): one or the other
+    this.smaaPass.enabled = q.aa && !q.fast && !ms;
     if (ms !== this.msaaSamples) {
       this.msaaSamples = ms;
       for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) { rt.samples = ms; rt.dispose(); }
