@@ -359,7 +359,7 @@ Code: MIT — see [LICENSE](LICENSE).
 
 ## Credits
 
-Weapon and prop models from Sketchfab, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (textures resized and recompressed, geometry re-oriented and scaled for the game; the G19 was cut out of its display scene):
+Weapon and prop models from Sketchfab, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (textures resized and recompressed with `tools/glb_shrink.py`, geometry re-oriented and scaled for the game; the G19 was cut out of its display scene, and only the signs and office pieces the maps use were kept from those packs):
 
 - [AR-15 (game ready)](https://sketchfab.com/3d-models/ar-15-game-ready-4620d29f61ab4723844d6162d29c9f4c) by IVA
 - [TPM SMG](https://sketchfab.com/3d-models/tpm-smg-b9e68645f0e048419f3fe84ebd58dd92) by TORI106
@@ -373,6 +373,12 @@ Weapon and prop models from Sketchfab, licensed under [CC BY 4.0](https://creati
 - [Corkboard](https://sketchfab.com/3d-models/corkboard-3ceda8ed02af45d1a8b36570076193e1) by XIN (market halls)
 - [Simple Bin - steel](https://sketchfab.com/3d-models/simple-bin-steel-7fce89ddbf1c49a4b7612993447571a2) by Sousinho (street bins)
 - [Downtown Buildings Set - Low Poly model](https://sketchfab.com/3d-models/downtown-buildings-set-low-poly-model-7378e7fb9c914c39880d9913a6f4e1d6) by Daniel Zhabotinsky (city skyline)
+- [dumpster](https://sketchfab.com/3d-models/dumpster-989ea7f01b924859b3484ee27103e8d9) by YJ_ (dumpsters)
+- [Locker](https://sketchfab.com/3d-models/locker-27ca4c4364a74d079fc3761ee1d2b114) by Samuel F. Johanns (Oneironauticus) (Freshway staff lockers)
+- [Low Poly Office Cubicle Assets](https://sketchfab.com/3d-models/low-poly-office-cubicle-assets-f430770d9ba5480a89b3e355d05f9385) by NobleCrow (Freshway office and break room)
+- [Kitchen tools Pack](https://sketchfab.com/3d-models/kitchen-tools-pack-f2d3743f366c4a21a5680457823f0f78) by Homie (Freshway kitchen)
+- [Sign package](https://sketchfab.com/3d-models/sign-package-2d153f387f264bca819357601eff3574) by Pedram Ashoori (Freshway lot and yard signs)
+- [Road Signs](https://sketchfab.com/3d-models/road-signs-c39bf97110494b5db3de84165211f592) by FrodoUndead (Pioneer Square street signs)
 
 From the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) (textures resized to 256 px, unused nodes removed):
 

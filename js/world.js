@@ -8,7 +8,7 @@ import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
-import { PROPS, containerVariants, buildingVariants } from './props.js';
+import { PROPS, containerVariants, buildingVariants, propFit } from './props.js';
 
 // Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
@@ -65,6 +65,7 @@ const TARSA_HALF = [
   [29, 17.5, 10, 11, 12, 0, 'block'],                   // x 24..34 (tall landmark)
   [41, 17.5, 8, 10, 7, 0, 'block'],                     // x 37..45; alley x 34..37, back street past x 45
   [35.5, 14, 1.6, 1.6, 1.6, 0, 'crate'],                // alley cover (breaks the straight look through)
+  [36.2, 21, 1.35, 1.9, 1.25, 0, 'dumpster', { flip: true }],
   // lane edges: cover hard against the divider walls, so nobody can hug a wall and see down a whole lane
   [29.5, 23.8, 1.6, 1.6, 1.6, 0, 'crate'], [31.1, 23.8, 1.6, 1.6, 1.6, 0, 'crate'], [30.3, 23.8, 1.4, 1.4, 1.4, 1.6, 'crate'],
   [12, -23.8, 1.6, 1.6, 1.6, 0, 'crate'], [12.2, -23.8, 1.4, 1.4, 1.4, 1.6, 'crate'],
@@ -74,6 +75,7 @@ const TARSA_HALF = [
   [27.5, -17.5, 9, 11, 8, 0, 'block'],                  // x 23..32; alley x 21..23
   [40, -17.5, 10, 10, 11, 0, 'block'],                  // x 35..45; alley x 32..35
   [33.5, -21, 0.8, 3, 1.1, 0, 'sand'],
+  [34.2, -15, 1.35, 1.9, 1.25, 0, 'dumpster', { dark: true }],
   // ================= north lane (z 24..39): market street, bomb site B in the market hall =================
   [22, 35, 12, 10, 4.2, 0, 'house', { s: [['d', -3], ['d', 3], ['w', 0, 2]], w: [['d', -1]], e: [['d', 1]], props: [['shelf', -3.5, 2.8, 0], ['crates', 4.2, 2.8], ['shelf', 3.5, -2.4, 0]], light: 1 }], // x 16..28, z 30..40
   [6, 27, 2.4, 0.9, 0.9, 0, 'stall', 1],
@@ -238,6 +240,8 @@ const PS_SW = [PS_V[0] - PS_U[0] * 3, PS_V[1] - PS_U[1] * 3];
 const psSouthWalk = (x) => PS_SW[1] - (x - PS_SW[0]) * Math.tan(PS_A);
 const PS_GARAGE = [[PS_SW[0] + (PS_SW[1] - 4) / Math.tan(PS_A), 4], [42, 4], [42, psSouthWalk(42)]];
 const psHyp = (z) => PS_V[0] + (z - PS_V[1]) * Math.tan(PS_A); // the plaza's east edge (x) at a given z
+// street signs in the "Road Signs" pack: mesh node numbers
+const ROAD_SIGNS = { noparking: 4, detour: 50, towaway: 56, roadwork: 58, pedestrian: 68, parking: 80 };
 const PIONEER_CENTER = [
   // ---- Pioneer Place: granite paving (runs on under the building fronts), the Underground beneath its south edge
   [8.5, -16.5, 25, 41, 0, 0, 'paving'],
@@ -304,6 +308,12 @@ const PIONEER_CENTER = [
   // ---- spawn lots at both ends (past the map's built edge): staggered HESCO
   [44, -28, 1, 4, 3.5, 0, 'hesco'], [43, 10, 1, 4, 3.5, 0, 'hesco'], [46, 18, 1, 4, 3.5, 0, 'hesco'], [46, -2, 1, 4, 3.5, 0, 'hesco'], [46, -22, 1, 4, 3.5, 0, 'hesco'], [48, 30, 3, 1, 3.5, 0, 'hesco'], [48, -34, 3, 1, 3.5, 0, 'hesco'], [51, 8, 2, 2, 1.2, 0, 'ammo'],
   [-44, 28, 1, 4, 3.5, 0, 'hesco'], [-43, -10, 1, 4, 3.5, 0, 'hesco'], [-43, 14, 1, 4, 3.5, 0, 'hesco'], [43, -14, 1, 4, 3.5, 0, 'hesco'], [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
+  // ---- street signs on the sidewalks and dumpsters in the back corners
+  [-6.8, 30, 0, 0, 0, 0, 'rsign', { n: 'noparking', ry: -Math.PI / 2 }],
+  [-6.8, -12, 0, 0, 0, 0, 'rsign', { n: 'noparking', ry: -Math.PI / 2 }], [-23.2, -18, 0, 0, 0, 0, 'rsign', { n: 'towaway', ry: Math.PI / 2 }],
+  [-34, 23.2, 0, 0, 0, 0, 'rsign', { n: 'roadwork', ry: -Math.PI / 2 }], [-40, 6.8, 0, 0, 0, 0, 'rsign', { n: 'detour', ry: -Math.PI / 2 }],
+  [-6.8, 6.6, 0, 0, 0, 0, 'rsign', { n: 'pedestrian', ry: -Math.PI / 2 }], [32, 6.8, 0, 0, 0, 0, 'rsign', { n: 'parking' }],
+  [-39, -15.5, 1.9, 1.35, 1.25, 0, 'dumpster', {}], [-24.2, 30.5, 1.35, 1.9, 1.25, 0, 'dumpster', { dark: true }],
   // ---- Smith Tower, up Yesler to the east
   [96, -14, 12, 12, 62, 0, 'tower'],
   // ---- perimeter
@@ -589,7 +599,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (!XF) return solidAA(cx, cz, w, d, h, y0, surface);
     return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
   };
-  const SURFACE = { infokiosk: 'wood', bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
+  const SURFACE = { dumpster: 'metal', infokiosk: 'wood', bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
   const NO_SOLID = new Set(['house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- shared decals / glows ----------
@@ -1991,6 +2001,27 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (let x = cx - w / 2 + 8; x < cx + w / 2 - 3; x += 13) put(new THREE.CircleGeometry(0.38, 18), M.dark, x, 0.031, cz + (rnd() - 0.5) * 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false });
         break;
       }
+      case 'rsign': {
+        // a street sign on a post, facing +z turned by extra.ry (CC-BY "Road Signs" by FrodoUndead), or a plain plate
+        const pc = propFit('roadsigns', new RegExp(`^Object_${ROAD_SIGNS[extra.n]}$`), 'y', 2.9);
+        if (pc) for (const { geo, mat } of pc.parts) put(geo.clone(), mat, cx, 0, cz, extra.ry || 0, { grime: 0 });
+        else {
+          put(new THREE.CylinderGeometry(0.035, 0.035, 2.5, 6), M.dark, cx, 1.25, cz, 0, { grime: 0.2 });
+          put(flatBox(0.6, 0.6, 0.03, 0), M.paint, cx, 2.3, cz, extra.ry || 0, { tint: 0xd8d2c0, grime: 0.1 });
+        }
+        break;
+      }
+      case 'dumpster': {
+        // a commercial dumpster, lid hinged at the back (CC-BY "dumpster" by YJ_: green 4-yard, or extra.dark the black 6-yard)
+        const ry = (w > d ? 0 : -Math.PI / 2) + (extra.flip ? Math.PI : 0) + (extra.ry || 0);
+        const pc = propFit('dumpster', extra.dark ? /^6Y/ : /^4Y/, 'x', Math.max(w, d));
+        if (pc) for (const { geo, mat } of pc.parts) put(geo.clone(), mat, cx, y0, cz, ry, { grime: 0 });
+        else {
+          B(M.paint, w, h, d, cx, y0, cz, 0, { tint: extra.dark ? 0x30343a : 0x2f5a3a, grime: 0.4 });
+          B(M.rubber, w + 0.1, 0.08, d + 0.1, cx, y0 + h, cz, 0, { grime: 0 });
+        }
+        break;
+      }
       case 'bollard': {
         solid(cx, cz, 0.3, 0.3, 1.0, 0, 'metal');
         put(new THREE.CylinderGeometry(0.13, 0.15, 0.95, 10), M.iron, cx, 0.475, cz, 0, { grime: 0.2 });
@@ -2143,6 +2174,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       solid(cx, cz, al ? w : 0.6, al ? 0.6 : d, 0.3, y0, 'concrete');
       solid(cx, cz, al ? w : 0.3, al ? 0.3 : d, h - 0.3, y0 + 0.3, 'concrete');
     } else if (kind === 'bench') solid(cx, cz, w, d, 0.95, y0, 'wood').pass = true;
+    else if (kind === 'rsign') solid(cx, cz, 0.12, 0.12, 2.2, y0, 'metal').pass = true;   // the post: stops you, not bullets
     else if (kind === 'stairs' && PROPS.stairs) solid(cx - (extra === 1 ? Math.sign(cx) * 0.2 : 0), cz, w - (extra === 1 ? 0.4 : 0), d, Math.min(h, 0.35), Math.max(0, h - 0.35), 'wood');   // the treads, open underneath like the model
     else if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
@@ -2159,6 +2191,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const mx = kind === 'house' ? mirrorSpec(extra) : kind === 'lights' ? [-extra[0], -extra[1], -extra[2], -extra[3]]
       : kind === 'cable' ? [-extra[0], -extra[1], extra[2], -extra[3], -extra[4], extra[5]]
       : kind === 'stairdown' ? { ...extra, dir: -((extra && extra.dir) || 1) }
+      : kind === 'dumpster' || kind === 'rsign' ? { ...extra, ry: ((extra && extra.ry) || 0) + Math.PI }
       : kind === 'tunnel' ? { ...extra, gaps: (extra && extra.gaps || []).map(([k, at, wd]) => [flipSide[k], -at, wd]) }
       : extra;
     add(-cx, -cz, w, d, h, y0, kind, mx, 0);

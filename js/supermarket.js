@@ -9,6 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { cloneSoldier } from './assets.js';
 import { armIK } from './character.js';
+import { propFit } from './props.js';
 
 // store shell: x -22..22 (front at -x), z -24..24, 6 m to the roof
 const X0 = -22, X1 = 22, Z0 = -24, Z1 = 24, H = 6, T = 0.4;
@@ -342,6 +343,18 @@ function build(ctx) {
     const g = new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2);
     const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / sc, uv.getY(i) * d / sc);
     U(g, mat, x, y, z);
+  };
+  // a piece of a CC-BY prop pack (props.js), base at y, turned by ry: batched with the ground floor, or (up)
+  // merged with the upstairs so the minimap doesn't show it
+  const model = (pc, x, y, z, ry = 0, up = false) => {
+    for (const { geo, mat } of pc.parts) up ? U(geo.clone(), mat, x, y, z, ry) : P(geo.clone(), mat, x, y, z, ry, { cast: true });
+  };
+  // street signs on posts (sign front faces +z before the turn): the pole stops you, bullets pass it
+  const signPost = (n, x, z, ry) => {
+    const pc = propFit('signs', new RegExp(`^(Box|Cylinder)0*${n}_`), 'y', 2.6);
+    if (!pc) return;
+    model(pc, x, 0, z, ry);
+    solid(x, z, 0.12, 0.12, 2.0, 0, 'metal').pass = true;
   };
   const flushOver = () => {
     for (const [mat, list] of over) {
@@ -825,7 +838,18 @@ function build(ctx) {
   SB(M.steelK, 0.8, 1.0, 0.85, -9.0, 0, -23.35, { grime: 0 }, 'metal');                    // fryer
   P(new THREE.BoxGeometry(0.6, 0.02, 0.6), M.ovenGlow, -9.0, 1.01, -23.35, 0);
   SB(M.steelK, 3.6, 0.9, 1.0, -9.4, 0, -21.0, { grime: 0 }, 'metal');                      // prep island
-  for (let i = 0; i < 5; i++) P(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 14), M.wood, -10.8 + i * 0.7, 0.91, -21.0, 0, { tint: 0xd8b888 });
+  // cookware (CC-BY "Kitchen tools Pack"): a stock pot and a pan on the range; a board and knife, bowls and
+  // plates on the island
+  const kit = (re, len, axis = 'x') => propFit('kitchen', re, axis, len);
+  const pot = kit(/^(Cylinder00[2-6]|Vert|Cube002)_kitchen/, 0.42), pan = kit(/^(Cylinder|Cylinder001|Plane)_kitchen/, 0.5);
+  const board = kit(/^Cube006_kitchen/, 0.42), knife = kit(/^Cube(00[1345])?_kitchen/, 0.28);
+  const bowl = kit(/^Cylinder009_kitchen/, 0.2), plate = kit(/^Cylinder010_kitchen/, 0.24), mug = kit(/^(Cylinder01[12]|Vert001)_kitchen/, 0.1);
+  if (pot && board) {
+    model(pot, -7.5, 0.93, -23.35); model(pan, -6.0, 0.93, -23.3, 0.4);
+    model(board, -10.5, 0.9, -21.0, 0.2); model(knife, -10.45, 0.92, -20.95, 0.6);
+    for (const [x, z] of [[-9.5, -21.2], [-9.2, -20.8]]) model(bowl, x, 0.9, z);
+    for (let i = 0; i < 4; i++) model(plate, -8.3, 0.9 + i * 0.02, -21.05);
+  } else for (let i = 0; i < 5; i++) P(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 14), M.wood, -10.8 + i * 0.7, 0.91, -21.0, 0, { tint: 0xd8b888 });
   SB(M.steelK, 2.2, 0.9, 0.7, -3.4, 0, -20.0, { grime: 0 }, 'metal');                     // sinks against the front wall
   for (const x of [-4.0, -2.8]) { P(new THREE.BoxGeometry(0.5, 0.02, 0.45), M.dark, x, 0.91, -20.05); P(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 6), M.steelK, x, 1.08, -19.75); }
   SB(M.steelK, 1.6, 1.9, 0.5, -11.0, 0, -23.65, { grime: 0 }, 'metal');         // dish shelving
@@ -906,7 +930,12 @@ function build(ctx) {
   rack(15.6, 21.6, -23.3); rack(18.0, 21.9, -14.0);
   palletStack(20.8, -20.6, 1.4); palletStack(16.4, -10.2, 1.2); palletStack(21.2, -9.6, 1.6);
   for (const [x, z] of [[21.3, -11.6], [20.7, -11.9], [21.3, -12.3]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
-  for (let i = 0; i < 4; i++) SB(M.paint, 0.5, 1.9, 0.5, 15.45, 0, -12.8 + i * 0.52, { tint: 0x4a6a8a }, 'metal');   // staff lockers
+  // staff lockers (CC-BY "Locker", doors facing into the room) or painted boxes
+  const locker = propFit('locker', null, 'y', 1.9);
+  for (let i = 0; i < 4; i++) {
+    if (locker) { model(locker, 15.45, 0, -12.8 + i * 0.52); solid(15.45, -12.8 + i * 0.52, 0.5, 0.5, 1.9, 0, 'metal'); }
+    else SB(M.paint, 0.5, 1.9, 0.5, 15.45, 0, -12.8 + i * 0.52, { tint: 0x4a6a8a }, 'metal');
+  }
   P(new THREE.BoxGeometry(0.12, 0.4, 0.3), M.dark, 15.2, 1.4, -15.4);                                                  // time clock
   signMesh(signTex(['STOCK ROOM', 'STAFF ONLY'], { bg: '#d8d4cc', fg: '#8a1a1a', font: 'bold 44px Arial', w: 256, h: 160 }), 0.8, 0.5, 14.84, 2.9, -14.0, -Math.PI / 2, 0.3, { noMinimap: true });
   // the open corner by the catwalk stair: overstock pallets
@@ -937,18 +966,40 @@ function build(ctx) {
   UF(M.wood, 5, 8, -19.5, UP + 0.006, -20, ctx.scaleOf(M.wood) || 2);
   UF(M.checker || M.tile, 5, 8, -14.5, UP + 0.006, -20, M.checker ? 3.0 : (ctx.scaleOf(M.tile) || 1));
   const SU = (mat, w, h, d, x, y, z, tint, surf = 'wood') => { solid(x, z, w, d, h, y, surf); UB(mat, w, h, d, x, y, z, tint); };
-  const desk = (x, z, y = UP) => {
+  // office furniture (CC-BY "Low Poly Office Cubicle Assets"; its fronts face +x) where loaded, boxes otherwise
+  const off = (re, axis, len, ry = 0) => propFit('office', re, axis, len, ry);
+  const monitor = off(/^Computer_Monitor/, 'y', 0.42, -Math.PI / 2), tower = off(/^PC_Tower/, 'y', 0.42, -Math.PI / 2);
+  const chair = off(/^Chair/, 'y', 1.05, Math.PI / 2);
+  const desk = (x, z, y = UP, i = 0) => {   // i: the second desk gets a coffee mug
     SU(M.wood, 1.6, 0.06, 0.8, x, y + 0.72, z, 0xc8a878);
     for (const dx of [-0.75, 0.75]) UB(M.dark, 0.05, 0.72, 0.75, x + dx, y, z);
+    U(new THREE.BoxGeometry(0.42, 0.02, 0.14), M.dark, x, y + 0.79, z + 0.1);
+    if (monitor) {
+      solid(x + 0.1, z + 0.7, 0.5, 0.5, 0.5, y, 'cloth');
+      model(monitor, x, y + 0.78, z - 0.15, 0, true);
+      model(tower, x - 0.5, y, z - 0.1, 0, true);
+      model(chair, x + 0.1, y, z + 0.75, 0, true);
+      if (mug && i) model(mug, x + 0.5, y + 0.78, z - 0.05, 2, true);
+      return;
+    }
+    SU(M.fabric, 0.5, 0.5, 0.5, x + 0.1, y, z + 0.7, 0xffffff, 'cloth');
     U(new THREE.BoxGeometry(0.55, 0.34, 0.03), M.screen, x, y + 1.02, z - 0.2);
     U(new THREE.BoxGeometry(0.06, 0.2, 0.06), M.dark, x, y + 0.85, z - 0.22);
-    U(new THREE.BoxGeometry(0.42, 0.02, 0.14), M.dark, x, y + 0.79, z + 0.1);
-    SU(M.fabric, 0.5, 0.5, 0.5, x + 0.1, y, z + 0.7, 0xffffff, 'cloth');
     U(new THREE.BoxGeometry(0.5, 0.55, 0.08), M.fabric, x + 0.1, y + 0.8, z + 0.95);
   };
   // office (x -22..-17): two desks, filing cabinets, a whiteboard
-  desk(-19.6, -22.9); desk(-19.6, -19.3);
-  for (let i = 0; i < 3; i++) SU(M.paint, 0.5, 1.3, 0.6, -21.6, UP, -17.0 - i * 0.62, 0x8a8e92, 'metal');
+  desk(-19.6, -22.9); desk(-19.6, -19.3, UP, 1);
+  const cabinet = off(/^4_Drawer/, 'y', 1.3);
+  for (let i = 0; i < 3; i++) {
+    if (cabinet) { solid(-21.6, -17.0 - i * 0.62, 0.5, 0.6, 1.3, UP, 'metal'); model(cabinet, -21.6, UP, -17.0 - i * 0.62, 0, true); }
+    else SU(M.paint, 0.5, 1.3, 0.6, -21.6, UP, -17.0 - i * 0.62, 0x8a8e92, 'metal');
+  }
+  if (cabinet) {
+    model(off(/^Potted_Plant/, 'y', 0.5), -21.6, UP + 1.3, -17.0, 0, true);
+    model(off(/^(Printer|Tray)/, 'y', 0.42), -21.6, UP + 1.3, -18.24, 0, true);
+    model(off(/^(Corkboard|Pin_|Sticky|Pinned)/, 'y', 0.75), -21.86, UP + 1.25, -21.1, 0, true);
+    model(off(/^Trash/, 'y', 0.4), -18.4, UP, -23.6, 0, true);
+  }
   U(new THREE.PlaneGeometry(1.4, 0.9), M.paint, -17.09, UP + 1.6, -22.6, -Math.PI / 2, 0xf4f4f0);
   // break room (x -17..-12): table and chairs, vending machine, fridge, counter with a microwave
   SU(M.wood, 1.0, 0.75, 1.8, -14.0, UP, -20.6, 0xd8c8a8);
@@ -958,6 +1009,9 @@ function build(ctx) {
   SU(M.paint, 0.8, 1.8, 0.7, -16.45, UP, -17.0, 0xe8e8e4, 'metal');
   SU(M.woodOld, 2.4, 0.9, 0.6, -13.6, UP, -16.45, 0x8a7a6a);
   U(new THREE.BoxGeometry(0.45, 0.3, 0.35), M.dark, -13.0, UP + 1.05, -16.45);
+  const cooler = off(/^Water/, 'y', 1.35);
+  if (cooler) { model(cooler, -16.65, UP, -22.4, 0, true); solid(-16.65, -22.4, 0.4, 0.4, 1.35, UP, 'metal'); }
+  if (mug) for (const [x, y, z, r] of [[-14.2, 0.9, -16.4, 0.3], [-14.5, 0.9, -16.55, 2], [-13.8, 0.75, -20.3, 1]]) model(mug, x, UP + y, z, r, true);   // two on the counter, one on the table
   signMesh(signTex(['BREAK ROOM'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 50px Arial', w: 256, h: 128 }), 0.7, 0.35, -16.91, UP + 2.35, -18.0, Math.PI / 2, 0.3, { noMinimap: true });
   signMesh(signTex(['OFFICE'], { bg: '#d8d4cc', fg: '#1a1a1a', font: 'bold 56px Arial', w: 256, h: 128 }), 0.7, 0.35, -17.09, UP + 2.35, -18.0, -Math.PI / 2, 0.3, { noMinimap: true });
   { const L = new THREE.PointLight(0xfff4e4, 9, 10, 1.3); L.position.set(-17, UP + 2.2, -20); L.userData.mapLight = true; group.add(L); }
@@ -1030,6 +1084,8 @@ function build(ctx) {
     P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, -32.9, 0.75, z, Math.PI / 2);
   }
   for (const z of [-21, -13, -9, 9, 13, 21]) { P(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10), M.paint, -24.8, 0.45, z, 0, { tint: 0xe8c020 }); solid(-24.8, z, 0.25, 0.25, 0.9, 0, 'metal'); }
+  // signs on posts (CC-BY "Sign package"): accessible parking and no parking by the entrances
+  signPost(7, -25.0, -16.6, -Math.PI / 2); signPost(6, -25.0, 16.6, -Math.PI / 2);
   // store sign
   const logo = signTex('FRESHWAY', { bg: null, fg: '#e8402a', font: 'bold 92px Arial', w: 1024, h: 160 });
   signMesh(logo, 12, 1.9, X0 - T - 0.14, 4.3, 0, -Math.PI / 2, 2.2, { transparent: true });
@@ -1114,8 +1170,12 @@ function build(ctx) {
   decal(new THREE.MeshBasicMaterial({ color: 0xd8c050, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), 4.2, 6, 26, 0.02, -1, 0, -Math.PI / 2);
   // roll-up door half open over the stockroom opening
   B(M.metal, 0.08, 2.2, 4.2, X1 + T + 0.02, 3.6, -0.5, 0, { tint: 0x8a9096, grime: 0.3 });
-  // dumpsters by the bakery door
+  // dumpsters by the bakery door (CC-BY "dumpster": the green 4-yard, or the black 6-yard for the blue ones,
+  // both scaled to the same 1.9 m footprint)
+  const dumpModels = { green: propFit('dumpster', /^4Y/, 'x', 1.9), dark: propFit('dumpster', /^6Y/, 'x', 1.9) };
   const dumpster = (x, z, tint) => {
+    const pc = dumpModels[tint === 0x2f5a3a ? 'green' : 'dark'];
+    if (pc) { model(pc, x, 0, z); solid(x, z, 1.9, Math.min(1.3, pc.size.z), pc.size.y, 0, 'metal'); return; }
     SB(M.paint, 1.9, 1.25, 1.2, x, 0, z, { tint, grime: 0.4 }, 'metal');
     B(M.rubber, 2.0, 0.08, 1.3, x, 1.25, z, 0, { grime: 0 });
   };
@@ -1312,6 +1372,8 @@ function build(ctx) {
   for (const x of [-32, -10, 14, 34]) addKind(x, -36.6, 0, 0, 9, 0, 'tree');
   // loading yard: blue drums, crate stacks, a second forklift, and a fenced pallet compound on the +z end
   for (const [x, z] of [[29.5, -13.5], [30.2, -13.1], [29.8, -12.4], [33.6, 15.4], [34.2, 15.9], [24.8, -27.6], [25.5, -28]]) addKind(x, z, 0.62, 0.62, 0.9, 0, 'barrel', 1);
+  signPost(9, 28.7, -14.3, Math.PI / 2);   // DANGER: CHEMICAL STORAGE by the drums
+  signPost(8, 22.95, -13.6, Math.PI / 2);  // the smoker's sign by the staff door
   addKind(28.6, 20.6, 1.6, 1.6, 1.6, 0, 'crate'); addKind(28.8, 20.6, 1.4, 1.4, 1.4, 1.6, 'crate'); addKind(30.3, 20.9, 1.6, 1.6, 1.6, 0, 'crate');
   forklift(31.5, -28.5);
   palletStack(36.5, -29.5, 1.6); palletStack(36.5, -31.2, 1.1); palletStack(27.5, -31.5, 1.2);
