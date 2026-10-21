@@ -312,7 +312,7 @@ export class BotBrain {
       } else if (dist < mn) {
         wish.addScaledVector(_c, -1);
       }
-      if (!nav.isOpenAt(b.pos.x + wish.x * 1.2, b.pos.z + wish.z * 1.2)) {
+      if (!nav.gridAt(b.pos).isOpenAt(b.pos.x + wish.x * 1.2, b.pos.z + wish.z * 1.2)) {   // no strafing off a platform edge
         this.strafeDir *= -1;
         wish.addScaledVector(perp, this.strafeDir * 2);
       }
@@ -396,7 +396,7 @@ export class BotBrain {
 
   // head for the nearest clear direction (or the centre of the nearest open nav cell) for a moment
   startUnstick() {
-    const b = this.bot, nav = this.game.world.nav;
+    const b = this.bot, nav = this.game.world.nav.gridAt(this.bot.pos);   // the level it's on (out of a track pit, say)
     const cell = nav.nearestOpen(nav.ci(b.pos.x), nav.cj(b.pos.z));
     let best = null, bestS = -Infinity;
     const base = Math.random() * Math.PI * 2;

@@ -569,9 +569,10 @@ export class Game {
           if (this.frozen) c.updateMovement(dt, ZERO, false, false);
           else this.brains.get(c).update(dt);
         }
-        c.updateCommon(dt);
-        // a train on the tracks (King Street Station): the host or an offline match decides, like any kill
+        // a train on the tracks (King Street Station): the host or an offline match decides, like any kill;
+        // before moving, or the train's collision box would first shove them up onto its roof
         if (c.alive && this.world.trainHit && this.world.trainHit(c.pos)) c.takeDamage(999, null, 'train', false, c.pos);
+        c.updateCommon(dt);
         if (!c.alive && this.live && !this.gm) {
           c.respawnT -= dt;
           if (c.respawnT <= 0) this.respawn(c);
