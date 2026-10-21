@@ -191,8 +191,8 @@ export const DIFFICULTY = {
 export const QUALITY = {
   low: { label: 'Low', pixelRatio: 0.75, shadows: 1024, softShadows: false, shadowEvery: 2, ao: false, bloom: true, aa: true, msaa: 0, lights: false, motes: 0, aniso: 4 },
   medium: { label: 'Medium', pixelRatio: 1, shadows: 2048, softShadows: true, shadowEvery: 2, ao: false, bloom: true, aa: true, msaa: 2, lights: true, motes: 140, aniso: 8 },
-  high: { label: 'High', pixelRatio: 1.25, shadows: 4096, softShadows: true, shadowEvery: 2, ao: true, bloom: true, aa: true, msaa: 4, lights: true, motes: 220, aniso: 8 },
-  ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, softShadows: true, shadowEvery: 1, ao: true, bloom: true, aa: true, msaa: 4, lights: true, motes: 300, aniso: 16 },
+  high: { label: 'High', pixelRatio: 1.25, shadows: 4096, softShadows: true, shadowEvery: 2, ao: true, bloom: true, aa: true, msaa: 0, lights: true, motes: 220, aniso: 8 },
+  ultra: { label: 'Ultra', pixelRatio: 2, shadows: 4096, softShadows: true, shadowEvery: 2, ao: true, bloom: true, aa: true, msaa: 2, lights: true, motes: 300, aniso: 16 },
   // phones and tablets: draws straight to the screen with hardware MSAA (near free on mobile GPUs) instead of the
   // post-processing chain, flat-edged world geometry, hard 1K shadows refreshed every third frame, and a pixel
   // budget so high-DPI screens don't render 3-4x more pixels than they can show. Distant players animate at a

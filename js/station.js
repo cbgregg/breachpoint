@@ -336,10 +336,10 @@ export function buildStation(ctx) {
   const sounds = [];
   const trains = TRACKS.map(tr => makeTrain(tr, std));
   for (const t of trains) {
-    group.add(t.group);
+    group.add(t.group, t.head);
     // a collision box per car, moved along with the train (parked far away while it's out of sight)
     t.cars = [0, 1].map(() => physics.addBox(new Box(t.tr.x - TW / 2, T_BOT, 9000, t.tr.x + TW / 2, T_TOP, 9000 + CAR)));
-    for (const c of t.cars) c.surface = 'metal';
+    for (const c of t.cars) { c.surface = 'metal'; c.dynamic = true; }   // it moves: the physics grid checks it every time
   }
   const state = trains.map(() => ({ s: -1e9, v: 0, phase: -1 }));
 
@@ -351,6 +351,8 @@ export function buildStation(ctx) {
       const shown = Math.abs(zc) < 110;
       t.group.visible = shown;
       t.group.position.set(tr.x, 0, zc);
+      t.head.intensity = shown ? 14 : 0;
+      t.head.position.set(tr.x, YP + 0.6, zc + tr.dir * (HALF + 2));
       t.cars.forEach((b, k) => {
         const c = shown ? zc + tr.dir * (k ? -1 : 1) * (CAR / 2 + GAP / 2) : 9000;   // car 0 leads
         b.minz = c - CAR / 2; b.maxz = c + CAR / 2;
@@ -490,11 +492,13 @@ function makeTrain(tr, std) {
   meshes(merged(doorsShut), shut); meshes(merged(doorsOpen), opened);
   opened.visible = false;
   group.add(shut, opened);
-  // headlight on the road ahead (dynamic lights are off on the lower quality settings)
-  const L = new THREE.PointLight(0xfff2dc, 14, 30, 1.5); L.position.set(0, YP + 0.6, CAR + GAP / 2 + 2); L.userData.mapLight = true; group.add(L);
+  // headlight on the track ahead (dynamic lights are off on the lower quality settings). It lives outside the
+  // train's group and only dims to nothing while the train is away: a light appearing or disappearing changes
+  // the scene's light count, and three.js then recompiles every lit material (a stutter each time a train came)
+  const head = new THREE.PointLight(0xfff2dc, 0, 30, 1.5); head.userData.mapLight = true;
   group.rotation.y = tr.dir > 0 ? 0 : Math.PI;
   group.visible = false;
-  return { group, tr, open: false, setDoors: (o) => { shut.visible = !o; opened.visible = o; } };
+  return { group, head, tr, open: false, setDoors: (o) => { shut.visible = !o; opened.visible = o; } };
 }
 
 // merge plain BufferGeometries (position, normal, uv) into one
