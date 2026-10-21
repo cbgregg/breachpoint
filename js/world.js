@@ -2019,7 +2019,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         }
         break;
       }
-      case 'station': station = buildStation({ put, flatBox, solid, physics, group, M, glowsHot }); break;
+      case 'station': station = buildStation({ put, flatBox, solid, physics, group, M }); break;
       case 'bollard': {
         solid(cx, cz, 0.3, 0.3, 1.0, 0, 'metal');
         put(new THREE.CylinderGeometry(0.13, 0.15, 0.95, 10), M.iron, cx, 0.475, cz, 0, { grime: 0.2 });

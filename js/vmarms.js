@@ -128,27 +128,76 @@ function applyPose(h, p) {
   t1.rotation.x = -p.t[3]; t2.rotation.x = -p.t[4];
 }
 
-// sleeve segment: a lathe from the joint toward -y with a rounded cap, a muscle swell, cloth bunching near the
-// joints and a hem at the far end; oval in section (wider across x). Scaled to the solved length.
-function limb(L, prof, mat, hem) {
-  const pts = [new THREE.Vector2(0.0001, prof[0] * 0.9)];
-  pts.push(new THREE.Vector2(prof[0] * 0.62, prof[0] * 0.66), new THREE.Vector2(prof[0] * 0.9, prof[0] * 0.36));
-  const n = 28;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const k = t * (prof.length - 2), a = Math.floor(k), f = k - a;
-    let r = prof[1 + a] + ((prof[2 + a] ?? prof[1 + a]) - prof[1 + a]) * (f * f * (3 - 2 * f));
-    r += 0.0016 * Math.sin(t * 41 + 1.3) * (t < 0.3 || t > 0.7 ? 1 : 0.35); // folds
-    pts.push(new THREE.Vector2(r, -t * L));
+// limbs are built as rings down local -y (the joint at 0, the far end at -L), oval in section (wide across x,
+// which lines up with the back of the hand), with the cloth's folds pushed into the surface itself.
+// r(t) is the radius at t (0 at the joint, 1 at the far end; t < 0 runs back past the joint); fold(t, a) adds
+// to it at angle a round the limb. Both ends are left open: they sit inside a cap, a cuff or out of view.
+function shell(L, t0, t1, r, fold, sx = 1.15, sz = 0.86) {
+  const S = 36, N = 64, pos = [], uv = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const t = t0 + (t1 - t0) * i / N;
+    for (let j = 0; j <= S; j++) {
+      const a = j / S * Math.PI * 2, rr = r(t) + (fold ? fold(t, a) : 0);
+      pos.push(Math.cos(a) * rr * sx, -t * L, Math.sin(a) * rr * sz);
+      uv.push(j / S, t * L * 2.5);
+    }
   }
-  if (hem) { const r = prof[prof.length - 1]; pts.push(new THREE.Vector2(r * 1.1, -L - 0.004), new THREE.Vector2(r * 1.1, -L - 0.016), new THREE.Vector2(r * 0.8, -L - 0.018)); }
-  else pts.push(new THREE.Vector2(0.0001, -L - 0.001));
-  const g = new THREE.LatheGeometry(pts.reverse(), 22);
-  g.scale(1.12, 1, 0.88);
+  for (let i = 0; i < N; i++) for (let j = 0; j < S; j++) {
+    const a = i * (S + 1) + j, b = a + S + 1;
+    idx.push(a, a + 1, b, a + 1, b + 1, b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
   g.computeVertexNormals();
-  const grp = new THREE.Group();
-  const m = new THREE.Mesh(g, mat); m.castShadow = false; grp.add(m);
-  return grp;
+  return g;
+}
+// smooth curve through [t, value] keys
+const curve = (keys) => (t) => {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) {
+    const [ta, a] = keys[i - 1], [tb, b] = keys[i], f = (t - ta) / (tb - ta);
+    return a + (b - a) * f * f * (3 - 2 * f);
+  }
+  return keys[keys.length - 1][1];
+};
+const bump = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));   // 0 before a, 1 after b
+// a rounded end over [c - len, c] (t units): the radius closes like a hemisphere
+const capped = (r, c, len, back = false) => (t) => {
+  const d = back ? (c - t) / len : (t - c) / len;
+  return d <= 0 ? r(t) : r(c) * Math.sqrt(Math.max(0, 1 - Math.min(1, d) ** 2));
+};
+const mesh = (g, mat) => { const m = new THREE.Mesh(g, mat); m.castShadow = false; return m; };
+
+// forearm, elbow (0) to wrist (-L): the jacket sleeve over the muscle (full near the elbow, where the forearm
+// flexors swell, tapering to the wrist), bunched cloth at the elbow and above the cuff, a cuff band with a
+// velcro tab, then the glove's gauntlet coming out of it with a strap round the wrist
+function forearm(L, M) {
+  const g = new THREE.Group();
+  const sleeveR = curve([[0, 0.048], [0.12, 0.054], [0.3, 0.056], [0.52, 0.05], [0.7, 0.043], [0.8, 0.04], [0.84, 0.042], [0.88, 0.045], [0.9, 0.045]]);
+  const folds = (t, a) =>
+    0.0032 * Math.sin(a * 2 + t * 48) * (1 - bump(t, 0.12, 0.3)) +                           // bunched at the elbow
+    0.0026 * Math.sin(t * 70 + Math.sin(a * 3) * 1.6) * bump(t, 0.6, 0.7) * (1 - bump(t, 0.8, 0.84)) +   // stacked above the cuff
+    0.0018 * Math.sin(a + t * 9) * Math.sin(t * 6);                                           // a long twist down the sleeve
+  g.add(mesh(shell(L, -0.13, 0.905, capped(sleeveR, 0, 0.13, true), folds), M.sleeve));
+  // cuff: a turned band and its tab
+  g.add(mesh(shell(L, 0.86, 0.905, () => 0.0465, (t, a) => 0.0006 * Math.sin(a * 9)), M.cuff));
+  const tab = new THREE.Mesh(new RoundedBoxGeometry(0.022, 0.034, 0.008, 2, 0.003), M.cuff);
+  tab.position.set(0.05, -0.885 * L, 0.004); tab.rotation.y = 0.1; g.add(tab);
+  // the glove's gauntlet and wrist strap
+  g.add(mesh(shell(L, 0.86, 1.01, curve([[0.86, 0.036], [0.95, 0.034], [1.01, 0.032]]), (t, a) => 0.0008 * Math.sin(a * 5 + t * 30)), M.glove));
+  g.add(mesh(shell(L, 0.935, 0.965, () => 0.0365, null), M.strap));
+  return g;
+}
+// upper arm, shoulder (0) to elbow (-L): runs on back past the shoulder (out of view however far the shoulder
+// comes forward), the biceps under the sleeve, cloth gathered in the crook of the elbow, a rounded elbow
+function upperArm(L, M) {
+  const r = curve([[-0.7, 0.064], [0, 0.062], [0.35, 0.06], [0.75, 0.054], [1, 0.05]]);
+  const folds = (t, a) => 0.0034 * Math.sin(t * 55 + a * 2) * bump(t, 0.72, 0.9) + 0.0015 * Math.sin(a * 2 - t * 7);
+  const g = new THREE.Group();
+  g.add(mesh(shell(L, -0.7, 1.12, capped(r, 1, 0.12), folds, 1.1, 0.95), M.sleeve));
+  return g;
 }
 
 export function createVmArms(team) {
@@ -163,6 +212,7 @@ export function createVmArms(team) {
     tip: new THREE.MeshStandardMaterial({ color: glove.clone().offsetHSL(0, 0, 0.025), roughness: 0.85 }),
     pad: new THREE.MeshStandardMaterial({ color: glove.clone().offsetHSL(0, -0.03, 0.035), roughness: 0.45, metalness: 0.08 }),
     strap: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.75 }),
+    cuff: new THREE.MeshStandardMaterial({ color: shirt.clone().offsetHSL(0, 0, -0.06), roughness: 0.95 }),
     sleeve: new THREE.MeshStandardMaterial({ map: fab.map, normalMap: fab.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.92 }),
   };
   const root = new THREE.Group();
@@ -183,14 +233,14 @@ export function createVmArms(team) {
     const hand = buildHand(side, M);
     let rig = null;
     if (HA) { rig = makeRig(HA, M.skin, side === 'L'); root.add(rig.root); hand.group.visible = false; }
-    const upper = limb(UPPER, [0.05, 0.052, 0.054, 0.05, 0.046], M.sleeve, false);
-    const fore = limb(FORE, [0.044, 0.046, 0.05, 0.048, 0.043, 0.038, 0.035], M.sleeve, true);
+    const upper = upperArm(UPPER, M);
+    const fore = forearm(FORE, M);
     root.add(upper, fore, hand.group);
     return { hand, upper, fore, rig };
   };
   return { root, R: mkArm('R'), L: mkArm('L'), M };
 }
-const UPPER = 0.36, FORE = 0.4;
+const UPPER = 0.33, FORE = 0.3;   // real proportions (a little long, for the bigger-than-life hands); the shoulder comes forward to reach
 
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
 // hand transform from a palm position and directions given in the gun's frame (or camera space if frame = null)
