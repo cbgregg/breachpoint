@@ -2,11 +2,11 @@
 """Shrink a .glb for the web: resize its embedded textures and recompress them.
 
     python3 tools/glb_shrink.py in.glb out.glb [--max 1024] [--quality 85] [--png-colors 256] [--drop NAME ...]
-                                   [--keep REGEX ...]
+                                   [--keep REGEX ...] [--mask] [--cutout 0.3]
 
 Textures larger than --max on their long side are halved until they fit. Images with real transparency stay
 PNG (--png-colors N makes them palette PNGs); everything else becomes JPEG, and a blended material whose
-colour texture turned out opaque becomes opaque. --drop removes mesh nodes whose
+colour texture turned out opaque becomes opaque (--mask makes the rest alpha-tested cut-outs). --drop removes mesh nodes whose
 name contains NAME (their geometry stays in the buffer, so dropping saves draw calls, not bytes). --keep keeps
 only the mesh nodes whose names match one of the regexes and prunes everything they don't use. The asset's
 credit (asset.extras: author, licence, source) is kept. Needs Pillow.
@@ -41,10 +41,15 @@ def write_glb(path, js, binc):
         if binc: f.write(struct.pack('<I4s', len(binc), b'BIN\x00') + binc)
 
 
-def shrink_image(data, mx, quality, colors=0):
+def shrink_image(data, mx, quality, colors=0, cutout=0.0):
     im = Image.open(io.BytesIO(data))
     im.load()
-    alpha = im.mode in ('RGBA', 'LA', 'P') and im.convert('RGBA').getextrema()[3][0] < 128   # real cut-outs, not a faint matte
+    alpha = False
+    if im.mode in ('RGBA', 'LA', 'P'):
+        a = im.convert('RGBA').getchannel('A').histogram()
+        # real cut-outs, not a faint matte; with --cutout F, only when more than F of the image is see-through
+        # (a texture atlas with transparent padding between its islands is opaque where it's used)
+        alpha = sum(a[:128]) > max(0.0, cutout) * sum(a) and sum(a[:128]) > 0
     while max(im.size) > mx:
         im = im.resize((max(1, im.width // 2), max(1, im.height // 2)), Image.LANCZOS)
     out = io.BytesIO()
@@ -58,8 +63,8 @@ def shrink_image(data, mx, quality, colors=0):
 
 
 def prune(js, keep, blobs):
-    """Keep only the mesh nodes whose names match, and drop every mesh, accessor, material, texture, image and
-    buffer view nothing uses any more. Returns the surviving view blobs."""
+    """Keep only the mesh nodes whose names match, and drop every mesh, accessor, material, texture, image,
+    uv set and buffer view nothing uses any more. Returns the surviving view blobs."""
     for n in js.get('nodes', []):
         if 'mesh' in n and not any(k.search(n.get('name', '')) for k in keep):
             del n['mesh']
@@ -86,6 +91,10 @@ def prune(js, keep, blobs):
     for r in refs: r['index'] = texs[r['index']]
     imgs = remap('images', {t['source'] for t in js['textures']})
     for t in js['textures']: t['source'] = imgs[t['source']]
+    # uv sets no material reads (only TEXCOORD_0 is used by most): drop them
+    uvs = {r.get('texCoord', 0) for r in refs}
+    for p in prims:
+        for k in [k for k in p['attributes'] if k.startswith('TEXCOORD_') and int(k[9:]) not in uvs]: del p['attributes'][k]
     accs = set()
     for p in prims:
         accs |= set(p['attributes'].values())
@@ -127,6 +136,8 @@ def main():
     ap.add_argument('--quality', type=int, default=85)
     ap.add_argument('--png-colors', type=int, default=0, help='quantize transparent textures to this many colours')
     ap.add_argument('--drop', nargs='*', default=[])
+    ap.add_argument('--cutout', type=float, default=0.0, help='treat a texture as see-through only when more than this fraction of it is')
+    ap.add_argument('--mask', action='store_true', help='turn blended materials into alpha-tested ones (cut-outs: no sorting trouble)')
     ap.add_argument('--keep', nargs='*', default=[], help='keep only mesh nodes whose name matches one of these regexes; prune the rest')
     a = ap.parse_args()
     js, binc = read_glb(a.src)
@@ -135,12 +146,14 @@ def main():
     views = js.get('bufferViews', [])
     for im in js.get('images', []):
         if 'bufferView' in im:
-            blobs[im['bufferView']], im['mimeType'] = shrink_image(blobs[im['bufferView']], a.max, a.quality, a.png_colors)
+            blobs[im['bufferView']], im['mimeType'] = shrink_image(blobs[im['bufferView']], a.max, a.quality, a.png_colors, a.cutout)
     # a blended material whose colour texture has no real transparency is opaque (no sorting trouble)
     for m in js.get('materials', []):
         bc = m.get('pbrMetallicRoughness', {}).get('baseColorTexture')
         if m.get('alphaMode') == 'BLEND' and bc and js['images'][js['textures'][bc['index']]['source']].get('mimeType') == 'image/jpeg':
             del m['alphaMode']
+        elif m.get('alphaMode') == 'BLEND' and a.mask:
+            m['alphaMode'], m['alphaCutoff'] = 'MASK', 0.5
     if a.drop:
         for n in js.get('nodes', []):
             if 'mesh' in n and any(s in n.get('name', '') for s in a.drop):

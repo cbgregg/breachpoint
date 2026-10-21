@@ -486,7 +486,12 @@ export class Game {
     this.input.poll(dt);
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
-    if (this.world.update) this.world.update(dt, performance.now() / 1000);
+    if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
+    // the world's own sounds (the station's trains), only in a match
+    if (this.world.sounds && this.world.sounds.length) {
+      if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) this.audio.play(name, pos, opts);
+      this.world.sounds.length = 0;
+    }
     // in-world music (the supermarket's speakers): only during a match, loud inside, faint outside
     const amb = this.world.ambient && (this.state === 'playing' || this.state === 'paused') ? this.world.ambient : null;
     this.music.ambient(amb ? amb.music : null);
@@ -500,6 +505,12 @@ export class Game {
     if (this.player && this.state !== 'menu') this.updateGlare(dt);
     this.renderer.render(dt, showVm);
     this.input.endFrame();
+  }
+
+  // a clock every machine in an online match agrees on (the host's match time): the station's trains run on it
+  netClock() {
+    if (this.session && this.session.hostNow) return this.session.hostNow();
+    return this.live ? this.time : performance.now() / 1000;
   }
 
   menuCamera(dt) {
@@ -559,6 +570,8 @@ export class Game {
           else this.brains.get(c).update(dt);
         }
         c.updateCommon(dt);
+        // a train on the tracks (King Street Station): the host or an offline match decides, like any kill
+        if (c.alive && this.world.trainHit && this.world.trainHit(c.pos)) c.takeDamage(999, null, 'train', false, c.pos);
         if (!c.alive && this.live && !this.gm) {
           c.respawnT -= dt;
           if (c.respawnT <= 0) this.respawn(c);

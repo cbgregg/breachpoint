@@ -149,8 +149,7 @@ export class BotBrain {
   setGoal(p, kind) {
     if (!this.goal || this.goal.distanceToSquared(p) > 4 || kind !== this.goalKind) {
       this.goal = p.clone();
-      const up = this.game.world.nav.upper;
-      this.goal.y = up && (up.y > 0 ? p.y > up.y - 1 : p.y < up.y + 1) ? up.y : 0;   // keep the level on two-level maps (upstairs or the Underground)
+      this.goal.y = this.game.world.nav.levelY(p);   // keep the level on multi-level maps (upstairs, the station)
       this.goalKind = kind;
       this.repathT = 0;
       this.goalT = kind === 'roam' || kind === 'intel' ? rand(10, 18) : 12;
