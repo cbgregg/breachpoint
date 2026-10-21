@@ -148,6 +148,8 @@ export class NavGrid {
     this.levels.forEach((L, i) => { const d = Math.abs(p.y - L.y); if (d < bd) { bd = d; best = i + 1; } });
     return best;
   }
+  // the grid for the level p is on (this one on the street)
+  gridAt(p) { const k = this.levels ? this.levelOf(p) : 0; return k ? this.levels[k - 1].grid : this; }
   levelY(p) { return this.levels ? (this.levelOf(p) ? this.levels[this.levelOf(p) - 1].y : 0) : 0; }
 
   findPath(from, to, route = null) {

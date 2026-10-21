@@ -263,7 +263,7 @@ export function buildStation(ctx) {
     const n = Math.round((YC - YP) / 0.333), rise = (YC - YP) / n, run = (s.bot - s.top) / n;
     for (let k = 1; k <= n; k++) {
       const top = YC - k * rise, za = s.top + (k - 1) * run;
-      solid((s.x0 + s.x1) / 2, (za + s.bot) / 2, s.x1 - s.x0, s.bot - za, top - YP, YP, 'concrete');
+      solid((s.x0 + s.x1) / 2, za + run / 2, s.x1 - s.x0, run, top - YP, YP, 'concrete');   // this tread, solid to the platform
       if (!model) put(flatBox(s.x1 - s.x0, 0.06, run, 0), concrete, (s.x0 + s.x1) / 2, top - 0.03, za + run / 2, 0, { grime: 0.3, tint: 0x9a948a });
     }
     // the mass under the stair, seen from the platform: tiled sides sloping down with the steps
@@ -372,12 +372,13 @@ export function buildStation(ctx) {
       bd.tex.needsUpdate = true;
     });
   }
-  // a moving train on top of you (anywhere on its track, from the bed to head height on the platform)
+  // a moving train on top of you: anywhere on its track, from the bed to its roof (the car's collision box
+  // shoves anyone it runs into up onto the roof, and there's no riding it through the tunnel either)
   function trainHit(p) {
     for (let i = 0; i < trains.length; i++) {
       const st = state[i], tr = trains[i].tr;
       if (st.v < 0.3 || st.zc === undefined) continue;
-      if (Math.abs(p.x - tr.x) > TW / 2 + 0.3 || p.y > YP + 2 || p.y < PIT - 1) continue;
+      if (Math.abs(p.x - tr.x) > TW / 2 + 0.3 || p.y > T_TOP + 1.5 || p.y < PIT - 1) continue;
       if (Math.abs(p.z - st.zc) < HALF + 0.3) return true;
     }
     return false;
