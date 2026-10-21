@@ -139,40 +139,72 @@ export class NavGrid {
     const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
     return (hsh(xi, yi) * (1 - sx) + hsh(xi + 1, yi) * sx) * (1 - sy) + (hsh(xi, yi + 1) * (1 - sx) + hsh(xi + 1, yi + 1) * sx) * sy;
   }
-  // two-level maps: this (ground) grid can carry an upper floor, { grid, y, portals: [{ bottom, top, rect }] }.
-  // A path between levels goes to a stair, climbs it waypoint by waypoint, and carries on on the other level.
+  // multi-level maps: this (ground) grid can carry more levels, levels = [{ grid, y, portals: [{ link, climb, rect }] }].
+  // Level 0 is this grid and level k is levels[k - 1]; a portal is a stair from level `link` to its own level,
+  // its climb waypoints listed in that order. Levels can chain (the street, a concourse, the platforms below
+  // it): a path between levels walks to a stair, climbs it waypoint by waypoint, and carries on.
+  levelOf(p) {
+    let best = 0, bd = Math.abs(p.y);
+    this.levels.forEach((L, i) => { const d = Math.abs(p.y - L.y); if (d < bd) { bd = d; best = i + 1; } });
+    return best;
+  }
+  levelY(p) { return this.levels ? (this.levelOf(p) ? this.levels[this.levelOf(p) - 1].y : 0) : 0; }
+
   findPath(from, to, route = null) {
-    const U = this.upper;
-    if (!U) return this.findPathFlat(from, to, route);
-    const onStair = (p) => U.portals.find(q => p.x > q.rect[0] && p.x < q.rect[2] && p.z > q.rect[1] && p.z < q.rect[3]);
-    // the other level can be above (an upper floor) or below (the Underground)
-    const lvl = (p) => (U.y > 0 ? p.y > U.y - 1.0 : p.y < U.y + 1.0) ? 1 : 0;
-    const fs = onStair(from), fl = fs ? ((U.y > 0 ? from.y > U.y * 0.5 : from.y < U.y * 0.5) ? 1 : 0) : lvl(from), tl = lvl(to);
-    if (fl === tl && !fs) return fl ? U.grid.findPathFlat(from, to) : this.findPathFlat(from, to, route);
-    // pick the stair with the shortest straight-line detour
-    let best = null, bd = Infinity;
-    for (const q of U.portals) {
-      const a = fl ? q.top : q.bottom, b = tl ? q.top : q.bottom;
-      const d = Math.hypot(a.x - from.x, a.z - from.z) + Math.hypot(b.x - to.x, b.z - to.z);
-      if (d < bd) { bd = d; best = q; }
-    }
-    if (!best) return [];
-    const dirUp = fs ? tl === 1 : tl > fl;
-    let climb = (dirUp ? best.climb : [...best.climb].reverse()).map(p => p.clone());
-    let legA = [];
-    if (fs === best) {
-      // already on this stair: carry on from the nearest step, don't walk back to its end
+    const L = this.levels;
+    if (!L || !L.length) return this.findPathFlat(from, to, route);
+    const Y = (k) => (k ? L[k - 1].y : 0);
+    const flat = (k, a, b) => (k ? L[k - 1].grid.findPathFlat(a, b) : this.findPathFlat(a, b, route));
+    // the stairs as edges between levels
+    const edges = [];
+    L.forEach((lv, i) => lv.portals.forEach(q => edges.push({ q, a: q.link, b: i + 1 })));
+    const levelRoute = (a, b) => {   // breadth-first over the levels
+      const prev = new Map([[a, -1]]), queue = [a];
+      while (queue.length) {
+        const k = queue.shift();
+        if (k === b) break;
+        for (const e of edges) for (const [u, v] of [[e.a, e.b], [e.b, e.a]]) if (u === k && !prev.has(v)) { prev.set(v, k); queue.push(v); }
+      }
+      if (!prev.has(b)) return null;
+      const out = [];
+      for (let k = b; k !== -1; k = prev.get(k)) out.unshift(k);
+      return out;
+    };
+    const tl = this.levelOf(to);
+    let cur = from, lv = this.levelOf(from);
+    const out = [];
+    // standing on a stair (between its two levels): carry on from the nearest step toward where we're going
+    const on = edges.find(e => from.x > e.q.rect[0] && from.x < e.q.rect[2] && from.z > e.q.rect[1] && from.z < e.q.rect[3] &&
+      Math.abs(from.y - Y(e.a)) > 0.5 && Math.abs(from.y - Y(e.b)) > 0.5);
+    if (on) {
+      const r = levelRoute(on.b, tl);
+      const up = !!r && !r.includes(on.a);   // the destination lies past the stair's own end
+      const climb = up ? on.q.climb : [...on.q.climb].reverse();
       let ni = 0, nd = Infinity;
-      climb.forEach((p, i) => { const d = Math.hypot(p.x - from.x, p.z - from.z); if (d < nd) { nd = d; ni = i; } });
-      climb = climb.slice(ni + 1);
-    } else {
-      const entry = dirUp ? best.bottom : best.top;
-      legA = fl ? U.grid.findPathFlat(from, entry) : this.findPathFlat(from, entry, route);
-      if (!legA.length && Math.hypot(from.x - entry.x, from.z - entry.z) > 1.2) return [];
+      climb.forEach((p, i) => { const d = Math.hypot(p.x - from.x, p.z - from.z) + Math.abs(p.y - from.y); if (d < nd) { nd = d; ni = i; } });
+      for (const p of climb.slice(ni + 1)) out.push(p.clone());
+      cur = climb[climb.length - 1]; lv = up ? on.b : on.a;
     }
-    const exit = dirUp ? best.top : best.bottom;
-    const legB = tl ? U.grid.findPathFlat(exit, to) : this.findPathFlat(exit, to, route);
-    return [...legA, ...climb, ...legB];
+    const levels = levelRoute(lv, tl);
+    if (!levels) return [];
+    for (let i = 1; i < levels.length; i++) {
+      const next = levels[i];
+      // the stair between these two levels with the shortest straight-line detour
+      let best = null, bd = Infinity;
+      for (const e of edges) {
+        if (!((e.a === lv && e.b === next) || (e.b === lv && e.a === next))) continue;
+        const c = e.a === lv ? e.q.climb : [...e.q.climb].reverse();
+        const d = Math.hypot(c[0].x - cur.x, c[0].z - cur.z) + Math.hypot(c[c.length - 1].x - to.x, c[c.length - 1].z - to.z);
+        if (d < bd) { bd = d; best = c; }
+      }
+      if (!best) return [];
+      const leg = flat(lv, cur, best[0]);
+      if (!leg.length && Math.hypot(cur.x - best[0].x, cur.z - best[0].z) > 1.2) return [];
+      out.push(...leg, ...best.map(p => p.clone()));
+      cur = best[best.length - 1]; lv = next;
+    }
+    out.push(...flat(lv, cur, to));
+    return out;
   }
 
   findPathFlat(from, to, route = null) {

@@ -102,6 +102,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     float integ = abs(dy) > 0.02 ? (exp(-FB * h0) - exp(-FB * (h0 + dy))) / (FB * dy) : exp(-FB * h0);
     float fGround = 1.0 - exp(-FG * fDist * max(integ, 0.0));
     float fogFactor = clamp(fHaze + fGround * (1.0 - fHaze), 0.0, 0.92);
+    fogFactor *= 1.0 - 0.85 * smoothstep(-0.5, -2.5, cameraPosition.y);   // underground (the station): no street haze
     float fSun = pow(max(dot(fDir, vec3(${fv(_sd.x)}, ${fv(_sd.y)}, ${fv(_sd.z)})), 0.0), 5.0);
     vec3 fCol = mix(fogColor, fogColor * vec3(1.15, 1.06, 0.92), fSun);
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fCol, fogFactor);

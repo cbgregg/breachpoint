@@ -336,7 +336,7 @@ export class HUD {
     const kf = $('killfeed');
     const d = document.createElement('div');
     d.className = 'kf' + ((killer === g.player || victim === g.player) ? ' mine' : '');
-    const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', semtex: 'SEMTEX', knife: 'KNIFE', shock: 'SHOCK', melee: 'MELEE', fall: 'FALL' }[weaponId] || '✖');
+    const wname = WEAPONS[weaponId]?.short || ({ grenade: 'FRAG', semtex: 'SEMTEX', knife: 'KNIFE', shock: 'SHOCK', melee: 'MELEE', fall: 'FALL', train: 'TRAIN' }[weaponId] || '✖');
     const col = (c) => (c === g.player || !g.foes(c, g.player) ? FRIENDLY_CSS : ENEMY_CSS);
     const kName = killer && killer !== victim ? `<span style="color:${col(killer)}">${esc(killer.name)}</span>` : '';
     d.innerHTML = `${kName}<span class="kw">${wname}${headshot ? ' ◎' : ''}</span><span style="color:${col(victim)}">${esc(victim.name)}</span>`;
@@ -411,7 +411,7 @@ export class HUD {
 
   showDeath(killer, weaponId) {
     const g = this.game;
-    const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', semtex: 'Semtex', knife: 'Throwing knife', shock: 'Shock stick', melee: 'Melee', fall: 'Fall damage' }[weaponId] || '');
+    const wname = WEAPONS[weaponId]?.name || ({ grenade: 'Frag grenade', semtex: 'Semtex', knife: 'Throwing knife', shock: 'Shock stick', melee: 'Melee', fall: 'Fall damage', train: 'Hit by a train' }[weaponId] || '');
     if (killer && killer !== g.player) {
       $('death-killer').textContent = killer.name.toUpperCase();
       $('death-killer').style.color = !g.foes(killer, g.player) ? FRIENDLY_CSS : ENEMY_CSS;
