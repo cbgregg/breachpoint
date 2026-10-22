@@ -82,6 +82,7 @@ try {
   throw err;
 }
 window.__game = game;
+if (new URLSearchParams(location.search).has('audit')) game.audit();   // the first map is built before any loadMap
 game.applySettings(settings);
 
 // ---------- form binding ----------

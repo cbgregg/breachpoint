@@ -2422,6 +2422,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   batch.build(group);
   if (LAYOUT.mountain !== false) group.add(buildMountain());
 
+  for (const [k, m] of Object.entries(M)) if (m && m.isMaterial && !m.name) m.name = k;   // named, for the map audit's reports
   const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
   if (LAYOUT.spawns2) {
     // asymmetric maps list each team's spawns

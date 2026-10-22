@@ -28,6 +28,7 @@ const _q = new THREE.Quaternion();
 const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(new THREE.Vector3(), 1.3);
 const ZERO = new THREE.Vector3();
 const GRAV = 20;
+const AUDIT = typeof location !== 'undefined' && new URLSearchParams(location.search).has('audit');   // map audit on every map load (js/audit.js)
 
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; }
@@ -1452,6 +1453,17 @@ export class Game {
     this.minimap = renderMinimap(this.renderer.renderer, this.scene);
     this.effects.clear();
     if (this.onMapChange) this.onMapChange(this.world);
+    if (AUDIT) this.audit();
+  }
+
+  // ?audit in the URL: check the map (see js/audit.js), mark what's wrong on it, print the report
+  async audit() {
+    const { auditMap, showAudit } = await import('./audit.js');
+    const r = await auditMap(this);
+    showAudit(this, r);
+    console.log(`[audit] ${r.map}:`, r.counts, r.stats);
+    console.table(r.issues.slice(0, 200));
+    return r;
   }
 
   buildPickups() {
