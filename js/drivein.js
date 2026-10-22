@@ -321,7 +321,7 @@ function build(ctx) {
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, 2.66, 0.3, 0, { grime: 0 });
     F.bx(M.chrome, 0.12, 0.16, W + 0.08, -2.66, 0.3, 0, { grime: 0 });
     for (const s of [-1, 1]) { F.g(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14), M.head, 2.64, 0.88, s * 0.7, { rz: Math.PI / 2 }); F.bx(M.tail, 0.04, 0.16, 0.12, -2.66, 0.62, s * 0.86); }
-    for (const lx of [-1.7, 1.75]) for (const s of [-1, 1]) wheel(F, lx, s * 0.88, 0.4, false);
+    for (const lx of [-1.7, 1.75]) for (const s of [-1, 1]) wheel(F, lx, s * 0.9, 0.4, false);   // tyres 2 cm proud of the body
     F.solid(0, 0, 5.3, W, 0.74, 0.3, 'metal');
     F.solid(-1.18, 0, 3.0, W + 0.1, 1.48, 1.04, 'metal');
     F.solid(0.7, 0, 1.3, W - 0.1, 0.75, 1.04, 'metal');   // the cab: steel doors and roof, small windows
@@ -453,7 +453,7 @@ function build(ctx) {
     // the theatre's name painted on the back, for the road
     signMesh(textTex('STARLITE', { bg: null, fg: '#e8e0c8', w: 1024, h: 220, font: `900 170px "Arial Black", Impact, sans-serif` }), 18, 3.9, x + s * 1.24, 10.2, 0, face(s, 0), 0.25, { transparent: true });
     // doorway under the screen: lintel, frame, the passage floor
-    B(M.concrete, 2.4, 0.3, 3.0, x, 2.6, 0, 0, { grime: 0.3 });
+    B(M.concrete, 2.42, 0.3, 3.02, x, 2.59, 0, 0, { grime: 0.3 });   // a hair proud of the beam above (no flicker)
     for (const z of [-1.44, 1.44]) B(M.concrete, 2.4, 2.6, 0.12, x, 0, z, 0, { grime: 0.4 });
     plane(M.concrete, 2.4, 3, x, 0, 0.01, 0, 0x9a948a);
     // tower lights on the back corners
