@@ -750,9 +750,9 @@ function build(ctx) {
   // a wooden pallet: three stringers under seven top boards and three bottom boards
   const pallet = (x, y, z, ry = 0, tint = 0xb89a6a) => {
     const c = Math.cos(ry), sn = Math.sin(ry), at = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
-    for (const lz of [-0.44, 0, 0.44]) { const [px, pz] = at(0, lz); B(M.wood, 1.2, 0.09, 0.1, px, y + 0.02, pz, ry, { tint: 0x9a7c52, grime: 0.3 }); }
-    for (const lx of [-0.55, 0, 0.55]) { const [px, pz] = at(lx, 0); B(M.wood, 0.1, 0.02, 1.0, px, y, pz, ry, { tint: 0x8a6e48, grime: 0.35 }); }
-    for (let i = 0; i < 7; i++) { const [px, pz] = at(-0.54 + i * 0.18, 0); B(M.wood, 0.13, 0.025, 1.0, px, y + 0.11, pz, ry, { tint, grime: 0.25 }); }
+    for (const lz of [-0.44, 0, 0.44]) { const [px, pz] = at(0, lz); B(M.wood, 1.2, 0.09, 0.1, px, y + 0.03, pz, ry, { tint: 0x9a7c52, grime: 0.3 }); }
+    for (const lx of [-0.55, 0, 0.55]) { const [px, pz] = at(lx, 0); B(M.wood, 0.1, 0.03, 1.0, px, y, pz, ry, { tint: 0x8a6e48, grime: 0.35 }); }   // (3 cm: clear of the floor's markings)
+    for (let i = 0; i < 7; i++) { const [px, pz] = at(-0.54 + i * 0.18, 0); B(M.wood, 0.13, 0.025, 1.0, px, y + 0.12, pz, ry, { tint, grime: 0.25 }); }
   };
   // a shipped pallet: cases stacked in layers (with gaps and a ragged top), stretch wrap, corner boards,
   // a shipping label; some tied with a strap. Collision is the whole block.

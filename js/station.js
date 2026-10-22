@@ -25,8 +25,8 @@ const PIT_X = [0, 8];
 const STOP_Z = (PL.z0 + PL.z1) / 2;             // where a train's middle stops
 // the hall's two stairs down to the platforms (top at the concourse, bottom on a platform)
 const STAIRS = [
-  { x0: -6.2, x1: -2.4, top: -18.11, bot: -3.89, cx: -4.2, walls: [[-2.6, -2.4, 1.5]] },                    // to the west (northbound) platform
-  { x0: 10.0, x1: 14.2, top: -17.6, bot: -3.71, cx: 11.8, walls: [[10.0, 10.2, 1.5], [13.6, 14.2, 2.4]] },   // to the east (southbound) platform
+  { x0: -6.2, x1: -2.4, top: -18.11, z1: -17.775, bot: -3.89, cx: -4.2, walls: [[-2.6, -2.4, 1.9]] },                    // to the west (northbound) platform
+  { x0: 10.0, x1: 14.2, top: -17.6, z1: -17.575, bot: -3.71, cx: 11.8, walls: [[10.0, 10.2, 1.9], [13.6, 14.2, 2.4]] },   // to the east (southbound) platform
 ];
 export const TRACKS = [
   { x: 1.5, dir: -1, dest: 'NORTHGATE', side: -1, offset: 0 },     // northbound (toward -z), doors to the west
@@ -193,7 +193,12 @@ export function buildStation(ctx) {
     }
   } else put(new THREE.PlaneGeometry(HALL[2] - HALL[0], HALL[1] - HALL[3]), dark, (HALL[0] + HALL[2]) / 2, -0.4, (HALL[1] + HALL[3]) / 2, 0, { rx: Math.PI / 2, grime: 0, cast: false });
   // the floor (with the model: just under its own, which stops short of the walls and the south end)
-  for (const [a, b, c, d] of minus(HALL, holes)) put(new THREE.PlaneGeometry(c - a, d - b), concrete, (a + c) / 2, model ? YC - 0.03 : YC + 0.01, (b + d) / 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x9a968e });
+  // (a thin slab, not a flat overlay: overlays get a depth offset toward the camera, and this one then showed
+  // through the model's floor along its seams)
+  for (const [a, b, c, d] of minus(HALL, holes)) {
+    if (model) B(concrete, c - a, 0.02, d - b, (a + c) / 2, YC - 0.05, (b + d) / 2, 0, { grime: 0, cast: false, tint: 0x8a8e96 });
+    else put(new THREE.PlaneGeometry(c - a, d - b), concrete, (a + c) / 2, YC + 0.01, (b + d) / 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x9a968e });
+  }
   // a ceiling over the whole hall just above the model's own (its entrance has none, and the street surface
   // is drawn from above only, so you'd see the sky through it)
   put(new THREE.PlaneGeometry(HALL[2] - HALL[0], HALL[3] - HALL[1]), dark, (HALL[0] + HALL[2]) / 2, -0.27, (HALL[1] + HALL[3]) / 2, 0, { rx: Math.PI / 2, grime: 0, cast: false });
@@ -208,7 +213,7 @@ export function buildStation(ctx) {
 
   // ---------- the passage from the plaza stairwells ----------
   {
-    const [x0, z0, x1, z1] = PASSAGE, T = 0.3, H = -0.4, TOP = -0.01;   // walls up to the street (closing the gap over the ceiling)
+    const [x0, z0, x1, z1] = PASSAGE, T = 0.3, H = -0.4, TOP = -0.002;   // walls up to the street (closing the gap over the ceiling)
     solid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, 0.3, YC - 0.3, 'concrete');
     put(new THREE.PlaneGeometry(x1 - x0, z1 - z0), concrete, (x0 + x1) / 2, YC + 0.01, (z0 + z1) / 2, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0xc8c4bc });
     put(new THREE.PlaneGeometry(x1 - x0, z1 - z0), std({ color: 0xd8dcdc, roughness: 0.8 }), (x0 + x1) / 2, H - 0.01, (z0 + z1) / 2, 0, { rx: Math.PI / 2, grime: 0, cast: false });
@@ -256,7 +261,11 @@ export function buildStation(ctx) {
   }
   // columns between the tracks, light strips over the platforms, a few real lights
   for (let z = PL.z0 + 4.5; z < PL.z1; z += 9) wall(tile, 3.75, z - 0.25, 4.25, z + 0.25, PIT, CEIL_P);
-  for (const x of [-3.1, 11.1]) strip(x, CEIL_P - 0.05, (PL.z0 + PL.z1) / 2, PL.z1 - PL.z0 - 2);
+  // light strips along the platforms, stopping short of the stairwell over each one (they ran through the flight)
+  for (const x of [-3.1, 11.1]) {
+    const s = STAIRS.find(q => x > q.x0 && x < q.x1), a = PL.z0 + 1, b = PL.z1 - 1;
+    for (const [z0, z1] of s ? [[a, s.top - 0.4], [s.bot + 0.4, b]] : [[a, b]]) strip(x, CEIL_P - 0.05, (z0 + z1) / 2, z1 - z0);
+  }
   for (const z of [-20, 8]) light(4, CEIL_P - 1.5, z, 9, 26);
   // benches and bins on the platforms
   for (const [x, z] of [[-5.4, -28], [-5.4, 12], [13.4, -28], [13.4, 12]]) {
@@ -283,15 +292,21 @@ export function buildStation(ctx) {
   });
 
   // ---------- the stairs down from the concourse (collision steps; the model draws them) ----------
+  // the model's flights: 14.75 cm steps on a 29.6 cm going (measured off it), the first one starting at s.z1
+  const RISE = 0.14746, RUN = 0.2964;
   for (const s of STAIRS) {
-    const n = Math.round((YC - YP) / 0.333), rise = (YC - YP) / n, run = (s.bot - s.top) / n;
-    for (let k = 1; k <= n; k++) {
-      const top = YC - k * rise, za = s.top + (k - 1) * run;
-      solid((s.x0 + s.x1) / 2, za + run / 2, s.x1 - s.x0, run, top - YP, YP, 'concrete');   // this tread, solid to the platform
+    const cx = (s.x0 + s.x1) / 2, n = Math.floor((YC - YP) / RISE - 0.01);
+    const steps = model ? Array.from({ length: n }, (_, i) => [YC - (i + 1) * RISE, s.z1 + i * RUN, RUN])
+      : Array.from({ length: 21 }, (_, i) => [YC - (i + 1) * (YC - YP) / 21, s.top + i * (s.bot - s.top) / 21, (s.bot - s.top) / 21]);
+    if (model) steps.unshift([YC, s.top, s.z1 - s.top]);   // the landing at the top
+    for (const [top, za, run] of steps) {
+      solid(cx, za + run / 2, s.x1 - s.x0, run, top - YP, YP, 'concrete');   // this tread, solid to the platform
       // the model's tiled walls either side of the flight: a knee wall with the handrail on the open side, the
       // full wall where it meets the station's wall (set in from it on the east stair)
       for (const [w0, w1, hh] of s.walls) solid((w0 + w1) / 2, za + run / 2, w1 - w0, run, top - YP + hh, YP, 'concrete');
-      if (!model) put(flatBox(s.x1 - s.x0, 0.06, run, 0), concrete, (s.x0 + s.x1) / 2, top - 0.03, za + run / 2, 0, { grime: 0.3, tint: 0x9a948a });
+      if (!model) put(flatBox(s.x1 - s.x0, 0.06, run, 0), concrete, cx, top - 0.03, za + run / 2, 0, { grime: 0.3, tint: 0x9a948a });
+      // the model's steps are open (treads only, you saw through them): a riser under each nosing
+      else if (top < YC) put(flatBox(s.x1 - s.x0 - 0.1, RISE + 0.02, 0.03, 0), concrete, cx, top + RISE / 2 - 0.02, za - 0.02, 0, { grime: 0.3, tint: 0x5e6064, cast: false });
     }
     // the mass under the stair, seen from the platform: tiled sides sloping down with the steps
     for (const x of [s.x0, s.x1]) {
@@ -303,6 +318,11 @@ export function buildStation(ctx) {
       put(g, tile, x + (x === s.x0 ? -0.1 : 0.1), YP, s.top, 0, { grime: 0 });   // just outside the model's own stair walls (no flicker)
     }
     for (const r of [Math.PI, 0]) put(new THREE.PlaneGeometry(s.x1 - s.x0, YC - YP), tile, (s.x0 + s.x1) / 2, (YC + YP) / 2, s.top - 0.005, r, { grime: 0 });   // (both ways: seen from under the flight too)
+    // the edge of the concourse slab round the stairwell, seen from the flight (the void between the floor and
+    // the platform ceiling showed): its open side and its far end
+    const xe = s.x0 > PL.x0 + 0.01 ? s.x0 : s.x1, se = xe === s.x0 ? 1 : -1;
+    B(tile, 0.03, YC - CEIL_P + 0.005, s.bot - s.top, xe + se * 0.015, CEIL_P - 0.01, (s.top + s.bot) / 2);
+    B(tile, s.x1 - s.x0, YC - CEIL_P + 0.005, 0.03, (s.x0 + s.x1) / 2, CEIL_P - 0.01, s.bot - 0.015);
     // the slot between the model's full wall and the station's (east stair): closed off at the bottom
     for (const [w0, w1, hh] of s.walls) if (hh > 2) B(tile, w1 - w0, hh + 0.35, 0.04, (w0 + w1) / 2, YP, s.bot - 0.02);
   }
