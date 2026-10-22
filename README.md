@@ -78,13 +78,13 @@ What you see is what stops you. Props have collision shaped like what's drawn (c
 
 ### Map audit
 
-`js/audit.js` checks a built map the way a player would run into it. From every place a player can reach (each nav level, flooded from the spawns and across the stairs, standing and crouched), it casts 72 rays against the drawn geometry (with three-mesh-bvh, loaded only for the audit) and compares them with the collision:
+`js/audit.js` checks a built map the way a player would run into it. From every place a player can reach (each nav level, flooded from the spawns and across the stairs, standing and crouched) and every 75 cm up and down each staircase, it casts 72 rays (240 on the stairs) against the drawn geometry (with three-mesh-bvh, loaded only for the audit) and compares them with the collision:
 
 | Check | What it finds |
 |---|---|
 | see-through | the first thing a ray meets is the undrawn back of a one-sided surface: a hole you can see through |
 | sky leak | below street level, a ray that hits nothing at all |
-| z-fight | two surfaces closer together than the depth buffer can tell apart at that distance (they flicker) |
+| z-fight | two surfaces closer together than the depth buffer can tell apart at that distance (they flicker), or a depth-offset overlay close enough under a surface to be pulled through it |
 | invisible wall | a collision face with nothing drawn near it, where a player can get to it |
 | walk-through | a broad, solid-looking surface at body height with no collision behind it |
 | floor | the floor drawn above or below your feet (sinking in, floating), or not drawn at all |

@@ -74,7 +74,14 @@ export async function auditMap(game, opts = {}) {
       for (const [p, q] of [[_ta, _tb], [_tb, _tc], [_tc, _ta]]) { _ln.set(p, q).closestPointToPoint(h.point, true, _cp); m = Math.min(m, _cp.distanceTo(h.point)); }
       return m;
     };
-    const triArea = (h) => {
+    // how far toward the camera a polygon offset pulls a surface there, in metres: the factor times the depth change
+  // across a pixel (steeper at grazing angles; 1080p, the game's 80 degree field of view) plus the units term
+  const PIX = (80 * Math.PI / 180) / 1080;
+  const pulled = (x, d) => {
+    const c = Math.max(0.1, Math.abs(x.n.dot(d))), tan = Math.sqrt(1 - c * c) / c;
+    return -x.mat.polygonOffsetFactor * x.distance * PIX * tan - x.mat.polygonOffsetUnits * x.distance * x.distance / (0.16 * 16777216);
+  };
+  const triArea = (h) => {
       const pos = h.object.geometry.attributes.position, f = h.face, mw = h.object.matrixWorld;
       _ta.fromBufferAttribute(pos, f.a).applyMatrix4(mw); _tb.fromBufferAttribute(pos, f.b).applyMatrix4(mw); _tc.fromBufferAttribute(pos, f.c).applyMatrix4(mw);
       return _tb.sub(_ta).cross(_tc.sub(_ta)).length() / 2;
@@ -156,17 +163,40 @@ export async function auditMap(game, opts = {}) {
         for (const eye of [1.6, 0.8]) { const v = new THREE.Vector3(g.cx(i), L.y + eye, g.cz(j)); v.floor = L.y; views.push(v); }
       }
     });
-    // directions: a Fibonacci sphere, biased toward the horizon where players look
-    const dirs = [];
-    const ND = opts.dirs || 72;
-    for (let k = 0; k < ND; k++) {
-      const y = 1 - 2 * (k + 0.5) / ND, r = Math.sqrt(1 - y * y), a = k * Math.PI * (3 - Math.sqrt(5));
-      dirs.push(new THREE.Vector3(Math.cos(a) * r, y * 0.8, Math.sin(a) * r).normalize());
+    // and on the stairs between levels (no nav cells there): every 75 cm along each climb path, standing on the
+    // step under it, looking round more closely (the steps, the stairwell's walls and what's over it)
+    const stairViews = new Set(), _so = new THREE.Vector3(), _dn = new THREE.Vector3(0, -1, 0);
+    for (const L of nav.levels || []) for (const q of L.portals) {
+      for (let k = 1; k < q.climb.length; k++) {
+        const a = q.climb[k - 1], b = q.climb[k], n = Math.max(1, Math.ceil(a.distanceTo(b) / 0.75));
+        for (let i = 0; i < n; i++) {
+          const p = a.clone().lerp(b, i / n);
+          // (from just over the climb line: from higher up, a stairwell's lintel would read as the floor)
+          const ph = physics.raycast(_so.set(p.x, p.y + 1.2, p.z), _dn, 4);
+          if (!ph) continue;
+          const fy = p.y + 1.2 - ph.t;
+          if (physics.overlap(p.x, fy + 0.05, p.z, 0.25, 1.6)) continue;
+          for (const eye of [1.6, 0.8]) { const v = new THREE.Vector3(p.x, fy + eye, p.z); v.floor = fy; views.push(v); stairViews.add(v); }
+        }
+      }
     }
+    // directions: a Fibonacci sphere, biased toward the horizon where players look
+    const sphere = (ND) => {
+      const out = [];
+      for (let k = 0; k < ND; k++) {
+        const y = 1 - 2 * (k + 0.5) / ND, r = Math.sqrt(1 - y * y), a = k * Math.PI * (3 - Math.sqrt(5));
+        out.push(new THREE.Vector3(Math.cos(a) * r, y * 0.8, Math.sin(a) * r).normalize());
+      }
+      return out;
+    };
+    const dirs = sphere(opts.dirs || 72), stairDirs = sphere(240);
     const FAR = 70, near = game.camera ? game.camera.near : 0.16;
     let rays = 0;
     // floor: what you stand on is drawn where your feet are (not floating over it, not sunk into it, not missing)
-    const _down = new THREE.Vector3(0, -1, 0), _q = new THREE.Vector3();
+    const _down = new THREE.Vector3(0, -1, 0), _q = new THREE.Vector3(), _q2 = new THREE.Vector3();
+    // a floor under a whole player there (the top of a 20 cm wall isn't one)
+    const _f = new THREE.Vector3();
+    const footing = (q, fy) => [[0.25, 0], [-0.25, 0], [0, 0.25], [0, -0.25]].every(([dx, dz]) => { const r = physics.raycast(_f.set(q.x + dx, fy + 0.3, q.z + dz), _down, 0.6); return r && Math.abs(fy + 0.3 - r.t - fy) < 0.3; });
     for (const v of views) {
       if (v.y - v.floor < 1 || physics.overlap(v.x, v.floor + 0.05, v.z, 0.3, 1.6)) continue;   // once per spot, if you can stand there
       const ph = physics.raycast(v, _down, 3);
@@ -178,11 +208,12 @@ export async function auditMap(game, opts = {}) {
     }
     for (const v of views) {
       const under = v.y < -1;
-      for (const d of dirs) {
+      for (const d of stairViews.has(v) ? stairDirs : dirs) {
         rays++;
         const hits = trace(v, d, FAR);
         if (!hits.length) {
-          if (under) report('sky-leak', v.clone().addScaledVector(d, 6), { from: v.toArray().map(x => +x.toFixed(1)), dir: d.toArray().map(x => +x.toFixed(2)) });
+          // (straight up a stairwell to the street is open sky)
+          if (under && d.y < 0.35) report('sky-leak', v.clone().addScaledVector(d, 6), { from: v.toArray().map(x => +x.toFixed(1)), dir: d.toArray().map(x => +x.toFixed(2)) });
           continue;
         }
         const h = hits[0];
@@ -196,14 +227,19 @@ export async function auditMap(game, opts = {}) {
         if (h2 && !h.back && !h2.back && Math.abs(h.n.dot(d)) > 0.2 && h.n.dot(h2.n) > 0.995 && !h.mat.polygonOffset && !h2.mat.polygonOffset && edgeDist(h) > 0.02 && edgeDist(h2) > 0.02) {
           report('z-fight', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), normal: h.n.toArray().map(x => +x.toFixed(2)), materials: [h.mat.name || h.mat.type, h2.mat.name || h2.mat.type] });
         }
+        // an overlay drawn with a depth offset toward the camera (ground decals) just under another surface: the
+        // offset pulls it through that surface along its seams and at grazing angles
+        const ov = !h.back && !h.mat.polygonOffset && hits.find(x => x !== h && x.mat.polygonOffset && x.mat.polygonOffsetFactor < 0 && !x.back && x.n.dot(h.n) > 0.9 && x.distance - h.distance < pulled(x, d));
+        if (ov) report('z-fight', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), materials: [h.mat.name || h.mat.type, ov.mat.name || ov.mat.type], problem: 'an offset overlay under it shows through' });
         // walk-through: a solid-looking upright surface at body height you could walk or shoot through. Only a
         // real wall counts: one that goes on around the hit (rays 30 cm to each side, above and below land on it
         // too), not the edge of a frame, a shutter, a sign or an awning, which are drawn without collision on purpose
         if (!h.back && Math.abs(h.n.y) < 0.4 && Math.abs(d.y) < 0.25 && -h.n.dot(d) > 0.35 && h.distance < 25 && h.object.castShadow && h.point.y > v.floor + 0.3 && h.point.y < v.floor + 1.8) {   // (head on, not grazing a door jamb)
           const p = physHit(v, d, h.distance + 0.6);
           // (and a player could be there: a bumper under a van's body, a fin over a car's, isn't somewhere you can walk)
-          const q = _q.copy(h.point).addScaledVector(d, 0.15);
-          if (p.t > h.distance + 0.5 && !physics.overlap(q.x, v.floor + 0.02, q.z, 0.1, 1.7) && broad(v, d, h)) report('walk-through', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), material: h.mat.name || h.mat.type });
+          // (standing on whatever floor is under the surface: a bulkhead high over a lower flight of stairs isn't)
+          const q = _q.copy(h.point).addScaledVector(d, 0.15), fq = physics.raycast(_q2.set(q.x, h.point.y + 0.05, q.z), _down, 15), qf = fq ? h.point.y + 0.05 - fq.t : -Infinity;
+          if (p.t > h.distance + 0.5 && h.point.y - qf < 1.9 && footing(q, qf) && !physics.overlap(q.x, qf + 0.02, q.z, 0.1, 1.7) && broad(v, d, h)) report('walk-through', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), material: h.mat.name || h.mat.type });
         }
       }
     }
@@ -246,7 +282,8 @@ export async function auditMap(game, opts = {}) {
         let near = 0;
         for (const y of ys) for (const f of [-0.3, 0, 0.3]) {
           _o.set(fx + nx * 0.6 + Math.abs(nz) * f * len, y, fz + nz * 0.6 + Math.abs(nx) * f * len);
-          if (!insideAny(_o, null) && standable(_o)) near++;   // not pressed against something else, and somewhere anyone gets to
+          const flush = insideAny(_q2.set(fx + nx * 0.05 + Math.abs(nz) * f * len, y, fz + nz * 0.05 + Math.abs(nx) * f * len), null);
+          if (!flush && !insideAny(_o, null) && standable(_o)) near++;   // not pressed against something else, and somewhere anyone gets to
         }
         if (!near) continue;
         // anything drawn in a slab hugging the face (a little outside it, up to tol inside: models are often inset):

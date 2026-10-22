@@ -544,8 +544,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       const h = m.userData.groundLayer;
       if (!(h > 0)) continue;
       const i = hs.indexOf(h) + 1;
-      // units: a fixed step in depth, which separates the layers at any range; the factor adds a little at grazing angles
-      m.polygonOffsetFactor = -(1 + i * 0.5); m.polygonOffsetUnits = -2 * i;
+      // units: a fixed step in depth, which separates the layers at any range; the factor adds a little at grazing
+      // angles, capped: a big one pulls an overlay through anything low standing on it (a door's threshold, a
+      // pallet) when seen from across the room
+      m.polygonOffsetFactor = -(1 + Math.min(i, 4) * 0.25); m.polygonOffsetUnits = -2 * i;
     }
     return hs.length;
   };
@@ -1011,7 +1013,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             const db = solid(hx, hz, S.ax ? 0.06 : 0.85, S.ax ? 0.85 : 0.06, 2.15, y0 + 0.03, 'wood'); db.navIgnore = true;
           }
           // threshold
-          put(flatBox(ow, 0.05, T + 0.1, 0), M.concrete, fx, y0, fz, ry, { grime: 0.3, tint: 0xbab3a4 });
+          put(flatBox(ow, 0.07, T + 0.1, 0), M.concrete, fx, y0 + 0.035, fz, ry, { grime: 0.3, tint: 0xbab3a4 });   // (a sill on the floor, clear of the floor's tiles)
         } else {
           seg(o.a, o.b, 0, 1.0);
           seg(o.a, o.b, 2.1, h);
@@ -1186,12 +1188,14 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           }
         }
         if (rnd() < 0.7) put(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 14), M.metal, cx + (rnd() - 0.5) * (w - 2), h + 0.68, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0x3d6b8a, grime: 0.2, base: h });
-        // posters and tags pasted on the ground floor
+        // posters and tags pasted on the ground floor, between two windows (over one, they showed through it)
         for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           if (rnd() < 0.45) continue;
-          const L = nx ? d : w, t = (rnd() - 0.5) * (L - 1.6);
+          const L = nx ? d : w, n = Math.max(1, Math.floor(L / 2.3));
+          if (n < 2) continue;
+          const t = -L / 2 + (1 + Math.floor(rnd() * (n - 1))) * (L / n);
           const px = cx + nx * (w / 2 + 0.015) + -nz * t, pz = cz + nz * (d / 2 + 0.015) + nx * t;
-          decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7 + rnd() * 0.3, 1.0, px, 1.45 + rnd() * 0.3, pz, Math.atan2(nx, nz));
+          decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7, 1.0, px, 1.45 + rnd() * 0.3, pz, Math.atan2(nx, nz));
         }
         break;
       }
@@ -1566,7 +1570,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const len = k === n ? run : run;
           solid(sx, cz, len, d - 2 * T, top - (y0 - D - 0.3), y0 - D - 0.3, 'concrete');
           put(flatBox(len, 0.06, d - 2 * T, 0), M.concrete, sx, top - 0.03, cz, 0, { tint: 0x9a948a, grime: 0.4 });
-          put(flatBox(0.04, top - (y0 - D), d - 2 * T, 0), M.concrete, sx + dir * (len / 2 - 0.02), (top + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });   // the riser, on its downhill edge (the face you see going up)
+          // the riser, on its downhill edge (the face you see going up), a hair behind the tread's nose
+          put(flatBox(0.04, top - 0.06 - (y0 - D), d - 2 * T, 0), M.concrete, sx + dir * (len / 2 - 0.03), (top - 0.06 + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });
+          // and above the first step, up to the street (an open slot under the street's edge otherwise)
+          if (k === 1) put(flatBox(0.04, y0 - 0.003 - (top - 0.06), d - 2 * T, 0), M.concrete, sx - dir * (len / 2 - 0.02), (y0 - 0.003 + top - 0.06) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5 });
         }
         for (const sz of [-1, 1]) {
           const z = cz + sz * (d / 2 - T / 2);
