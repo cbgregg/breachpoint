@@ -165,7 +165,7 @@ const SHURAN_HALF = [
   [27.5, 3.5, 1, 3, 3.5, 0, 'hesco'],
   [11, 0.2, 3, 0.8, 1.1, 0, 'sand'],
   [21, -3, 6, 6, 3.2, 0, 'house', { w: [['d', -1]], e: [['d', 1]], n: [['w', 0]], s: [], props: [['crates', 1.5, -1.5], ['shelf', 0, 0, 1]] }],
-  [27.5, 2.5, 0.8, 3, 1.1, 0, 'sand'],
+  [27.5, 0, 0.8, 3, 1.1, 0, 'sand'],   // continues the hesco's line, a peek gap between
   // north lane (z 12..30)
   [6, 18, 4.4, 2.0, 1.45, 0, 'car', 0],
   [3.5, 23.5, 4, 0.6, 1.2, 0, 'wall', 3],
@@ -282,9 +282,9 @@ const PIONEER_CENTER = [
   [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 29.5, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
   [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
   // ---- Yesler Way: parked cars, a streetcar at its stop, a work zone, sandbags
-  [-44, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-42, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [3, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
+  [-44, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-42, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [1.6, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
   [31, 10.5, 10, 2.4, 3, 0, 'tram'], [31, 10.5, 10, 1.6, 0, 0, 'tracks'],
-  [-1, 14.5, 3.2, 0.9, 1.1, 0, 'jersey'], [6, 16.5, 3.2, 0.9, 1.1, 0, 'jersey'], [2.5, 15.5, 1.6, 1.6, 1.6, 0, 'crate'],
+  [-1, 15, 3.2, 0.9, 1.1, 0, 'jersey'], [6, 16.5, 3.2, 0.9, 1.1, 0, 'jersey'], [2.5, 15.5, 1.6, 1.6, 1.6, 0, 'crate'],
   [18, 19.5, 0.8, 3, 1.1, 0, 'sand'], [-40, 16, 2, 2, 1.2, 0, 'pallet'], [40, 17, 2, 2.5, 1.8, 0, 'crate'],
   [-14.5, 26.5, 0.7, 0.5, 1, 0, 'aframe', 2], [-24.8, 2.5, 0.7, 0.5, 1, 0, 'aframe', 1],
   // traffic and a utility dig, staggered across the lanes so Yesler is never one long line from end to end:
@@ -298,7 +298,7 @@ const PIONEER_CENTER = [
   [-30, 5.75, 2.6, 2.7, 2.8, 0, 'kiosk'], [26, 5.75, 2.6, 2.7, 2.8, 0, 'kiosk'], [-3, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'], [-38, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'], [32, 24.1, 2.6, 3.4, 2.8, 0, 'kiosk'],
   [24, 21.3, 7, 2.4, 3.3, 0, 'truck', {}], [-20, 21.3, 7, 2.4, 3.3, 0, 'truck', { food: 2 }],
   [12, 8.2, 7, 2.4, 3.3, 0, 'truck', { back: 1 }], [-18, 8.2, 7, 2.4, 3.3, 0, 'truck', {}],
-  [-11, -0.6, 2.4, 7, 3.3, 0, 'truck', {}], [-10.2, 30, 2.6, 12, 3.2, 0, 'bus', { livery: 1, back: 1 }], [-10.3, -29, 2.4, 7, 3.3, 0, 'truck', { back: 1 }], [36, 3.2, 7, 2.4, 3.3, 0, 'truck', {}], [21.8, 2.8, 1.6, 1.6, 2.8, 0, 'kiosk'], [-6, -17, 2.6, 1.8, 2.8, 0, 'kiosk'], [23.5, -3.5, 2.6, 1.8, 2.8, 0, 'kiosk'],
+  [-11, -0.6, 2.4, 7, 3.3, 0, 'truck', {}], [-10.2, 30, 2.6, 12, 3.2, 0, 'bus', { livery: 1, back: 1 }], [-10.3, -29, 2.4, 7, 3.3, 0, 'truck', { back: 1 }], [36, 5.3, 7, 2.4, 3.3, 0, 'truck', {}], [21.8, 2.8, 1.6, 1.6, 2.8, 0, 'kiosk'], [-6, -17, 2.6, 1.8, 2.8, 0, 'kiosk'], [23.5, -3.5, 2.6, 1.8, 2.8, 0, 'kiosk'],
   [2, 13.3, 7, 2.4, 3.3, 0, 'truck', { food: 0 }], [31, 13.6, 6, 2.4, 2.6, 0, 'container', 0x4d6b54],
   // ---- 1st Avenue: parked cars both curbs, a delivery truck's crates, a work zone up north
   [-21, -6, 2.0, 4.4, 1.45, 0, 'car', 0], [-9, -20, 2.0, 4.4, 1.45, 0, 'car', 1], [-21, -30, 2.0, 4.4, 1.45, 0, 'car', 0],
@@ -306,10 +306,10 @@ const PIONEER_CENTER = [
   [-15, -27, 0.9, 3.2, 1.1, 0, 'jersey'], [-13, -33, 1.6, 1.6, 1.6, 0, 'crate'], [-16.5, 29, 0.8, 3, 1.1, 0, 'sand'],
   [-25, -21, 1.6, 1.6, 1.6, 0, 'crate'], [-5.5, -36.5, 2, 2, 1.2, 0, 'pallet'],
   // ---- James St and the garage side
-  [32, -9.5, 2.0, 2.5, 1.8, 0, 'crate'], [27, 6.2, 0.62, 0.62, 0.9, 0, 'barrel'], [37.5, -12, 0.8, 3, 1.1, 0, 'sand'],
+  [32, -9.5, 2.0, 2.5, 1.8, 0, 'crate'], [27.85, 6.2, 0.62, 0.62, 0.9, 0, 'barrel'], [37.5, -12, 0.8, 3, 1.1, 0, 'sand'],
   // ---- spawn lots at both ends (past the map's built edge): staggered HESCO
   [44, -28, 1, 4, 3.5, 0, 'hesco'], [43, 10, 1, 4, 3.5, 0, 'hesco'], [46, 18, 1, 4, 3.5, 0, 'hesco'], [46, -2, 1, 4, 3.5, 0, 'hesco'], [46, -22, 1, 4, 3.5, 0, 'hesco'], [48, 30, 3, 1, 3.5, 0, 'hesco'], [48, -34, 3, 1, 3.5, 0, 'hesco'], [51, 8, 2, 2, 1.2, 0, 'ammo'],
-  [-44, 28, 1, 4, 3.5, 0, 'hesco'], [-43, -10, 1, 4, 3.5, 0, 'hesco'], [-43, 14, 1, 4, 3.5, 0, 'hesco'], [43, -14, 1, 4, 3.5, 0, 'hesco'], [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
+  [-44, 28, 1, 4, 3.5, 0, 'hesco'], [-43.6, -10, 1, 4, 3.5, 0, 'hesco'], [-43, 14, 1, 4, 3.5, 0, 'hesco'], [43, -14, 1, 4, 3.5, 0, 'hesco'], [-46, -18, 1, 4, 3.5, 0, 'hesco'], [-46, 2, 1, 4, 3.5, 0, 'hesco'], [-46, 22, 1, 4, 3.5, 0, 'hesco'], [-48, -30, 3, 1, 3.5, 0, 'hesco'], [-48, 34, 3, 1, 3.5, 0, 'hesco'], [-51, -8, 2, 2, 1.2, 0, 'ammo'],
   // ---- street signs on the sidewalks and dumpsters in the back corners
   [-6.8, 30, 0, 0, 0, 0, 'rsign', { n: 'noparking', ry: -Math.PI / 2 }],
   [-6.8, -12, 0, 0, 0, 0, 'rsign', { n: 'noparking', ry: -Math.PI / 2 }], [-23.2, -18, 0, 0, 0, 0, 'rsign', { n: 'towaway', ry: Math.PI / 2 }],
@@ -422,6 +422,28 @@ class Batcher {
 // props stop casting sun shadows. Set before a map is built.
 let LOW_DETAIL = !!savedQuality().lowPoly;
 export function setWorldDetail(low) { LOW_DETAIL = !!low; }
+
+// the treads of a staircase model: its upward faces of any size, by height ({y, x0, x1, z0, z1}, model units,
+// lowest first)
+function stairTreads(geo) {
+  if (geo.userData.treads) return geo.userData.treads;
+  const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position;
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3(), E = new THREE.Vector3();
+  const tops = new Map();
+  for (let i = 0; i < p.count; i += 3) {
+    A.fromBufferAttribute(p, i); B.fromBufferAttribute(p, i + 1); C.fromBufferAttribute(p, i + 2);
+    N.crossVectors(E.subVectors(B, A), new THREE.Vector3().subVectors(C, A));
+    const area = N.length() / 2;
+    if (N.normalize().y < 0.95) continue;
+    const k = Math.round(A.y * 50);
+    const t = tops.get(k) || { y: A.y, area: 0, x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+    t.area += area;
+    for (const v of [A, B, C]) { t.x0 = Math.min(t.x0, v.x); t.x1 = Math.max(t.x1, v.x); t.z0 = Math.min(t.z0, v.z); t.z1 = Math.max(t.z1, v.z); }
+    tops.set(k, t);
+  }
+  const all = [...tops.values()], big = Math.max(...all.map(t => t.area));
+  return (geo.userData.treads = all.filter(t => t.area > big * 0.5 && t.y > 0.05).sort((a, b) => a.y - b.y));
+}
 export const worldDetailLow = () => LOW_DETAIL;
 function worldBox(w, h, d, scale, radius) {
   const r = LOW_DETAIL ? 0 : radius ?? (Math.min(w, h, d) < 0.12 ? 0 : Math.min(0.05, Math.min(w, h, d) * 0.14));
@@ -971,10 +993,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           seg(o.a, o.b, 2.3, h);
           // door frame + a battered door swung open against the inside wall
           for (const sx of [-1, 1]) put(flatBox(0.09, 2.3, T + 0.06, 0), M.frame, fx + S.ax * sx * (ow / 2 - 0.04), y0 + 1.15, fz + S.az * sx * (ow / 2 - 0.04), ry, { grime: 0.2, tint: 0x5a4632, base: y0 });
-          put(flatBox(ow + 0.1, 0.12, T + 0.06, 0), M.frame, fx, y0 + 2.36, fz, ry, { grime: 0, tint: 0x5a4632 });
+          put(flatBox(ow + 0.1, 0.12, T + 0.06, 0), M.frame, fx, y0 + 2.35, fz, ry, { grime: 0, tint: 0x5a4632 });   // its underside 1 cm below the wall's
           if (rnd() < 0.7) {
             const hx = fx + S.ax * (ow / 2 - 0.08) - S.nx * (T / 2 + 0.45), hz = fz + S.az * (ow / 2 - 0.08) - S.nz * (T / 2 + 0.45);
             put(flatBox(0.85, 2.15, 0.05, 1.2), M.woodOld, hx, y0 + 1.1, hz, ry + Math.PI / 2, { grime: 0.3, tint: [0x6f5a3a, 0x3d4f5a, 0x7a3a2a][Math.floor(rnd() * 3)], base: y0 });
+            // solid (you can't walk through it); bots keep the doorway, they pass well clear of it
+            const db = solid(hx, hz, S.ax ? 0.06 : 0.85, S.ax ? 0.85 : 0.06, 2.15, y0 + 0.03, 'wood'); db.navIgnore = true;
           }
           // threshold
           put(flatBox(ow, 0.05, T + 0.1, 0), M.concrete, fx, y0, fz, ry, { grime: 0.3, tint: 0xbab3a4 });
@@ -1198,7 +1222,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           // one flight per stair run, placed on its first step
           if (extra === 1) {
             const st = PROPS.stairs.parts[0], dir = Math.sign(cx) || 1;
-            put(st.geo.clone(), st.mat, cx - dir * 2.7, 0, cz, dir > 0 ? Math.PI : 0, { sx: 6.3 / 3.48, sy: 3.5 / 3.42, sz: 3.0 / 1.62, grime: 0 });
+            // the model's treads (its height includes the handrail): scaled so the step after its top tread is
+            // the roof, and the collision is those treads exactly, so you walk on what you see
+            const tr = stairTreads(st.geo), rise = (tr[tr.length - 1].y - tr[0].y) / (tr.length - 1);
+            const sx = 6.3 / 3.48, sy = (h * 7 - 0.05) / (tr[tr.length - 1].y + rise), sz = 3.0 / 1.62, ox = cx - dir * 2.7;
+            put(st.geo.clone(), st.mat, ox, 0, cz, dir > 0 ? Math.PI : 0, { sx, sy, sz, grime: 0 });
+            for (const t of tr) {
+              const xa = ox - dir * t.x0 * sx, xb = ox - dir * t.x1 * sx, top = t.y * sy;
+              solid((xa + xb) / 2, cz, Math.abs(xb - xa), (t.z1 - t.z0) * sz, Math.min(0.3, top), top - Math.min(0.3, top), 'wood');
+            }
           }
           break;
         }
@@ -1252,7 +1284,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       }
       case 'pallet': {
         B(M.woodOld, w, 0.14, d, cx, 0, cz, 0, { grime: 0.2, tint: 0xd8c4a4 });
-        B(M.bag, w - 0.08, h - 0.16, d - 0.08, cx, 0.14, cz, 0, { grime: 0.1, tint: 0xbcb094 });   // the sacks are stacked tight: no see-through gaps
+        B(M.bag, w - 0.2, h - 0.16, d - 0.2, cx, 0.14, cz, 0, { grime: 0.1, tint: 0xbcb094 });   // the sacks behind the cartons: no see-through gaps (set back so the cartons' faces don't flicker against it)
         // shrink-wrapped cartons
         const rows = Math.round(h / 0.4);
         for (let r = 0; r < rows; r++) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
@@ -2173,7 +2205,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       solid(cx, cz, al ? w : 0.3, al ? 0.3 : d, h - 0.3, y0 + 0.3, 'concrete');
     } else if (kind === 'bench') solid(cx, cz, w, d, 0.95, y0, 'wood').pass = true;
     else if (kind === 'rsign') solid(cx, cz, 0.12, 0.12, 2.2, y0, 'metal').pass = true;   // the post: stops you, not bullets
-    else if (kind === 'stairs' && PROPS.stairs) solid(cx - (extra === 1 ? Math.sign(cx) * 0.2 : 0), cz, w - (extra === 1 ? 0.4 : 0), d, Math.min(h, 0.35), Math.max(0, h - 0.35), 'wood');   // the treads, open underneath like the model
+    else if (kind === 'stairs' && PROPS.stairs) { /* the model's own treads (decorate) */ }
     else if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
     for (let i = nb; i < physics.boxes.length; i++) if (!physics.boxes[i].src) physics.boxes[i].src = `${kind}@${+cx.toFixed(1)},${+cz.toFixed(1)}`; // for the collision audit
