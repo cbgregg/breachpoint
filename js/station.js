@@ -209,6 +209,11 @@ export function buildStation(ctx) {
     wall(tile, x0, z1 - T, x1, z1, YC, H);                       // south wall
     wall(tile, 8, z0, x1, z0 + T, YC, H);                        // north wall east of the opening into the hall
     wall(tile, -6.2, z0, x0, z0 + T, YC, H);                     // and closing the hall's west corner
+    // the hall model's side walls stop short of its open south end: close both sides to the passage (flush with
+    // the model's walls), or you could see and walk out into the ground under the street
+    wall(tile, -6.2, -4.5, -6.0, z0 + T, YC, H);
+    wall(tile, 13.4, -4.3, 13.6, z0 + T, YC, H);
+    wall(tile, x1, z0, 13.4, z0 + T, YC, H);
     for (const x of [x0, x1 - T]) { wall(tile, x, z0, x + T, 2.3, YC, H); wall(tile, x, 4.7, x + T, z1, YC, H); wall(tile, x, 2.3, x + T, 4.7, YC + 2.4, H); }
     strip((x0 + x1) / 2, H - 0.06, 1.6, x1 - x0 - 1, 'x'); strip((x0 + x1) / 2, H - 0.06, 5.0, x1 - x0 - 1, 'x');
     light(6.25, H - 1.2, 3.25, 5, 12);
@@ -311,12 +316,12 @@ export function buildStation(ctx) {
       for (const x of [PIT_X[0] - 0.15, PIT_X[1] + 0.15]) put(flatBox(0.3, TUN_TOP - PIT, L, 2), mat, x, (PIT + TUN_TOP) / 2, zc, 0, { grime: 0.4, tint: 0x6a6660 });
       put(flatBox(PIT_X[1] - PIT_X[0] + 0.6, 0.3, L, 2), mat, (PIT_X[0] + PIT_X[1]) / 2, TUN_TOP + 0.15, zc, 0, { grime: 0, tint: 0x5a5650 });
     }
-    const c0 = Math.max(z0, -40.5), c1 = Math.min(z1, 40.5);   // nobody gets further than the end walls below
+    const c0 = Math.max(z0, -39.7), c1 = Math.min(z1, 39.7);   // nobody gets further than the end walls below
     for (const x of [PIT_X[0], PIT_X[1]]) solid(x + (x ? 0.15 : -0.15), (c0 + c1) / 2, 0.3, c1 - c0, TUN_TOP - PIT, PIT, 'concrete');
     for (let z = z0 + 5; z < z1; z += 10) for (const x of [PIT_X[0] + 0.03, PIT_X[1] - 0.03]) put(flatBox(0.04, 0.08, 0.08, 0), marker, x, PIT + 1.2, z, 0, { grime: 0, cast: false });
   }
   // the end of the line for anyone walking the tunnels (trains carry on through)
-  for (const z of [-39.5, 39.5]) solid((PIT_X[0] + PIT_X[1]) / 2, z, PIT_X[1] - PIT_X[0], 0.4, TUN_TOP - PIT, PIT, 'concrete').pass = true;
+  for (const z of [-39.5, 39.5]) { const e = solid((PIT_X[0] + PIT_X[1]) / 2, z, PIT_X[1] - PIT_X[0], 0.4, TUN_TOP - PIT, PIT, 'concrete'); e.pass = true; e.hidden = true; }   // hidden: invisible on purpose (the tunnel goes on into the dark)
 
   // ---------- the street: Link station signs at both stairwells ----------
   for (const [x, z, ry] of [[-6.6, 1.4, Math.PI], [19.3, 1.4, Math.PI]]) {

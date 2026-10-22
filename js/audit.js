@@ -91,6 +91,19 @@ export async function auditMap(game, opts = {}) {
     return best || 'unlabelled';
   };
 
+  // a surface that carries on around a hit: parallel rays 30 cm out to each side, above and below all land on
+  // something drawn within 30 cm of the same depth
+  const _side = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _ro = new THREE.Vector3();
+  const broad = (o, d, h) => {
+    _side.crossVectors(d, _up).normalize();
+    for (const [a, b] of [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]]) {
+      _ro.copy(o).addScaledVector(_side, a); _ro.y += b;
+      const hh = trace(_ro, d, h.distance + 1).find(x => !x.back);
+      if (!hh || Math.abs(hh.distance - h.distance) > 0.3) return false;
+    }
+    return true;
+  };
+
   const issues = [];
   const seen = new Set();
   const report = (type, p, info = {}) => {
@@ -101,16 +114,35 @@ export async function auditMap(game, opts = {}) {
   };
 
   // ---------- viewpoints: walkable cells on every level, standing and crouched ----------
+  // only the cells a player can get to: flooded from the spawns, and onto other levels by their stairs (a sealed
+  // pocket with a floor isn't somewhere anyone stands)
   const levels = [{ grid: nav, y: 0 }, ...(nav.levels || [])];
+  const seeds = levels.map(() => []);
+  world.spawns.forEach(list => list.forEach(p => seeds[0].push(p)));
+  (nav.levels || []).forEach((L, k) => L.portals.forEach(q => { seeds[q.link].push(q.climb[0]); seeds[k + 1].push(q.climb[q.climb.length - 1]); }));
+  const reach = levels.map((L, k) => {
+    const g = L.grid, seen = new Uint8Array(g.cols * g.rows), queue = [];
+    for (const p of seeds[k]) {
+      // the nearest open cell to a seed (stairs end right at a wall)
+      let best = -1, bd = 4;
+      for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) { const i = g.ci(p.x) + di, j = g.cj(p.z) + dj, dd = Math.hypot(di, dj); if (g.isOpen(i, j) && dd < bd) { bd = dd; best = j * g.cols + i; } }
+      if (best >= 0 && !seen[best]) { seen[best] = 1; queue.push(best); }
+    }
+    while (queue.length) {
+      const c = queue.pop(), i = c % g.cols, j = (c / g.cols) | 0;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (j + dj) * g.cols + i + di; if (g.isOpen(i + di, j + dj) && !seen[n]) { seen[n] = 1; queue.push(n); } }
+    }
+    return seen;
+  });
   const views = [];
   const step = opts.step || 3;
-  for (const L of levels) {
+  levels.forEach((L, k) => {
     const g = L.grid, every = Math.max(1, Math.round(step / g.cell));
     for (let j = 0; j < g.rows; j += every) for (let i = 0; i < g.cols; i += every) {
-      if (!g.isOpen(i, j)) continue;
-      for (const eye of [1.6, 0.8]) views.push(new THREE.Vector3(g.cx(i), L.y + eye, g.cz(j)));
+      if (!reach[k][j * g.cols + i]) continue;
+      for (const eye of [1.6, 0.8]) { const v = new THREE.Vector3(g.cx(i), L.y + eye, g.cz(j)); v.floor = L.y; views.push(v); }
     }
-  }
+  });
   // directions: a Fibonacci sphere, biased toward the horizon where players look
   const dirs = [];
   const ND = opts.dirs || 72;
@@ -134,12 +166,14 @@ export async function auditMap(game, opts = {}) {
       // z-fight: the next surface at (almost) the same depth, facing the same way, not a seam between two faces
       const h2 = hits.find(x => x !== h && x.distance - h.distance < 0.004 && (x.object !== h.object || x.faceIndex !== h.faceIndex));
       if (h2 && !h.back && !h2.back && Math.abs(h.n.dot(d)) > 0.2 && h.n.dot(h2.n) > 0.995 && !h.mat.polygonOffset && !h2.mat.polygonOffset && edgeDist(h) > 0.02 && edgeDist(h2) > 0.02) {
-        report('z-fight', h.point, { dist: +h.distance.toFixed(2), materials: [h.mat.name || h.mat.type, h2.mat.name || h2.mat.type] });
+        report('z-fight', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), normal: h.n.toArray().map(x => +x.toFixed(2)), materials: [h.mat.name || h.mat.type, h2.mat.name || h2.mat.type] });
       }
-      // walk-through: a solid-looking upright surface at body height you could walk or shoot through
-      if (!h.back && Math.abs(h.n.y) < 0.4 && Math.abs(d.y) < 0.25 && h.distance < 25 && h.object.castShadow) {
+      // walk-through: a solid-looking upright surface at body height you could walk or shoot through. Only a
+      // real wall counts: one that goes on around the hit (rays 30 cm to each side, above and below land on it
+      // too), not the edge of a frame, a shutter, a sign or an awning, which are drawn without collision on purpose
+      if (!h.back && Math.abs(h.n.y) < 0.4 && Math.abs(d.y) < 0.25 && h.distance < 25 && h.object.castShadow && h.point.y > v.floor + 0.3 && h.point.y < v.floor + 1.8) {
         const p = physHit(v, d, h.distance + 0.6);
-        if (p.t > h.distance + 0.5) report('walk-through', h.point, { dist: +h.distance.toFixed(2), material: h.mat.name || h.mat.type });
+        if (p.t > h.distance + 0.5 && broad(v, d, h)) report('walk-through', h.point, { from: v.toArray().map(x => +x.toFixed(1)), dist: +h.distance.toFixed(2), material: h.mat.name || h.mat.type });
       }
     }
   }
@@ -151,24 +185,31 @@ export async function auditMap(game, opts = {}) {
   let faces = 0;
   for (const b of boxes) {
     if (b.pass && b.maxy - b.miny < 1.3) continue;   // low see-through barriers (railings, gates): drawn thin on purpose
+    if (b.hidden || (b.src && b.src.startsWith('boundary'))) continue;   // invisible on purpose (the map's edge, a tunnel's end)
     const h = b.maxy - b.miny;
     if (h < 0.25) continue;
-    const ys = [b.miny + Math.min(h / 2, 1.1)];
+    // a few points across each face at two heights (one point could land in the gap between two drawn pieces,
+    // like barrier segments or a stack of boxes); a face is invisible when most of them have nothing drawn
+    // (a slab: a tread or a floor is drawn as a board at its top)
+    const ys = h < 0.5 ? [b.maxy - 0.04, b.miny + h / 2] : [b.miny + Math.min(h / 2, 0.35), b.miny + Math.min(h * 0.75, 1.1)];
     const sides = [
       [b.minx, (b.minz + b.maxz) / 2, -1, 0, b.maxz - b.minz], [b.maxx, (b.minz + b.maxz) / 2, 1, 0, b.maxz - b.minz],
       [(b.minx + b.maxx) / 2, b.minz, 0, -1, b.maxx - b.minx], [(b.minx + b.maxx) / 2, b.maxz, 0, 1, b.maxx - b.minx],
     ];
     for (const [fx, fz, nx, nz, len] of sides) {
       if (len < 0.3) continue;
-      for (const y of ys) {
-        faces++;
-        _o.set(fx + nx * 0.6, y, fz + nz * 0.6);
+      faces++;
+      let tried = 0, bare = 0, gap = 0;
+      for (const y of ys) for (const f of [-0.3, 0, 0.3]) {
+        _o.set(fx + nx * 0.6 + Math.abs(nz) * f * len, y, fz + nz * 0.6 + Math.abs(nx) * f * len);
         if (insideAny(_o, null)) continue;                 // face pressed against something else: not visible anyway
+        tried++;
         _d.set(-nx, 0, -nz);
-        const hits = trace(_o, _d, 3);
-        const first = hits.find(x => !x.cutout);
-        if (!first || first.distance > 0.6 + Math.max(0.3, 0.12 * len)) report('invisible-wall', new THREE.Vector3(fx, y, fz), { what: b.src || 'unlabelled', drawnAt: first ? +(first.distance - 0.6).toFixed(2) : null });
+        const first = trace(_o, _d, 3).find(x => !x.cutout);
+        const g2 = first ? first.distance - 0.6 : Infinity;
+        if (g2 > Math.max(0.3, 0.12 * len)) { bare++; gap = Math.max(gap, g2); }
       }
+      if (tried && bare * 2 > tried) report('invisible-wall', new THREE.Vector3(fx, b.miny + Math.min(h / 2, 1.1), fz), { what: b.src || 'unlabelled', drawnAt: gap === Infinity ? null : +gap.toFixed(2), bare: `${bare}/${tried}`, box: [b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz].map(v => +v.toFixed(2)) });
     }
   }
   // clipping: one prop's collision pushed well into another's
