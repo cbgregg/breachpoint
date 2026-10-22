@@ -549,6 +549,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
     return hs.length;
   };
+  // an open shape (a lampshade, a half-torus arch, a pyramid roof) drawn from inside too: a reversed copy of it
+  // in the same geometry, so it batches like any other (no see-through from underneath)
+  const bothSides = (geo) => {
+    if (!geo.index) geo.setIndex([...Array(geo.attributes.position.count).keys()]);
+    const back = geo.clone();
+    back.setIndex([...geo.index.array].reverse());
+    const n = back.attributes.normal; for (let i = 0; i < n.array.length; i++) n.array[i] = -n.array[i];
+    const g = mergeGeometries([geo, back]); geo.dispose(); back.dispose();
+    return g;
+  };
   const FLAT = new Set(['PlaneGeometry', 'CircleGeometry', 'RingGeometry']);
   const put = (geo, mat, x, y, z, ry = 0, opts = {}) => {
     // a flat piece lying face-up just above a floor: a ground overlay
@@ -933,7 +943,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const ft = 0.07, fd = 0.1, ftint = [0xe9e3d6, 0x5a4a3a, 0x3d4f5a][Math.floor(rnd() * 3)];
     [x, z] = at(0.05);
     for (const sx of [-1, 1]) put(flatBox(ft, wh + ft, fd, 0), M.frame, x + ax * sx * (ww / 2 + ft / 2 - 0.02), y, z + az * sx * (ww / 2 + ft / 2 - 0.02), ry, { grime: 0, tint: ftint });
-    put(flatBox(ww + ft * 2, ft, fd, 0), M.frame, x, y + wh / 2 + ft / 2 - 0.02, z, ry, { grime: 0, tint: ftint });
+    put(flatBox(ww + ft * 2, ft, fd + 0.01, 0), M.frame, x, y + wh / 2 + ft / 2 - 0.02, z, ry, { grime: 0, tint: ftint });   // (a hair deeper than the sides: their corners overlap)
     put(flatBox(0.04, wh, 0.05, 0), M.frame, x, y, z, ry, { grime: 0, tint: ftint });
     put(flatBox(ww, 0.04, 0.05, 0), M.frame, x, y + wh * 0.18, z, ry, { grime: 0, tint: ftint });
     [x, z] = at(0.08);
@@ -980,7 +990,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const ox = S.nx * (T / 2 + 0.03), oz = S.nz * (T / 2 + 0.03);
           put(flatBox(S.ax ? L : 0.06, 0.45, S.az ? L : 0.06, scaleOf(M.concrete), 0.005), M.concrete, x + ox, y0 + 0.225, z + oz, 0, { tint: 0xa89e8e, grime: 0.5, base: y0 });
           // now and then a poster or a spray tag on the outside
-          if (L > 1.3 && rnd() < 0.3) decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7, 1.0, x + S.nx * (T / 2 + 0.02) + S.ax * (rnd() - 0.5) * (L - 1), y0 + 1.5, z + S.nz * (T / 2 + 0.02) + S.az * (rnd() - 0.5) * (L - 1), ry);
+          if (L > 1.3 && rnd() < 0.3 && y2 > 2.2) decal(posterMat[Math.floor(rnd() * posterMat.length)], 0.7, 1.0, x + S.nx * (T / 2 + 0.02) + S.ax * (rnd() - 0.5) * (L - 1), y0 + 1.5, z + S.nz * (T / 2 + 0.02) + S.az * (rnd() - 0.5) * (L - 1), ry);
         }
       };
       const ops = (spec[S.k] || []).map(([k, at, wd]) => { const ww = wd || OPEN_W[k]; return { k, a: Math.max(-S.len / 2 + 0.25, at - ww / 2), b: Math.min(S.len / 2 - 0.25, at + ww / 2), at }; }).sort((p, q) => p.a - q.a);
@@ -993,7 +1003,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           seg(o.a, o.b, 2.3, h);
           // door frame + a battered door swung open against the inside wall
           for (const sx of [-1, 1]) put(flatBox(0.09, 2.3, T + 0.06, 0), M.frame, fx + S.ax * sx * (ow / 2 - 0.04), y0 + 1.15, fz + S.az * sx * (ow / 2 - 0.04), ry, { grime: 0.2, tint: 0x5a4632, base: y0 });
-          put(flatBox(ow + 0.1, 0.12, T + 0.06, 0), M.frame, fx, y0 + 2.35, fz, ry, { grime: 0, tint: 0x5a4632 });   // its underside 1 cm below the wall's
+          put(flatBox(ow + 0.1, 0.12, T + 0.07, 0), M.frame, fx, y0 + 2.35, fz, ry, { grime: 0, tint: 0x5a4632 });   // its underside 1 cm below the wall's
           if (rnd() < 0.7) {
             const hx = fx + S.ax * (ow / 2 - 0.08) - S.nx * (T / 2 + 0.45), hz = fz + S.az * (ow / 2 - 0.08) - S.nz * (T / 2 + 0.45);
             put(flatBox(0.85, 2.15, 0.05, 1.2), M.woodOld, hx, y0 + 1.1, hz, ry + Math.PI / 2, { grime: 0.3, tint: [0x6f5a3a, 0x3d4f5a, 0x7a3a2a][Math.floor(rnd() * 3)], base: y0 });
@@ -1006,8 +1016,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           seg(o.a, o.b, 0, 1.0);
           seg(o.a, o.b, 2.1, h);
           // open window: frame, sill, a few glass shards left in the corners
-          for (const sx of [-1, 1]) put(flatBox(0.07, 1.1, T + 0.04, 0), M.frame, fx + S.ax * sx * (ow / 2 - 0.035), y0 + 1.55, fz + S.az * sx * (ow / 2 - 0.035), ry, { grime: 0, tint: 0xe9e3d6 });
-          put(flatBox(ow + 0.14, 0.07, T + 0.04, 0), M.frame, fx, y0 + 2.07, fz, ry, { grime: 0, tint: 0xe9e3d6 });
+          // (deeper than the wall plus a brick lining inside, 2.2 cm: flush with it, the two flicker)
+          for (const sx of [-1, 1]) put(flatBox(0.07, 1.1, T + 0.07, 0), M.frame, fx + S.ax * sx * (ow / 2 - 0.035), y0 + 1.55, fz + S.az * sx * (ow / 2 - 0.035), ry, { grime: 0, tint: 0xe9e3d6 });
+          put(flatBox(ow + 0.14, 0.07, T + 0.08, 0), M.frame, fx, y0 + 2.07, fz, ry, { grime: 0, tint: 0xe9e3d6 });
           put(flatBox(ow + 0.3, 0.07, T + 0.18, 3), M.concrete, fx, y0 + 0.98, fz, ry, { grime: 0.15, tint: 0xe2dccf });
           for (const sx of [-1, 1]) if (rnd() < 0.6) {
             const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.22 + rnd() * 0.2, 0, 0), new THREE.Vector3(0, 0.35 + rnd() * 0.3, 0)]);
@@ -1050,7 +1061,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const uv = fl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w - 2 * T) / flS, uv.getY(i) * (d - 2 * T) / flS);
     put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: spec.stone ? 0xd2a070 : flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
     // a corkboard of maps and notes on the back wall of the big halls (CC-BY 4.0, "Corkboard" by XIN)
-    if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.04, Math.PI, { grime: 0, cast: false });
+    if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.07, Math.PI, { grime: 0, cast: false });   // clear of a brick-lined wall's veneer
     // props
     for (const [k, dx, dz, rot] of spec.props || []) {
       const px = cx + dx, pz = cz + dz;
@@ -1099,7 +1110,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       // shop pendants: green enamel shades over warm bulbs
       const lx = cx + fx2 * w, lz = cz + fz2 * d;
       put(new THREE.CylinderGeometry(0.006, 0.006, 0.8, 4), M.dark, lx, y0 + h - 0.4, lz, 0, { grime: 0, cast: false });
-      put(new THREE.ConeGeometry(0.28, 0.22, 14, 1, true), M.paint, lx, y0 + h - 0.85, lz, 0, { tint: 0x2f5a3a, grime: 0 });
+      put(bothSides(new THREE.ConeGeometry(0.28, 0.22, 14, 1, true)), M.paint, lx, y0 + h - 0.85, lz, 0, { tint: 0x2f5a3a, grime: 0 });
       put(new THREE.SphereGeometry(0.07, 10, 8), M.bulb, lx, y0 + h - 0.95, lz, 0, { grime: 0, cast: false });
       glows.push([lx, y0 + h - 0.95, lz, 0.5]);
     }
@@ -1398,7 +1409,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // pop-up market canopy: four legs, a peaked square top with a valance (farmers-market style)
         const cw = w + 0.6, cd = Math.max(d + 1.4, 2.4), czc = cz - 0.2;
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(new THREE.CylinderGeometry(0.022, 0.022, 2.35, 6), M.metal, cx + sx * cw / 2, 1.18, czc + sz * cd / 2, 0, { grime: 0, tint: 0xd8dade });
-        const top = new THREE.ConeGeometry(Math.hypot(cw, cd) / 2, 0.45, 4, 1, true); top.rotateY(Math.PI / 4); top.scale(cw / Math.hypot(cw, cd) * Math.SQRT2, 1, cd / Math.hypot(cw, cd) * Math.SQRT2);
+        const top = bothSides(new THREE.ConeGeometry(Math.hypot(cw, cd) / 2, 0.45, 4, 1, true)); top.rotateY(Math.PI / 4); top.scale(cw / Math.hypot(cw, cd) * Math.SQRT2, 1, cd / Math.hypot(cw, cd) * Math.SQRT2);
         const ctint = [0xf2f2ee, 0x2a4a7a, 0x2f6a3a, 0xc8322b][(extra + Math.abs(Math.round(cx))) % 4];
         put(top, M.cloth, cx, 2.58, czc, 0, { grime: 0, tint: ctint });
         for (const sz of [-1, 1]) put(new THREE.PlaneGeometry(cw, 0.22), M.cloth, cx, 2.25, czc + sz * cd / 2, sz > 0 ? 0 : Math.PI, { grime: 0, tint: ctint, cast: false });
@@ -1448,7 +1459,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
               if (rnd() < 0.5) put(new THREE.PlaneGeometry(bw - 0.6, 1.4, 4, 2), M.cloth, fx(t, 0.75), y0 + 3.4, fz(t, 0.75), ry, { rx: -Math.PI / 2 + 0.55, tint: [0x8a2f2a, 0x2f5a3a, 0x9c7a3a, 0x3d4f63][Math.floor(rnd() * 4)], grime: 0 });
             } else if (i === Math.floor(bays / 2) && L > 9) {
               put(flatBox(1.8, 3.0, 0.05, 0), M.dim, fx(t, 0.02), y0 + 1.5, fz(t, 0.02), ry, { grime: 0 });
-              put(new THREE.TorusGeometry(1.15, 0.22, 6, 18, Math.PI), M.stone, fx(t, 0.1), y0 + 3.0, fz(t, 0.1), ry, { grime: 0.2, tint: 0xb9ae9c });
+              put(bothSides(new THREE.TorusGeometry(1.15, 0.22, 6, 18, Math.PI)), M.stone, fx(t, 0.1), y0 + 3.0, fz(t, 0.1), ry, { grime: 0.2, tint: 0xb9ae9c });
             } else {
               put(flatBox(bw - 0.9, 2.5, 0.05, 0), M.glass, fx(t, 0.03), y0 + 1.85, fz(t, 0.03), ry, { grime: 0, tint: rnd() < 0.3 ? 0xd8c9a0 : 0xffffff });
               put(flatBox(bw - 0.7, 0.14, 0.12, 0), M.frame, fx(t, 0.06), y0 + 3.15, fz(t, 0.06), ry, { grime: 0, tint: 0x2f3a33 });
@@ -1460,7 +1471,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
               const y = y0 + G + 0.6 + f * 3.4 + 1.25;
               const top = f === floors - 1, ww = Math.min(1.25, bw - 1.1), wh = top ? 1.7 : 1.95;
               windowDecor(fx(t), fz(t), nx, nz, y, ww, wh);
-              put(new THREE.TorusGeometry(ww / 2 + 0.12, 0.13, 5, 14, Math.PI), wallMat, fx(t, 0.06), y + wh / 2 - 0.05, fz(t, 0.06), ry, { tint: 0xc9a080, grime: 0.2 });
+              put(bothSides(new THREE.TorusGeometry(ww / 2 + 0.12, 0.13, 5, 14, Math.PI)), wallMat, fx(t, 0.06), y + wh / 2 - 0.05, fz(t, 0.06), ry, { tint: 0xc9a080, grime: 0.2 });
               put(new THREE.CircleGeometry(ww / 2, 14, 0, Math.PI), M.dim, fx(t, 0.015), y + wh / 2 - 0.05, fz(t, 0.015), ry, { grime: 0 });
             }
             // string course every floor
@@ -1517,7 +1528,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             // 2 cm short of the street: wall tops flush with the paving above z-fight with it
             put(flatBox(S.ax ? L : T, D - 0.02, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + (D - 0.02) / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
           };
-          for (const [a, b] of gaps) { seg(cur, a); put(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI), M.brick, S.ox + S.ax * (a + b) / 2, floorY + 2.3, S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
+          for (const [a, b] of gaps) { seg(cur, a); put(bothSides(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI)), M.brick, S.ox + S.ax * (a + b) / 2, floorY + 2.3, S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
           seg(cur, S.len / 2);
         }
         // ceiling: planks on joists (the underside of the street), with glass prism lights here and there
@@ -1555,7 +1566,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const len = k === n ? run : run;
           solid(sx, cz, len, d - 2 * T, top - (y0 - D - 0.3), y0 - D - 0.3, 'concrete');
           put(flatBox(len, 0.06, d - 2 * T, 0), M.concrete, sx, top - 0.03, cz, 0, { tint: 0x9a948a, grime: 0.4 });
-          put(flatBox(0.04, top - (y0 - D), d - 2 * T, 0), M.concrete, sx - dir * len / 2, (top + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });
+          put(flatBox(0.04, top - (y0 - D), d - 2 * T, 0), M.concrete, sx + dir * (len / 2 - 0.02), (top + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });   // the riser, on its downhill edge (the face you see going up)
         }
         for (const sz of [-1, 1]) {
           const z = cz + sz * (d / 2 - T / 2);
@@ -1643,7 +1654,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const glassMat = M.pergolaGlass || (M.pergolaGlass = std({ color: 0x9fbab0, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }));
         const roof = new THREE.CylinderGeometry(d / 2, d / 2, w, 16, 1, true, -Math.PI / 2, Math.PI);
         put(roof, glassMat, cx, H + 0.1, cz, 0, { rz: Math.PI / 2, sx: 1, sy: 1, grime: 0, cast: false });
-        for (let i = 0; i <= n; i++) put(new THREE.TorusGeometry(d / 2, 0.05, 5, 16, Math.PI), M.iron, cx - w / 2 + i * (w / n), H + 0.1, cz, Math.PI / 2, { grime: 0 });
+        for (let i = 0; i <= n; i++) put(bothSides(new THREE.TorusGeometry(d / 2, 0.05, 5, 16, Math.PI)), M.iron, cx - w / 2 + i * (w / n), H + 0.1, cz, Math.PI / 2, { grime: 0 });
         put(flatBox(w, 0.08, 0.08, 0), M.iron, cx, H + 0.1 + d / 2, cz, 0, { grime: 0 });
         for (let i = 0; i < Math.round(w / 0.4); i++) put(new THREE.ConeGeometry(0.05, 0.3, 4), M.iron, cx - w / 2 + 0.2 + i * 0.4, H + 0.3 + d / 2, cz, 0, { grime: 0 });
         for (const sz of [-1, 1]) put(flatBox(w, 0.25, 0.08, 0), M.iron, cx, H + 0.05, cz + sz * (d / 2 - 0.1), 0, { grime: 0 });
@@ -1688,7 +1699,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             g.fillStyle = '#20402b'; g.fillRect(0, 0, 512, 64); g.fillStyle = '#efe9da'; g.font = 'bold 42px Arial, sans-serif'; g.textAlign = 'center'; g.fillText('INFORMATION', 256, 48);
             const t2 = new THREE.CanvasTexture(c); t2.colorSpace = THREE.SRGBColorSpace; kioskSign = new THREE.MeshStandardMaterial({ map: t2, roughness: 0.6 });
           }
-          put(new THREE.PlaneGeometry(Math.min(L - 0.2, 2.4), 0.3), kioskSign, cx + nx * (w / 2 + 0.035), h * 0.85, cz + nz * (d / 2 + 0.035), ry, { grime: 0, cast: false });
+          put(bothSides(new THREE.PlaneGeometry(Math.min(L - 0.2, 2.4), 0.3)), kioskSign, cx + nx * (w / 2 + 0.035), h * 0.85, cz + nz * (d / 2 + 0.035), ry, { grime: 0, cast: false });
         }
         B(M.paint, w + 0.9, 0.16, d + 0.9, cx, h, cz, 0, { tint: 0x22402c, grime: 0.1 });
         B(M.paint, w + 0.3, 0.3, d + 0.3, cx, h + 0.16, cz, 0, { tint: 0x2f5a3c, grime: 0.1 });
@@ -1725,6 +1736,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // café sandwich board on the sidewalk
         for (const s2 of [-1, 1]) put(flatBox(0.6, 0.95, 0.03, 0), M.wood, cx, 0.46, cz + s2 * 0.17, 0, { rx: s2 * 0.2, tint: 0x2b2b2b, grime: 0.1 });
         for (const s2 of [-1, 1]) put(new THREE.PlaneGeometry(0.48, 0.7), posterMat[(extra || 0) % 5], cx, 0.5, cz + s2 * 0.2, s2 > 0 ? 0 : Math.PI, { rx: s2 * 0.2, grime: 0, cast: false });
+        solid(cx, cz, 0.6, 0.5, 0.95, 0, 'wood').pass = true;   // you don't walk through it (bullets do)
         break;
       }
       case 'garage': {
@@ -1783,7 +1795,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             // serving hatch with its awning propped open on the kerb side, a menu board
             box(M.dark, -L / 2 + 1, L / 2 - cab - 0.6, W / 2 - 0.01, W / 2 + 0.01, 1.35, 1.0, { grime: 0 });
             const [x, z] = P(fr * (-L / 2 + (L - cab) / 2 + 0.2), W / 2 + 0.45);
-            put(new THREE.PlaneGeometry(along ? 0.9 : L - cab - 1.4, along ? L - cab - 1.4 : 0.9), M.paint, x, y0 + 2.45, z, 0, { rx: -Math.PI / 2 + 0.35 * (along ? 0 : 1), rz: along ? -0.35 : 0, grime: 0, tint: 0xf2e8d0, cast: false });
+            // (top and underside: you see it from below)
+            for (const flip of [0, Math.PI]) put(new THREE.PlaneGeometry(along ? 0.9 : L - cab - 1.4, along ? L - cab - 1.4 : 0.9).rotateY(flip), M.paint, x, y0 + 2.45, z, 0, { rx: -Math.PI / 2 + 0.35 * (along ? 0 : 1), rz: along ? -0.35 : 0, grime: 0, tint: 0xf2e8d0, cast: false });
           } else box(M.paint, -L / 2 - 0.01, -L / 2 + 0.01, -W / 2 + 0.1, W / 2 - 0.1, 0.8, h - 0.9, { tint: 0xc8c8c4, grime: 0.3 }); // roll-up door
           for (const a of [L / 2 - 1.2, -L / 2 + 1.3]) for (const s2 of [-1, 1]) wheel(a, s2);
         }
@@ -1796,7 +1809,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         for (let i = 0; i < 5; i++) put(worldBox(0.3 + (i % 3) * 0.08, 0.2 + (i % 2) * 0.2, 0.25, 0), M.paint, cx - w / 2 + 0.4 + i * (w - 0.8) / 4, h + 0.12, cz + ((i * 7) % 3 - 1) * 0.15, (i * 0.7) % 1, { grime: 0, tint: [0xc8322b, 0x2f6db0, 0xe8b62a, 0x2f8a4a, 0x6a3a8a][(i + (extra | 0)) % 5] });
         const tw = w + 0.4, td = d + 1.6, tz = cz - 0.3, ct = [0xf2f2ee, 0x2a4a7a, 0x2f6a3a, 0xc8322b][(extra | 0) % 4];
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(new THREE.CylinderGeometry(0.022, 0.022, 2.35, 6), M.metal, cx + sx * tw / 2, 1.18, tz + sz * td / 2, 0, { grime: 0, tint: 0xd8dade });
-        const top = new THREE.ConeGeometry(Math.hypot(tw, td) / 2, 0.45, 4, 1, true); top.rotateY(Math.PI / 4); top.scale(tw / Math.hypot(tw, td) * Math.SQRT2, 1, td / Math.hypot(tw, td) * Math.SQRT2);
+        const top = bothSides(new THREE.ConeGeometry(Math.hypot(tw, td) / 2, 0.45, 4, 1, true)); top.rotateY(Math.PI / 4); top.scale(tw / Math.hypot(tw, td) * Math.SQRT2, 1, td / Math.hypot(tw, td) * Math.SQRT2);
         put(top, M.cloth, cx, 2.58, tz, 0, { grime: 0, tint: ct });
         break;
       }
@@ -1880,16 +1893,17 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             // the stone skin's face is 5 cm out: the pane stands 2 cm proud of it (flush, the two z-fight)
             put(flatBox(ow, oh, 0.06, 0), main ? M.dim : M.glass, fx(t, 0.04), y0 + oh / 2 + 0.25, fz(t, 0.04), ry, { grime: 0, tint: main ? 0xffffff : (rnd() < 0.3 ? 0xd8c9a0 : 0xffffff) });
             put(new THREE.CircleGeometry(ow / 2, 16, 0, Math.PI), main ? M.dim : M.glass, fx(t, 0.071), y0 + oh + 0.25, fz(t, 0.071), ry, { grime: 0 });
-            put(new THREE.TorusGeometry(ow / 2 + 0.18, 0.2, 6, 18, Math.PI), M.stone, fx(t, 0.12), y0 + oh + 0.25, fz(t, 0.12), ry, { tint: STL, grime: 0.25 });
+            put(bothSides(new THREE.TorusGeometry(ow / 2 + 0.18, 0.2, 6, 18, Math.PI)), M.stone, fx(t, 0.12), y0 + oh + 0.25, fz(t, 0.12), ry, { tint: STL, grime: 0.25 });
             if (!main) {
               put(flatBox(0.08, oh, 0.12, 0), M.frame, fx(t, 0.08), y0 + oh / 2 + 0.25, fz(t, 0.08), ry, { grime: 0, tint: 0x24302a });
               put(flatBox(ow, 0.1, 0.12, 0), M.frame, fx(t, 0.08), y0 + 2.6, fz(t, 0.08), ry, { grime: 0, tint: 0x24302a });
               if (rnd() < 0.55) put(new THREE.PlaneGeometry(ow + 0.2, 1.3, 4, 2), M.cloth, fx(t, 0.7), y0 + 2.75, fz(t, 0.7), ry, { rx: -Math.PI / 2 + 0.55, tint: [0x2f5a3a, 0x7a2a24, 0x5a3a2a][(rnd() * 3) | 0], grime: 0 });
             } else {
               // the entrance: deep stone arch, steps, lamp either side
-              put(new THREE.TorusGeometry(ow / 2 + 0.45, 0.35, 6, 20, Math.PI), M.stone, fx(t, 0.25), y0 + oh + 0.25, fz(t, 0.25), ry, { tint: 0xb9b09e, grime: 0.2 });
+              put(bothSides(new THREE.TorusGeometry(ow / 2 + 0.45, 0.35, 6, 20, Math.PI)), M.stone, fx(t, 0.25), y0 + oh + 0.25, fz(t, 0.25), ry, { tint: 0xb9b09e, grime: 0.2 });
               for (const sd of [-1, 1]) {
                 put(flatBox(0.7, oh + 0.3, 0.6, 3), M.stone, fx(t + sd * (ow / 2 + 0.3), 0.3), y0 + (oh + 0.3) / 2, fz(t + sd * (ow / 2 + 0.3), 0.3), ry, { tint: 0xb9b09e, grime: 0.3 });
+                solid(fx(t + sd * (ow / 2 + 0.3), 0.3), fz(t + sd * (ow / 2 + 0.3), 0.3), nx ? 0.6 : 0.7, nx ? 0.7 : 0.6, oh + 0.3, y0, 'concrete');   // the piers stand out from the wall
                 put(new THREE.SphereGeometry(0.2, 10, 8), M.bulb, fx(t + sd * (ow / 2 + 0.3), 0.75), y0 + 3.2, fz(t + sd * (ow / 2 + 0.3), 0.75), 0, { grime: 0, cast: false }); glows.push([fx(t + sd * (ow / 2 + 0.3), 0.75), y0 + 3.2, fz(t + sd * (ow / 2 + 0.3), 0.75), 1.1]);
               }
             }
@@ -1901,9 +1915,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
               const y = y0 + G + 0.55 + f * FH + 1.15, top = f === NF - 1, wh = top ? 1.75 : 2.0, ww = Math.min(0.95, (bw - 1.0) / 2 - 0.08);
               for (const k of [-1, 1]) windowDecor(fx(t + k * (ww / 2 + 0.1)), fz(t + k * (ww / 2 + 0.1)), nx, nz, y, ww, wh);
               if (top) {
-                put(new THREE.TorusGeometry(ww + 0.32, 0.16, 5, 16, Math.PI), M.brick, fx(t, 0.08), y + wh / 2 - 0.1, fz(t, 0.08), ry, { tint: 0xb85e3a, grime: 0.2 });
+                put(bothSides(new THREE.TorusGeometry(ww + 0.32, 0.16, 5, 16, Math.PI)), M.brick, fx(t, 0.08), y + wh / 2 - 0.1, fz(t, 0.08), ry, { tint: 0xb85e3a, grime: 0.2 });
                 put(new THREE.CircleGeometry(ww + 0.2, 16, 0, Math.PI), M.dim, fx(t, 0.02), y + wh / 2 - 0.1, fz(t, 0.02), ry, { grime: 0 });
-              } else if (f === 2) put(new THREE.TorusGeometry(ww / 2 + 0.15, 0.12, 5, 12, Math.PI), M.stone, fx(t, 0.08), y + wh / 2, fz(t, 0.08), ry, { tint: STL, grime: 0.15 });
+              } else if (f === 2) put(bothSides(new THREE.TorusGeometry(ww / 2 + 0.15, 0.12, 5, 12, Math.PI)), M.stone, fx(t, 0.08), y + wh / 2, fz(t, 0.08), ry, { tint: STL, grime: 0.15 });
             }
           }
           // belt courses: a heavy one over the stone base, then one per floor
@@ -1945,7 +1959,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           put(new THREE.ConeGeometry(R + 0.2, 1.6, 20), M.metal, ox, y2 + 0.8, oz, 0, { tint: 0x4f5654, grime: 0.15 });
           put(new THREE.ConeGeometry(R, 0.9, 20), M.metal, ox, y1 - 0.45, oz, 0, { rx: Math.PI, tint: IRON, grime: 0.2 });
           // the arched corner entrance beneath it
-          put(new THREE.TorusGeometry(1.3, 0.22, 6, 16, Math.PI), M.stone, ox - 0.6, y0 + 3.4, oz + 0.6, -Math.PI / 4, { tint: STL, grime: 0.2 });
+          put(bothSides(new THREE.TorusGeometry(1.3, 0.22, 6, 16, Math.PI)), M.stone, ox - 0.6, y0 + 3.4, oz + 0.6, -Math.PI / 4, { tint: STL, grime: 0.2 });
         }
         // the tower over the entrance: brick drum with arched openings, steep slate pyramid with dormers and a finial
         {
@@ -1954,7 +1968,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const k of [-1, 1]) {
             const ax = -nz, az = nx, px = tx + nx * TW / 2 + ax * k * 1.3, pz = tz + nz * TW / 2 + az * k * 1.3, ry = Math.atan2(nx, nz);
             put(flatBox(1.0, 2.6, 0.05, 0), M.dim, px + nx * 0.02, ty + 3.2, pz + nz * 0.02, ry, { grime: 0 });
-            put(new THREE.TorusGeometry(0.62, 0.12, 5, 12, Math.PI), M.stone, px + nx * 0.06, ty + 4.5, pz + nz * 0.06, ry, { tint: STL, grime: 0.15 });
+            put(bothSides(new THREE.TorusGeometry(0.62, 0.12, 5, 12, Math.PI)), M.stone, px + nx * 0.06, ty + 4.5, pz + nz * 0.06, ry, { tint: STL, grime: 0.15 });
           }
           B(M.stone, TW + 0.6, 0.4, TW + 0.6, tx, ty + TH, tz, 0, { tint: STL, grime: 0.15 });
           put(new THREE.ConeGeometry(TW * 0.74, 11, 4), M.iron, tx, ty + TH + 0.4 + 5.5, tz, Math.PI / 4, { tint: 0x55605c, grime: 0.15 });
@@ -2000,16 +2014,22 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           if (k > 0) slab(pts, null, y - 0.3, 0.3, M.concrete, 0xcfc9bd);
           if (k < decks) slab(pts, inner, y + (k ? 0 : 0), 1.05, M.concrete, 0xd8d2c6);
         }
-        // columns along every edge
+        // columns along every edge (each edge's start: its end is the next edge's start)
         for (let i = 0; i < pts.length; i++) {
           const a = inner[i], b = inner[(i + 1) % inner.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / 5));
-          for (let j = 0; j <= n; j++) { const t = j / n; B(M.concrete, 0.45, h, 0.45, a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t, 0, { tint: 0xc9c3b6, grime: 0.4 }); }
+          for (let j = 0; j < n; j++) { const t = j / n; B(M.concrete, 0.45, h, 0.45, a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t, 0, { tint: 0xc9c3b6, grime: 0.4 }); }
         }
         // cars along the decks
         const cxp = pts.reduce((q, p) => q + p[0], 0) / pts.length, czp = pts.reduce((q, p) => q + p[1], 0) / pts.length;
-        for (let k = 0; k < decks; k++) for (let i = 0; i < 6; i++) {
-          const f = 0.25 + rnd() * 0.55, P = inner[i % inner.length], x = P[0] + (cxp - P[0]) * f, z = P[1] + (czp - P[1]) * f;
-          B(M.paint, 1.8, 0.7, 4.2, x, k * (h / decks) + 0.25, z, rnd() * 3, { tint: [0x8a1c1c, 0x1c2a44, 0xcfcfcf, 0x2b2b2b, 0x5a6a72][(rnd() * 5) | 0], grime: 0.1 });
+        for (let k = 0; k < decks; k++) {
+          const parked = [];
+          for (let i = 0; i < 6; i++) {
+            const f = 0.25 + rnd() * 0.55, P = inner[i % inner.length], x = P[0] + (cxp - P[0]) * f, z = P[1] + (czp - P[1]) * f;
+            const ry = rnd() * 3, tint = [0x8a1c1c, 0x1c2a44, 0xcfcfcf, 0x2b2b2b, 0x5a6a72][(rnd() * 5) | 0];
+            if (parked.some(([px, pz]) => Math.hypot(px - x, pz - z) < 4.6)) continue;   // no two cars in one another
+            parked.push([x, z]);
+            B(M.paint, 1.8, 0.7, 4.2, x, k * (h / decks) + 0.25, z, ry, { tint, grime: 0.1 });
+          }
         }
         // the prow (sharpest corner) carries the blue P sign
         const prow = pts[extra.prow || 0];
@@ -2110,7 +2130,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const box = (w, h, d, lx, ly, lz, mat, t) => { const [x, y, z] = P(lx, ly, lz); put(flatBox(w, h, d, scaleOf(mat)), mat, x, y, z, ry, { tint: t, grime: 0.2 }); };
     box(0.14, 0.2, W + 0.06, 2.24, 0.4, 0, M.dark, 0x2a2a2a);
     box(0.14, 0.2, W + 0.06, -2.24, 0.42, 0, M.dark, 0x2a2a2a);
-    box(0.04, 0.16, 0.9, 2.25, 0.62, 0, M.dark, 0x1a1a1a);
+    box(0.04, 0.16, 0.9, 2.26, 0.62, 0, M.dark, 0x1a1a1a);   // grille: 1 cm proud of the nose (its bevel ends at 2.27)
     if (!burnt) {
       for (const lz of [-0.68, 0.68]) {
         box(0.05, 0.12, 0.32, 2.22, 0.66, lz, M.lamp, 0xffffff);
@@ -2256,7 +2276,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         solid(xx, z, 0.5, 0.5, 0.95, 0, 'metal');
       }
     }
-    // litter along the walls: bin bags, tyres, cardboard, newspaper
+    // litter along the walls: bin bags, tyres, cardboard, newspaper. Each stops your feet (no wading through a
+    // bag), not bullets; bots don't plan round it
+    const litter = (x, z, s, h) => { const b = solid(x, z, s, s, h, 0, 'cloth'); b.pass = true; b.navIgnore = true; };
     const bagMat = std({ color: 0x1b1d20, roughness: 0.35, metalness: 0.05 });
     const paperMat = std({ color: 0xd9d2c0, roughness: 0.9, side: THREE.DoubleSide });
     const nLit = Math.round(HX * HZ / 40);
@@ -2271,12 +2293,17 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const pp = g.attributes.position;
           for (let v = 0; v < pp.count; v++) { const y = pp.getY(v); pp.setY(v, y < 0 ? y * 0.55 : y * (0.9 + Math.sin(pp.getX(v) * 9) * 0.08)); }
           g.computeVertexNormals();
-          put(g, bagMat, x + (rnd() - 0.5) * 0.6, 0.17, z + (rnd() - 0.5) * 0.6, rnd() * 6, { sx: 1 + rnd() * 0.3, sz: 0.9 + rnd() * 0.3, grime: 0.2, tint: rnd() < 0.3 ? 0x2d3b2a : 0xffffff });
+          const bx = x + (rnd() - 0.5) * 0.6, bz = z + (rnd() - 0.5) * 0.6;
+          put(g, bagMat, bx, 0.17, bz, rnd() * 6, { sx: 1 + rnd() * 0.3, sz: 0.9 + rnd() * 0.3, grime: 0.2, tint: rnd() < 0.3 ? 0x2d3b2a : 0xffffff });
+          litter(bx, bz, 0.55, 0.42);
         }
       } else if (k < 0.55) {
         put(new THREE.TorusGeometry(0.3, 0.11, 8, 16), M.rubber, x, 0.11, z, rnd() * 6, { rx: Math.PI / 2, grime: 0.3 });
+        litter(x, z, 0.75, 0.22);
       } else if (k < 0.75) {
-        put(flatBox(0.5 + rnd() * 0.3, 0.3 + rnd() * 0.2, 0.4, 0), M.paint, x, 0.2, z, rnd() * 6, { rz: (rnd() - 0.5) * 0.3, grime: 0.3, tint: 0xb59a6e });
+        const bw = 0.5 + rnd() * 0.3, bh = 0.3 + rnd() * 0.2;
+        put(flatBox(bw, bh, 0.4, 0), M.paint, x, 0.2, z, rnd() * 6, { rz: (rnd() - 0.5) * 0.3, grime: 0.3, tint: 0xb59a6e });
+        litter(x, z, 0.4, 0.2 + bh / 2);
       } else {
         for (let j = 0; j < 3; j++) put(new THREE.PlaneGeometry(0.3, 0.42), paperMat, x + (rnd() - 0.5) * 1.2, 0.012 + j * 0.002, z + (rnd() - 0.5) * 1.2, rnd() * 6, { rx: -Math.PI / 2, grime: 0, cast: false });
       }
@@ -2340,7 +2367,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           if (pio) {
             const top = f === floors - 1, ww = 1.1, wh = top ? 1.6 : 1.9;
             windowDecor(px, pz, nx, nz, y, ww, wh);
-            if (top || f % 2 === 0) put(new THREE.TorusGeometry(ww / 2 + 0.12, 0.12, 5, 14, Math.PI), mat, px + nx * 0.06, y + wh / 2 - 0.05, pz + nz * 0.06, ry, { tint: brk ? 0xc9a080 : 0xd8ccb4, grime: 0.15 });
+            if (top || f % 2 === 0) put(bothSides(new THREE.TorusGeometry(ww / 2 + 0.12, 0.12, 5, 14, Math.PI)), mat, px + nx * 0.06, y + wh / 2 - 0.05, pz + nz * 0.06, ry, { tint: brk ? 0xc9a080 : 0xd8ccb4, grime: 0.15 });
             continue;
           }
           windowDecor(px, pz, nx, nz, y);

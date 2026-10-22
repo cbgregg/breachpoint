@@ -4,7 +4,11 @@
 //
 //   npx serve .                                  (or any static server on the repo)
 //   node tools/map_audit.mjs [--url http://localhost:3000] [--maps tarsa,pioneer] [--out audit]
-//                            [--shots N] [--local-modules path/to/node_modules]
+//                            [--shots N] [--local-modules path/to/node_modules] [--selftest]
+//
+// --selftest plants one known defect of every kind in the first map (an invisible box, a wall without
+// collision, a one-sided panel, two surfaces in one plane, a floating and a clipping crate, a raised floor) and
+// checks the audit finds each one: a clean report only means something if this passes.
 //
 // Writes <out>/report.json (every issue) and <out>/report.md (counts and the first issues of each kind per map),
 // and with --shots N, N screenshots of each kind of issue per map (taken from where a player would see it).
@@ -39,6 +43,44 @@ await page.goto(url + '/index.html');
 await page.waitForFunction('window.__game && window.__game.world', null, { timeout: 300000 });
 await page.addStyleTag({ content: 'body > *:not(#app){display:none!important} #app > *:not(canvas){display:none!important}' });   // just the 3D view
 const maps = arg('maps', null)?.split(',') || await page.evaluate(async () => (await import('/js/world.js')).MAP_IDS);
+
+if (process.argv.includes('--selftest')) {
+  const r = await page.evaluate(async (map) => {
+    const g = window.__game, THREE = await import('three'), { Box } = await import('/js/physics.js');
+    g.loadMap(map, true);
+    const W = g.world, nav = W.nav, ph = g.physics;
+    // open spots well away from everything: cells whose whole 7 x 7 neighbourhood is open, far apart
+    const spots = [];
+    for (const k of nav.openCells) {
+      const i = k % nav.cols, j = (k / nav.cols) | 0;
+      let ok = true;
+      for (let dj = -3; dj <= 3 && ok; dj++) for (let di = -3; di <= 3; di++) if (!nav.isOpen(i + di, j + dj)) { ok = false; break; }
+      const p = new THREE.Vector3(nav.cx(i), 0, nav.cz(j));
+      if (ok && spots.every(q => q.distanceTo(p) > 9)) spots.push(p);
+      if (spots.length >= 7) break;
+    }
+    if (spots.length < 7) return { error: 'not enough open spots' };
+    const mat = (c, o = {}) => Object.assign(new THREE.MeshStandardMaterial({ color: c }), o);
+    const mesh = (geo, m, p) => { const o = new THREE.Mesh(geo, m); o.position.copy(p); o.castShadow = true; W.group.add(o); return o; };
+    const box = (p, w, h, d, y0 = 0, src = null) => { const b = ph.addBox(new Box(p.x - w / 2, y0, p.z - d / 2, p.x + w / 2, y0 + h, p.z + d / 2)); b.src = src; return b; };
+    const [a, b, c, d, e, f, h] = spots;
+    box(a, 1, 2, 1, 0, 'test-invisible@' + a.x + ',' + a.z);                                             // invisible wall
+    mesh(new THREE.BoxGeometry(3, 2.4, 0.4), mat(0x884444), b.clone().setY(1.2));                         // walk-through
+    mesh(new THREE.PlaneGeometry(4, 3), mat(0x448844), c.clone().setY(1.5));                              // see-through from behind
+    for (const col of [0x4444aa, 0xaaaa44]) mesh(new THREE.PlaneGeometry(2, 2), mat(col), d.clone().setY(1.2)); // z-fight
+    box(e, 1, 1, 1, 1.2, 'crate@' + e.x + ',' + e.z);                                                       // floating crate
+    box(f, 1.2, 1, 1.2, 0, 'crate@' + f.x + ',' + f.z); box(f.clone().setX(f.x + 0.6), 1.2, 1, 1.2, 0, 'barrel@' + (f.x + 0.6) + ',' + f.z); // clipping
+    const fl = mesh(new THREE.BoxGeometry(5, 0.3, 5), mat(0x666666), h.clone().setY(0.15));                 // a raised floor with no collision
+    fl.castShadow = false;
+    const { auditMap } = await import('/js/audit.js');
+    const res = await auditMap(g);
+    const near = (type, p, r = 3) => res.issues.some(i => i.type === type && Math.hypot(i.at[0] - p.x, i.at[2] - p.z) < r);
+    return { found: { 'invisible-wall': near('invisible-wall', a), 'walk-through': near('walk-through', b), 'see-through': near('see-through', c), 'z-fight': near('z-fight', d), floating: near('floating', e), clipping: near('clipping', f), floor: near('floor', h, 4) } };
+  }, arg('maps', 'tarsa').split(',')[0]);
+  console.log(r);
+  await browser.close();
+  process.exit(r.found && Object.values(r.found).every(Boolean) ? 0 : 1);
+}
 
 const all = [];
 for (const map of maps) {

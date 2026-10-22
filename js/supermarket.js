@@ -285,7 +285,7 @@ function build(ctx) {
   const SB = (mat, w, h, d, x, y, z, opts = {}, surf = 'concrete') => { solid(x, z, w, d, h, y, surf); B(mat, w, h, d, x, y, z, 0, opts); };
   const P = (geo, mat, x, y, z, ry = 0, opts = {}) => put(geo, mat, x, y, z, ry, { grime: 0, ...opts });
   // a clipped hedge from (x0,z0) to (x1,z1): soft-edged box with a leaf texture and a slightly uneven top
-  const hedge = (x0, z0, x1, z1, h = 1.1, t = 0.8, col = false, y0 = 0) => {
+  const hedge = (x0, z0, x1, z1, h = 1.1, t = 0.8, col = true, y0 = 0) => {   // col: solid (you can't walk into a hedge)
     const L = Math.hypot(x1 - x0, z1 - z0), ry = -Math.atan2(z1 - z0, x1 - x0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const n = Math.max(1, Math.round(L / 3));
     for (let i = 0; i < n; i++) {
@@ -294,7 +294,7 @@ function build(ctx) {
       const uv = g.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * seg / 1.4, uv.getY(k) * hh / 1.4);
       P(g, M.hedge, x0 + (x1 - x0) * f, y0 + hh / 2, z0 + (z1 - z0) * f, ry, { cast: true, tint: [0xffffff, 0xeef4e8, 0xf4f8ee][i % 3] });
     }
-    if (col) solid(cx, cz, Math.abs(x1 - x0) || t, Math.abs(z1 - z0) || t, h, 0, 'cloth').pass = false;
+    if (col) solid(cx, cz, Math.abs(x1 - x0) || t, Math.abs(z1 - z0) || t, h, y0, 'cloth').pass = false;
   };
   // vertical textured plane facing +z (ry rotates it), uv tiled every `tile` metres
   const face = (mat, w, h, x, y, z, ry, tile = 1) => {
@@ -598,10 +598,10 @@ function build(ctx) {
   const carts = (x, z, n) => {
     for (let i = 0; i < n; i++) {
       const cx = x + i * 0.38;
-      P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, cx, 0.75, z, 0, { sx: 1 - i * 0.01 });
+      P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, cx, 0.75, z, 0, { sx: 1 - i * 0.02, sy: 1 - i * 0.02, sz: 1 - i * 0.02 });   // nested: each a touch smaller (no shared faces)
       P(new THREE.BoxGeometry(0.06, 0.04, 0.6), M.paint, cx - 0.5, 1.05, z, 0, { tint: 0xc8322b });
     }
-    solid(x + n * 0.19, z, n * 0.38 + 0.7, 0.7, 0.55, 0.5, 'metal');   // the baskets: open underneath
+    solid(x + (n - 1) * 0.19, z, (n - 1) * 0.38 + 0.9, 0.7, 0.55, 0.5, 'metal');   // the baskets, first to last: open underneath
   };
   carts(-21.2, 22.6, 5); carts(-21.2, -22.6, 4);
   // neon over the front end: CHECKOUTS above the lanes (both faces), CUSTOMER SERVICE over the desk
@@ -676,7 +676,7 @@ function build(ctx) {
   const aisleNames = ['FROZEN · DAIRY', 'CANNED · SOUP', 'PASTA · RICE', 'SNACKS · SODA', 'BAKING · SPICES', 'BREAD · CEREAL', 'HOUSEHOLD'];
   [-11.35, -8.05, -4.75, -1.45, 1.85, 5.15, 8.0].forEach((z, i) => {
     const tex = signTex([`${i + 1}`, aisleNames[i]], { bg: i === 0 ? '#2a6aa8' : '#1f4e8a', fg: '#ffffff', font: 'bold 44px Arial', w: 512, h: 160 });
-    for (const s of [0, Math.PI]) signMesh(tex, 2.0, 0.62, -2.6 + (s ? -0.01 : 0.01), 3.85, z, s + Math.PI / 2, 0.6, { noMinimap: true });
+    for (const s of [0, Math.PI]) signMesh(tex, 2.0, 0.62, -2.6 + (s ? -0.01 : 0.01), 3.85, z, s + Math.PI / 2, 0.6, { noMinimap: true, double: true });   // hanging: seen edge-on and from behind
     P(new THREE.CylinderGeometry(0.01, 0.01, 1.7, 4), M.dark, -2.6, 5.0, z);
   });
 
@@ -727,8 +727,8 @@ function build(ctx) {
     B(M.paint, 3, 0.25, 0.5, x + 1.5, 2.1, 23.7, 0, { tint: 0x2f6a2a, grime: 0 });
   }
   const prodSign = signTex('FRESH PRODUCE', { bg: '#2f6a2a', font: 'bold 64px Arial' });
-  signMesh(prodSign, 4, 1, -2.6, 3.6, 23.9, Math.PI, 0.6, { noMinimap: true });
-  for (const s of [0, Math.PI]) signMesh(signTex('PRODUCE', { bg: '#2f6a2a', font: 'bold 70px Arial', w: 512, h: 128 }), 2.2, 0.55, -2.6, 3.9, 13.1 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true });
+  signMesh(prodSign, 4, 1, -2.6, 3.6, 23.9, Math.PI, 0.6, { noMinimap: true, double: true });
+  for (const s of [0, Math.PI]) signMesh(signTex('PRODUCE', { bg: '#2f6a2a', font: 'bold 70px Arial', w: 512, h: 128 }), 2.2, 0.55, -2.6, 3.9, 13.1 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true, double: true });
   fruit.flush();
   // front "action alley": a few promo pallets, staggered so the front isn't one long lane
   SB(M.cardboard, 1.4, 1.5, 1.4, -14.2, 0, 2.5, {}, 'wood');
@@ -946,7 +946,7 @@ function build(ctx) {
   SB(M.cardboard, 1.2, 1.4, 1.2, 12.6, 0, -1.2, { grime: 0.05 }, 'wood'); face(M.goodsBox, 1.1, 0.6, 12.6, 0.8, -0.59, 0, 1);
   gondola(8.8, 12.6, 14.0, [M.goodsBottle, M.goodsBottle, M.goodsCan]);
   gondola(8.8, 12.6, 18.4, [M.goodsBottle, M.goodsCan, M.goodsBottle]);
-  for (const s of [0, Math.PI]) signMesh(signTex('BEER & WINE', { bg: '#6a1a2a', font: 'bold 64px Arial', w: 512, h: 128 }), 2.2, 0.55, 10.7, 3.6, 16.2 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true });
+  for (const s of [0, Math.PI]) signMesh(signTex('BEER & WINE', { bg: '#6a1a2a', font: 'bold 64px Arial', w: 512, h: 128 }), 2.2, 0.55, 10.7, 3.6, 16.2 + (s ? -0.01 : 0.01), s, 0.6, { noMinimap: true, double: true });
 
   // ---------- upstairs: offices + break room on a mezzanine over the front corner (floor at 3.2 m) ----------
   // under it: the entrance, customer service and the carts. Inside stair from the dairy end, outside stair
@@ -1138,7 +1138,7 @@ function build(ctx) {
     SB(M.paint, 1.3, 2.5, 2.4, cx0 + 2.35, 1.1, zc, { tint: 0x2a4a7a, grime: 0.1 }, 'metal');     // sleeper
     SB(M.paint, 1.9, 2.0, 2.45, cx0 + 3.95, 1.1, zc, { tint: 0x2a4a7a, grime: 0.1 }, 'metal');    // cab
     SB(M.paint, 1.4, 1.25, 2.1, cx0 + 5.55, 0.95, zc, { tint: 0x2a4a7a, grime: 0.15 }, 'metal');  // hood
-    solid(cx0 + 3.9, zc, 5.6, 2.45, 0.5, 0.6, 'metal');                               // frame and tanks
+    solid(cx0 + 3.73, zc, 5.26, 2.45, 0.5, 0.6, 'metal');                             // frame and tanks (to the grille)
     for (const dx of [1.2, 2.5, 5.4]) for (const s of [-1, 1]) solid(cx0 + dx, zc + s * 1.0, 1.0, 0.4, 1.04, 0, 'metal'); // wheels
     P(new THREE.BoxGeometry(0.04, 0.85, 2.1), M.glass, cx0 + 4.91, 2.55, zc, 0, { tint: 0xffffff });
     B(M.steelK, 0.12, 0.6, 2.2, cx0 + 6.3, 0.95, zc, 0, { grime: 0 }); // grille
@@ -1235,8 +1235,8 @@ function build(ctx) {
     SB(M.concrete, w, 0.55, d, x, 0, z, { tint: 0xc8c0b0, grime: 0.3 });
     plane(M.dirt, w - 0.2, d - 0.2, x, z, 0.56);
     solid(x, z, w - 0.1, d - 0.1, 1.2, 0, 'dirt');
-    hedge(x0 + 0.35, z - d / 2 + 0.5, x1 - 0.35, z - d / 2 + 0.5, 0.75, 0.6, false, 0.55);   // low box hedge along the back, ferns and grasses in front
-    hedge(x0 + 0.5, z + 0.35, x1 - 0.5, z + 0.35, 0.4, 0.5, false, 0.55);   // a lower, lighter row in front
+    hedge(x0 + 0.35, z - d / 2 + 0.5, x1 - 0.35, z - d / 2 + 0.5, 0.75, 0.6, true, 0.55);   // low box hedge along the back, ferns and grasses in front
+    hedge(x0 + 0.5, z + 0.35, x1 - 0.5, z + 0.35, 0.4, 0.5, true, 0.55);   // a lower, lighter row in front
     for (let t = -w / 2 + 0.7; t <= w / 2 - 0.6; t += 0.9) for (let k = 0; k < 3; k++) P(new THREE.BoxGeometry(0.06, 0.06, 0.06), M.paint, x + t + k * 0.13, 1.0 + (k % 2) * 0.03, z + 0.2 + k * 0.1, k, { tint: [0xe8d040, 0xf0f0e8, 0xd8508a][(k + Math.round(t * 3)) % 3] });   // flowers
   };
   for (const [x0, x1] of [[-21.5, -15], [-13.5, -6.5], [-0.5, 6.5], [8, 14.5], [16, 21.5]]) bed(x0, x1, 25.6);
@@ -1301,13 +1301,14 @@ function build(ctx) {
     SB(M.paint, 0.08, 1.2, 3.2, x - 1.2, 0, z, { tint: 0x2f5a3a, grime: 0.2 }, 'metal');
     for (const [dx, dz] of [[-1.15, -1.55], [1.15, -1.55], [-1.15, 1.55], [1.15, 1.55]]) P(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 8), M.dark, x + dx, 1.2, z + dz);
     B(M.metal, 2.6, 0.08, 3.4, x, 2.4, z, 0, { tint: 0x2f5a3a, grime: 0.15 });
-    for (let i = 0; i < 4; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x + 0.2, 0.75, z - 1.0 + i * 0.4, Math.PI / 2);
-    solid(x + 0.2, z, 1.0, 2.4, 0.55, 0.5, 'metal');
+    for (let i = 0; i < 4; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x + 0.2, 0.75, z - 1.0 + i * 0.4, Math.PI / 2, { sx: 1 - i * 0.02, sy: 1 - i * 0.02, sz: 1 - i * 0.02 });
+    solid(x + 0.2, z - 0.4, 0.6, 2.1, 0.55, 0.5, 'metal');   // just the carts' baskets
   };
   shelter(-26.2, -4); shelter(-39.6, 8);
   const boxVan = (x, z, tint) => {
     SB(M.paint, 2.2, 2.6, 5.4, x, 0.45, z, { tint, grime: 0.15 }, 'metal');
-    solid(x, z, 2.2, 5.4, 0.45, 0, 'metal');
+    solid(x, z - 0.9, 2.2, 7.2, 0.45, 0, 'metal');   // the chassis, under the cab too
+    B(M.dark, 2.0, 0.42, 7.1, x, 0.03, z - 0.9, 0, { grime: 0 });   // (drawn: it's what you bump into)
     SB(M.paint, 2.1, 1.6, 1.8, x, 0.45, z - 3.5, { tint: 0xe8e8e4, grime: 0.15 }, 'metal');
     P(new THREE.BoxGeometry(1.9, 0.7, 0.04), M.glass, x, 1.75, z - 4.42, 0, { tint: 0xffffff });
     for (const s2 of [-1, 1]) for (const dz of [-3.4, 1.6]) P(new THREE.CylinderGeometry(0.4, 0.4, 0.26, 14), M.rubber, x + s2 * 1.0, 0.4, z + dz, 0, { rz: Math.PI / 2 });
@@ -1337,7 +1338,7 @@ function build(ctx) {
   const corral = (x, z) => {
     solid(x, z, 2.6, 1.2, 1.0, 0, 'metal').pass = true;
     for (const s2 of [-1, 1]) B(M.steelK, 2.6, 0.05, 0.05, x, 0.95, z + s2 * 0.55, 0, { grime: 0 });
-    for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x - 0.8 + i * 0.4, 0.75, z, 0);
+    for (let i = 0; i < 3; i++) P(new RoundedBoxGeometry(0.9, 0.5, 0.55, 1, 0.03), M.steelK, x - 0.8 + i * 0.4, 0.75, z, 0, { sx: 1 - i * 0.02, sy: 1 - i * 0.02, sz: 1 - i * 0.02 });
   };
   corral(-26.8, -20); corral(-26.8, 21.2);
   palletStack(-39.6, -15.5, 1.3); palletStack(-39.6, 15.8, 1.0); palletStack(-27, -9.4, 1.4); palletStack(-27, 9, 1.1);

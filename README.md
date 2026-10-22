@@ -74,7 +74,25 @@ Run `python3 tools/drivein_gen.py 90` to search again, or `--rebuild js/drivein_
 
 ## Collision
 
-What you see is what stops you: an automated check casts about 100,000 rays per map against both the collision and the drawn geometry and flags any collision that isn't drawn (invisible walls, blocked gaps, bullet holes in thin air). Props have collision shaped like what's drawn (cars are a body plus a cabin, jersey barriers a wide foot and narrow top, tables only their top, stair flights only their treads). Railings, benches, shop windows, wire racks and car glass stop players but not bullets or sight. The map edges are always a visible building, wall or fence.
+What you see is what stops you. Props have collision shaped like what's drawn (cars are a body plus a cabin, jersey barriers a wide foot and narrow top, tables only their top, stair flights only their treads). Railings, benches, shop windows, wire racks and car glass stop players but not bullets or sight. The map edges are always a visible building, wall or fence.
+
+### Map audit
+
+`js/audit.js` checks a built map the way a player would run into it. From every place a player can reach (each nav level, flooded from the spawns and across the stairs, standing and crouched), it casts 72 rays against the drawn geometry (with three-mesh-bvh, loaded only for the audit) and compares them with the collision:
+
+| Check | What it finds |
+|---|---|
+| see-through | the first thing a ray meets is the undrawn back of a one-sided surface: a hole you can see through |
+| sky leak | below street level, a ray that hits nothing at all |
+| z-fight | two surfaces closer together than the depth buffer can tell apart at that distance (they flicker) |
+| invisible wall | a collision face with nothing drawn near it, where a player can get to it |
+| walk-through | a broad, solid-looking surface at body height with no collision behind it |
+| floor | the floor drawn above or below your feet (sinking in, floating), or not drawn at all |
+| clipping | a prop's collision pushed into another object's |
+| floating | a prop with nothing under it |
+| bad spot | a spawn, pickup or bomb site inside something or with no floor |
+
+In the game, add `?audit` to the URL: markers appear on the map, and the report goes to the console (`__game.audit()` re-runs it). For every map headless, serve the repo and run `node tools/map_audit.mjs --url http://localhost:3000`. That needs Playwright. It writes `audit/report.md` and `audit/report.json`; `--shots N` adds screenshots of each kind of issue, taken from where it was seen, and `--maps tarsa,pioneer` limits the maps. `--selftest` plants one defect of each kind in a map and checks the audit finds every one, so run it after changing a rule. All five maps currently audit clean.
 
 ## Controllers
 
@@ -291,6 +309,7 @@ npx serve .            # or: python3 -m http.server 8000
 | `js/drivein.js` | Drive-In: the theatre built from the generated layout (screens and the projected feature, 50s cars, vans, pickups, step vans, speaker posts, snack bar and booth, playground, marquee), dusk sky and stars |
 | `js/drivein_layout.js`, `tools/drivein_gen.py` | The generated Drive-In layout and the generator that makes it |
 | `js/supermarket.js` | Freshway: the indoor map, its textures (goods, floor, signs), the instanced produce and the smoking soldier |
+| `js/audit.js`, `tools/map_audit.mjs` | Map audit: see-through surfaces, flicker, invisible walls, walk-through scenery, floors, clipping and floating props; in game with `?audit`, or every map headless |
 | `js/doors.js` | Doors that open and close (swing, traffic and sliding doors), their collision and network sync |
 | `js/modes.js` | Gun Game ladder; Gunfight and Search & Destroy: rounds, bomb, sites, overtime flag, bot objectives, HUD |
 | `js/main.js` | Boot, title screen, Offline/Online, sign-in screens, menu tabs, controller/keyboard menu navigation, settings persistence |
