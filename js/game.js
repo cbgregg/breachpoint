@@ -21,6 +21,7 @@ import { Renderer, SUN_DIR } from './render.js';
 import { HostSession, GuestSession } from './online.js';
 import { Music } from './music.js';
 import { createMode, MODES, GUN_LADDER } from './modes.js';
+import { compileGently } from './warm.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Vector3(), _end = new THREE.Vector3(), _r = new THREE.Vector3();
 const _gf = new THREE.Vector3(), _gs = new THREE.Vector3(), _gt = new THREE.Vector3();
@@ -100,7 +101,8 @@ export class Game {
     setCharacterDetail(this.world.textures.fabric);
     this.fitShadows();
     this.renderer.setLook(this.world.look);
-    this.minimap = renderMinimap(this.renderer.renderer, this.scene);
+    this.minimap = null;
+    this.warmMap();
     this.effects = new Effects(this.scene, this.physics);
     this.audio = new GameAudio();
     this.music = new Music(this.audio);
@@ -504,8 +506,28 @@ export class Game {
     this.vmSun.position.copy(SUN_DIR).applyQuaternion(_q).multiplyScalar(5);
     const showVm = (this.state === 'playing' || this.state === 'paused') && !!this.player && this.player.alive && this.playerCtl.vmRoot.visible;
     if (this.player && this.state !== 'menu') this.updateGlare(dt);
-    this.renderer.render(dt, showVm);
+    if (!this.warming) this.renderer.render(dt, showVm);   // (nothing drawn while a new map's shaders compile)
     this.input.endFrame();
+  }
+
+  // A new map's shaders compile without freezing the page (see warm.js), and nothing 3D is drawn until they're
+  // done: drawing first made the page wait on every compile at once. Then the minimap's snapshot.
+  async warmMap() {
+    const token = (this.warmToken = (this.warmToken || 0) + 1), r = this.renderer.renderer;
+    this.warming = true;
+    this.warmPromise = (async () => {
+      try {
+        await compileGently(r, this.scene, this.camera);
+        await compileGently(r, this.vmScene, this.vmCamera);
+      } catch (_) { /* older browsers: compile on first draw, as before */ }
+      if (token !== this.warmToken) return;   // the map changed again meanwhile: that warm-up takes over
+      this.warming = false;
+      const mm = await renderMinimap(r, this.scene);
+      if (token !== this.warmToken) return;
+      this.minimap = mm;
+      if (this.onMinimap) this.onMinimap(this.minimap);
+    })();
+    return this.warmPromise;
   }
 
   // a clock every machine in an online match agrees on (the host's match time): the station's trains run on it
@@ -1366,8 +1388,11 @@ export class Game {
   // soldiers, effects, pickups) are made visible for one frame, every soldier is stood in front of the
   // camera, all programs (including the shadow and skinning variants) compile and every texture uploads.
   // Without this the first time you see a bot or a group of bots the game hitches while the GPU catches up.
-  prewarm() {
+  // Async: the programs compile gently (see warm.js) while the loading screen keeps animating.
+  async prewarm() {
+    if (this.warmPromise) await this.warmPromise;
     const r = this.renderer.renderer, hidden = [], moved = [], texs = new Set();
+    this.warming = true;
     for (const sc of [this.scene, this.vmScene]) sc.traverse(o => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     this.characters.forEach((c, i) => {
@@ -1383,12 +1408,13 @@ export class Game {
     // thrown equipment too, so the first knife or semtex of the match doesn't compile mid-throw
     const eq = [];
     for (const t of ['frag', 'semtex', 'knife', 'shock', 'stun']) { const m = this.equipMesh(t); m.position.copy(this.camera.position).addScaledVector(fwd, 3); this.scene.add(m); eq.push(m); }
-    try { r.compile(this.scene, this.camera); r.compile(this.vmScene, this.vmCamera); } catch (_) { /* best effort */ }
+    try { await compileGently(r, this.scene, this.camera); await compileGently(r, this.vmScene, this.vmCamera); } catch (_) { /* best effort */ }
     for (const m of eq) this.scene.remove(m);
     for (const t of texs) { try { r.initTexture(t); } catch (_) { /* best effort */ } }
     try { this.renderer.render(1 / 60, true); } catch (_) { /* best effort */ }
     for (const [m, p] of moved) { m.position.copy(p); m.updateMatrixWorld(true); }
     for (const o of hidden) o.visible = false;
+    this.warming = false;
   }
 
   // swap the map: drop the old geometry, collision and nav grid, then build the new one
@@ -1450,7 +1476,8 @@ export class Game {
     this.fitShadows();
     if (this.collisionView) this.setCollisionView(true, true);
     this.renderer.setLook(this.world.look);
-    this.minimap = renderMinimap(this.renderer.renderer, this.scene);
+    this.minimap = null;
+    this.warmMap();
     this.effects.clear();
     if (this.onMapChange) this.onMapChange(this.world);
     if (AUDIT) this.audit();

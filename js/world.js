@@ -2605,16 +2605,19 @@ function buildMountain() {
   return m;
 }
 
-// Top-down render of the map for the minimap (needs the renderer, so it runs after the scene is built)
-export function renderMinimap(renderer, scene) {
+// Top-down render of the map for the minimap (needs the renderer, so it runs after the scene is built). Async:
+// the picture is read back without making the page wait for the GPU (see readPixelsLater).
+export async function renderMinimap(renderer, scene) {
   const W = 504, H = Math.round(W * (MAP.maxZ - MAP.minZ) / (MAP.maxX - MAP.minX));
   const cam = new THREE.OrthographicCamera(MAP.minX, MAP.maxX, -MAP.minZ, -MAP.maxZ, 1, 200);
   cam.position.set(0, 100, 0);
   cam.up.set(0, 0, -1);
   cam.lookAt(0, 0, 0);
   const rt = new THREE.WebGLRenderTarget(W, H, { colorSpace: THREE.SRGBColorSpace });
-  const fog = scene.fog;
-  scene.fog = null;
+  // no fog for the top-down view (thinned to nothing rather than removed: removing it would need every
+  // material's shader compiled again without fog)
+  const fog = scene.fog, density = fog && fog.density;
+  if (fog && density !== undefined) fog.density = 0;
   // roofs (indoor maps) come off for the top-down view
   const hidden = [];
   scene.traverse(o => { if (o.userData.noMinimap && o.visible) { o.visible = false; hidden.push(o); } });
@@ -2622,11 +2625,11 @@ export function renderMinimap(renderer, scene) {
   renderer.setRenderTarget(rt);
   renderer.render(scene, cam);
   renderer.setRenderTarget(null);
-  scene.fog = fog;
+  if (fog && density !== undefined) fog.density = density;
   for (const o of hidden) o.visible = true;
   renderer.shadowMap.enabled = prevShadow;
   const px = new Uint8Array(W * H * 4);
-  renderer.readRenderTargetPixels(rt, 0, 0, W, H, px);
+  await readPixelsLater(renderer, rt, W, H, px);
   rt.dispose();
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
@@ -2642,4 +2645,31 @@ export function renderMinimap(renderer, scene) {
   }
   g.putImageData(img, 0, 0);
   return { canvas: c, scale: W / (MAP.maxX - MAP.minX) };
+}
+
+// Read a render target's pixels back without stalling the page: a plain readPixels waits for everything the GPU
+// still has queued (seconds on a slow one, or with hardware acceleration off). WebGL 2 copies them into a buffer
+// on the GPU and says when it's done; the page carries on meanwhile.
+async function readPixelsLater(renderer, rt, W, H, px) {
+  const gl = renderer.getContext();
+  if (typeof WebGL2RenderingContext === 'undefined' || !(gl instanceof WebGL2RenderingContext)) { renderer.readRenderTargetPixels(rt, 0, 0, W, H, px); return; }
+  const buf = gl.createBuffer();
+  renderer.setRenderTarget(rt);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buf);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, px.byteLength, gl.STREAM_READ);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  renderer.setRenderTarget(null);
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.flush();
+  for (;;) {
+    const st = gl.clientWaitSync(sync, 0, 0);
+    if (st !== gl.TIMEOUT_EXPIRED) break;   // done (or failed: then the picture is just blank)
+    await new Promise(r => setTimeout(r, 16));
+  }
+  gl.deleteSync(sync);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buf);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, px);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  gl.deleteBuffer(buf);
 }
