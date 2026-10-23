@@ -130,7 +130,7 @@ Loading never freezes the page: a map's shaders compile in the background where 
 | Shadow updates | Every frame, every other frame, or every third frame |
 | Options are staged | Changing an option doesn't apply it: an UNSAVED CHANGES bar appears and **X** (keyboard or controller) or APPLY applies everything at once. Leaving Options with unsaved changes asks whether to apply or discard them. **Reset tab to defaults** (under the description on the right) puts the open tab back to its defaults, staged the same way; on Graphics it picks the preset recommended for your GPU |
 | Anti-aliasing | SMAA plus **MSAA** on the post-processing path (Medium 2×, High and Ultra 4×, Custom up to 8×), hardware 4× MSAA on the fast path |
-| Hardware check | Options → Graphics shows the GPU and the preset recommended for it; presets above that are marked *not recommended*. If the browser is drawing on the CPU (hardware acceleration off) a banner says so, with the setting to turn on for Chrome, Edge or Firefox. In a match, a frame rate under 40 fps for 20 s suggests a lighter preset or FSR (once) |
+| Hardware check | Options → Graphics shows the GPU and the preset recommended for it; presets above that are marked *not recommended*. If the browser is drawing on the CPU (hardware acceleration off) a banner says so, with the setting to turn on for Chrome, Edge or Firefox. In a match, a frame rate under 40 fps for 20 s suggests a lighter preset or FSR (once), and back in the menu offers a one-click switch |
 | Dynamic resolution | Only reacts to a sustained slowdown (2 s) and changes at most once every 4 s, since each change reallocates render targets |
 | **Upscaling: AMD FSR 1.0** (`js/fsr.js`) | Options → Graphics → Upscaling: Ultra Quality (77% render scale), Quality (67%), Balanced (59%), Performance (50%), plus an FSR sharpness slider. The scene renders smaller and FSR's EASU pass upscales it to the screen with edge-aware filtering, then RCAS sharpens it. Works with any preset and both render paths (on the fast path it renders into a 4× multisampled target first). With FSR on, dynamic resolution moves the render scale and the canvas stays at full resolution. FSR 1 is spatial and open source, so it runs on any GPU in any browser |
 | DLSS, FSR 2/3, MetalFX | Not available to web pages: they need motion vectors plus NVIDIA, AMD or Apple driver APIs that browsers don't expose (DLSS also needs NVIDIA tensor cores). On Macs, iPhones and iPads the game already runs on Metal: Safari and Chrome translate WebGL to Metal through ANGLE |
@@ -158,6 +158,25 @@ The menus are a tree, laid out like Modern Warfare (2019):
 | Back | Esc | B | Always climbs one level (page → tiles → game type → title) |
 
 A breadcrumb over each page shows where you are (PLAY › SEARCH & DESTROY, OPTIONS › GRAPHICS). The pause menu uses the same Options categories.
+
+**Play now vs bots** on the game-type screen starts a match against bots with your last setup (mode, map, difficulty): two presses from the title screen.
+
+The menus show slowly drifting screenshots of the maps instead of drawing the 3D map behind them, so browsing menus costs the graphics card almost nothing (and nothing at all is drawn behind the loading screen). Options → Graphics → *Menu background* → *Live 3D* brings the live view back.
+
+### When something goes wrong
+
+| Problem | What the game does |
+|---|---|
+| The game didn't finish starting twice in a row | The next start is in **safe mode**: the lightest preset and the picture menu, with a note saying so. `?safe` in the address does the same. The "didn't finish loading" box has a *Reset settings & start in safe mode* button |
+| Saved settings are broken (wrong type, out of range, from an old version) | Each value is checked when loaded; a bad one falls back to its default instead of spinning the camera or stopping the game from starting |
+| The graphics driver resets mid-game (WebGL context lost) | A local match pauses, a note says what happened, and the picture comes back when the browser restores it (with a one-click lighter preset); if it doesn't within 6 s, a Reload button |
+| A match fails to start | Back to the menu with a message and a Reload button, instead of a silent bounce. Double clicks start one match, not two |
+| A match ran slowly | A toast in the match, then back in the menu a one-click switch to the next lighter preset. A preset saved well above what the GPU usually manages (e.g. Ultra on integrated graphics) is offered a lighter one once |
+| The browser refuses to capture the mouse (resuming with Esc, or too soon after leaving) | A *Click to resume* screen: one click captures it, instead of aiming with a loose cursor |
+| Touchscreen laptop | Keeps mouse aiming; the touch controls appear when the screen is actually touched, and go away when the mouse moves again |
+| Alt-tab, a notification or a phone call mid-match | A local match pauses (controller and touch players; mouse players already pause when the pointer is released). Sound that a call interrupted comes back with the next tap or key |
+| Wrong 6-digit code | After 8 s the join screen says it's still looking and what to check, instead of a silent 45 s wait |
+| Host presses Close lobby / End session with players in it | Needs a second press, since it drops everyone |
 
 ## Controls
 

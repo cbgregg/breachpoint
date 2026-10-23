@@ -21,6 +21,14 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0e; color: var(--ink); font-family: var(--body); user-select: none; -webkit-user-select: none; touch-action: none; }
 #app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+/* menu background: a slow slideshow of the maps (body.still-menu: the 3D view isn't drawn behind the menus) */
+#menu-bg { position: fixed; inset: 0; display: none; overflow: hidden; background: #0b0d0e; }
+body.still-menu #menu-bg { display: block; }
+#menu-bg i { position: absolute; inset: -4%; background-size: cover; background-position: center; opacity: 0; transition: opacity 1.8s ease; }
+#menu-bg i.on { opacity: 1; animation: mbg-drift 24s ease-in-out infinite alternate; }
+#menu-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8, 10, 11, 0.7) 0%, rgba(8, 10, 11, 0.32) 55%, rgba(8, 10, 11, 0.55) 100%); }
+@keyframes mbg-drift { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.08) translate(-1.5%, -1%); } }
+@media (prefers-reduced-motion: reduce) { #menu-bg i.on { animation: none; } }
 button { font: inherit; color: inherit; }
 :focus-visible, .pad-focus { outline: 2px solid var(--amber); outline-offset: 2px; }
 
@@ -1075,6 +1083,8 @@ body.mode-online #pane-play > * { order: 0 !important; }
 @media (max-width: 760px) { body.mode-online #play-rows { grid-template-columns: 1fr; } }
 #lobby-leave.cancel { background: rgba(214, 72, 60, 0.18); border: 1px solid rgba(255, 110, 96, 0.7); color: #fff; font-size: 18px; padding: 14px; letter-spacing: 0.18em; }
 #lobby-leave.cancel:hover, #lobby-leave.cancel.pad-focus { background: rgba(214, 72, 60, 0.4); box-shadow: inset 0 0 0 2px #fff; }
+.mode-quick { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; max-width: 738px; margin: 0 0 14px; padding: 12px; font-size: 18px; border-color: var(--accent, #e8a33d); }
+.mode-quick small { font-size: 10px; letter-spacing: 0.16em; color: var(--ink-faint, #8a8a86); }
 .mode-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .mode-extra .menu-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 16px; padding: 12px; }
 .mode-extra .menu-btn small { font-size: 10px; letter-spacing: 0.16em; color: var(--ink-faint, #8a8a86); }
@@ -1611,13 +1621,21 @@ select option.nr { color: #9a8f80; }
 .boot-fail b { font-family: var(--display); font-size: 20px; letter-spacing: 0.1em; color: #ff8a7a; }
 .boot-fail p { margin: 0; }
 .boot-fail button { align-self: flex-start; }
+.boot-fail .cta.alt { background: transparent; color: #e8e6e0; border: 1px solid rgba(232, 230, 224, 0.4); font-size: 13px; }
 .boot-fail details { font-size: 12px; color: #9a9890; }
 .boot-fail code { display: block; white-space: pre-wrap; word-break: break-all; margin-top: 6px; user-select: text; }
 .gpu-warn { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; background: rgba(40, 10, 8, 0.94); border: 1px solid #ff6a55; color: #fff; font-size: 13px; line-height: 1.45; }
 .gpu-warn b { font-family: var(--display); letter-spacing: 0.14em; color: #ff8a7a; }
 .gpu-warn .menu-btn { align-self: flex-end; margin: 0; }
-#notice.motd-pop .mw-head small { visibility: hidden; }
-#notice.motd-pop .mw-head small::after { content: 'MESSAGE OF THE DAY'; visibility: visible; display: block; }
+.click-resume { position: fixed; inset: 0; z-index: 59; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 0; background: rgba(6, 8, 9, 0.45); color: #fff; cursor: pointer; font: inherit; }
+.click-resume b { font-family: var(--display); font-size: clamp(28px, 4vw, 44px); letter-spacing: 0.14em; }
+.click-resume span { font-size: 14px; opacity: 0.8; }
+.top-notes { position: fixed; right: max(16px, 2vw); top: 18px; z-index: 61; width: min(460px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.top-notes .gpu-warn { position: static; transform: none; max-width: none; pointer-events: auto; }
+.gpu-warn.offer { background: rgba(14, 16, 17, 0.95); border-color: var(--accent, #e8a33d); z-index: 61; }
+.gpu-warn.offer b { color: var(--accent, #e8a33d); }
+.offer-btns { display: flex; gap: 8px; justify-content: flex-end; }
+#notice .bo-title b { white-space: normal; overflow-wrap: anywhere; }   /* long headings wrap instead of being cut off */
 #notice .nt-text { white-space: pre-line; }
 
 /* options are staged: nothing changes until Apply (X) */

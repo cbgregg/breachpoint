@@ -37,13 +37,21 @@
 </head>
 <body data-device="kbm">
   <div id="app"></div>
+  <!-- menu background: screenshots from the maps (the live 3D view behind the menus is optional: Options > Graphics) -->
+  <div id="menu-bg" aria-hidden="true"><i></i><i></i></div>
   <div id="bo-fx" aria-hidden="true"></div>
+
+  <!-- a suggestion the player can act on in one click (lighter graphics after a slow match, safe mode) -->
+  <div class="top-notes">
+    <div id="offer" class="gpu-warn offer" hidden role="status"><b id="offer-head"></b><span id="offer-text"></span><div class="offer-btns"><button id="offer-yes" class="menu-btn small primary">SWITCH</button><button id="offer-no" class="menu-btn small">KEEP</button></div></div>
+    <div id="gpu-warn" class="gpu-warn" hidden><b>Hardware acceleration is off</b><span id="gpu-warn-text"></span><button id="gpu-warn-x" class="menu-btn small">OK</button></div>
+  </div>
+  <button id="click-resume" class="click-resume" hidden><b>CLICK TO RESUME</b><span>The browser needs a click to capture the mouse again</span></button>
 
   <!-- ============ HUD ============ -->
   <div id="hud">
     <div id="stun-fx"></div>
     <div id="apply-dlg" class="apply-dlg" hidden><div class="ad-box"><b>APPLY CHANGES?</b><p>You changed some options. Apply them, or go back to how they were?</p><div class="ad-btns"><button id="ad-apply" class="cta small" data-nav><span>APPLY</span></button><button id="ad-discard" class="menu-btn small" data-nav>DISCARD</button><button id="ad-cancel" class="menu-btn small" data-nav>KEEP EDITING</button></div></div></div>
-    <div id="gpu-warn" class="gpu-warn" hidden><b>Hardware acceleration is off</b><span id="gpu-warn-text"></span><button id="gpu-warn-x" class="menu-btn small">OK</button></div>
     <div id="scope"><div class="lens"><i class="h"></i><i class="v"></i><i class="dot"></i></div></div>
 
     <div id="tl">
@@ -135,6 +143,8 @@
   <div id="mode" class="screen">
     <div class="mw mode-wrap">
       <header class="mw-head"><div class="bo-title"><b>BREACHPOINT</b><small>SELECT GAME TYPE</small></div></header>
+      <!-- straight into a match against bots with the last setup: two presses from the title screen -->
+      <button class="menu-btn mode-quick" id="mode-quick" data-nav>▶ PLAY NOW VS BOTS <small id="mode-quick-d"></small></button>
       <div class="mode-cards">
         <button class="mode-card" id="mode-offline" data-nav>
           <span class="mc-k">OFFLINE · VERSUS BOTS</span><span class="mc-t">COMBAT TRAINING</span>
@@ -447,6 +457,8 @@
               <option value="1">Off</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></div>
             <div class="row"><label for="opt-gfxdust">Ambient dust</label><select id="opt-gfxdust" data-nav>
               <option value="0">Off</option><option value="140">Low</option><option value="220">Medium</option><option value="300">High</option></select></div>
+            <div class="row"><label for="opt-menubg">Menu background</label><select id="opt-menubg" data-nav>
+              <option value="picture">Pictures (lightest)</option><option value="live">Live 3D</option></select></div>
             <div class="row"><label for="opt-fpscap">Frame rate limit</label><select id="opt-fpscap" data-nav>
               <option value="0">Unlimited</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="144">144</option><option value="240">240</option></select></div>
             <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
@@ -618,7 +630,7 @@
   <!-- ============ account notice (review / checkpoint) ============ -->
   <div id="notice" class="screen">
     <div class="mw narrow signin nt">
-      <header class="mw-head"><div class="bo-title"><b id="nt-title">NOTICE</b><small>ACCOUNT</small></div></header>
+      <header class="mw-head"><div class="bo-title"><b id="nt-title">NOTICE</b><small id="nt-sub">ACCOUNT</small></div></header>
       <p class="nt-text" id="nt-text"></p>
       <button id="nt-ok" class="cta" data-nav><span>CONTINUE</span><span class="glyph" data-act="accept"></span></button>
     </div>
@@ -840,9 +852,13 @@
       shown = true;
       var ld = document.getElementById('loading'), box = document.createElement('div');
       box.className = 'boot-fail';
-      box.innerHTML = '<b>Breachpoint didn\'t finish loading</b><p>' + why + '</p><p>Reload the page. If it keeps happening: update your browser (Chrome, Edge, Firefox or Safari), turn on hardware or graphics acceleration in its settings, and try with ad or script blockers off for this site.</p><button class="cta">RELOAD</button><details><summary>Details</summary><code></code></details>';
+      box.innerHTML = '<b>Breachpoint didn\'t finish loading</b><p>' + why + '</p><p>Reload the page. If it keeps happening: update your browser (Chrome, Edge, Firefox or Safari), turn on hardware or graphics acceleration in its settings, and try with ad or script blockers off for this site.</p><button class="cta">RELOAD</button><button class="cta alt">RESET SETTINGS &amp; START IN SAFE MODE</button><details><summary>Details</summary><code></code></details>';
       box.querySelector('code').textContent = (errs.join('\n') || 'no error reported') + '\n' + navigator.userAgent;
       box.querySelector('button').onclick = function () { location.reload(); };
+      box.querySelector('.alt').onclick = function () {
+        try { localStorage.removeItem('breachpoint.settings.v2'); localStorage.removeItem('breachpoint.boots'); } catch (_) { /* private mode */ }
+        location.href = location.pathname + '?safe';
+      };
       (ld || document.body).appendChild(box);
     }
     addEventListener('error', function (e) {

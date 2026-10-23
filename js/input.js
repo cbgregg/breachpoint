@@ -88,7 +88,10 @@ export class Input {
     this.lastDevice = 'kbm';
     // touch
     this.touchMoveX = 0; this.touchMoveY = 0; this.touchFire = false; this.touchAds = false; this.touchScore = false;
-    this.isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+    // Touch controls follow the primary pointer: a touchscreen laptop (fine pointer, but touch events exist) keeps
+    // mouse aiming and only switches to the on-screen controls once the screen is actually touched.
+    this.coarse = window.matchMedia('(pointer: coarse)').matches;
+    this.isTouch = this.coarse;
     // gamepad
     this.pad = null; this.padConnected = false;
     this.prevBtn = []; this.padMoveX = 0; this.padMoveY = 0; this.lookX = 0; this.lookY = 0;
@@ -145,8 +148,25 @@ export class Input {
       if (!this.locked) { this.mouseFire = false; this.mouseAds = false; }
       if (this.onLockChange) this.onLockChange(this.locked);
     });
+    document.addEventListener('pointerlockerror', () => {   // browsers whose requestPointerLock returns nothing
+      if (!this.locked && this.onLockRefused && this.enabled) this.onLockRefused();
+    });
     window.addEventListener('gamepadconnected', () => this.poll(0));
     if (this.isTouch) this.setupTouch();
+    window.addEventListener('touchstart', () => { if (!this.isTouch) this.useTouch(true); }, { capture: true, passive: true });
+    // ...and back to mouse aiming when a real mouse moves on a device that was not touch-first
+    window.addEventListener('pointermove', (e) => {
+      if (this.isTouch && !this.coarse && e.pointerType === 'mouse' && Math.abs(e.movementX) + Math.abs(e.movementY) > 4) this.useTouch(false);
+    });
+  }
+
+  useTouch(on) {
+    this.isTouch = on;
+    if (on) { if (document.pointerLockElement) document.exitPointerLock(); this.setupTouch(); return; }
+    document.getElementById('touch').classList.remove('on');
+    document.body.classList.remove('touch', 'ads-on');
+    this.touchMoveX = this.touchMoveY = 0; this.touchFire = this.touchAdsHeld = false;
+    this.setDevice('kbm');
   }
 
   setDevice(d) {
@@ -172,9 +192,17 @@ export class Input {
   }
   get scoreboard() { return this.keys.has('Tab') || this.touchScore || this.padScore; }
 
+  // Pointer lock can be refused: browsers only grant it inside a click or key press (Esc doesn't count), and not
+  // for about a second after the player left it. A page in an iframe that may never lock aims with the free
+  // cursor instead; anywhere else a refusal asks for a click (onLockRefused), which always works.
   lock() {
     if (this.isTouch) return;
-    const fail = () => { this.fallback = true; };
+    const framed = (() => { try { return window.self !== window.top; } catch (_) { return true; } })();
+    const fail = () => {
+      if (this.locked) return;
+      if (framed || !this.canvas.requestPointerLock) this.fallback = true;
+      else if (this.onLockRefused) this.onLockRefused();
+    };
     try {
       if (!this.canvas.requestPointerLock) { fail(); return; }
       const r = this.canvas.requestPointerLock();
@@ -334,6 +362,8 @@ export class Input {
     ui.classList.add('on');
     document.body.classList.add('touch');
     this.setDevice('touch');
+    if (this.touchReady) return;   // listeners are added once
+    this.touchReady = true;
     const stick = document.getElementById('stick');
     const knob = document.getElementById('stick-knob');
     let stickId = null, sx = 0, sy = 0;
