@@ -288,10 +288,10 @@ export const DEFAULT_SETTINGS = {
   musicVolume: 0.5,
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
   sightSize: 'large',  // how much of the screen the sight fills when aiming: normal | large | huge
-  privateRelay: false,
+  privateRelay: false, // route private matches through the TURN relay too (hides your IP)
   touchSize: 'small',   // touch screens: size of the on-screen buttons (small leaves more room to look around)
   touchAds: 'toggle',   // touch screens: tap ADS once to aim, again to stop
-  touchAutoFire: true,  // touch screens: fire automatically while the crosshair is on an enemy // route private matches through the TURN relay too (hides your IP)
+  touchAutoFire: true,  // touch screens: fire automatically while the crosshair is on an enemy
   name: 'Operator',
   mode: 'tdm',       // tdm | gunfight | snd
   teamSize: 6,
@@ -311,6 +311,7 @@ export const DEFAULT_SETTINGS = {
   invertY: false,
   quality: coarse ? 'mobile' : firstQuality(),
   dynamicRes: true,
+  menuBg: 'picture',   // behind the menus: map screenshots, or 'live' (the 3D map; costs the GPU while you browse)
   padSensitivity: 1,
   padDeadzone: 0.12,
   aimAssist: true,

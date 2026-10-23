@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, gpuTier, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, gpuTier, probeGpu, QUALITY, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
@@ -19,17 +19,54 @@ const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
 
 let startCd = null; // private-match start countdown (see Start Match)
+// Saved settings are checked on the way in: a value of the wrong type, out of range or from an old version
+// (a NaN sensitivity spins the camera; a bad volume used to stop the game starting) falls back to its default.
+const RANGES = { sensitivity: [0.05, 10], adsSens: [0.1, 3], padSensitivity: [0.1, 5], padDeadzone: [0, 0.5], adsZoom: [0.5, 1.6],
+  fov: [60, 120], vmFov: [50, 100], volume: [0, 1], musicVolume: [0, 1], fsrSharp: [0, 100], fpsCap: [0, 1000], gfxRes: [25, 200],
+  teamSize: [1, 12], scoreLimit: [1, 10000], timeLimit: [1, 120] };
+function cleanSettings(raw) {
+  const s = { ...DEFAULT_SETTINGS };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return s;
+  for (const [k, v] of Object.entries(raw)) {
+    const d = DEFAULT_SETTINGS[k];
+    if (d === undefined) { s[k] = v; continue; }       // extra keys (custom graphics, flags) are checked where they're used
+    if (typeof d === 'number') {
+      const n = typeof v === 'number' ? v : parseFloat(v);
+      if (!Number.isFinite(n)) continue;
+      const r = RANGES[k]; s[k] = r ? Math.min(r[1], Math.max(r[0], n)) : n;
+    } else if (typeof d === 'boolean') { if (typeof v === 'boolean') s[k] = v; }
+    else if (typeof d === 'string') { if (typeof v === 'string' && v) s[k] = v; }
+    else if (Array.isArray(d)) { if (Array.isArray(v) && v.length) s[k] = v; }
+    else s[k] = v;
+  }
+  if (s.quality !== 'custom' && !QUALITY[s.quality]) s.quality = DEFAULT_SETTINGS.quality;
+  return s;
+}
 function loadSettings() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch (_) { /* storage unavailable */ }
+    if (raw) return cleanSettings(JSON.parse(raw));
+  } catch (_) { /* storage unavailable, or the saved settings aren't readable */ }
   return { ...DEFAULT_SETTINGS };
 }
 function saveSettings(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
 }
 const settings = loadSettings();
+// Safe mode: if the game didn't finish starting the last two times (or the page was opened with ?safe), start on
+// the lightest graphics with the picture menu, and say so. Cleared once the menu is up.
+const BOOTS = 'breachpoint.boots';
+let safeMode = new URLSearchParams(location.search).has('safe');
+try {
+  const n = +localStorage.getItem(BOOTS) || 0;
+  if (n >= 2) safeMode = true;
+  localStorage.setItem(BOOTS, String(n + 1));
+} catch (_) { /* private mode */ }
+if (safeMode) {
+  Object.assign(settings, { quality: coarse || probeGpu().soft ? 'mobile' : 'low', fsr: 'off', menuBg: 'picture', dynamicRes: true, fpsCap: 0 });
+  saveSettings(settings);   // read again by the renderer before it starts
+}
+const bootDone = () => { try { localStorage.removeItem(BOOTS); } catch (_) { /* private mode */ } };
 // phones and tablets move to the Mobile preset once (it didn't exist before; Low was the touch default)
 if (coarse && !settings.mobileOffered) { settings.mobileOffered = 1; if (settings.quality === 'low' || !settings.quality) settings.quality = 'mobile'; saveSettings(settings); }
 const applyTheme = () => { document.body.dataset.theme = settings.theme || 'amber'; };
@@ -90,7 +127,7 @@ const bindings = [
   ['opt-name', 'name', 'text'], ['opt-theme', 'theme', 'str'], ['opt-mode', 'mode', 'str'], ['opt-map', 'map', 'str'], ['opt-team', 'teamSize', 'int'], ['opt-diff', 'difficulty', 'str'],
   ['opt-score', 'scoreLimit', 'int'], ['opt-time', 'timeLimit', 'int'], ['opt-ff', 'friendlyFire', 'bool'],
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
-  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxmsaa', 'gfxMsaa', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'],
+  ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxmsaa', 'gfxMsaa', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'], ['opt-menubg', 'menuBg', 'str'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
@@ -175,6 +212,7 @@ function applyOptions() {
   applyTheme();
   game.applySettings(settings);
   syncLive();
+  syncMenuBg();
   const gfx = JSON.parse(optBase);
   const gfxChanged = Object.keys(gfx).some(k => (k === 'quality' || k.startsWith('gfx')) && gfx[k] !== settings[k]);
   optBase = optState();
@@ -227,6 +265,7 @@ for (const [id, key, type] of bindings) {
     game.applySettings(settings);
     if (key === 'quality' || key.startsWith('gfx')) checkMsaa();
     syncLive();
+    syncMenuBg();
   });
 }
 
@@ -276,10 +315,49 @@ if (GPU.soft) {
   $('gpu-warn').hidden = seen;
   $('gpu-warn-x').addEventListener('click', () => { $('gpu-warn').hidden = true; try { localStorage.setItem('breachpoint.gpuwarn', GPU.name); } catch (_) { /* private mode */ } });
 }
-// in a match: if the frame rate stays low for a while on a preset above what's recommended, say so (once)
-let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false;
+// A suggestion with a one-click fix (SWITCH / KEEP), e.g. a lighter preset after a slow match.
+let offerYes = null;
+function offer(head, text, yes, yesLabel = 'SWITCH', noLabel = 'KEEP') {
+  $('offer-head').textContent = head; $('offer-text').textContent = text;
+  $('offer-yes').textContent = yesLabel; $('offer-no').textContent = noLabel;
+  $('offer-yes').hidden = !yes;
+  offerYes = yes; $('offer').hidden = false;
+}
+$('offer-yes').addEventListener('click', () => { $('offer').hidden = true; if (offerYes) offerYes(); offerYes = null; });
+$('offer-no').addEventListener('click', () => { $('offer').hidden = true; offerYes = null; });
+// the browser refused to capture the mouse (Esc to resume, or too soon after leaving it): one click fixes it
+game.input.onLockRefused = () => { if (game.state === 'playing' && !game.input.isTouch && game.input.lastDevice !== 'pad') $('click-resume').hidden = false; };
+$('click-resume').addEventListener('click', () => { $('click-resume').hidden = true; if (game.state === 'playing') game.input.lock(); });
+setInterval(() => { if (!$('click-resume').hidden && (game.input.locked || game.state !== 'playing' || game.input.lastDevice === 'pad')) $('click-resume').hidden = true; }, 250);
+// graphics driver reset: say what's happening; if the browser doesn't give the context back, offer a reload
+let ctxTimer = 0;
+game.onContext = (ok) => {
+  clearTimeout(ctxTimer);
+  if (!ok) {
+    offer('GRAPHICS RESET', 'Your graphics driver restarted. Getting the picture back…', null, '', 'OK');
+    ctxTimer = setTimeout(() => offer('GRAPHICS STOPPED', 'The browser didn\'t give the graphics back. Reloading the page fixes it; closing other tabs with games or video helps it not happen again.', () => location.reload(), 'RELOAD', 'WAIT'), 6000);
+  } else {
+    const lighter = Object.keys(PRESET_RANK).find(k => PRESET_RANK[k] === PRESET_RANK[settings.quality] - 1);
+    if (lighter && settings.quality !== 'custom') offer('GRAPHICS RECOVERED', `The graphics driver restarted. If it happens again, a lighter preset (${QUALITY[lighter].label}) puts less load on it.`, () => usePreset(lighter), `USE ${QUALITY[lighter].label.toUpperCase()}`);
+    else $('offer').hidden = true;
+  }
+};
+function usePreset(q) {
+  settings.quality = q; saveSettings(settings); game.applySettings(settings); writeForm(); optBase = optState(); syncApplyBar();
+  game.hud.toast(`GRAPHICS: ${QUALITY[q].label.toUpperCase()}`);
+}
+// in a match: if the frame rate stays low for a while, say so (once) and offer the next lighter preset back in
+// the menu, where it's one click
+let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false, perfOffer = null;
 setInterval(() => {
-  if (perfShown || game.state !== 'playing' || document.hidden) { perfFrames = perfTime = 0; return; }
+  if (perfShown || game.state !== 'playing' || document.hidden) {
+    perfFrames = perfTime = 0;
+    if (perfOffer && game.state === 'menu' && $('offer').hidden) {
+      const { fps: f, better: b } = perfOffer; perfOffer = null;
+      offer('LOW FRAME RATE', `Your last match ran at about ${f} FPS. The ${QUALITY[b].label} preset should run smoother.`, () => usePreset(b), `USE ${QUALITY[b].label.toUpperCase()}`);
+    }
+    return;
+  }
   const now = performance.now();
   if (perfNoteT) { perfFrames += game.frameCount - (perfNoteT.f || 0); perfTime += (now - perfNoteT.t) / 1000; }
   perfNoteT = { t: now, f: game.frameCount };
@@ -289,7 +367,9 @@ setInterval(() => {
     perfShown = true;
     const cur = settings.quality, better = PRESET_RANK[cur] > PRESET_RANK[GPU.best] ? GPU.best : PRESET_RANK[cur] > 0 ? Object.keys(PRESET_RANK)[PRESET_RANK[cur] - 1] : null;
     game.hud.toast(GPU.soft ? 'LOW FRAME RATE: TURN ON HARDWARE ACCELERATION IN YOUR BROWSER' : better ? `LOW FRAME RATE (${Math.round(fps)} FPS): TRY THE ${better.toUpperCase()} PRESET OR FSR IN OPTIONS` : `LOW FRAME RATE (${Math.round(fps)} FPS): TRY FSR PERFORMANCE IN OPTIONS`);
+    if (better && !GPU.soft && settings.quality !== 'custom') perfOffer = { fps: Math.round(fps), better };
   }
+
 }, 2000);
 // match mode: show only the settings that apply
 function syncModeRows() {
@@ -817,6 +897,7 @@ const OPT_DESC = {
   'opt-gfxshadows': 'Resolution of the sun\'s shadows. Higher is crisper and costs more GPU time. Off is fastest.',
   'opt-fps': 'Shows frames per second in the corner (and your ping when you join someone\'s online match).',
   'opt-fpscap': 'Caps the frame rate to save power and heat. Unlimited follows your display.',
+  'opt-menubg': 'Pictures: screenshots of the maps behind the menus, nothing drawn in 3D until you play (smooth menus on any machine). Live 3D: the map itself, slowly flying round (uses the graphics card the whole time you are in the menus).',
   'opt-fov': 'How wide your view is. Higher shows more around you; lower makes distant targets bigger.',
   'opt-vmfov': 'How large your weapon looks in first person. It doesn\'t change what you can see.',
   'opt-adsmode': 'Hold: aim while the button is held. Toggle: press once to aim, press again to stop.',
@@ -879,8 +960,36 @@ function showScreen(id) {
   if (window.__chatReady) { if (chatOpen) closeChat(); syncChat(); }
   if (sideOpen && !sideAllowed()) closeSide();
   document.body.classList.toggle('ingame', id === null);
+  syncMenuBg();
   if (id && game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
+
+// ---------- menu background: map screenshots, or the live 3D map (Options > Graphics) ----------
+// Drawing the 3D map behind the menus kept the graphics card busy the whole time: on a slow machine the menus
+// themselves went sluggish. By default the menus show pictures and nothing 3D is drawn until a match.
+const MENU_PHOTOS = [...new Set(Object.values(MAPS).flatMap(m => m.photos || []))];
+let mbgTimer = 0, mbgIdx = (Math.random() * MENU_PHOTOS.length) | 0, mbgLayer = 0;
+function menuPhoto() {
+  if (!MENU_PHOTOS.length) return;
+  const src = MENU_PHOTOS[mbgIdx++ % MENU_PHOTOS.length], layers = $('menu-bg').children;
+  loadPhoto(src).then(im => {
+    if (!im || !document.body.classList.contains('still-menu')) return;
+    const next = layers[mbgLayer ^= 1], prev = layers[mbgLayer ^ 1];
+    next.style.backgroundImage = `url("${src}")`;
+    next.classList.remove('on'); void next.offsetWidth; next.classList.add('on');
+    prev.classList.remove('on');
+  });
+}
+function syncMenuBg() {
+  const still = settings.menuBg !== 'live' && game.state === 'menu' && screen !== 'loading';
+  // nothing 3D is drawn behind the pictures, or behind the loading screen before a match (it covers the page)
+  game.menuStill = still || (game.state === 'menu' && screen === 'loading');
+  if (still === document.body.classList.contains('still-menu')) return;
+  document.body.classList.toggle('still-menu', still);
+  clearInterval(mbgTimer);
+  if (still) { menuPhoto(); mbgTimer = setInterval(menuPhoto, 12000); }
+}
+setInterval(() => { if (typeof screen !== 'undefined') syncMenuBg(); }, 500);   // (the match state can change after the screen does)
 
 // ---------- loading screen (between the menu and a match) ----------
 function setLoadingPhoto(id) {
@@ -897,7 +1006,13 @@ function drawLoadingMap(id) {
 }
 const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 const wait = (ms) => new Promise(r => setTimeout(r, ms));
+let launching = false;   // one match start at a time (a double click or Enter + click used to start two)
 function launch(cfg, online = null) {
+  if (launching) return Promise.resolve();
+  launching = true;
+  return launchMatch(cfg, online).finally(() => { launching = false; });
+}
+function launchMatch(cfg, online) {
   const guestCfg = online && online.start && online.start.cfg;
   // online, your Name Tag always comes from your account (the host's own character used to fall back to "Operator")
   if (online) { cfg = { ...cfg, name: myName() || 'Operator' }; if (online.lobby && online.lobby.role === 'host') online.lobby.hostName = cleanName(myName() || 'Operator'); }
@@ -926,7 +1041,13 @@ function launch(cfg, online = null) {
     await wait(160); await nextFrame();
     step(35, 'Building the map');
     await wait(220); await nextFrame();   // let the bar paint before the (blocking) build
-    try { game.startMatch(cfg, online); } catch (e) { showScreen('menu'); throw e; }
+    try { game.startMatch(cfg, online); } catch (e) {
+      console.error(e);
+      try { game.quitToMenu(); } catch (_) { /* best effort */ }
+      showScreen('menu');
+      offer('THE MATCH COULDN\'T START', `Something went wrong building ${map ? map.name : 'the map'}. Try again or pick another map; if it keeps happening, the Low preset or a page reload usually fixes it.`, () => location.reload(), 'RELOAD PAGE', 'OK');
+      return;
+    }
     const w = MAPS[game.world.id];
     $('ld-name').textContent = (w ? w.name : game.world.name || '').toUpperCase();
     if (w) $('ld-desc').textContent = w.blurb || '';
@@ -1223,7 +1344,12 @@ function renderLobby() {
     if (joinError) { html = esc(joinError); st.classList.add('bad'); }
     else if (!busy) html = 'Ask the host for their 6-digit code.';
     else if (lobby.status === 'matching' || (lobby.quickMode && lobby.status === 'searching')) html = '<span class="spin"></span>Looking for an open public match…';
-    else if (lobby.status === 'searching') html = '<span class="spin"></span>Looking for the match…';
+    else if (lobby.status === 'searching') {
+      // a wrong code waits out the whole search: after a few seconds, say what usually causes it
+      const secs = Math.round((Date.now() - (lobby.searchAt || Date.now())) / 1000);
+      html = secs < 8 ? '<span class="spin"></span>Looking for the match…'
+        : `<span class="spin"></span>Still looking (${secs}s)… Check the code matches the one on the host's lobby screen, and that they're still in it.`;
+    }
     else if (lobby.status === 'pending') html = '<span class="spin"></span>Found it. Waiting for the host to let you in…';
     else if (lobby.status === 'accepted' || lobby.status === 'ingame') {
       st.classList.add('good');
@@ -1581,8 +1707,19 @@ function doStartMatch() {
   launch(lobby.public ? publicSettings() : settings, { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
 }
 $('lobby-back').addEventListener('click', () => showScreen('pause'));
+setInterval(() => { if (screen === 'lobby' && lobby.role === 'guest' && lobby.status === 'searching' && !lobby.quickMode) lobby.changed(); }, 1000);
+let leaveArmed = 0;
 $('lobby-leave').addEventListener('click', () => {
   if (quickIntro) { quickIntro = false; showScreen('menu'); return; }
+  // a host closing the lobby or ending the session drops everyone in it: ask for a second press
+  const el = $('lobby-leave');
+  if (lobby.role === 'host' && (game.live || lobby.players.size > 0) && !leaveArmed) {
+    const label = el.textContent;
+    el.classList.add('armed'); el.textContent = `PRESS AGAIN: ${game.live ? 'END IT' : 'CLOSE IT'} FOR EVERYONE`;
+    leaveArmed = setTimeout(() => { leaveArmed = 0; el.classList.remove('armed'); if (el.textContent.startsWith('PRESS AGAIN')) el.textContent = label; }, 3500);
+    return;
+  }
+  clearTimeout(leaveArmed); leaveArmed = 0; el.classList.remove('armed');
   const wasPlaying = game.state !== 'menu';
   leaveOnline();
   if (wasPlaying) game.quitToMenu();
@@ -1872,8 +2009,11 @@ function titleGo() {
   // the message of the day pops up once per visit, right after the title screen
   if (motdData && !motdShown) {
     motdShown = true;
-    $('nt-title').textContent = String(motdData.title || 'MESSAGE OF THE DAY').slice(0, 80).toUpperCase();
-    $('nt-text').textContent = String(motdData.body).slice(0, 600) + (motdData.date ? `\n\n${String(motdData.date).slice(0, 10)}` : '');
+    const head = String(motdData.title || 'MESSAGE OF THE DAY').slice(0, 80).toUpperCase();
+    $('nt-title').textContent = head;
+    // the small line under the heading: what this is, and when (never the heading twice)
+    $('nt-sub').textContent = [head === 'MESSAGE OF THE DAY' ? 'BREACHPOINT' : 'MESSAGE OF THE DAY', motdData.date ? String(motdData.date).slice(0, 10) : ''].filter(Boolean).join(' · ');
+    $('nt-text').textContent = String(motdData.body).slice(0, 600);
     $('notice').classList.remove('bad');
     $('notice').classList.add('motd-pop');
     noticeDone = () => { $('notice').classList.remove('motd-pop'); openMode(); };
@@ -1894,6 +2034,8 @@ window.addEventListener('keydown', (e) => {
 function openMode() {
   if (lobby.active) leaveOnline();
   syncAccount();
+  const qm = MODES[settings.mode] || MODES.tdm;
+  $('mode-quick-d').textContent = `${qm.name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.difficulty} bots`.toUpperCase();
   showScreen('mode');
 }
 function setPlayMode(m) {
@@ -1901,7 +2043,7 @@ function setPlayMode(m) {
   document.body.classList.toggle('mode-online', m === 'online');
   document.body.classList.toggle('mode-offline', m !== 'online');
   const nm = myName() || 'Operator';
-  $('mode-chip').innerHTML = `<span class="pc-emb">${esc(nm.slice(0, 1).toUpperCase())}</span><span class="pc-txt"><b>${esc(nm.toUpperCase())}</b><small><i></i>${m === 'online' ? 'ONLINE · MULTIPLAYER' : 'OFFLINE · COMBAT TRAINING'}</small></span>`;
+  $('mode-chip').innerHTML = `<span class="pc-emb">${esc(([...nm][0] || '?').toUpperCase())}</span><span class="pc-txt"><b>${esc(nm.toUpperCase())}</b><small><i></i>${m === 'online' ? 'ONLINE · MULTIPLAYER' : 'OFFLINE · COMBAT TRAINING'}</small></span>`;
   $('menu-title').textContent = m === 'online' ? 'MULTIPLAYER' : 'COMBAT TRAINING';
   $('menu-subtitle').textContent = m === 'online' ? (onlineName() ? `ONLINE · SIGNED IN AS ${onlineName().toUpperCase()}` : 'ONLINE · PEER-TO-PEER') : 'OFFLINE · VERSUS BOTS';
   const mn = (MODES[settings.mode] || MODES.tdm).name.toUpperCase();
@@ -1918,6 +2060,7 @@ function enterMenu(m) {
   showScreen('menu');
 }
 $('mode-offline').addEventListener('click', () => enterMenu('offline'));
+$('mode-quick').addEventListener('click', () => { enterMenu('offline'); deploy(); });
 $('mode-online').addEventListener('click', async () => {
   if (window.BREACHPOINT_OFFLINE) { game.hud.toast('ONLINE PLAY WORKS ON BREACH-POINT.NET'); return; }
   if (!account.ready) { setPlayMode('online'); openSignin(); return; }
@@ -1949,7 +2092,7 @@ async function checkProgress() {
 let noticeDone = null;
 function showNotice(kind, then) {
   const [t, x] = NOTICES[kind];
-  $('nt-title').textContent = t; $('nt-text').textContent = x;
+  $('nt-title').textContent = t; $('nt-text').textContent = x; $('nt-sub').textContent = 'ACCOUNT';
   $('notice').classList.toggle('bad', kind !== 'cleared');
   noticeDone = then;
   showScreen('notice');
@@ -2269,7 +2412,7 @@ function renderSide() {
   $('sd-sub').textContent = u ? `${online} OF ${d.friends.length} FRIENDS ONLINE` : 'FRIENDS · ACCOUNT';
   if (!u) return;
   $('sd-codebox').classList.remove('on');
-  $('sd-emb').textContent = (u.tag || '?').slice(0, 1).toUpperCase();
+  $('sd-emb').textContent = ([...(u.tag || '?')][0]).toUpperCase();
   $('sd-tag').textContent = (u.tag || 'Choose a Name Tag').toUpperCase();
   $('sd-acct').textContent = `${u.email} · ${account.remember ? 'remembered on this device' : 'signed in until you close the browser'}`;
   if (document.activeElement !== $('sd-tag-in')) $('sd-tag-in').value = u.tag || '';
@@ -2631,6 +2774,16 @@ setInterval(() => {
   if (Date.now() - friendsAt > (sideOpen ? 20000 : 120000)) { friendsAt = Date.now(); account.loadFriends().catch(() => {}); }
 }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); });
+// Switching away mid-match (alt-tab, a notification, turning a phone): a local match pauses so you don't come back
+// dead. (Mouse players already pause when the pointer is released; this covers controllers and touch.)
+const awayPause = () => { if (game.state === 'playing' && game.mode === 'local') game.pause(); };
+window.addEventListener('blur', () => { if (game.input.lastDevice !== 'kbm' || game.input.isTouch) awayPause(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) awayPause();
+  else if (game.audio.ctx) game.audio.init();   // iOS leaves audio "interrupted" after a call or another app
+});
+// ...and sound that a phone call or another tab interrupted comes back with the next touch or key
+for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { const c = game.audio.ctx; if (c && c.state !== 'running') game.audio.init(); }, { capture: true, passive: true });
 window.addEventListener('pagehide', () => { account.presenceOff(); hbLast = ''; });
 
 // ---------- device-aware hints ----------
@@ -2737,3 +2890,18 @@ syncAccount();
   } else showScreen('title');
   account.refresh().then(() => heartbeat(true));
 }
+// the game started: forget the start-up count (a few seconds on, so a crash drawing the first menu frames counts)
+setTimeout(() => {
+  bootDone();
+  if (safeMode) {
+    offer('SAFE MODE', `The game didn't finish starting last time, so it's on the ${QUALITY[settings.quality].label} preset with the lightest menu. You can raise graphics in Options > Graphics once it runs well.`, null, '', 'OK');
+  } else {
+    // saved on a preset well above what this graphics hardware usually manages (e.g. Ultra on a laptop's integrated graphics)
+    const cur = PRESET_RANK[settings.quality], best = PRESET_RANK[GPU.best];
+    let asked = ''; try { asked = localStorage.getItem('breachpoint.presetAsked') || ''; } catch (_) { /* private mode */ }
+    if (settings.quality !== 'custom' && cur > best && !GPU.soft && asked !== settings.quality + GPU.name) {
+      try { localStorage.setItem('breachpoint.presetAsked', settings.quality + GPU.name); } catch (_) { /* private mode */ }
+      offer('GRAPHICS', `${QUALITY[settings.quality].label} is heavy for ${GPU.name}. ${QUALITY[GPU.best].label} should run smoother.`, () => usePreset(GPU.best), `USE ${QUALITY[GPU.best].label.toUpperCase()}`);
+    }
+  }
+}, 4000);

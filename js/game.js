@@ -141,6 +141,20 @@ export class Game {
         this.pause();
       }
     };
+    // The graphics driver can reset (a GPU crash, a driver update, too many tabs using WebGL): three.js rebuilds
+    // its state when the browser restores the context. A local match pauses meanwhile; main.js tells the player.
+    const cv = this.renderer.renderer.domElement;
+    cv.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();   // ask the browser to restore it
+      this.contextLost = true;
+      if (this.state === 'playing' && this.mode === 'local') this.pause();
+      if (this.onContext) this.onContext(false);
+    });
+    cv.addEventListener('webglcontextrestored', () => {
+      this.contextLost = false;
+      this.renderer.setSize();
+      if (this.onContext) this.onContext(true);
+    });
     window.addEventListener('resize', () => this.renderer.setSize());
     this.last = performance.now();
     this.renderer.renderer.setAnimationLoop(() => this.frame());
@@ -468,8 +482,10 @@ export class Game {
   frame(background = false) {
     const now = performance.now();
     // frame-rate cap: skip display refreshes until the next frame is due (keeps the average at the cap)
-    // the menu's live background doesn't need more than 30 fps on the Mobile path (battery, heat)
-    const cap = this.state === 'menu' && this.renderer.quality && this.renderer.quality.fast ? Math.min(this.fpsCap || 30, 30) : this.fpsCap;
+    // the menu's live background doesn't need more than 30 fps on the Mobile path (battery, heat), and behind
+    // pictures (nothing drawn) the loop only ticks along
+    const cap = this.state === 'menu' && this.menuStill ? 15
+      : this.state === 'menu' && this.renderer.quality && this.renderer.quality.fast ? Math.min(this.fpsCap || 30, 30) : this.fpsCap;
     if (!background && cap > 0) {
       const iv = 1000 / cap;
       if (now < (this.nextFrameT || 0) - 1) return;
@@ -506,7 +522,8 @@ export class Game {
     this.vmSun.position.copy(SUN_DIR).applyQuaternion(_q).multiplyScalar(5);
     const showVm = (this.state === 'playing' || this.state === 'paused') && !!this.player && this.player.alive && this.playerCtl.vmRoot.visible;
     if (this.player && this.state !== 'menu') this.updateGlare(dt);
-    if (!this.warming) this.renderer.render(dt, showVm);   // (nothing drawn while a new map's shaders compile)
+    // nothing drawn while a new map's shaders compile, or behind menus showing pictures (see main.js)
+    if (!this.warming && !(this.menuStill && this.state === 'menu')) this.renderer.render(dt, showVm);
     this.input.endFrame();
   }
 

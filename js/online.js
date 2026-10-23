@@ -416,6 +416,7 @@ export class Lobby {
     this.myName = cleanName(name);
     this.myPrimary = primary;
     this.status = 'searching';
+    this.searchAt = Date.now();
     this.lastError = '';
     this.openNet(code, this.wantRelay(quick));
     clearTimeout(this.findTimer);
