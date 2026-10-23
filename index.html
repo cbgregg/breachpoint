@@ -29,8 +29,8 @@
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        "three": "./lib/three/build/three.module.min.js",
+        "three/addons/": "./lib/three/examples/jsm/"
       }
     }
   </script>
@@ -830,6 +830,31 @@
   </div>
   <noscript><p style="color:#fff;padding:2rem">Breachpoint requires JavaScript and WebGL.</p></noscript>
 
+  <!-- If the game can't start (a file didn't load, an old browser, WebGL off), say so instead of leaving the
+       loading bar frozen: what to try, a Reload button, and the details to send us. -->
+  <script>
+  (function () {
+    var errs = [], shown = false;
+    function fail(why) {
+      if (shown || window.__game) return;
+      shown = true;
+      var ld = document.getElementById('loading'), box = document.createElement('div');
+      box.className = 'boot-fail';
+      box.innerHTML = '<b>Breachpoint didn\'t finish loading</b><p>' + why + '</p><p>Reload the page. If it keeps happening: update your browser (Chrome, Edge, Firefox or Safari), turn on hardware or graphics acceleration in its settings, and try with ad or script blockers off for this site.</p><button class="cta">RELOAD</button><details><summary>Details</summary><code></code></details>';
+      box.querySelector('code').textContent = (errs.join('\n') || 'no error reported') + '\n' + navigator.userAgent;
+      box.querySelector('button').onclick = function () { location.reload(); };
+      (ld || document.body).appendChild(box);
+    }
+    addEventListener('error', function (e) {
+      var t = e.target;
+      if (t && t.tagName === 'SCRIPT') { errs.push('could not load ' + (t.src || 'a script')); fail('Part of the game didn\'t download.'); }
+      else if (e.message) { errs.push(e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); if (!window.__game) setTimeout(function () { fail('Something went wrong while starting the game.'); }, 20000); }
+    }, true);
+    addEventListener('unhandledrejection', function (e) { errs.push(String(e.reason && e.reason.message || e.reason)); });
+    if (!('noModule' in HTMLScriptElement.prototype) || !window.WebGL2RenderingContext) { errs.push('no ES modules or WebGL 2'); setTimeout(function () { fail('This browser is too old to run the game.'); }, 0); }
+    setTimeout(function () { fail('The game is taking far too long to start.'); }, 90000);
+  })();
+  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

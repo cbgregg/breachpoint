@@ -1606,6 +1606,13 @@ button.lcard, .wbox, .wpc { cursor: pointer; }
 .gpu-row small b { color: var(--bo-hi); }
 .gpu-row.bad small { color: #ff8a7a; }
 select option.nr { color: #9a8f80; }
+/* the boot watchdog's message (index.html): the game couldn't start */
+.boot-fail { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 80; width: min(560px, 92vw); display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; background: rgba(12, 14, 16, 0.96); border: 1px solid #ff6a55; color: #e8e6e0; font-size: 14px; line-height: 1.5; }
+.boot-fail b { font-family: var(--display); font-size: 20px; letter-spacing: 0.1em; color: #ff8a7a; }
+.boot-fail p { margin: 0; }
+.boot-fail button { align-self: flex-start; }
+.boot-fail details { font-size: 12px; color: #9a9890; }
+.boot-fail code { display: block; white-space: pre-wrap; word-break: break-all; margin-top: 6px; user-select: text; }
 .gpu-warn { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 60; max-width: min(640px, 92vw); display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; background: rgba(40, 10, 8, 0.94); border: 1px solid #ff6a55; color: #fff; font-size: 13px; line-height: 1.45; }
 .gpu-warn b { font-family: var(--display); letter-spacing: 0.14em; color: #ff8a7a; }
 .gpu-warn .menu-btn { align-self: flex-end; margin: 0; }

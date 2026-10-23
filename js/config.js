@@ -245,6 +245,39 @@ export const PUBLIC_MATCH = { fillBots: true, mode: 'tdm', teamSize: 6, difficul
 // Optional: your own music files (paths in the repo, e.g. 'assets/music/menu.mp3'). null = the built-in score.
 export const MUSIC_FILES = { menu: null, action: null };
 
+// The graphics hardware, from the GPU's renderer string: software rendering (no hardware acceleration), a phone,
+// integrated or discrete graphics, and the preset that's likely to run smoothly on it.
+export function gpuTier(name) {
+  const n = String(name || '').replace(/ANGLE \((.*)\)/, '$1');
+  const soft = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(n);
+  let tier;   // 0 software, 1 phone/tablet, 2 integrated, 3 discrete
+  if (soft) tier = 0;
+  else if (coarse || /mali|adreno|powervr|apple gpu|sgx|tegra|videocore/i.test(n)) tier = 1;
+  else if (/geforce|rtx|gtx|quadro|radeon (rx|pro)|radeon\(tm\) rx|arc a|apple m\d|nvidia/i.test(n)) tier = 3;
+  else tier = 2;   // Intel HD / UHD / Iris, Radeon integrated graphics and anything unrecognised
+  const best = ['mobile', 'mobile', 'medium', 'ultra'][tier];
+  return { name: n.split(',').slice(0, 2).join(',').trim() || 'Unknown GPU', tier, soft, best };
+}
+// Asked before the game's own context exists, from a throwaway one, so a first visit starts on a preset the
+// machine can run (it used to start everyone on High: the heaviest load, on a weak laptop or with hardware
+// acceleration off, could take long enough for the browser to give up on the page).
+let probed = null;
+export function probeGpu() {
+  if (probed) return probed;
+  let name = '';
+  try {
+    const c = document.createElement('canvas'), gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (gl) {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '';
+      const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+    }
+  } catch (_) { /* unknown */ }
+  return (probed = gpuTier(name));
+}
+// the preset a first visit starts on: the recommended one, at most High
+const firstQuality = () => { if (typeof document === 'undefined') return 'high'; const b = probeGpu().best; return b === 'ultra' ? 'high' : b; };
+
 export const DEFAULT_SETTINGS = {
   fsr: 'off',          // FSR 1 upscaling mode (FSR_MODES)
   fsrSharp: 80,        // RCAS sharpening, 0-100
@@ -276,7 +309,7 @@ export const DEFAULT_SETTINGS = {
   showFps: false,
   friendlyFire: false,
   invertY: false,
-  quality: coarse ? 'mobile' : 'high',
+  quality: coarse ? 'mobile' : firstQuality(),
   dynamicRes: true,
   padSensitivity: 1,
   padDeadzone: 0.12,
@@ -300,8 +333,8 @@ export function savedQuality() {
   try {
     const raw = localStorage.getItem('breachpoint.settings.v2');
     const s = raw ? JSON.parse(raw) : {};
-    return qualityFrom(s.quality ? s : { quality: coarse ? 'mobile' : 'high' });
-  } catch (_) { return qualityFrom({ quality: coarse ? 'mobile' : 'high' }); }
+    return qualityFrom(s.quality ? s : { quality: coarse ? 'mobile' : firstQuality() });
+  } catch (_) { return qualityFrom({ quality: coarse ? 'mobile' : firstQuality() }); }
 }
 // the fast (mobile) render path draws straight to the canvas, so its anti-aliasing is the canvas's own MSAA,
 // which can only be chosen when the WebGL context is created

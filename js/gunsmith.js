@@ -2,6 +2,7 @@
 // lit by a studio environment and slowly turning. Only runs while the canvas is on screen.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { compileGently } from './warm.js';
 import { buildGun } from './weapons.js';
 
 export class GunPreview {
@@ -91,7 +92,11 @@ export class GunPreview {
 // Static side-profile thumbnails for weapon cards (one shared offscreen renderer, cached as data URLs).
 let thumbR = null, thumbScene = null, thumbCam = null;
 const thumbCache = new Map();
-export function gunThumb(id, att) {
+export const thumbReady = (id, att) => thumbCache.get(id + JSON.stringify(att || {}));
+const nextFrame = () => new Promise(r => requestAnimationFrame(r));
+// Made a step per frame (the renderer, then its lighting, then each gun's shaders compiled in the background
+// before it's drawn), so making the menu's thumbnails never freezes the page.
+export async function gunThumb(id, att) {
   const key = id + JSON.stringify(att || {});
   if (thumbCache.has(key)) return thumbCache.get(key);
   let url = '';
@@ -103,14 +108,17 @@ export function gunThumb(id, att) {
       thumbR.toneMapping = THREE.ACESFilmicToneMapping;
       thumbR.outputColorSpace = THREE.SRGBColorSpace;
       thumbScene = new THREE.Scene();
-      const pm = new THREE.PMREMGenerator(thumbR);
-      thumbScene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-      pm.dispose();
       const k = new THREE.DirectionalLight(0xfff0dc, 2.4); k.position.set(2, 3, 2);
       const r = new THREE.DirectionalLight(0xbcd4ff, 1.4); r.position.set(-2, 1, -3);
       thumbScene.add(k, r);
       thumbCam = new THREE.PerspectiveCamera(20, 480 / 200, 0.05, 20);
+      await nextFrame();
+      const pm = new THREE.PMREMGenerator(thumbR);
+      thumbScene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      pm.dispose();
+      await nextFrame();
     }
+    if (thumbCache.has(key)) return thumbCache.get(key);
     const gun = buildGun(id, { att, detail: 2 });
     const g = new THREE.Group(); g.add(gun.group);
     g.rotation.y = -Math.PI / 2 + 0.12;
@@ -121,6 +129,7 @@ export function gunThumb(id, att) {
     const tv = Math.tan(THREE.MathUtils.degToRad(thumbCam.fov) / 2);
     const d = Math.max(s.x / 2 / (tv * thumbCam.aspect), s.y / 2 / tv) * 1.12 + s.z / 2;
     thumbCam.position.set(0, d * 0.08, d); thumbCam.lookAt(0, 0, 0);
+    try { await compileGently(thumbR, thumbScene, thumbCam); } catch (_) { /* compiles on the draw instead */ }
     thumbR.render(thumbScene, thumbCam);
     url = thumbR.domElement.toDataURL('image/png');
     thumbScene.remove(g);

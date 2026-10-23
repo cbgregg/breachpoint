@@ -1,5 +1,5 @@
 // Entry point: menus (mouse, keyboard and controller navigable), settings persistence, game bootstrap
-import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
+import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_CSS, PUBLIC_MATCH, presetGfx, GRENADE, coarse, gpuTier, wantsMsaa, EQUIPMENT, LETHALS, TACTICALS } from './config.js';
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
@@ -9,7 +9,7 @@ import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
-import { GunPreview, gunThumb } from './gunsmith.js';
+import { GunPreview, gunThumb, thumbReady } from './gunsmith.js';
 import { applyReticles, cleanReticles, reticlePreview, shapesFor, RET_COLORS, RET_OPTICS } from './reticles.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
@@ -248,15 +248,7 @@ const GPU = (() => {
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
     name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '';
   } catch (_) { /* unknown */ }
-  const n = name.replace(/ANGLE \((.*)\)/, '$1');
-  const soft = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i.test(n);
-  let tier;   // 0 software, 1 phone/tablet, 2 integrated, 3 discrete
-  if (soft) tier = 0;
-  else if (coarse || /mali|adreno|powervr|apple gpu|sgx|tegra|videocore/i.test(n)) tier = 1;
-  else if (/geforce|rtx|gtx|quadro|radeon (rx|pro)|radeon\(tm\) rx|arc a|apple m\d|nvidia/i.test(n)) tier = 3;
-  else tier = 2;   // Intel HD / UHD / Iris, Radeon integrated graphics and anything unrecognised
-  const best = ['mobile', 'mobile', 'medium', 'ultra'][tier];
-  return { name: n.split(',').slice(0, 2).join(',').trim() || 'Unknown GPU', tier, soft, best };
+  return gpuTier(name);
 })();
 const PRESET_RANK = { mobile: 0, low: 1, medium: 2, high: 3, ultra: 4 };
 function markPresets() {
@@ -414,7 +406,36 @@ const isCustom = (k) => !!k && k[0] === 'c';
 const modCount = (id, att) => SLOTS.filter(s => GUNSMITH[id][s] && att[s] !== GUNSMITH[id][s][0]).length;
 const slotCount = (id) => SLOTS.filter(s => GUNSMITH[id][s]).length;
 const pips = (id, att) => `<span class="pips">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<i class="${att[s] !== GUNSMITH[id][s][0] ? 'on' : ''}"></i>`).join('')}</span>`;
-const thumb = (id, att) => { const u = gunThumb(id, att); return u ? `<img class="gthumb" src="${u}" alt="">` : `<span class="gthumb none">${WEAPONS[id].short}</span>`; };
+// Weapon card thumbnails: each one is a render read back to an image, so they're made one per frame, in the
+// background (all at once froze the page for seconds on a slow GPU); until then the card shows the gun's name.
+const thumbQueue = new Map();   // slot number -> [id, att]
+let thumbSlot = 0, thumbBusy = false;
+const thumb = (id, att) => {
+  const u = thumbReady(id, att);
+  if (u !== undefined) return u ? `<img class="gthumb" src="${u}" alt="">` : `<span class="gthumb none">${WEAPONS[id].short}</span>`;
+  const n = ++thumbSlot;
+  thumbQueue.set(n, [id, att]);
+  if (!thumbBusy) { thumbBusy = true; requestAnimationFrame(makeThumbs); }
+  return `<span class="gthumb none" data-gt="${n}">${WEAPONS[id].short}</span>`;
+};
+async function makeThumbs() {
+  const next = thumbQueue.entries().next();
+  if (next.done) { thumbBusy = false; return; }
+  const [n, [id, att]] = next.value;
+  if (document.querySelector(`[data-gt="${n}"]`)) await gunThumb(id, att);   // (only if it's still on the page)
+  else thumbQueue.delete(n);
+  // fill every card whose picture is ready (the same gun can be on the page more than once)
+  for (const [m, [id2, att2]] of [...thumbQueue]) {
+    const u = thumbReady(id2, att2);
+    if (u === undefined) continue;
+    thumbQueue.delete(m);
+    const el = document.querySelector(`[data-gt="${m}"]`);
+    if (!el) continue;
+    if (!u) { el.removeAttribute('data-gt'); continue; }
+    const img = new Image(); img.className = 'gthumb'; img.alt = ''; img.src = u; el.replaceWith(img);
+  }
+  requestAnimationFrame(makeThumbs);
+}
 
 // segmented stat bars (BO2): `now` vs `base` shows the change in green / red
 function statBars(now, base) {
@@ -914,7 +935,8 @@ function launch(cfg, online = null) {
     await wait(200); await nextFrame();
     // build the bots' guns now, not mid-match; then warm up shaders so the first seconds don't stutter
     try { prewarmBotGuns(); } catch (_) { /* optional */ }
-    try { game.prewarm(); } catch (_) { /* optional */ }
+    try { await game.prewarm(); } catch (_) { /* optional */ }
+    drawLoadingMap(game.world.id);   // (the minimap is ready once the shaders are)
     step(100, 'Ready');
     await wait(Math.max(online && online.mode === 'guest' ? 150 : 450, 1300 - (performance.now() - t0)));
     if (screen === 'loading') showScreen(null);
@@ -2687,6 +2709,7 @@ function drawIntel() {
   $('intel-mapname').textContent = (want === 'random' ? 'RANDOM' : MAPS[want] ? MAPS[want].name : game.world.name).toUpperCase();
 }
 game.onMapChange = () => drawIntel();
+game.onMinimap = () => drawIntel();
 $('opt-map').addEventListener('change', () => {
   if (lobby.role === 'host') { setMapHint(); lobby.broadcastLobby(); }
   drawIntel();

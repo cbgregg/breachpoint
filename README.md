@@ -118,6 +118,9 @@ The Multiplayer menus use the pre-match lobby's look: plain list items, a ▸ de
 
 ## Performance and the Mobile preset
 
+Loading never freezes the page: a map's shaders compile in the background where the browser can (otherwise a few per frame), textures upload a few per frame, the minimap is read back from the GPU without waiting on it, and the menu's weapon pictures are made one per frame. A first visit starts on the preset recommended for the GPU (Mobile with hardware acceleration off, Medium on integrated graphics, High otherwise) instead of always High.
+
+
 | Optimization | Where it applies |
 |---|---|
 | **Mobile preset** (default on phones and tablets) | Draws straight to the screen with hardware 4× MSAA instead of the post-processing chain (no float render targets or full-screen passes, where mobile GPUs spend their bandwidth); damage and flash effects become a CSS overlay. Pixel budget of 1.25 MP, so 3× screens don't render 9× the pixels; dynamic resolution still drops further when frames run long. Hard 1K shadows refreshed every third frame. Low geometry detail. Distant players animate at 30 Hz from 14 m and 15 Hz from 32 m. The menu background runs at 30 fps |
@@ -304,7 +307,7 @@ npx serve .            # or: python3 -m http.server 8000
 
 | Path | Purpose |
 |---|---|
-| `index.html` | Page shell, HUD, menus, import map for Three.js + addons (CDN) |
+| `index.html` | Page shell, HUD, menus, import map for Three.js + addons, the start-up watchdog (a message and a Reload button if the game can't start) |
 | `css/style.css` | Menus, HUD, scoreboard, touch controls |
 | `js/drivein.js` | Drive-In: the theatre built from the generated layout (screens and the projected feature, 50s cars, vans, pickups, step vans, speaker posts, snack bar and booth, playground, marquee), dusk sky and stars |
 | `js/drivein_layout.js`, `tools/drivein_gen.py` | The generated Drive-In layout and the generator that makes it |
@@ -322,6 +325,8 @@ npx serve .            # or: python3 -m http.server 8000
 | `cloudflare/auth-worker.js` | Account server (Cloudflare Worker): sign-in emails via Resend, KV storage, pass signing |
 | `cloudflare/turn-worker.js` | TURN relay credentials (Cloudflare Worker) |
 | `lib/trystero.js` | Vendored [Trystero](https://github.com/dmotz/trystero) 0.25 (Nostr strategy), MIT |
+| `lib/three/` | Three.js 0.160 (minified build and the addons the game imports), MIT: served with the game, so a blocked or slow CDN can't stop it loading |
+| `js/warm.js` | Shader compile and texture upload a little at a time, so loading never freezes the page |
 | `js/render.js` | Sky + IBL, shadows, post-processing chain, quality presets |
 | `js/config.js` | **All tuning**: weapons, movement, grenades, scoring, bot difficulty, quality presets, defaults |
 | `js/world.js` | Map layout (mirrored), dressing merged per material, minimap render |
