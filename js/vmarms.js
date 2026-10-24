@@ -311,17 +311,21 @@ function makeRig(asset, mat, mirror) {
 const _rm = new THREE.Matrix4(), _rm2 = new THREE.Matrix4(), _rinv = new THREE.Matrix4(), _rs = new THREE.Vector3();
 const _ax = new THREE.Vector3(1, 0, 0), _az = new THREE.Vector3(0, 0, 1), _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion();
 // set a bone's transform given in rig-root space
+// Only the bones on the way down are brought up to date (their parent chain, then the bone itself): refreshing
+// whole subtrees here, several times per arm per frame, was the costliest part of the game's frame. Everything
+// below gets its world matrix when the scene is drawn.
 function setRootSpace(R, b, p, q, sc) {
+  b.parent.updateWorldMatrix(true, false);
   _rinv.copy(R.root.matrixWorld).invert();
   _rm2.multiplyMatrices(_rinv, b.parent.matrixWorld).invert();      // root space -> parent local
   _rm.compose(p, q, sc);
   _rm.premultiply(_rm2);
   _rm.decompose(b.position, b.quaternion, b.scale);
-  b.updateMatrixWorld(true);
+  b.updateWorldMatrix(false, false);
 }
 const _rq0 = new THREE.Quaternion(), _rq1 = new THREE.Quaternion(), _rv = new THREE.Vector3(), _rv2 = new THREE.Vector3();
 function driveRig(R, wrist, q, foreDir, pose) {
-  R.root.updateMatrixWorld(true);
+  R.root.updateWorldMatrix(true, false);
   // forearm: keep its natural twist relative to the hand, swung to lie along the solved forearm
   _rq0.copy(q).multiply(R.off);                                       // hand bone orientation
   _rq1.copy(_rq0).multiply(R.foreRel);
@@ -341,7 +345,6 @@ function driveRig(R, wrist, q, foreDir, pose) {
   t1.b.quaternion.copy(t1.rest).multiply(_fq.setFromAxisAngle(_az, rt[0])).multiply(_fq2.setFromAxisAngle(_ax, rt[1]));
   t2.b.quaternion.copy(t2.rest).multiply(_fq.setFromAxisAngle(_ax, rt[2]));
   t3.b.quaternion.copy(t3.rest).multiply(_fq.setFromAxisAngle(_ax, rt[3]));
-  R.hand.updateMatrixWorld(true);
 }
 const _mp = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mw = new THREE.Vector3(), _me = new THREE.Vector3(), _md = new THREE.Vector3();
 const mirrorQ = (q) => q.set(q.x, -q.y, -q.z, q.w);

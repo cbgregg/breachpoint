@@ -290,6 +290,10 @@ const GPU = (() => {
   return gpuTier(name);
 })();
 const PRESET_RANK = { mobile: 0, low: 1, medium: 2, high: 3, ultra: 4 };
+// A PC with an NVIDIA or AMD graphics card often runs the browser on the processor's built-in graphics anyway
+// (Windows picks the power-saving chip for browsers), which can run the game at a fraction of the speed.
+const onBuiltIn = () => GPU.tier === 2 && /Windows/.test(navigator.userAgent) && /intel|radeon\(tm\) graphics|amd radeon graphics|vega|uhd|iris/i.test(GPU.name);
+const IGPU_FIX = 'if this PC also has an NVIDIA or AMD graphics card, the browser isn\'t using it. In Windows: Settings → System → Display → Graphics, choose your browser, set it to High performance, then restart the browser.';
 function markPresets() {
   const max = PRESET_RANK[GPU.best] + (GPU.tier === 1 ? 1 : 0);   // phones: Mobile or Low
   for (const o of $('opt-quality').options) {
@@ -300,7 +304,9 @@ function markPresets() {
   }
   $('gpu-name').textContent = GPU.name;
   const label = { mobile: 'Mobile', medium: 'Medium', ultra: 'High or Ultra' }[GPU.best];
-  $('gpu-note').innerHTML = GPU.soft ? 'Hardware acceleration is off: the game is running on the CPU. Turn it on in your browser settings.' : `Recommended for this device: <b>${label}</b>`;
+  $('gpu-note').innerHTML = GPU.soft ? 'Hardware acceleration is off: the game is running on the CPU. Turn it on in your browser settings.'
+    : onBuiltIn() ? `Recommended for this device: <b>${label}</b>. This is your computer's <b>built-in</b> graphics: ${IGPU_FIX}`
+    : `Recommended for this device: <b>${label}</b>`;
   $('gpu-note').closest('.row').classList.toggle('bad', GPU.soft);
 }
 markPresets();
@@ -1225,8 +1231,12 @@ const lobby = new Lobby(game);
 lobby.account = account;
 lobby.myXp = 0;   // from the account server (refreshed when you open multiplayer and after each match)
 window.__lobby = lobby;
+// a match only starts on its own for a player who is in the lobby (or on the scoreboard of the last match);
+// anyone who has wandered back to the menus is taken out of the lobby instead
+const awayFromLobby = () => game.state === 'menu' && screen !== 'lobby' && screen !== 'loading';
 lobby.onMapVoteDone = (mapId) => {
   if (!lobby.public || lobby.role !== 'host') return;
+  if (awayFromLobby()) { leaveOnline(); return; }
   lobby.nextMap = mapId;
   clearTimeout(nextMatchT);
   launch(publicSettings(), { mode: 'host', lobby }).then(() => { lobby.broadcastLobby(); syncOnlineFlags(); });
@@ -1253,7 +1263,9 @@ function syncOnlineFlags() {
 }
 
 function leaveOnline() {
-  if (lobby.active) lobby.close();
+  // (still searching the lobby list, Quick Match has no role yet, but its search must stop too: left running,
+  // it opened a lobby a few seconds later and started a match while the player sat in the menu)
+  if (lobby.active || lobby.quickMode) lobby.close();
   syncOnlineFlags();
   clearChat();
 }
@@ -1748,6 +1760,7 @@ $('pause-lobby').addEventListener('click', () => openLobby());
 confirmBtn($('pause-end'), () => game.endMatch());
 
 lobby.onStart = (m) => {
+  if (awayFromLobby()) { leaveOnline(); return; }
   launch(settings, { mode: 'guest', lobby, start: m }).then(() => syncOnlineFlags(), (err) => {
     console.error(err);
     lobby.close('The host sent a match this version can\'t load.');
@@ -1781,7 +1794,7 @@ window.addEventListener('paste', (e) => {
   const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
   if (digits) { joinCode = digits; joinError = ''; renderLobby(); }
 });
-window.addEventListener('pagehide', () => { if (lobby.active) lobby.close(); });
+window.addEventListener('pagehide', () => { if (lobby.active || lobby.quickMode) lobby.close(); });
 // during a match, a stray Ctrl+W (or a mis-click on the tab's X) asks before closing instead of ending the match
 window.addEventListener('beforeunload', (e) => {
   if (game.state === 'playing' || game.state === 'paused') { e.preventDefault(); e.returnValue = ''; return ''; }
@@ -2050,7 +2063,7 @@ window.addEventListener('keydown', (e) => {
 
 // ---------- offline / online ----------
 function openMode() {
-  if (lobby.active) leaveOnline();
+  if (lobby.active || lobby.quickMode) leaveOnline();
   syncAccount();
   const qm = MODES[settings.mode] || MODES.tdm;
   $('mode-quick-d').textContent = `${qm.name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.difficulty} bots`.toUpperCase();
@@ -2917,6 +2930,9 @@ setTimeout(() => {
   bootDone();
   if (safeMode) {
     offer('SAFE MODE', `The game didn't finish starting last time, so it's on the ${QUALITY[settings.quality].label} preset with the lightest menu. You can raise graphics in Options > Graphics once it runs well.`, null, '', 'OK');
+  } else if (onBuiltIn() && (() => { try { return localStorage.getItem('breachpoint.igpuAsked') !== GPU.name; } catch (_) { return false; } })()) {
+    try { localStorage.setItem('breachpoint.igpuAsked', GPU.name); } catch (_) { /* private mode */ }
+    offer('RUNNING ON BUILT-IN GRAPHICS', `The browser is drawing the game with ${GPU.name}. If this PC also has an NVIDIA or AMD graphics card, the browser isn't using it. In Windows: Settings → System → Display → Graphics, choose your browser, set it to High performance, then restart the browser.`, null, '', 'OK');
   } else {
     // saved on a preset well above what this graphics hardware usually manages (e.g. Ultra on a laptop's integrated graphics)
     const cur = PRESET_RANK[settings.quality], best = PRESET_RANK[GPU.best];

@@ -96,6 +96,7 @@ export class HUD {
 
   reset() {
     this.cache = {};
+    this.lastHd = undefined;   // the compass redraws on the next tick
     ['killfeed', 'center-msg', 'dmg-ind', 'score-pop', 'medal'].forEach(id => { $(id).innerHTML = ''; });
     $('death').classList.remove('on');
     $('scoreboard').classList.remove('on');
@@ -231,9 +232,13 @@ export class HUD {
   drawCompass() {
     const g = this.game, p = g.player, ctx = this.ccCtx;
     const W = this.cc.width, H = this.cc.height;
-    ctx.clearRect(0, 0, W, H);
     const yaw = p.alive ? p.yaw : g.camera.rotation.y;
     const hd = this.heading(yaw);
+    // text on a canvas is slow to draw: only when the heading has moved, or while an enemy-fire ping fades
+    const pinging = g.characters.some(c => c.alive && g.time - c.lastFireT <= 1.6 && g.foes(c, p));
+    if (!pinging && !this.pinged && this.lastHd !== undefined && this.ccW === W && Math.abs(hd - this.lastHd) < 0.2) return;
+    this.lastHd = hd; this.pinged = pinging; this.ccW = W;
+    ctx.clearRect(0, 0, W, H);
     const span = 120, ppd = W / span;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';

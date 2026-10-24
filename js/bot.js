@@ -1,5 +1,6 @@
 // Bot AI: perception, goal selection, pathing, aiming, shooting, grenades
 import * as THREE from 'three';
+import { ROUTE_SEEDS } from './nav.js';
 import { DIFFICULTY, PLAYER } from './config.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
@@ -156,7 +157,7 @@ export class BotBrain {
       // a fresh route preference per goal: bots spread over different streets and doorways instead of all
       // taking the one shortest lane (pickups and hunting stay on the direct way)
       this.walkSlow = kind === 'intel' && Math.random() < 0.3;
-      this.route = (kind === 'health' || kind === 'ammo' || kind === 'hunt') ? null : { seed: (Math.random() * 1e6) | 0, w: 1.2 + Math.random() * 2.6 };
+      this.route = (kind === 'health' || kind === 'ammo' || kind === 'hunt') ? null : { seed: (Math.random() * ROUTE_SEEDS) | 0, w: 1.2 + Math.random() * 2.6 };
     }
   }
 
@@ -243,9 +244,17 @@ export class BotBrain {
     const b = this.bot, nav = this.game.world.nav;
     this.repathT -= dt;
     if (this.repathT <= 0 || this.pathIdx >= this.path.length) {
-      this.path = nav.findPath(b.pos, target, this.route && Math.hypot(target.x - b.pos.x, target.z - b.pos.z) > 10 ? this.route : null);
-      this.pathIdx = 0;
-      this.repathT = rand(0.8, 1.5);
+      // at most three path searches per game step across all bots: a bot that still has a path to follow
+      // waits a moment for its new one, so a squad spotting you at once doesn't plan in the same frame
+      const t = this.game.time;
+      if (nav.searchT !== t) { nav.searchT = t; nav.searches = 0; }
+      if (nav.searches >= 3 && this.pathIdx < this.path.length) this.repathT = rand(0.03, 0.12);
+      else {
+        nav.searches++;
+        this.path = nav.findPath(b.pos, target, this.route && Math.hypot(target.x - b.pos.x, target.z - b.pos.z) > 10 ? this.route : null);
+        this.pathIdx = 0;
+        this.repathT = rand(0.8, 1.5);
+      }
     }
     while (this.pathIdx < this.path.length && Math.hypot(this.path[this.pathIdx].x - b.pos.x, this.path[this.pathIdx].z - b.pos.z) < 0.7) this.pathIdx++;
     if (this.pathIdx >= this.path.length) return null;

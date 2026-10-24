@@ -2520,6 +2520,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
+  world.nav.warm();   // (while the map loads, not in the first firefight)
   // more levels bots can use (Freshway's offices, the station under Pioneer Square): each its own grid, joined
   // by stairs to the street or to another level (portal.link: 0 = the street, k = the k-th level)
   if (world.upper) {

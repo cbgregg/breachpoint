@@ -403,7 +403,7 @@ export class PlayerController {
   // returns look-rate multiplier; also tracks the target for rotational assist
   aimAssist(dt, s) {
     const A = this.assist;
-    if (!s.aimAssist || this.game.input.lastDevice !== 'pad') { A.target = null; return 1; }
+    if (!s.aimAssist || this.game.input.lastDevice !== 'pad') { A.target = null; A.mul = 1; return 1; }
     const c = this.c, g = this.game;
     const eye = c.eyePos(_a);
     const fwd = c.forward(_b);
@@ -417,14 +417,16 @@ export class PlayerController {
       const lim = Math.atan2(1.4, dist) + 0.03;
       if (ang < lim && ang < bestAng && !g.physics.blocked(eye, e.chestPos(_E))) { best = e; bestAng = ang; }
     }
-    if (!best) { A.target = null; return 1; }
+    // the stick's slowdown eases in and out (a sudden change in turn speed reads as a stutter)
+    const ease = (to) => (A.mul = (A.mul ?? 1) + (to - (A.mul ?? 1)) * Math.min(1, dt * 9));
+    if (!best) { A.target = null; return ease(1); }
     best.chestPos(_c).sub(eye);
     const ty = Math.atan2(-_c.x, -_c.z), tp = Math.atan2(_c.y, Math.hypot(_c.x, _c.z));
     const inp = g.input, steering = Math.abs(inp.lookX || 0) + Math.abs(inp.lookY || 0) > 0.05 || Math.abs(inp.moveX || 0) + Math.abs(inp.moveY || 0) > 0.1;
     if (A.target === best && steering) {
       // rotational assist: follow part of the target's angular motion, only while you're aiming or moving
       // (never on its own), capped so it can't swing the view
-      const strength = 0.22 + 0.18 * c.adsT, cap = 1.1 * dt;
+      const strength = 0.15 + 0.12 * c.adsT, cap = 0.8 * dt;
       const dy = angDiff(A.yaw, ty), dp = tp - A.pitch;
       if (Math.abs(dy) < 0.12 && Math.abs(dp) < 0.12) {
         c.yaw += clamp(dy * strength, -cap, cap);
@@ -434,7 +436,7 @@ export class PlayerController {
     A.target = best; A.yaw = ty; A.pitch = tp;
     const dist = best.pos.distanceTo(c.pos);
     const onTarget = bestAng < Math.atan2(0.5, dist) + 0.01;
-    return onTarget ? 0.5 : 0.75;
+    return ease(onTarget ? 0.7 : 0.85);
   }
 
   applyAdsSnap(dt) {
