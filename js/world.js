@@ -8,6 +8,7 @@ import { NavGrid } from './nav.js';
 import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
+import { LINKLOOP } from './linkloop.js';
 import { PROPS, containerVariants, buildingVariants, propFit } from './props.js';
 import { buildStation, STATION_LIDS } from './station.js';
 
@@ -296,7 +297,7 @@ function undergroundLayout(rooms, doors, stairs, depth) {
 }
 const PIONEER_UG = undergroundLayout(UG_ROOMS, UG_DOORS, UG_STAIRS, UG);
 const PIONEER_CENTER = [
-  // ---- Pioneer Place: granite paving (runs on under the building fronts), King Street Station beneath it
+  // ---- Pioneer Place: granite paving (runs on under the building fronts), the Underground beneath it
   [8.5, -16.5, 25, 41, 0, 0, 'paving'],
   // ---- the Underground: rooms, doors and stairwells (above), purple prism lights over it in the sidewalks
   ...PIONEER_UG.items,
@@ -407,6 +408,7 @@ export const MAPS = {
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
   drivein: DRIVEIN,
+  link: LINKLOOP,
 };
 export const MAP_IDS = Object.keys(MAPS);
 
@@ -746,6 +748,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     for (const it of LAYOUT.center) scan(it[0], it[1], it[2], it[3], it[6], it[7]);
     for (const it of LAYOUT.half) { scan(it[0], it[1], it[2], it[3], it[6], it[7]); scan(-it[0], -it[1], it[2], it[3], it[6], it[7]); }
   }
+  // custom-built maps name their own openings in the ground (stairwells) and lids (halls under walkable paving)
+  if (LAYOUT.holes) HOLES.push(...LAYOUT.holes);
+  if (LAYOUT.lids) LIDS.push(...LAYOUT.lids);
   const SOLID_LIDS = HOLES; // building mass over these rects is nav-transparent (a level runs beneath)
   for (const [x0, z0, x1, z1] of rectsMinus([-200, -200, 200, 200], [...HOLES, ...LIDS])) physics.addBox(new Box(x0, -2, z0, x1, 0, z1)).surface = 'ground';
   for (const [x0, z0, x1, z1] of LIDS) physics.addBox(new Box(x0, -0.3, z0, x1, 0, z1)).surface = 'concrete';
@@ -1195,7 +1200,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   };
 
   // ---------- dressing per collision kind ----------
-  let station = null;   // King Street Station (Pioneer Square): its trains run in world.update
+  let station = null;   // a 'station' piece (a Link stop with its own trains, for custom maps): they run in world.update
   const shutterTints = [0x9c9c94, 0x6e7f86, 0x8a7a62, 0x7d8a6a];
   const signTints = [0x2f5a6a, 0x8a2f2a, 0xb08a3a, 0x3d5a3a, 0xd9d2c0];
   const plasterTints = [0xe9e7e2, 0xc9cbc8, 0xb4c0c8, 0xd6d0c6, 0xa8b6a2, 0xc6a698, 0xdcd8cf, 0x9fa7ad];   // painted render: greys, off-whites, slate, sage, brick-red
@@ -2579,10 +2584,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (LAYOUT.sites) world.sites = [LAYOUT.sites, LAYOUT.sites];   // asymmetric maps: both teams use the same two sites
   if (LAYOUT.lower) world.upper = LAYOUT.lower;                    // a second nav level (here below ground)
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
-  world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
+  if (!world.spawnYaw) world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
   world.nav.warm();   // (while the map loads, not in the first firefight)
-  // more levels bots can use (Freshway's offices, the station under Pioneer Square): each its own grid, joined
+  // more levels bots can use (Freshway's offices, the Underground, Link Loop's stations): each its own grid, joined
   // by stairs to the street or to another level (portal.link: 0 = the street, k = the k-th level)
   if (world.upper) {
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);

@@ -250,7 +250,7 @@ export class GameAudio {
       case 'spawn': this.tone(dry(0), t, { freq: 220, end: 330, type: 'sine', decay: 0.4, gain: 0.15 }); break;
       case 'beep': this.tone(dry(0), t, { freq: opts.freq || 660, type: 'sine', decay: 0.18, gain: 0.2 }); break;
       case 'ui': this.click(dry(0), t, opts.freq || 3200, 0.12); break;
-      // Link light rail (King Street Station): the two-tone horn, the bell, wheel and motor rumble, the door chime
+      // Link light rail (the station piece and Link Loop): the two-tone horn, the bell, wheel and motor rumble, the door chime
       case 'trainhorn': {
         const o = dry(0.5);
         for (const [f, dt0] of [[311, 0], [370, 0], [311, 0.75], [370, 0.75]]) this.tone(o, t + dt0, { freq: f, type: 'sawtooth', decay: 0.6, gain: 0.18, attack: 0.03 });

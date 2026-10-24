@@ -1,4 +1,4 @@
-// King Street Station: a Link light rail stop under Pioneer Place (in place of the Seattle Underground).
+// A Link light rail station (it stood under Pioneer Place as King Street Station; Link Loop builds three).
 // Three levels: the street; the concourse 4.2 m down (a ticket hall from a model, CC-BY "Subway station" by
 // Pasha, reached from the two plaza stairwells through a tiled passage); and the platforms 7 m below that, down
 // the hall's two long stairs. Two tracks run north-south between side platforms and on through tunnels past
@@ -12,17 +12,17 @@ import { CONCOURSE_BOXES } from './station_data.js';
 
 export const YC = -4.2;            // concourse floor
 export const YP = -11.2;           // platform tops
-const PIT = YP - 0.9;              // track bed
-const RAIL = PIT + 0.25;           // rail heads
+export const PIT = YP - 0.9;       // track bed
+export const RAIL = PIT + 0.25;    // rail heads
 const CEIL_P = YC - 0.3;           // platform-level ceiling (the underside of the concourse floor)
 const TUN_TOP = PIT + 5.6;         // tunnel ceiling
 // the concourse model in the world: model metres + offset (its hall floor sits at model y 3.2)
 const DX = -15.6, DY = YC - 3.2, DZ = 11.24;
-const HALL = [-6.0, -37.46, 13.9, 0];          // [x0, z0, x1, z1]
-const PASSAGE = [0.5, 0, 12, 6.5];              // from the plaza stairwells to the hall's open south end
-const PL = { x0: -6.2, x1: 14.2, z0: -36, z1: 24 };
+export const HALL = [-6.0, -37.46, 13.9, 0];   // [x0, z0, x1, z1]
+export const PASSAGE = [0.5, 0, 12, 6.5];       // from the plaza stairwells to the hall's open south end
+export const PL = { x0: -6.2, x1: 14.2, z0: -36, z1: 24 };
 const PIT_X = [0, 8];
-const STOP_Z = (PL.z0 + PL.z1) / 2;             // where a train's middle stops
+export const STOP_Z = (PL.z0 + PL.z1) / 2;      // where a train's middle stops
 // the hall's two stairs down to the platforms (top at the concourse, bottom on a platform)
 const STAIRS = [
   { x0: -6.2, x1: -2.4, top: -18.11, z1: -17.775, bot: -3.89, cx: -4.2, walls: [[-2.6, -2.4, 1.9]] },                    // to the west (northbound) platform
@@ -71,7 +71,7 @@ const CAR = 28.6, GAP = 0.5, HALF = CAR + GAP / 2;   // two cars: the train is 2
 const TW = 2.65, T_BOT = RAIL + 0.12, T_TOP = YP + 3.0;   // car width, bottom of the skirts, roof (the floor is level with the platforms)
 
 // ---------- canvas textures ----------
-function canvasTex(w, h, draw) {
+export function canvasTex(w, h, draw) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -79,20 +79,21 @@ function canvasTex(w, h, draw) {
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
-const FONT = 'Helvetica, Arial, sans-serif';
+export const FONT = 'Helvetica, Arial, sans-serif';
 // the 1 Line bullet: a green disc with a white "1"
-function lineBullet(g, x, y, r) {
+export function lineBullet(g, x, y, r) {
   g.fillStyle = '#28813f'; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#fff'; g.font = `bold ${r * 1.4}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('1', x, y + r * 0.06);
 }
 // station name panel (Sound Transit style: white type on dark blue, the line bullet at the left)
-function nameTex() {
+function nameTex(name) {
   return canvasTex(1024, 192, (g, w, h) => {
     g.fillStyle = '#0f2346'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#2a6fb5'; g.fillRect(0, h - 14, w, 14);
     lineBullet(g, 96, h / 2 - 6, 58);
     g.fillStyle = '#fff'; g.font = `bold 88px ${FONT}`; g.textAlign = 'left'; g.textBaseline = 'middle';
-    g.fillText('King Street Station', 186, h / 2 - 6);
+    g.font = `bold ${name.length > 20 ? 58 : 88}px ${FONT}`;
+    g.fillText(name, 186, h / 2 - 6);
   });
 }
 function wayTex(lines, arrow) {
@@ -125,8 +126,15 @@ function tileTex() {
   return t;
 }
 
-export function buildStation(ctx) {
-  const { put, flatBox, solid, physics, group, M } = ctx;
+// opts: ox, oz (where the station stands: everything below is authored around the origin), name (on the
+// signs), trains (false: no timetable trains of its own, for a map that runs its own), board(track, clock) ->
+// [destination, status] for the arrival boards when it doesn't
+export function buildStation(ctx, opts = {}) {
+  const { flatBox, physics, M } = ctx;
+  const ox = opts.ox || 0, oz = opts.oz || 0, NAME = opts.name || 'King Street Station', OWN = opts.trains !== false;
+  const group = new THREE.Group(); group.position.set(ox, 0, oz); ctx.group.add(group);
+  const put = (g, m, x, y, z, ...r) => ctx.put(g, m, x + ox, y, z + oz, ...r);
+  const solid = (cx, cz, ...r) => ctx.solid(cx + ox, cz + oz, ...r);
   // underground: the sky's image-based light mostly shut out (it read as blue sheen on every floor)
   const ENV = 0.25;
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, envMapIntensity: ENV, ...o });
@@ -205,7 +213,7 @@ export function buildStation(ctx) {
   // the far stair (another line, not built): a shutter across it
   wall(dark, 1.6, -37.75, 6.6, -37.45, YC, -0.4);
   sign(plainTex('NO ENTRY · STAFF ONLY', '#8a1a1a', '#fff'), 2.6, 0.65, 4.1, YC + 2.4, -37.43, 0, 0.6);
-  sign(nameTex(), 6, 1.12, 4.1, YC + 3.2, -37.42, 0, 0.9);
+  sign(nameTex(NAME), 6, 1.12, 4.1, YC + 3.2, -37.42, 0, 0.9);
   // wayfinding over the two stairs down
   sign(wayTex(['Northgate', 'Northbound trains'], '↓'), 3.2, 0.8, STAIRS[0].cx, YC + 3.1, STAIRS[0].top - 0.4, Math.PI, 0.9);
   sign(wayTex(['Angle Lake', 'Southbound trains'], '↓'), 3.2, 0.8, STAIRS[1].cx, YC + 3.1, STAIRS[1].top - 0.4, Math.PI, 0.9);
@@ -228,7 +236,7 @@ export function buildStation(ctx) {
     for (const x of [x0, x1 - T]) { wall(tile, x, z0, x + T, 2.3, YC, TOP); wall(tile, x, 4.7, x + T, z1, YC, TOP); wall(tile, x, 2.3, x + T, 4.7, YC + 2.4, TOP); }
     strip((x0 + x1) / 2, H - 0.06, 1.6, x1 - x0 - 1, 'x'); strip((x0 + x1) / 2, H - 0.06, 5.0, x1 - x0 - 1, 'x');
     light(6.25, H - 1.2, 3.25, 5, 12);
-    sign(nameTex(), 4.2, 0.79, 6.25, YC + 2.2, z1 - T - 0.02, Math.PI, 0.9);
+    sign(nameTex(NAME), 4.2, 0.79, 6.25, YC + 2.2, z1 - T - 0.02, Math.PI, 0.9);
     sign(wayTex(['To trains', 'Northgate · Angle Lake'], '↑'), 2.6, 0.65, 4.25, YC + 2.95, 0.32, 0, 0.9);   // read from the passage
     // fare readers (ORCA): a row of posts by the hall
     for (const x of [2.2, 3.4, 4.6, 5.8]) {
@@ -257,7 +265,7 @@ export function buildStation(ctx) {
   // a blue band and the station name along both walls, facing the tracks
   for (const [x, ry] of [[PL.x0 + 0.01, Math.PI / 2], [PL.x1 - 0.01, -Math.PI / 2]]) {
     put(new THREE.PlaneGeometry(PL.z1 - PL.z0, 0.35), std({ color: 0x1d4f91, roughness: 0.5 }), x, YP + 2.6, (PL.z0 + PL.z1) / 2, ry, { grime: 0, cast: false });
-    for (let z = PL.z0 + 6; z < PL.z1 - 3; z += 12) sign(nameTex(), 3.6, 0.68, x + Math.sign(ry) * 0.01, YP + 1.8, z, ry, 0.8);
+    for (let z = PL.z0 + 6; z < PL.z1 - 3; z += 12) sign(nameTex(NAME), 3.6, 0.68, x + Math.sign(ry) * 0.01, YP + 1.8, z, ry, 0.8);
   }
   // columns between the tracks, light strips over the platforms, a few real lights
   for (let z = PL.z0 + 4.5; z < PL.z1; z += 9) wall(tile, 3.75, z - 0.25, 4.25, z + 0.25, PIT, CEIL_P);
@@ -352,7 +360,7 @@ export function buildStation(ctx) {
     for (let z = z0 + 5; z < z1; z += 10) for (const x of [PIT_X[0] + 0.03, PIT_X[1] - 0.03]) put(flatBox(0.04, 0.08, 0.08, 0), marker, x, PIT + 1.2, z, 0, { grime: 0, cast: false });
   }
   // the end of the line for anyone walking the tunnels (trains carry on through)
-  for (const z of [-39.5, 39.5]) { const e = solid((PIT_X[0] + PIT_X[1]) / 2, z, PIT_X[1] - PIT_X[0], 0.4, TUN_TOP - PIT, PIT, 'concrete'); e.pass = true; e.hidden = true; }   // hidden: invisible on purpose (the tunnel goes on into the dark)
+  if (OWN) for (const z of [-39.5, 39.5]) { const e = solid((PIT_X[0] + PIT_X[1]) / 2, z, PIT_X[1] - PIT_X[0], 0.4, TUN_TOP - PIT, PIT, 'concrete'); e.pass = true; e.hidden = true; }   // hidden: invisible on purpose (the tunnel goes on into the dark)
 
   // ---------- the street: Link station signs at both stairwells ----------
   for (const [x, z, ry] of [[-6.6, 1.4, Math.PI], [19.3, 1.4, Math.PI]]) {
@@ -364,17 +372,18 @@ export function buildStation(ctx) {
       lineBullet(g, w / 2, 90, 62);
       g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = `bold 50px ${FONT}`; g.fillText('Link', w / 2, 200);
       g.font = `30px ${FONT}`; g.fillText('light rail', w / 2, 238);
-      g.font = `bold 32px ${FONT}`; g.fillText('King Street', w / 2, 300); g.fillText('Station', w / 2, 338);
+      const words = NAME.split(' '), half = Math.ceil(words.length / 2);
+      g.font = `bold ${NAME.length > 20 ? 24 : 32}px ${FONT}`; g.fillText(words.slice(0, half).join(' '), w / 2, 300); g.fillText(words.slice(half).join(' '), w / 2, 338);
     }), 0.84, 1.24, x, 3.25, z + (s ? 0.08 : -0.08), ry + s, 0.9);   // on the outside of the box, facing out
   }
 
   // ---------- trains ----------
   const sounds = [];
-  const trains = TRACKS.map(tr => makeTrain(tr, std));
+  const trains = OWN ? TRACKS.map(tr => makeTrain(tr, std)) : [];
   for (const t of trains) {
     group.add(t.group, t.head);
     // a collision box per car, moved along with the train (parked far away while it's out of sight)
-    t.cars = [0, 1].map(() => physics.addBox(new Box(t.tr.x - TW / 2, T_BOT, 9000, t.tr.x + TW / 2, T_TOP, 9000 + CAR)));
+    t.cars = [0, 1].map(() => physics.addBox(new Box(ox + t.tr.x - TW / 2, T_BOT, 9000, ox + t.tr.x + TW / 2, T_TOP, 9000 + CAR)));
     for (const c of t.cars) { c.surface = 'metal'; c.dynamic = true; }   // it moves: the physics grid checks it every time
   }
   const state = trains.map(() => ({ s: -1e9, v: 0, phase: -1 }));
@@ -390,35 +399,40 @@ export function buildStation(ctx) {
       t.head.intensity = shown ? 14 : 0;
       t.head.position.set(tr.x, YP + 0.6, zc + tr.dir * (HALF + 2));
       t.cars.forEach((b, k) => {
-        const c = shown ? zc + tr.dir * (k ? -1 : 1) * (CAR / 2 + GAP / 2) : 9000;   // car 0 leads
+        const c = shown ? oz + zc + tr.dir * (k ? -1 : 1) * (CAR / 2 + GAP / 2) : 9000;   // car 0 leads
         b.minz = c - CAR / 2; b.maxz = c + CAR / 2;
       });
       // doors: open through most of the dwell
       const dwellT = cyc - T_ARR, open = dwellT > 1.5 && dwellT < DWELL - 2;
-      if (open !== t.open) { t.open = open; t.setDoors(open); sounds.push(['trainchime', new THREE.Vector3(tr.x, YP + 1.5, zc)]); }
+      if (open !== t.open) { t.open = open; t.setDoors(open); sounds.push(['trainchime', new THREE.Vector3(ox + tr.x, YP + 1.5, oz + zc)]); }
       // horn before it runs in, a bell as it reaches the platform and as it pulls out, rumble while it moves
-      const pos = new THREE.Vector3(tr.x, YP + 1.5, zc + tr.dir * HALF);   // the cab
+      const pos = new THREE.Vector3(ox + tr.x, YP + 1.5, oz + zc + tr.dir * HALF);   // the cab
       const ph = s < -70 ? 0 : s < -35 ? 1 : s < 0 ? 2 : v === 0 ? 3 : 4;
       if (ph !== st.phase) {
         if (ph === 1) sounds.push(['trainhorn', pos]);
         if (ph === 2 || (ph === 4 && st.phase === 3)) sounds.push(['trainbell', pos]);
         st.phase = ph;
       }
-      if (shown && v > 1) { st.rumble = (st.rumble || 0) - dt; if (st.rumble <= 0) { st.rumble = 0.45; sounds.push(['trainrumble', new THREE.Vector3(tr.x, YP + 1, zc), { speed: v }]); } }
+      if (shown && v > 1) { st.rumble = (st.rumble || 0) - dt; if (st.rumble <= 0) { st.rumble = 0.45; sounds.push(['trainrumble', new THREE.Vector3(ox + tr.x, YP + 1, oz + zc), { speed: v }]); } }
       st.s = s; st.v = v; st.zc = zc;
     });
     // the arrival boards
-    boards.forEach((bd) => {
-      const tr = bd.tr, cyc = ((clock + tr.offset) % PERIOD + PERIOD) % PERIOD;
-      const until = cyc < T_ARR ? T_ARR - cyc : PERIOD - cyc + T_ARR;
-      const txt = cyc >= T_ARR && cyc < T_ARR + DWELL ? 'BOARDING' : until < 25 ? 'ARRIVING' : `${Math.ceil(until / 60)} min`;
-      if (txt === bd.last) return;
-      bd.last = txt;
+    boards.forEach((bd, i) => {
+      const tr = bd.tr;
+      let dest = tr.dest, txt;
+      if (opts.board) [dest, txt] = opts.board(i, clock);
+      else {
+        const cyc = ((clock + tr.offset) % PERIOD + PERIOD) % PERIOD;
+        const until = cyc < T_ARR ? T_ARR - cyc : PERIOD - cyc + T_ARR;
+        txt = cyc >= T_ARR && cyc < T_ARR + DWELL ? 'BOARDING' : until < 25 ? 'ARRIVING' : `${Math.ceil(until / 60)} min`;
+      }
+      if (txt + dest === bd.last) return;
+      bd.last = txt + dest;
       const g = bd.c.getContext('2d');
       g.fillStyle = '#05070a'; g.fillRect(0, 0, 512, 128);
       lineBullet(g, 52, 64, 34);
-      g.fillStyle = '#ffb21e'; g.font = `bold 46px ${FONT}`; g.textAlign = 'left'; g.textBaseline = 'middle';
-      g.fillText(tr.dest, 100, 64);
+      g.fillStyle = '#ffb21e'; g.font = `bold ${dest.length > 12 ? 32 : 46}px ${FONT}`; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(dest, 100, 64);
       g.textAlign = 'right'; g.fillText(txt, 496, 64);
       bd.tex.needsUpdate = true;
     });
@@ -429,8 +443,8 @@ export function buildStation(ctx) {
     for (let i = 0; i < trains.length; i++) {
       const st = state[i], tr = trains[i].tr;
       if (st.v < 0.3 || st.zc === undefined) continue;
-      if (Math.abs(p.x - tr.x) > TW / 2 + 0.3 || p.y > T_TOP + 1.5 || p.y < PIT - 1) continue;
-      if (Math.abs(p.z - st.zc) < HALF + 0.3) return true;
+      if (Math.abs(p.x - ox - tr.x) > TW / 2 + 0.3 || p.y > T_TOP + 1.5 || p.y < PIT - 1) continue;
+      if (Math.abs(p.z - oz - st.zc) < HALF + 0.3) return true;
     }
     return false;
   }
