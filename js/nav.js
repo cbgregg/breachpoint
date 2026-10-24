@@ -60,13 +60,16 @@ export class NavGrid {
     this.curStamp = 0;
     this.heap = new MinHeap();
 
+    // a lower or upper level only cares about boxes near its own height (the street's thousands of boxes above
+    // an underground level are skipped: a map-wide level grid was slow to build otherwise)
+    const F = opts.floorY;
+    const levelBoxes = F === undefined ? null : physics.boxes.filter(b => (b.maxy > F - 0.3 && b.maxy < F + 0.3) || (b.maxy > F + 0.35 && b.miny < F + 1.7));
     for (let j = 0; j < this.rows; j++) {
       for (let i = 0; i < this.cols; i++) {
         const cx = this.minX + (i + 0.5) * cell, cz = this.minZ + (j + 0.5) * cell;
-        if (opts.floorY !== undefined) {
-          const F = opts.floorY;
+        if (F !== undefined) {
           let floor = false, block = false;
-          for (const b of physics.boxes) {
+          for (const b of levelBoxes) {
             if (b.maxy > F - 0.3 && b.maxy < F + 0.3 && cx > b.minx + 0.05 && cx < b.maxx - 0.05 && cz > b.minz + 0.05 && cz < b.maxz - 0.05) floor = true;
             if (b.maxy > F + 0.35 && b.miny < F + 1.7 && cx > b.minx - agentR && cx < b.maxx + agentR && cz > b.minz - agentR && cz < b.maxz + agentR) { block = true; break; }
           }
