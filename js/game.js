@@ -99,6 +99,7 @@ export class Game {
 
     this.physics = new Physics();
     this.world = buildWorld(this.scene, this.physics, 'tarsa');
+    this.world.game = this;
     setCharacterDetail(this.world.textures.fabric);
     this.fitShadows();
     this.renderer.setLook(this.world.look);
@@ -622,7 +623,7 @@ export class Game {
           if (this.frozen) c.updateMovement(dt, ZERO, false, false);
           else this.brains.get(c).update(dt);
         }
-        // a train on the tracks (King Street Station): the host or an offline match decides, like any kill;
+        // a train on the tracks (a station piece or Link Loop): the host or an offline match decides, like any kill;
         // before moving, or the train's collision box would first shove them up onto its roof
         if (c.alive && this.world.trainHit && this.world.trainHit(c.pos)) c.takeDamage(999, null, 'train', false, c.pos);
         c.updateCommon(dt);
@@ -1490,6 +1491,7 @@ export class Game {
     if (this.doors) { this.doors.dispose(); this.doors = null; }
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
+    this.world.game = this;   // (maps with moving parts carry the characters on them)
     // doors come after the nav grid, so bots path through doorways (and open them on the way)
     if (this.world.doors) this.doors = new Doors(this, this.world.doors);
     setCharacterDetail(this.world.textures.fabric);

@@ -209,9 +209,12 @@ export class BotBrain {
         const side = g.ffa ? (Math.random() < 0.5 ? 1 : -1) : b.team === 0 ? 1 : -1; // blue pushes +x, red pushes -x (FFA: anywhere)
         // a few candidates; keep the one furthest from where teammates are already going
         let p = null, best = -1;
+        // maps made of separate areas (Link Loop's stations): mostly somewhere in the area the bot is in; a trip
+        // to another one now and then (the push-to-the-enemy's-side rule doesn't fit them)
+        const area = g.world.sameArea, local = area && Math.random() < 0.6;
         for (let k = 0; k < 4; k++) {
           const HX = g.world.bounds ? g.world.bounds.hx : 42;
-          const q = g.world.nav.randomOpenPoint(q => q.x * side > -HX * 0.43 && Math.abs(q.x) < HX - 4);
+          const q = g.world.nav.randomOpenPoint(area ? (q => !local || area(q, b.pos)) : (q => q.x * side > -HX * 0.43 && Math.abs(q.x) < HX - 4));
           const d = this.mateGoalDist(q);
           if (d > best) { best = d; p = q; }
         }
@@ -268,6 +271,14 @@ export class BotBrain {
     let sprint = false, jump = false;
     this.crouch = false; this.prone = false;
     b.useHeld = false;
+    // maps where getting somewhere takes more than walking (Link Loop's trains) steer the bot themselves
+    const tv = g.world.botTravel && g.world.botTravel(this, dt);
+    if (tv) {
+      if (tv.wish.lengthSq() > 0.04) this.steer(tv.wish);
+      b.wantCrouch = !!tv.crouch; b.wantProne = false;
+      b.updateMovement(dt, tv.wish, !!tv.sprint && !this.visible, false, false, false);
+      return;
+    }
     // objective spots: stop there (and hold the button to plant / defuse); guard / push spots: settle into
     // a stance and check angles until the mode hands out the next spot
     const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6, push: 2 }[this.goalKind];

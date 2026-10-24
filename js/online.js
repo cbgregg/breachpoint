@@ -39,7 +39,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const angLerp = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * t; };
 export const cleanName = (n) => safeName(String(n || '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Operator');
 const cleanLabel = (s) => String(s ?? '').replace(/[^A-Z0-9 +\-]/g, '').slice(0, 28);
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _wish = new THREE.Vector3();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _wish = new THREE.Vector3(), _ride = new THREE.Vector3();
 
 // ---------------------------------------------------------------------------------------------
 // Lobby: owns the connection for the whole online session (across several matches).
@@ -817,6 +817,8 @@ export class HostSession {
       saved.push([c, c.pos.x, c.pos.y, c.pos.z, c.height]);
       c.pos.set(lerp(pa[0], pb[0], k), lerp(pa[1], pb[1], k), lerp(pa[2], pb[2], k));
       c.height = lerp(pa[3], pb[3], k);
+      // riding a train (Link Loop): the shooter saw them in the car where it is now (see the guest's interpolate)
+      if (g.world.trainShift) c.pos.add(g.world.trainShift(c.pos, target, g.time, _ride));
     }
     return saved;
   }
@@ -1110,6 +1112,8 @@ export class GuestSession {
       c.updateMovement(cmd.dt, _wish, !!cmd.sp, !!cmd.j, !!cmd.sl, !!cmd.tac);
     }
     c.tacFuel = keepFuel; c.tacIdle = keepIdle; c.tacSprinting = keepTac; c.stepOff = keepStep;
+    // riding a train: replaying the inputs doesn't carry us, so add how far the car went since that snapshot
+    if (g.world.trainShift && fin(this.curTm)) c.pos.add(g.world.trainShift(_v2.set(x, y, z), this.curTm, this.hostNow(), _ride));
     g.audio.muted = false;
     c.adsT = keepAds; c.wantCrouch = keepCrouch; c.wantProne = keepProne;
     if (!this.pending.length) c.sprinting = keepSprint && c.sprinting;
@@ -1290,6 +1294,8 @@ export class GuestSession {
       let x = lerp(A.x, B.x, k), y = lerp(A.y, B.y, k), z = lerp(A.z, B.z, k);
       // the next snapshot is late: keep coasting on the last velocity for a moment instead of freezing
       if (rt > B.tm && (B.fl & 1)) { const over = Math.min(rt - B.tm, 0.12); x += B.vx * over; z += B.vz * over; }
+      // riding a train (Link Loop): they're drawn a moment in the past, but the car is drawn now; carry them along
+      if (g.world.trainShift) { g.world.trainShift(_v3.set(x, y, z), rt, this.hostNow(), _ride); x += _ride.x; z += _ride.z; }
       if (alive && !c.alive) {
         if (A.tm <= (c.deathTm ?? -1)) continue; // still showing the moments before their death
         c.spawn(_v1.set(x, y, z), A.yaw); // (re)spawned
