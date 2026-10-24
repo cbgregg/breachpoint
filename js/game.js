@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { TEAMS, PLAYER, GRENADE, SCORE, MELEE, BOT_NAMES, WEAPONS, qualityFrom, EQUIPMENT } from './config.js';
 const WEAPON_IDS = Object.keys(WEAPONS);
+const _rayHit = { t: 0, head: false };
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
 import { Doors } from './doors.js';
@@ -742,7 +743,8 @@ export class Game {
       tb = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, Math.min(ax, bx) - 0.22, c.pos.y, Math.min(az, bz) - 0.22, Math.max(ax, bx) + 0.22, c.pos.y + 0.4, Math.max(az, bz) + 0.22, Math.min(maxT, t));
     } else tb = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, c.pos.x - 0.28, c.pos.y, c.pos.z - 0.28, c.pos.x + 0.28, c.pos.y + c.height - 0.32, c.pos.z + 0.28, Math.min(maxT, t));
     if (tb < Math.min(maxT, t)) { t = tb; head = false; }
-    return { t, head };
+    _rayHit.t = t; _rayHit.head = head;   // one shared result (read straight away by every caller): no garbage per test
+    return _rayHit;
   }
 
   // ---------- networking hooks ----------
@@ -1569,7 +1571,8 @@ export class Game {
       if (this.mode === 'guest') continue; // the host decides who picked what up
       for (const c of this.characters) {
         if (!c.alive) continue;
-        if (Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z) > 1.1 || Math.abs(c.pos.y - p.pos.y) > 1.2) continue;
+        const px = c.pos.x - p.pos.x, pz = c.pos.z - p.pos.z;
+        if (px * px + pz * pz > 1.21 || Math.abs(c.pos.y - p.pos.y) > 1.2) continue;
         let used = false;
         if (p.type === 'health' && c.health < PLAYER.maxHealth) {
           c.health = Math.min(PLAYER.maxHealth, c.health + 50);

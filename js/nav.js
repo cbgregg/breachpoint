@@ -12,7 +12,7 @@ class MinHeap {
     while (i > 0) {
       const p = (i - 1) >> 1;
       if (k[p] <= k[i]) break;
-      [a[p], a[i]] = [a[i], a[p]]; [k[p], k[i]] = [k[i], k[p]];
+      let t = a[p]; a[p] = a[i]; a[i] = t; t = k[p]; k[p] = k[i]; k[i] = t;
       i = p;
     }
   }
@@ -29,7 +29,7 @@ class MinHeap {
         if (l < a.length && k[l] < k[m]) m = l;
         if (r < a.length && k[r] < k[m]) m = r;
         if (m === i) break;
-        [a[m], a[i]] = [a[i], a[m]]; [k[m], k[i]] = [k[i], k[m]];
+        let t = a[m]; a[m] = a[i]; a[i] = t; t = k[m]; k[m] = k[i]; k[i] = t;
         i = m;
       }
     }
@@ -37,7 +37,11 @@ class MinHeap {
   }
 }
 
+// bots pick their route "personality" from this many noise fields (each also gets its own random weight), so
+// every field can be made while the map loads instead of mid-fight
+export const ROUTE_SEEDS = 16;
 const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+const DX = DIRS.map(d => d[0]), DZ = DIRS.map(d => d[1]), DC = DIRS.map(d => d[2]);
 
 export class NavGrid {
   // opts.floorY: build an upper-level grid (an office floor): a cell is open only where something solid
@@ -131,6 +135,20 @@ export class NavGrid {
     return true;
   }
 
+  // everything a search needs that can be made ahead of time: which areas connect, and the route fields
+  warm() { this.region(0); for (let k = 0; k < ROUTE_SEEDS; k++) this.noiseField(k); }
+  // a bot's route noise for every cell, computed once per seed (it was recomputed for every neighbour of
+  // every cell each search visited)
+  noiseField(seed) {
+    const cache = this.fields || (this.fields = new Map());
+    let f = cache.get(seed);
+    if (!f) {
+      f = new Float32Array(this.cols * this.rows);
+      for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) f[j * this.cols + i] = this.routeNoise(i, j, seed);
+      cache.set(seed, f);
+    }
+    return f;
+  }
   // route variety: a smooth per-seed cost field (value noise on a ~7 m lattice) makes each bot prefer
   // different streets and doorways to the same goal; costs only grow, so A* stays correct
   routeNoise(i, j, seed) {
@@ -209,34 +227,69 @@ export class NavGrid {
     return out;
   }
 
+  // Which open cells connect to which (same moves as the search: diagonals only past two open sides), labelled
+  // once. A search between two areas that don't connect (a target on a roof, behind a fence) used to expand
+  // the whole map before giving up, a frame-long freeze when several bots chased an unreachable player.
+  region(k) {
+    if (!this.regions) {
+      const cols = this.cols, n = cols * this.rows, lab = this.regions = new Int32Array(n).fill(-1), q = new Int32Array(n);
+      let id = 0;
+      for (let k0 = 0; k0 < n; k0++) {
+        if (this.blocked[k0] || lab[k0] >= 0) continue;
+        let h = 0, t = 0; q[t++] = k0; lab[k0] = id;
+        while (h < t) {
+          const cur = q[h++], ci = cur % cols, cj = (cur / cols) | 0;
+          for (const [di, dj] of DIRS) {
+            const ni = ci + di, nj = cj + dj;
+            if (!this.isOpen(ni, nj)) continue;
+            if (di && dj && (!this.isOpen(ci + di, cj) || !this.isOpen(ci, cj + dj))) continue;
+            const nk = nj * cols + ni;
+            if (lab[nk] < 0) { lab[nk] = id; q[t++] = nk; }
+          }
+        }
+        id++;
+      }
+    }
+    return this.regions[k];
+  }
+
   findPathFlat(from, to, route = null) {
     let s = this.nearestOpen(this.ci(from.x), this.cj(from.z));
     let e = this.nearestOpen(this.ci(to.x), this.cj(to.z));
     if (!s || !e) return [];
     const cols = this.cols;
     const start = s[1] * cols + s[0], goal = e[1] * cols + e[0];
+    if (this.region(start) !== this.region(goal)) return [];   // no way there: the same answer, without the search
     const st = ++this.curStamp;
     const heap = this.heap; heap.clear();
     const ex = e[0], ez = e[1];
-    const h = (i, j) => { const dx = Math.abs(i - ex), dz = Math.abs(j - ez); return (dx + dz) + (Math.SQRT2 - 2) * Math.min(dx, dz); };
-    this.g[start] = 0; this.stamp[start] = st; this.parent[start] = -1;
+    // Weighted A*: route noise makes cells up to ~5x dearer while the distance estimate stays at 1x, which
+    // turned each search into a sweep of most of the map (tens of ms, in one frame). Weighting the estimate
+    // keeps searches heading for the goal; the paths stay valid and still vary per bot, just not perfectly
+    // shortest, which bots don't need.
+    const field = route ? this.noiseField(route.seed) : null, rw = route ? route.w : 0;
+    const hw = route ? 1 + rw * 0.45 : 1.05;
+    const h = (i, j) => { const dx = Math.abs(i - ex), dz = Math.abs(j - ez); return ((dx + dz) + (Math.SQRT2 - 2) * Math.min(dx, dz)) * hw; };
+    const blocked = this.blocked, rows = this.rows, g = this.g, stamp = this.stamp, closed = this.closed, parent = this.parent;
+    const open = (i, j) => i >= 0 && j >= 0 && i < cols && j < rows && !blocked[j * cols + i];
+    g[start] = 0; stamp[start] = st; parent[start] = -1;
     heap.push(start, h(s[0], s[1]));
     let found = false, iterations = 0;
     while (heap.size && iterations++ < 30000) {
       const cur = heap.pop();
-      if (this.closed[cur] === st) continue;
-      this.closed[cur] = st;
+      if (closed[cur] === st) continue;
+      closed[cur] = st;
       if (cur === goal) { found = true; break; }
       const ci = cur % cols, cj = (cur / cols) | 0;
-      for (const [di, dj, cost] of DIRS) {
-        const ni = ci + di, nj = cj + dj;
-        if (!this.isOpen(ni, nj)) continue;
-        if (di && dj && (!this.isOpen(ci + di, cj) || !this.isOpen(ci, cj + dj))) continue;
+      for (let d = 0; d < 8; d++) {
+        const di = DX[d], dj = DZ[d], ni = ci + di, nj = cj + dj;
+        if (!open(ni, nj)) continue;
+        if (di && dj && (!open(ci + di, cj) || !open(ci, cj + dj))) continue;
         const nk = nj * cols + ni;
-        if (this.closed[nk] === st) continue;
-        const ng = this.g[cur] + (route ? cost * (1 + route.w * this.routeNoise(ni, nj, route.seed)) : cost);
-        if (this.stamp[nk] !== st || ng < this.g[nk]) {
-          this.stamp[nk] = st; this.g[nk] = ng; this.parent[nk] = cur;
+        if (closed[nk] === st) continue;
+        const ng = g[cur] + (field ? DC[d] * (1 + rw * field[nk]) : DC[d]);
+        if (stamp[nk] !== st || ng < g[nk]) {
+          stamp[nk] = st; g[nk] = ng; parent[nk] = cur;
           heap.push(nk, ng + h(ni, nj));
         }
       }
