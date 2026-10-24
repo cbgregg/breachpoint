@@ -71,7 +71,7 @@ const GUN_FILES = {
 const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/models/mags.glb', corkboard: 'assets/models/corkboard.glb', stairs: 'assets/models/stairs.glb', downtown: 'assets/models/downtown.glb', bin: 'assets/models/bin.glb',
   fridge: 'assets/models/fridge.glb', lantern: 'assets/models/lantern.glb', cone: 'assets/models/cone.glb',
   dumpster: 'assets/models/dumpster.glb', locker: 'assets/models/locker.glb', office: 'assets/models/office.glb', kitchen: 'assets/models/kitchen.glb',
-  signs: 'assets/models/signs.glb', roadsigns: 'assets/models/roadsigns.glb', station: 'assets/models/station.glb' };
+  signs: 'assets/models/signs.glb', roadsigns: 'assets/models/roadsigns.glb' };
 async function loadProps() {
   await Promise.all(Object.entries(PROP_FILES).map(async ([name, file]) => {
     try { setProp(name, (await new GLTFLoader().loadAsync(file)).scene); }

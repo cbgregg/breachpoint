@@ -1,4 +1,5 @@
-// A Link light rail station (it stood under Pioneer Place as King Street Station; Link Loop builds three).
+// A Link light rail station piece (King Street Station, from an earlier Pioneer Square; no map uses it now and
+// its concourse model is no longer loaded, so it builds a plain hall; Link Loop takes its sign helpers).
 // Three levels: the street; the concourse 4.2 m down (a ticket hall from a model, CC-BY "Subway station" by
 // Pasha, reached from the two plaza stairwells through a tiled passage); and the platforms 7 m below that, down
 // the hall's two long stairs. Two tracks run north-south between side platforms and on through tunnels past

@@ -1295,7 +1295,7 @@ export class GuestSession {
       // the next snapshot is late: keep coasting on the last velocity for a moment instead of freezing
       if (rt > B.tm && (B.fl & 1)) { const over = Math.min(rt - B.tm, 0.12); x += B.vx * over; z += B.vz * over; }
       // riding a train (Link Loop): they're drawn a moment in the past, but the car is drawn now; carry them along
-      if (g.world.trainShift) { g.world.trainShift(_v3.set(x, y, z), rt, this.hostNow(), _ride); x += _ride.x; z += _ride.z; }
+      if (g.world.trainShift) { g.world.trainShift(_v3.set(x, y, z), rt, this.hostNow(), _ride); x += _ride.x; y += _ride.y; z += _ride.z; }
       if (alive && !c.alive) {
         if (A.tm <= (c.deathTm ?? -1)) continue; // still showing the moments before their death
         c.spawn(_v1.set(x, y, z), A.yaw); // (re)spawned
