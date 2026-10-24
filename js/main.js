@@ -383,7 +383,6 @@ function syncModeRows() {
   $('play-title').textContent = m.name.toUpperCase();
   document.querySelector('#pv-setup .pane-sub').textContent = m.blurb;
   try { if (screen === 'menu' && playView === 'root') renderTiles(); } catch (_) { /* still initialising */ }
-  if ($('quick-sub')) $('quick-sub').textContent = `${m.name.toUpperCase()} · PUBLIC`;
 }
 $('opt-mode').addEventListener('change', () => { syncModeRows(); if (lobby && lobby.role === 'host') lobby.broadcastLobby(); });
 // big mode buttons on the Play tab drive the (hidden) mode select
@@ -758,10 +757,11 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 // Level 1 is a column of playlist tiles; each opens its own page (Back returns). Offline the tiles are the
 // game modes and open the match setup; online they're Quick Play, Private Match, Friends and Combat Training.
 let playView = 'root', tileSel = null;
-const TILE_ART = { tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', ffa: 'pioneer-3', browser: 'shuran-1', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
+const TILE_ART = { modes: 'shuran-1', tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', ffa: 'pioneer-3', browser: 'shuran-1', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
 function playTiles() {
   if (playMode === 'online') return [
-    { id: 'quick', k: 'PUBLIC · DROP IN', t: 'PUBLIC MATCH', d: 'Find a public match in the modes you choose (X in the lobby). If none is open within 10 seconds, a lobby starts and counts down with a map vote while players drop in.' },
+    { id: 'quick', k: `PUBLIC · ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}`, t: 'QUICK MATCH', d: 'Drop into a public match in your modes. If none is open within 10 seconds, a lobby starts and counts down with a map vote while players drop in.' },
+    { id: 'modes', k: 'QUICK MATCH PLAYLIST', t: 'EDIT MODES', d: 'Choose which game modes Quick Match looks for: any or all of Team Deathmatch, Free-for-All, Gunfight, Search & Destroy and Gun Game.' },
     { id: 'browser', k: 'EVERY PUBLIC MATCH', t: 'MATCH BROWSER', d: 'See the public matches being played right now, with their mode, map and players, and join one.' },
     { id: 'private', k: 'FRIENDS · 6-DIGIT CODE', t: 'PRIVATE MATCH', d: 'Host a match and share the code, or join a friend\'s. You choose the map, mode and rules; bots fill empty slots.' },
     { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
@@ -787,12 +787,13 @@ function openPlayView(v) {
   document.querySelectorAll('#pane-play .pv').forEach(p => p.classList.toggle('on', p.id === `pv-${v}`));
   $('menu').dataset.pv = v;
   if (v === 'browser') openBrowser(); else closeBrowser();
-  const name = v === 'browser' ? 'MATCH BROWSER' : v === 'quick' ? 'QUICK PLAY' : v === 'setup' ? (playMode === 'online' ? 'PRIVATE MATCH' : (MODES[settings.mode] || MODES.tdm).name.toUpperCase()) : null;
+  const name = v === 'browser' ? 'MATCH BROWSER' : v === 'quick' ? 'EDIT MODES' : v === 'setup' ? (playMode === 'online' ? 'PRIVATE MATCH' : (MODES[settings.mode] || MODES.tdm).name.toUpperCase()) : null;
   crumbs('play-crumbs', name ? ['PLAY', name] : ['PLAY']);
   $('pv-back').style.display = v === 'root' ? 'none' : '';
   const pc = $('play-crumbs').querySelector('span'); if (pc) { pc.classList.add('link'); pc.onclick = () => openPlayView('root'); }
   if (v === 'setup' && playMode === 'online') $('play-title').textContent = 'PRIVATE MATCH';
   if (v === 'root') renderTiles();
+  if (v === 'quick') renderQuickModes();
   renderHints(game.input.lastDevice);
   if (game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }
@@ -803,6 +804,7 @@ $('play-tiles').addEventListener('click', (e) => {
   game.audio.play('ui', null, { ui: true });
   if (MODES[id]) { const sel = $('opt-mode'); if (sel.value !== id) { sel.value = id; sel.dispatchEvent(new Event('change')); } openPlayView('setup'); }
   else if (id === 'quick') $('quick-btn').click();
+  else if (id === 'modes') openPlayView('quick');
   else if (id === 'browser') openPlayView('browser');
   else if (id === 'private') openPlayView('setup');
   else if (id === 'friends') openSide();
@@ -1302,7 +1304,7 @@ function renderLobby() {
   $('join-info').textContent = inf ? [(MODES[inf.m] || MODES.tdm).name, MAPS[inf.map] ? MAPS[inf.map].name : 'Random map', `${inf.n}v${inf.n}`, inf.b ? 'bots fill empty slots' : 'no bots, players only', inf.ff ? 'friendly fire' : ''].filter(Boolean).join(' · ') : '';
   $('code-slots').style.display = lobby.quickMode && !lobby.code ? 'none' : '';
   const quickish = quickIntro || lobby.quickMode || lobby.public;
-  $('join-label').textContent = quickish ? 'PUBLIC MATCH' : 'ENTER MATCH CODE';
+  $('join-label').textContent = quickish ? 'QUICK MATCH' : 'ENTER MATCH CODE';
   $('lobby-hints').style.visibility = '';
   if (quickish) { const d = game.input.lastDevice; $('lobby-hints').innerHTML = d === 'touch' ? '' : `<span>${glyph('back', d)} Cancel matchmaking</span>`; } else if ($('lobby-hints').dataset.q) renderHints(game.input.lastDevice);
   $('lobby-hints').dataset.q = quickish ? '1' : '';
@@ -1400,7 +1402,7 @@ function renderClassic() {
   const inf = lobby.info || {};
   const mode = MODES[inf.m] || MODES[settings.mode] || MODES.tdm;
   const searching = lobby.quickMode && lobby.role !== 'host' && !(lobby.info && lobby.info.m);
-  $('cl-title').textContent = searching ? `PUBLIC MATCH / ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}` : `${pub ? 'PUBLIC MATCH' : 'PRIVATE MATCH'} / ${mode.name.toUpperCase()}`;
+  $('cl-title').textContent = searching ? `QUICK MATCH / ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}` : `${pub ? 'PUBLIC MATCH' : 'PRIVATE MATCH'} / ${mode.name.toUpperCase()}`;
   setHTML('cl-code', !pub && lobby.code ? `MATCH CODE <b>${fmtCode(lobby.code)}</b>` : '');
   // menu
   const items = [];
@@ -1493,8 +1495,24 @@ function syncLobbyLoadout() {
   else if (lobby.role === 'guest' && lobby.hostId) lobby.net.send({ t: 'lo', l }, lobby.hostId);
 }
 $('cl-done').addEventListener('click', () => { if (clModes) closeModeFilter(); else if (clSetup) closeLobbySetup(); else closeClassEditor(); });
+// Edit Modes (Play > Edit modes): the same playlist as the lobby's filter, ticked on its own page
+function renderQuickModes() {
+  const sel = new Set(settings.quickModes || []);
+  setHTML('qm-list', QUICK_MODES.map(id => `<button class="cl-mf${sel.has(id) ? ' on' : ''}" data-qm="${id}" data-nav role="checkbox" aria-checked="${sel.has(id)}"><i></i><b>${esc(MODES[id].name.toUpperCase())}</b><small>${esc(MODES[id].blurb)}</small></button>`).join(''));
+  $('quick-sub').textContent = quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel();
+}
+$('qm-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qm]'); if (!b) return;
+  const set = new Set(settings.quickModes || []), id = b.dataset.qm;
+  if (set.has(id)) { if (set.size > 1) set.delete(id); else { game.hud.toast('KEEP AT LEAST ONE MODE'); return; } } else set.add(id);
+  settings.quickModes = QUICK_MODES.filter(m => set.has(m));
+  saveSettings(settings);
+  game.audio.play('ui', null, { ui: true });
+  renderQuickModes();
+  focusEl($('qm-list').querySelector(`[data-qm="${id}"]`));
+});
 // public match playlists: tick the modes you want; matchmaking uses any of them (X in the lobby)
-const quickModesLabel = () => { const l = (settings.quickModes || []).filter(m => MODES[m]); return l.length === QUICK_MODES.length ? 'ALL' : l.map(m => MODES[m].short).join(' · '); };
+function quickModesLabel() { const l = (settings.quickModes || []).filter(m => MODES[m]); return l.length === QUICK_MODES.length ? 'ALL' : l.map(m => MODES[m].short).join(' · '); }
 function renderModeFilter() {
   const sel = new Set(settings.quickModes || []);
   setHTML('cl-modes', `<div class="cl-setup-h on">CHOOSE GAME MODES</div><p class="cl-mf-note">Matchmaking looks for a lobby in any mode you tick. If none is open after 10 seconds, a lobby starts in one of them at random.</p>`

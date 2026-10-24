@@ -248,3 +248,11 @@ body:has(#pause.on) .support, body:has(#end.on) .support, body:has(#lobby.on) .s
   .support { display: none !important; }
   .mode-quick { font-size: 24px; }
 }
+
+/* Play > Edit modes: the Quick Match playlist */
+.qm-list { display: flex; flex-direction: column; gap: 6px; max-width: 620px; }
+.qm-list .cl-mf { background: var(--mw-panel); border: 1px solid var(--mw-line); }
+.qm-list .cl-mf.on i { background: var(--mw-acc); border-color: var(--mw-acc); }
+.qm-list .cl-mf:hover, .qm-list .cl-mf.pad-focus { background: var(--mw-hover); border-color: var(--mw-ink); }
+#quick-btn { max-width: 620px; margin-top: 8px; }
+#quick-btn small { font-family: var(--display); font-size: 13px; font-weight: 600; letter-spacing: 0.12em; opacity: 0.75; }
