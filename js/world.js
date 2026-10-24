@@ -268,7 +268,7 @@ const UG_ROOMS = {
   SE: [34.5, 26, 44, 35],       // the east cellar (east spawn's stairs)
 };
 // doors between rooms that share an edge: [a, b, position along the edge, width]
-const UG_DOORS = [['W1', 'W2', -35, 3], ['W2', 'W3', -35, 3], ['W3', 'W4', -9.5, 2.4], ['W3', 'W4', -4.5, 2.4], ['W3', 'P1', -20, 2.2],
+const UG_DOORS = [['W1', 'W2', -35, 3], ['W2', 'W3', -35, 3], ['W3', 'W4', -9.5, 2.4], ['W3', 'W4', -4.5, 2.4], ['W3', 'P1', -20, 2.0],
   ['W3', 'C', 10, 2.4], ['C', 'PR', 10, 2.4], ['C', 'E1', -10, 2.4], ['E1', 'E2', 0, 2.4], ['E1', 'E2', 8, 2.4], ['E1', 'V', 24.25, 2.4], ['E1', 'SE', 39, 3]];
 // stairwells from the street: [room, x of the room's edge they land on, z, dir (+1: going down toward +x)]
 const UG_STAIRS = [['W1', -44, -38, 1], ['P1', -4, -20, -1], ['PR', 12, 3.5, -1], ['V', 26, 28.5, -1], ['SE', 44, 32, -1]];
@@ -287,7 +287,7 @@ function undergroundLayout(rooms, doors, stairs, depth) {
   const items = [], portals = [];
   for (const [k, x, z, dir] of stairs) {
     const r = rooms[k], cx = x - dir * UG_SW / 2, top = x - dir * UG_SW;
-    gaps[k].push([dir > 0 ? 'w' : 'e', off(r, 'z', z), 2.2]);
+    gaps[k].push([dir > 0 ? 'w' : 'e', off(r, 'z', z), 2.0]);   // (2.2 was flush with a 3 m passage's walls: they z-fought)
     items.push([cx, z, UG_SW, 2.4, depth, 0, 'stairdown', { dir }]);
     portals.push({ rect: [Math.min(top, x), z - 1.2, Math.max(top, x), z + 1.2],
       climb: [[top - dir * 1.3, 0, z], [top + dir * 0.3, 0, z], [cx, -depth / 2, z], [x - dir * 0.3, -depth, z], [x + dir * 1.3, -depth, z]] });
@@ -305,7 +305,7 @@ const PIONEER_CENTER = [
   [-24, -28, 2.4, 3.2, 0, 0, 'prism'], [-24, -6, 2.4, 3.2, 0, 0, 'prism'], [-15, 6, 3.2, 2.4, 0, 0, 'prism'],
   [4, 24, 3.2, 2.4, 0, 0, 'prism'], [18, 24, 3.2, 2.4, 0, 0, 'prism'], [36, 24, 3.2, 2.4, 0, 0, 'prism'],
   // cover down there: the long areaways are broken up by fallen timber and crates (never one sightline end to end)
-  [-24.9, -27, 1.4, 1.2, 1.1, -UG, 'crate'], [-23.1, -14, 1.4, 1.2, 1.1, -UG, 'crate'], [-24.9, 0, 1.4, 1.2, 1.2, -UG, 'crate'],
+  [-24.9, -27, 1.4, 1.2, 1.1, -UG, 'crate'], [-23.4, -14, 1.4, 1.2, 1.1, -UG, 'crate'], [-24.6, 0, 1.4, 1.2, 1.2, -UG, 'crate'],
   [6, 23.1, 1.2, 1.4, 1.1, -UG, 'crate'], [16, 24.9, 1.2, 1.4, 1.2, -UG, 'crate'], [30, 23.1, 1.2, 1.4, 1.1, -UG, 'crate'],
   // site A, the buried intersection: crates and a pallet stack round the plant
   [-18.5, 11.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-11, 18.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-18, 19, 1.4, 1.4, 0.9, -UG, 'crate'], [-11.5, 11.5, 1.2, 1.2, 0.9, -UG, 'crate'],
@@ -391,7 +391,7 @@ const PIONEER_PICKUPS = [
   { type: 'health', pos: [-30, -UG, -7] },     // the speakeasy
   { type: 'ammo', pos: [4, -UG, 30] },         // the corner block's basement
   { type: 'health', pos: [-31, 0, -14] },
-  { type: 'health', pos: [29, 0, 33] },
+  { type: 'health', pos: [26.5, 0, 34] },
   { type: 'ammo', pos: [18, 0, 35] },
   { type: 'ammo', pos: [-15, 0, 0.5] },
   { type: 'ammo', pos: [33, 0, -2] },
@@ -1594,13 +1594,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
             // 2 cm short of the street: wall tops flush with the paving above z-fight with it
             put(flatBox(S.ax ? L : T, D - 0.02, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + (D - 0.02) / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
           };
-          for (const [a, b] of gaps) { seg(cur, a); put(bothSides(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI)), M.brick, S.ox + S.ax * (a + b) / 2, floorY + 2.3, S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
+          // brick arch over each doorway, its crown kept under the street (a wide one sprang through the paving)
+          for (const [a, b] of gaps) { seg(cur, a); put(bothSides(new THREE.TorusGeometry((b - a) / 2, 0.18, 5, 12, Math.PI)), M.brick, S.ox + S.ax * (a + b) / 2, floorY + Math.min(2.3, D - 0.3 - (b - a) / 2 - 0.18), S.oz + S.az * (a + b) / 2, Math.atan2(S.nx, S.nz), { tint: 0xc08a70, grime: 0.4 }); cur = b; }
           seg(cur, S.len / 2);
         }
         // ceiling: planks on joists (the underside of the street), with glass prism lights here and there
         // (it casts the sun's shadow: nothing else stands between the sky and the floor down here)
         put(new THREE.PlaneGeometry(w, d), M.woodOld, cx, y0 - 0.05, cz, 0, { rx: Math.PI / 2, grime: 0, tint: 0x6a5a48 });
         const along = w >= d, L = along ? w : d, W = along ? d : w;
+        // is a spot along one of the long walls (sd: +1 / -1) in or next to a doorway?
+        const inDoor = (sd, t, pad) => (o.gaps || []).some(g => g[0] === (along ? (sd > 0 ? 'n' : 's') : (sd > 0 ? 'e' : 'w')) && Math.abs(g[1] - t) < g[2] / 2 + pad);
         for (let i = -L / 2 + 0.75; i < L / 2; i += 1.5) put(flatBox(along ? 0.2 : W, 0.28, along ? W : 0.2, 1.2), M.woodOld, cx + (along ? i : 0), y0 - 0.2, cz + (along ? 0 : i), 0, { grime: 0, tint: 0x5a4a3a });
         for (const off of [-W / 2 + 0.6, -W / 2 + 0.9]) put(new THREE.CylinderGeometry(0.06, 0.06, L - 1, 8), M.metal, cx + (along ? 0 : off), y0 - 0.5, cz + (along ? off : 0), 0, { rx: along ? 0 : 0, rz: along ? Math.PI / 2 : 0, ...(along ? {} : { rx: Math.PI / 2 }), tint: 0x3a3a38, grime: 0.4 });
         // timber posts down the middle (cover), bulbs between them; in a passage under 6 m wide they stand against
@@ -1608,6 +1611,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const narrow = W < 6;
         for (let i = -L / 2 + 2.5, n = 0; i < L / 2 - 1.5; i += 3, n++) {
           const po = narrow ? (n % 2 ? 1 : -1) * (W / 2 - T - 0.15) : W * 0.12;
+          if (narrow && inDoor(Math.sign(po), i, 0.3)) continue;
           const px = cx + (along ? i : po), pz = cz + (along ? po : i);
           solid(px, pz, 0.3, 0.3, D, floorY, 'wood').navBlock = !o.lid;
           put(flatBox(0.3, D, 0.3, 1.2), M.woodOld, px, floorY + D / 2, pz, 0, { tint: 0x7a6650, grime: 0.6, base: floorY });
@@ -1619,11 +1623,17 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // junk along one wall: broken planks, crates, an old painted sign (not in narrow passages: their cover is placed)
         for (let i = 0; i < (narrow ? 0 : Math.floor(L / 3)); i++) {
           const t = -L / 2 + 1.5 + i * 3 + rnd(), side = (i % 2 ? 1 : -1) * (W / 2 - T - 0.45);
+          if (inDoor(Math.sign(side), t, 0.6)) continue;
           const jx = cx + (along ? t : side), jz = cz + (along ? side : t);
           if (rnd() < 0.5) { solid(jx, jz, 0.9, 0.9, 0.9, floorY, 'wood').navBlock = !o.lid; B(M.wood, 0.9, 0.9, 0.9, jx, floorY, jz, rnd(), { grime: 0.4, base: floorY }); }
           else for (let k = 0; k < 4; k++) put(flatBox(0.12, 0.04, 1.6, 1.2), M.woodOld, jx + (rnd() - 0.5) * 0.4, floorY + 0.15 + k * 0.08, jz + (rnd() - 0.5) * 0.4, rnd() * 3, { rz: (rnd() - 0.5) * 0.6, grime: 0.3, tint: 0x8a7458 });
         }
-        if (posterMat) decal(posterMat[1], 1.6, 1.1, cx + (along ? -L / 4 : W / 2 - T - 0.01), floorY + 1.7, cz + (along ? W / 2 - T - 0.01 : -L / 4), along ? Math.PI : -Math.PI / 2);
+        // an old poster on a stretch of wall clear of the doorways
+        const spot = posterMat && [1, -1].flatMap(sd => [-L / 4, L / 4, 0].map(t => [sd, t])).find(([sd, t]) => !inDoor(sd, t, 1));
+        if (spot) {
+          const [sd, t] = spot, wo = sd * (W / 2 - T - 0.01);
+          decal(posterMat[1], 1.6, 1.1, cx + (along ? t : wo), floorY + 1.7, cz + (along ? wo : t), along ? (sd > 0 ? Math.PI : 0) : (sd > 0 ? -Math.PI / 2 : Math.PI / 2));
+        }
         break;
       }
       case 'stairdown': {
@@ -1639,8 +1649,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           // the riser, on its downhill edge (the face you see going up), a hair behind the tread's nose
           put(flatBox(0.04, top - 0.06 - (y0 - D), d - 2 * T, 0), M.concrete, sx + dir * (len / 2 - 0.03), (top - 0.06 + y0 - D) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5, base: y0 - D });
           // and above the first step, up to the street (an open slot under the street's edge otherwise)
-          if (k === 1) put(flatBox(0.04, y0 - 0.003 - (top - 0.06), d - 2 * T, 0), M.concrete, sx - dir * (len / 2 - 0.02), (y0 - 0.003 + top - 0.06) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5 });
+          // (a hair proud of the street: paving overlays above it showed their undersides through the slot)
+          if (k === 1) put(flatBox(0.04, y0 + 0.025 - (top - 0.06), d - 2 * T, 0), M.concrete, sx - dir * (len / 2 - 0.02), (y0 + 0.025 + top - 0.06) / 2, cz, 0, { tint: 0x8a8478, grime: 0.5 });
         }
+        // a header over the opening at the bottom (the slot between the ceiling below and the street's edge showed
+        // daylight) and a floor under the flight (grazing views slipped between the last tread and the floor)
+        put(flatBox(0.4, 0.3, d, 0), M.brick, cx + dir * (w / 2 + 0.15), y0 - 0.155, cz, 0, { tint: 0xc08a70, grime: 0.5 });
+        put(new THREE.PlaneGeometry(w, d), M.concrete, cx, y0 - D + 0.004, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: 0x8a8478 });
         for (const sz of [-1, 1]) {
           const z = cz + sz * (d / 2 - T / 2);
           solid(cx, z, w, T, D, y0 - D, 'concrete').navBlock = true;

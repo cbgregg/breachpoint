@@ -182,10 +182,12 @@ function enclosure(tints, stone) {
   // tall blocks all round the plaza: no way out, nothing beyond to see
   const t = (i) => tints[i % tints.length];
   const out = [];
-  [[-24, 18], [-6, 18], [12, 18], [30, 18]].forEach(([x, w], i) => out.push([x, -47.5, w, 7, 22 + (i % 2) * 6, 0, 'brick', { tint: t(i), stone: stone && i % 2 }]));
-  [[-24, 18], [-6, 18], [12, 18], [30, 18]].forEach(([x, w], i) => out.push([x, 25.5, w, 7, 20 + ((i + 1) % 2) * 6, 0, 'brick', { tint: t(i + 1), stone: stone && !(i % 2) }]));
-  [[-34, -27, 7, 34], [-34, 5, 7, 30]].forEach(([x, z, w, d], i) => out.push([x + 2.5, z, w, d, 24 + i * 4, 0, 'brick', { tint: t(i + 2) }]));
-  [[42, -27, 7, 34], [42, 5, 7, 30]].forEach(([x, z, w, d], i) => out.push([x - 2.5, z, w, d, 26 - i * 4, 0, 'brick', { tint: t(i + 3) }]));
+  // (the rows run corner to corner and the sides meet them: a gap at a corner left a pocket of bare ground)
+  const ROW = [[-25, 20], [-6, 18], [12, 18], [32, 22]];
+  ROW.forEach(([x, w], i) => out.push([x, -47.5, w, 7, 22 + (i % 2) * 6, 0, 'brick', { tint: t(i), stone: stone && i % 2 }]));
+  ROW.forEach(([x, w], i) => out.push([x, 25.5, w, 7, 20 + ((i + 1) % 2) * 6, 0, 'brick', { tint: t(i + 1), stone: stone && !(i % 2) }]));
+  [[-34, -27, 7, 34], [-34, 6, 7, 32]].forEach(([x, z, w, d], i) => out.push([x + 2.5, z, w, d, 24 + i * 4, 0, 'brick', { tint: t(i + 2) }]));
+  [[42, -27, 7, 34], [42, 6, 7, 32]].forEach(([x, z, w, d], i) => out.push([x - 2.5, z, w, d, 26 - i * 4, 0, 'brick', { tint: t(i + 3) }]));
   out.push([4, PLAZA.z0 - 7.5, 80, 1, 30, 0, 'boundary'], [4, PLAZA.z1 + 7.5, 80, 1, 30, 0, 'boundary'], [PLAZA.x0 - 7.5, -11, 1, 80, 30, 0, 'boundary'], [PLAZA.x1 + 7.5, -11, 1, 80, 30, 0, 'boundary']);
   return out;
 }
@@ -209,7 +211,7 @@ const THEMES = {
     [-6, 12, 1.3, 1.3, 0.75, 0, 'planter'], [16, 13, 1.3, 1.3, 0.75, 0, 'planter'], [5, 9, 4.4, 2.0, 1.45, 0, 'car', 0],
     [-16, 2, 2.4, 1.0, 0.95, 0, 'tent', 0], [24, 3, 2.4, 1.0, 0.95, 0, 'tent', 1],
     [-24, -6, 1.9, 1.35, 1.25, 0, 'dumpster', {}], [33, -36, 1.35, 1.9, 1.25, 0, 'dumpster', { dark: true }],
-    [6, -5, 2.6, 2.7, 2.8, 0, 'kiosk'], [-12, -14, 1.6, 1.6, 1.6, 0, 'crate'],
+    [6, -5, 2.6, 2.7, 2.8, 0, 'kiosk'], [-10, -12, 1.6, 1.6, 1.6, 0, 'crate'],
   ],
   // Symphony: Benaroya Hall's lobby on the north side, a garden of planters and trees, a bus at the curb
   civic: [
@@ -219,8 +221,8 @@ const THEMES = {
     [-4, -20, 6, 6, 0.75, 0, 'planter'], [12, -20, 6, 6, 0.75, 0, 'planter'], [4, -12, 3, 3, 0.75, 0, 'planter'],
     [-4, -20, 0, 0, 8, 0, 'tree'], [12, -20, 0, 0, 8.5, 0, 'tree'], [26, -24, 0, 0, 9, 0, 'tree'], [-12, -2, 0, 0, 9, 0, 'tree'],
     [4, -28, 1.8, 0.6, 0.95, 0, 'bench'], [4, -4, 1.8, 0.6, 0.95, 0, 'bench'], [22, -14, 1.8, 0.6, 0.95, 0, 'bench'],
-    [27, -6, 12, 2.6, 3.2, 0, 'bus', { livery: 0 }], [30, 9, 2.4, 7, 3.3, 0, 'truck', {}],
-    [-14, -30, 2.2, 1.6, 2.6, 0, 'infokiosk'], [22, -32, 2.6, 2.7, 2.8, 0, 'kiosk'],
+    [27, -6, 12, 2.6, 3.2, 0, 'bus', { livery: 0 }], [34, 1, 2.4, 7, 3.3, 0, 'truck', {}],
+    [-14, -30, 2.2, 1.6, 2.6, 0, 'infokiosk'], [25, -36, 2.6, 2.7, 2.8, 0, 'kiosk'],
     [-20, 4, 3.2, 0.9, 1.1, 0, 'jersey'], [4, 12, 3.2, 0.9, 1.1, 0, 'jersey'], [-8, 14, 0.9, 3.2, 1.1, 0, 'jersey'],
     [18, -34, 1.6, 1.6, 1.6, 0, 'crate'], [-2, 9, 2, 2, 1.2, 0, 'pallet'],
     // the middle of the plaza: a newsstand over the entrance passage, barriers and food tents (no clear line from
