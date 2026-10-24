@@ -156,7 +156,7 @@ The menus are a tree, laid out like Modern Warfare (2019):
 | Level | Keyboard | Controller | What it does |
 |---|---|---|---|
 | Top tabs: Play · Weapons · Options | Q / E | LB / RB | Switch section |
-| Play tiles | ↑ ↓, Enter | D-pad, A | Offline: one tile per mode, opening its match setup. Online: Quick Play (playlist + Find a match), Private Match (host / join + rules), Friends, Combat Training |
+| Play tiles | ↑ ↓, Enter | D-pad, A | Offline: one tile per mode, opening its match setup. Online: Quick Match (straight into matchmaking in your modes), Edit Modes (tick which modes Quick Match looks for), Match Browser, Private Match (host / join + rules), Friends, Combat Training |
 | Options categories: General · Graphics · Controls · Audio · Account · About | Z / C | LT / RT | One list per category; the panel on the right explains the highlighted setting |
 | Back | Esc | B | Always climbs one level (page → tiles → game type → title) |
 

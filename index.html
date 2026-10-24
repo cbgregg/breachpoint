@@ -323,19 +323,12 @@
           <div class="pv-bar"><button id="pv-back" class="menu-btn small" data-nav>‹ BACK</button><div class="crumbs" id="play-crumbs"></div></div>
           <!-- PLAY, level 1: playlist tiles (MW2019 style); each opens its own page -->
           <div class="pv on" id="pv-root"><div class="tiles" id="play-tiles" role="list"></div><p class="tile-desc" id="tile-desc"></p></div>
-          <!-- level 2, online: Quick Play playlist -->
+          <!-- level 2, online: the modes Quick Match searches (any of the ticked ones) -->
           <div class="pv" id="pv-quick">
-            <h2 class="pane-title">QUICK PLAY</h2>
-            <p class="pane-sub">Drop into a public match. Pick the playlist; maps are voted on in the lobby between matches.</p>
-            <div class="sec-k">PLAYLIST</div>
-            <div class="mode-pick" role="radiogroup" aria-label="Game mode">
-            <button class="mp" data-mode="tdm" data-nav><b>TEAM DEATHMATCH</b><small>Respawns · score limit</small></button>
-            <button class="mp" data-mode="ffa" data-nav><b>FREE-FOR-ALL</b><small>Everyone for themselves · 30 kills</small></button>
-            <button class="mp" data-mode="gunfight" data-nav><b>GUNFIGHT</b><small>2v2 · one life · same guns</small></button>
-            <button class="mp" data-mode="snd" data-nav><b>SEARCH &amp; DESTROY</b><small>Plant or defuse · one life</small></button>
-            <button class="mp" data-mode="gungame" data-nav><b>GUN GAME</b><small>Free-for-all · next gun every kill</small></button>
-          </div>
-            <button id="quick-btn" class="menu-btn quick" data-nav>FIND A MATCH <small id="quick-sub">TEAM DEATHMATCH · PUBLIC</small></button>
+            <h2 class="pane-title">EDIT MODES</h2>
+            <p class="pane-sub">Quick Match joins an open public match in any mode you tick. If none is open within 10 seconds, a lobby starts in one of them and players drop in. Maps are voted on in the lobby.</p>
+            <div class="qm-list" id="qm-list" role="group" aria-label="Quick Match modes"></div>
+            <button id="quick-btn" class="cta quick" data-nav><span>QUICK MATCH</span><small id="quick-sub"></small></button>
           </div>
           <!-- level 2, online: the match browser (every public match right now) -->
           <div class="pv" id="pv-browser">
