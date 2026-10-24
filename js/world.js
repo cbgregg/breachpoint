@@ -9,7 +9,7 @@ import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
 import { PROPS, containerVariants, buildingVariants, propFit } from './props.js';
-import { buildStation, STATION_LIDS, STATION_LEVELS, YC as STATION_YC, YP as STATION_YP } from './station.js';
+import { buildStation, STATION_LIDS } from './station.js';
 
 // Playable area of the loaded map (set by buildWorld from the layout's bounds; the minimap and nav grid read it)
 export const MAP = { minX: -42, maxX: 42, minZ: -30, maxZ: 30 };
@@ -217,17 +217,16 @@ const SHURAN_PICKUPS = [
 ];
 
 // Pioneer Square (108 x 80 m): Seattle's 1890s brick district. A cobbled plaza with the iron pergola, totem
-// pole and plane trees in the middle, streetcar avenues either side, Romanesque brick blocks beyond. Bomb site
-// A is down in King Street Station (the light rail stop under the plaza, reached by two stairwells; trains run
-// through it); site B is inside the corner tavern.
+// pole and plane trees in the middle, streetcar avenues either side, Romanesque brick blocks beyond, and the
+// Seattle Underground under the sidewalks (see UG_ROOMS). Bomb site A is down in the Underground; site B is
+// inside the corner tavern.
 // ---------- Pioneer Square, on the real street plan ----------
 // Game axes: +x east, +z south. 1st Avenue runs north-south (x -22..-8 curb to curb), Yesler Way east-west
 // (z 8..22). Pioneer Place is the triangle east of 1st Ave and north of Yesler; its east side is the old street
 // in front of the Pioneer Building, which stands at the downtown grid's angle (32 degrees) on the NE corner of
 // 1st & James. James St leaves the plaza's south-east corner at the same angle, uphill to the ENE, between the
 // Pioneer Building and the "Sinking Ship" garage on the old Seattle Hotel's wedge. The pergola stands at the
-// plaza's south end over one of the two stairwells down to King Street Station, the Link light rail stop under
-// the plaza (js/station.js; bomb site A is on its northbound platform).
+// plaza's south end over one of the stairwells down to the Underground.
 // Smith Tower rises up Yesler to the east.
 const PS_A = 32 * Math.PI / 180;
 const PS_D = [Math.cos(PS_A), -Math.sin(PS_A)];            // along James St (ENE)
@@ -244,18 +243,76 @@ const PS_GARAGE = [[PS_SW[0] + (PS_SW[1] - 4) / Math.tan(PS_A), 4], [42, 4], [42
 const psHyp = (z) => PS_V[0] + (z - PS_V[1]) * Math.tan(PS_A); // the plaza's east edge (x) at a given z
 // street signs in the "Road Signs" pack: mesh node numbers
 const ROAD_SIGNS = { noparking: 4, detour: 50, towaway: 56, roadwork: 58, pedestrian: 68, parking: 80 };
+// ---------- the Seattle Underground (under Pioneer Square's sidewalks) ----------
+// After the 1889 fire the district's streets were raised a storey; the old sidewalks and shopfronts were left
+// underneath as "areaways", lit from above by purple glass prism lights set into the new sidewalks. Here they
+// form a network from the west team's corner (a freight cellar off the spawn lot) to the east team's (a cellar
+// off theirs): down 1st Avenue's west sidewalk, through the buried 1st & Yesler intersection (bomb site A) and
+// east under Yesler's south sidewalk. Loops off the long runs (a speakeasy, a basement under the corner block)
+// and five stairwells (both spawn lots, the plaza's west edge, the pergola, Occidental Mall) let the street
+// lanes drop in. About 68 m from the west stairs to site A and 61 m from the east.
+const UG = 3.3;   // depth: floor at y = -3.3
+// rooms [x0, z0, x1, z1]
+const UG_ROOMS = {
+  W1: [-44, -40, -34.5, -31],   // freight cellar under the bookshop (west spawn's stairs)
+  W2: [-34.5, -37, -26, -33],   // passage to 1st Ave
+  W3: [-26, -38, -22, 12],      // 1st Avenue's west areaway
+  W4: [-34, -12, -26, -2],      // a speakeasy under the Mutual Life Building (two doors: a loop)
+  P1: [-22, -21.5, -4, -18.5],  // under 1st Avenue to the plaza's west stairs
+  C: [-22, 8, -8, 22],          // the buried intersection under 1st & Yesler (bomb site A)
+  PR: [-8, 2, 12, 12],          // under the plaza's south edge and the prism lights (the pergola's stairs)
+  E1: [-12, 22, 44, 26],        // Yesler Way's south areaway
+  E2: [-2, 26, 10, 34],         // basement under the corner block (two doors: a loop)
+  V: [22.5, 26, 26, 31],        // landing of the Occidental Mall stairs
+  SE: [34.5, 26, 44, 35],       // the east cellar (east spawn's stairs)
+};
+// doors between rooms that share an edge: [a, b, position along the edge, width]
+const UG_DOORS = [['W1', 'W2', -35, 3], ['W2', 'W3', -35, 3], ['W3', 'W4', -9.5, 2.4], ['W3', 'W4', -4.5, 2.4], ['W3', 'P1', -20, 2.2],
+  ['W3', 'C', 10, 2.4], ['C', 'PR', 10, 2.4], ['C', 'E1', -10, 2.4], ['E1', 'E2', 0, 2.4], ['E1', 'E2', 8, 2.4], ['E1', 'V', 24.25, 2.4], ['E1', 'SE', 39, 3]];
+// stairwells from the street: [room, x of the room's edge they land on, z, dir (+1: going down toward +x)]
+const UG_STAIRS = [['W1', -44, -38, 1], ['P1', -4, -20, -1], ['PR', 12, 3.5, -1], ['V', 26, 28.5, -1], ['SE', 44, 32, -1]];
+const UG_SW = 6.5;   // stair length
+// rooms and stairs as layout pieces ('tunnel' with door gaps, 'stairdown'), and the bots' map of the level
+function undergroundLayout(rooms, doors, stairs, depth) {
+  const gaps = Object.fromEntries(Object.keys(rooms).map(k => [k, []]));
+  // (the tunnel piece's 'n' wall is its +z side and 's' its -z side)
+  const side = (r, q) => r[2] === q[0] ? ['e', 'w', 'z'] : r[0] === q[2] ? ['w', 'e', 'z'] : r[3] === q[1] ? ['n', 's', 'x'] : r[1] === q[3] ? ['s', 'n', 'x'] : null;
+  const off = (r, axis, at) => at - (axis === 'z' ? (r[1] + r[3]) / 2 : (r[0] + r[2]) / 2);
+  for (const [a, b, at, wd] of doors) {
+    const ra = rooms[a], rb = rooms[b], sd = side(ra, rb);
+    if (!sd) throw new Error(`underground: ${a} and ${b} don't share an edge`);
+    gaps[a].push([sd[0], off(ra, sd[2], at), wd]); gaps[b].push([sd[1], off(rb, sd[2], at), wd]);
+  }
+  const items = [], portals = [];
+  for (const [k, x, z, dir] of stairs) {
+    const r = rooms[k], cx = x - dir * UG_SW / 2, top = x - dir * UG_SW;
+    gaps[k].push([dir > 0 ? 'w' : 'e', off(r, 'z', z), 2.2]);
+    items.push([cx, z, UG_SW, 2.4, depth, 0, 'stairdown', { dir }]);
+    portals.push({ rect: [Math.min(top, x), z - 1.2, Math.max(top, x), z + 1.2],
+      climb: [[top - dir * 1.3, 0, z], [top + dir * 0.3, 0, z], [cx, -depth / 2, z], [x - dir * 0.3, -depth, z], [x + dir * 1.3, -depth, z]] });
+  }
+  for (const [k, [x0, z0, x1, z1]] of Object.entries(rooms)) items.push([(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, depth, 0, 'tunnel', { lid: true, gaps: gaps[k] }]);
+  return { items, level: { y: -depth, bounds: { minX: -53, maxX: 53, minZ: -41, maxZ: 41 }, portals } };
+}
+const PIONEER_UG = undergroundLayout(UG_ROOMS, UG_DOORS, UG_STAIRS, UG);
 const PIONEER_CENTER = [
   // ---- Pioneer Place: granite paving (runs on under the building fronts), King Street Station beneath it
   [8.5, -16.5, 25, 41, 0, 0, 'paving'],
-  [0, 0, 0, 0, 0, 0, 'station'],
-  [-2.75, 3.5, 6.5, 2.4, -STATION_YC, 0, 'stairdown', { dir: 1 }],
-  [15.25, 3.5, 6.5, 2.4, -STATION_YC, 0, 'stairdown', { dir: -1 }],
+  // ---- the Underground: rooms, doors and stairwells (above), purple prism lights over it in the sidewalks
+  ...PIONEER_UG.items,
   [3.5, 3.5, 4.2, 3.4, 0, 0, 'prism'], [9.2, 3.5, 4.2, 3.4, 0, 0, 'prism'],
+  [-24, -28, 2.4, 3.2, 0, 0, 'prism'], [-24, -6, 2.4, 3.2, 0, 0, 'prism'], [-15, 6, 3.2, 2.4, 0, 0, 'prism'],
+  [4, 24, 3.2, 2.4, 0, 0, 'prism'], [18, 24, 3.2, 2.4, 0, 0, 'prism'], [36, 24, 3.2, 2.4, 0, 0, 'prism'],
+  // cover down there: the long areaways are broken up by fallen timber and crates (never one sightline end to end)
+  [-24.9, -27, 1.4, 1.2, 1.1, -UG, 'crate'], [-23.1, -14, 1.4, 1.2, 1.1, -UG, 'crate'], [-24.9, 0, 1.4, 1.2, 1.2, -UG, 'crate'],
+  [6, 23.1, 1.2, 1.4, 1.1, -UG, 'crate'], [16, 24.9, 1.2, 1.4, 1.2, -UG, 'crate'], [30, 23.1, 1.2, 1.4, 1.1, -UG, 'crate'],
+  // site A, the buried intersection: crates and a pallet stack round the plant
+  [-18.5, 11.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-11, 18.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-18, 19, 1.4, 1.4, 0.9, -UG, 'crate'], [-11.5, 11.5, 1.2, 1.2, 0.9, -UG, 'crate'],
   [15.25, 3.5, 9, 4.4, 3.8, 0, 'pergola'],
   // the totem pole, plane trees, benches, lamps, a few planters and the information kiosk
   [1.5, -21, 1.0, 1.0, 15, 0, 'totem'], [1.5, -21, 3.2, 3.2, 0.9, 0, 'railing', { open: 's' }],
   [-1.5, -6, 0, 0, 9, 0, 'tree'], [6.5, -6.5, 0, 0, 9.5, 0, 'tree'], [-1.5, -14, 0, 0, 10, 0, 'tree'], [5, -14.5, 0, 0, 9, 0, 'tree'], [-1.8, -27, 0, 0, 9, 0, 'tree'],
-  [2.2, -9.5, 1.8, 0.6, 0.95, 0, 'bench'], [-2.4, -19, 1.8, 0.6, 0.95, 0, 'bench'], [9.5, -1.8, 1.8, 0.6, 0.95, 0, 'bench'],
+  [2.2, -9.5, 1.8, 0.6, 0.95, 0, 'bench'], [-2.4, -24.5, 1.8, 0.6, 0.95, 0, 'bench'], [9.5, -1.8, 1.8, 0.6, 0.95, 0, 'bench'],
   [-3.2, -2.5, 0, 0, 0, 0, 'vlamp'], [11, -5, 0, 0, 0, 0, 'vlamp'], [-3.2, -23, 0, 0, 0, 0, 'vlamp'], [4.5, -0.6, 0, 0, 0, 0, 'vlamp'],
   [8.5, -10.5, 2.2, 1.6, 2.6, 0, 'infokiosk'],
   [1.5, -2, 1.3, 1.3, 0.75, 0, 'planter'], [-1, -31.5, 1.3, 1.3, 0.75, 0, 'planter'], [11.5, -0.5, 1.3, 1.3, 0.75, 0, 'planter'],
@@ -279,7 +336,7 @@ const PIONEER_CENTER = [
   // ---- south of Yesler: the corner block, the tavern (bomb site B), Occidental's pedestrian mall, one more block
   [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890, shop: { s: [['d', -3.5], ['w', 1], ['d', 4.5]], w: [['d', -2.5], ['w', 2.5]], e: [['d', 2]], props: [['shelf', -2, 1, 0], ['table', 3, 3.5], ['crates', -5, 4.5], ['shelf', 4, -2, 1]], light: 1 } }],
   [18, 33.5, 10, 11, 3.8, 0, 'house', { n: [['d', -2], ['w', 2.2]], e: [['d', 1.5]], w: [['d', 0]], s: [['w', 0]], props: [['table', -2, 1.5], ['table', 2, 2.5], ['shelf', 3.4, -3.2, 0]], light: 1 }],
-  [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 29.5, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
+  [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 33, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
   [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
   // ---- Yesler Way: parked cars, a streetcar at its stop, a work zone, sandbags
   [-44, 9.2, 4.4, 2.0, 1.45, 0, 'car', 0], [-42, 20.8, 4.4, 2.0, 1.45, 0, 'car', 1], [1.6, 20.8, 4.4, 2.0, 1.45, 0, 'car', 0],
@@ -330,8 +387,8 @@ const PIONEER_ROADS = [
 const PIONEER_SPAWNS = [[50, -34], [50, -26], [50, -16], [50, -6], [50, 2], [50, 12], [50, 20], [48, 27], [47, 35], [51, -1]];
 const PIONEER_PICKUPS = [
   { type: 'health', pos: [1.5, 0, -11] },
-  { type: 'health', pos: [6.25, STATION_YC, 5.4] },
-  { type: 'ammo', pos: [11.2, STATION_YP, -28] },
+  { type: 'health', pos: [-30, -UG, -7] },     // the speakeasy
+  { type: 'ammo', pos: [4, -UG, 30] },         // the corner block's basement
   { type: 'health', pos: [-31, 0, -14] },
   { type: 'health', pos: [29, 0, 33] },
   { type: 'ammo', pos: [18, 0, 35] },
@@ -340,13 +397,13 @@ const PIONEER_PICKUPS = [
   { type: 'ammo', pos: [-34, 0, 26.5] },
   { type: 'ammo', pos: [-2, 0, -33] },
 ];
-// bomb sites (both teams): A on the station's northbound platform, B in the tavern on Yesler
-const PIONEER_SITES = [[-3.2, -26, STATION_YP], [18, 34]];
+// bomb sites (both teams): A down in the Underground's buried intersection, B in the tavern on Yesler
+const PIONEER_SITES = [[-15, 15, -UG], [18, 34]];
 
 export const MAPS = {
   tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg'] },
-  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; bomb site A is down in King Street Station, where Link trains run through', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: STATION_LEVELS, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
+  pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; and the Seattle Underground beneath the sidewalks, corner to corner; bomb site A is down in the buried intersection', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_UG.level, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
   drivein: DRIVEIN,
@@ -1528,7 +1585,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           const seg = (a, b) => {
             if (b - a < 0.05) return;
             const m = (a + b) / 2, L = b - a, x = S.ox + S.ax * m, z = S.oz + S.az * m;
-            solid(x, z, S.ax ? L : T, S.az ? L : T, D, floorY, 'brick').navBlock = true;
+            solid(x, z, S.ax ? L : T, S.az ? L : T, D, floorY, 'brick').navBlock = !o.lid;   // (under a lid the street above stays walkable)
             // 2 cm short of the street: wall tops flush with the paving above z-fight with it
             put(flatBox(S.ax ? L : T, D - 0.02, S.az ? L : T, scaleOf(M.brick)), M.brick, x, floorY + (D - 0.02) / 2, z, 0, { tint: 0xc08a70, grime: 0.7, base: floorY });
           };
@@ -1536,25 +1593,29 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           seg(cur, S.len / 2);
         }
         // ceiling: planks on joists (the underside of the street), with glass prism lights here and there
-        put(new THREE.PlaneGeometry(w, d), M.woodOld, cx, y0 - 0.05, cz, 0, { rx: Math.PI / 2, grime: 0, cast: false, tint: 0x6a5a48 });
+        // (it casts the sun's shadow: nothing else stands between the sky and the floor down here)
+        put(new THREE.PlaneGeometry(w, d), M.woodOld, cx, y0 - 0.05, cz, 0, { rx: Math.PI / 2, grime: 0, tint: 0x6a5a48 });
         const along = w >= d, L = along ? w : d, W = along ? d : w;
         for (let i = -L / 2 + 0.75; i < L / 2; i += 1.5) put(flatBox(along ? 0.2 : W, 0.28, along ? W : 0.2, 1.2), M.woodOld, cx + (along ? i : 0), y0 - 0.2, cz + (along ? 0 : i), 0, { grime: 0, tint: 0x5a4a3a });
         for (const off of [-W / 2 + 0.6, -W / 2 + 0.9]) put(new THREE.CylinderGeometry(0.06, 0.06, L - 1, 8), M.metal, cx + (along ? 0 : off), y0 - 0.5, cz + (along ? off : 0), 0, { rx: along ? 0 : 0, rz: along ? Math.PI / 2 : 0, ...(along ? {} : { rx: Math.PI / 2 }), tint: 0x3a3a38, grime: 0.4 });
-        // timber posts down the middle (cover), bulbs between them
-        for (let i = -L / 2 + 2.5; i < L / 2 - 1.5; i += 3) {
-          const px = cx + (along ? i : W * 0.12), pz = cz + (along ? W * 0.12 : i);
-          solid(px, pz, 0.3, 0.3, D, floorY, 'wood').navBlock = true;
+        // timber posts down the middle (cover), bulbs between them; in a passage under 6 m wide they stand against
+        // alternate walls instead (a post in the middle of a 4 m areaway left no room to pass a crate)
+        const narrow = W < 6;
+        for (let i = -L / 2 + 2.5, n = 0; i < L / 2 - 1.5; i += 3, n++) {
+          const po = narrow ? (n % 2 ? 1 : -1) * (W / 2 - T - 0.15) : W * 0.12;
+          const px = cx + (along ? i : po), pz = cz + (along ? po : i);
+          solid(px, pz, 0.3, 0.3, D, floorY, 'wood').navBlock = !o.lid;
           put(flatBox(0.3, D, 0.3, 1.2), M.woodOld, px, floorY + D / 2, pz, 0, { tint: 0x7a6650, grime: 0.6, base: floorY });
           const bx = px + (along ? 1.5 : 0), bz = pz + (along ? 0 : 1.5);
           put(new THREE.SphereGeometry(0.07, 8, 6), M.bulbHot, bx, y0 - 0.45, bz, 0, { grime: 0, cast: false });
           glowsHot.push([bx, y0 - 0.45, bz, 0.9]);
           if (Math.round(i * 10) % 2 === 0) { const L2 = new THREE.PointLight(0xffd6a0, 6, 8, 1.6); L2.position.set(bx, y0 - 0.6, bz); L2.userData.mapLight = true; group.add(L2); }
         }
-        // junk along one wall: broken planks, crates, an old painted sign
-        for (let i = 0; i < Math.floor(L / 3); i++) {
+        // junk along one wall: broken planks, crates, an old painted sign (not in narrow passages: their cover is placed)
+        for (let i = 0; i < (narrow ? 0 : Math.floor(L / 3)); i++) {
           const t = -L / 2 + 1.5 + i * 3 + rnd(), side = (i % 2 ? 1 : -1) * (W / 2 - T - 0.45);
           const jx = cx + (along ? t : side), jz = cz + (along ? side : t);
-          if (rnd() < 0.5) { solid(jx, jz, 0.9, 0.9, 0.9, floorY, 'wood').navBlock = true; B(M.wood, 0.9, 0.9, 0.9, jx, floorY, jz, rnd(), { grime: 0.4, base: floorY }); }
+          if (rnd() < 0.5) { solid(jx, jz, 0.9, 0.9, 0.9, floorY, 'wood').navBlock = !o.lid; B(M.wood, 0.9, 0.9, 0.9, jx, floorY, jz, rnd(), { grime: 0.4, base: floorY }); }
           else for (let k = 0; k < 4; k++) put(flatBox(0.12, 0.04, 1.6, 1.2), M.woodOld, jx + (rnd() - 0.5) * 0.4, floorY + 0.15 + k * 0.08, jz + (rnd() - 0.5) * 0.4, rnd() * 3, { rz: (rnd() - 0.5) * 0.6, grime: 0.3, tint: 0x8a7458 });
         }
         if (posterMat) decal(posterMat[1], 1.6, 1.1, cx + (along ? -L / 4 : W / 2 - T - 0.01), floorY + 1.7, cz + (along ? W / 2 - T - 0.01 : -L / 4), along ? Math.PI : -Math.PI / 2);
