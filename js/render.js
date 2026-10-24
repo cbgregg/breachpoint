@@ -109,6 +109,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
   }
 #endif`;
 
+const _fwd = new THREE.Vector3(), _ident = new THREE.Matrix4();
 export class Renderer {
   constructor(container, scene, camera, vmScene, vmCamera) {
     this.scene = scene; this.camera = camera; this.vmScene = vmScene; this.vmCamera = vmCamera;
@@ -187,6 +188,16 @@ export class Renderer {
     scene.add(sun);
     scene.add(sun.target);
     this.sun = sun;
+    // Light pool: every map lamp (userData.mapLight / lampLight) is only a marker. A fixed handful of real lights
+    // follows the lamps nearest the camera, so each pixel loops over a few lights instead of every lamp on the map
+    // (the biggest GPU cost on lamp-heavy maps), and the light count never changes, so shaders never recompile.
+    this.poolPoint = []; this.poolSpot = [];
+    for (let i = 0; i < 8; i++) { const l = new THREE.PointLight(0xffffff, 0, 10, 1.6); l.userData.pool = { src: null, fade: 0 }; scene.add(l); this.poolPoint.push(l); }
+    for (let i = 0; i < 3; i++) {
+      const l = new THREE.SpotLight(0xffffff, 0, 16, 1, 0.6, 1.6); l.userData.pool = { src: null, fade: 0 };
+      scene.add(l); scene.add(l.target); this.poolSpot.push(l);
+    }
+    this.lightSrc = []; this.lightScan = 0;
     // faint sky fill so shadowed faces keep detail (env map does most of the work)
     this.hemi = new THREE.HemisphereLight(0xb8cff0, 0x8a7458, 0.75); // blue sky above, warm sunlit bounce below
     scene.add(this.hemi);
@@ -284,10 +295,11 @@ export class Renderer {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     }
-    this.scene.traverse(o => {
-      if (o.isPointLight && o.userData.mapLight) o.visible = q.lights;
-      if (o.userData.lampLight) o.visible = q.lights;
-    });
+    // light pool size (see the constructor): none on presets without lamp lights
+    const np = !q.lights ? 0 : q.label === 'Ultra' ? 8 : q.label === 'Medium' ? 4 : 6, ns = !q.lights ? 0 : q.label === 'Medium' ? 1 : 2;
+    this.poolPoint.forEach((l, i) => { l.visible = i < np; });
+    this.poolSpot.forEach((l, i) => { l.visible = i < ns; });
+    this.lightScan = 0;
     this.applyAniso();
     this.scene.traverse(o => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach(x => { x.needsUpdate = true; }); } });
     this.aoPass.enabled = q.ao && !q.fast;
@@ -376,8 +388,90 @@ export class Renderer {
     this.vmCamera.aspect = w / h; this.vmCamera.updateProjectionMatrix();
   }
 
+  // the map's lamps: hidden markers the pool copies from (rescanned now and then, so a new map is picked up)
+  scanLights() {
+    this.lightSrc = [];
+    this.scene.traverse(o => {
+      if (!o.isLight || o.userData.pool) return;
+      if ((o.isPointLight && o.userData.mapLight) || o.userData.lampLight) { o.visible = false; this.lightSrc.push(o); }
+    });
+  }
+  updateLightPool(dt) {
+    if (--this.lightScan <= 0) { this.scanLights(); this.lightScan = 90; }
+    const cam = this.camera.position, fwd = _fwd.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const pick = (pool, isSpot) => {
+      const n = pool.reduce((k, l) => k + (l.visible ? 1 : 0), 0);
+      if (!n) return;
+      const cand = [];
+      for (const s of this.lightSrc) {
+        if (!!s.isSpotLight !== isSpot || !(s.intensity > 0)) continue;
+        const e = s.matrixWorld.elements, dx = e[12] - cam.x, dy = e[13] - cam.y, dz = e[14] - cam.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz), range = s.distance || 20;
+        if (d > range + 25) continue;
+        // lamps behind the camera matter less than the ones in view (unless you're standing in their light)
+        const behind = d > range * 0.7 && (dx * fwd.x + dy * fwd.y + dz * fwd.z) < 0;
+        cand.push({ s, score: d - range * 0.5 + (behind ? 12 : 0) });
+      }
+      cand.sort((a, b) => a.score - b.score);
+      const want = new Set(cand.slice(0, n).map(c => c.s));
+      // keep lights on the lamps they already follow; give the freed ones the newly chosen lamps (fading in)
+      const free = [];
+      for (let i = 0; i < n; i++) { const P = pool[i].userData.pool; if (P.src && want.has(P.src)) want.delete(P.src); else free.push(pool[i]); }
+      const add = [...want];
+      for (const l of free) { const P = l.userData.pool, src = add.shift() || null; if (src !== P.src) { P.src = src; P.fade = 0; } }
+      for (let i = 0; i < n; i++) {
+        const l = pool[i], P = l.userData.pool, s = P.src;
+        if (!s) { l.intensity = 0; continue; }
+        P.fade = Math.min(1, P.fade + dt * 4);
+        const e = s.matrixWorld.elements;
+        l.position.set(e[12], e[13], e[14]);
+        l.color.copy(s.color); l.intensity = s.intensity * P.fade; l.distance = s.distance; l.decay = s.decay;
+        if (isSpot) {
+          l.angle = s.angle; l.penumbra = s.penumbra;
+          const t = s.target;
+          if (t.parent) t.getWorldPosition(l.target.position); else l.target.position.copy(t.position).applyMatrix4(s.parent ? s.parent.matrixWorld : _ident);
+          l.target.updateMatrixWorld();
+        }
+      }
+    };
+    pick(this.poolPoint, false);
+    pick(this.poolSpot, true);
+  }
+
+  // GPU time per frame (EXT_disjoint_timer_query_webgl2, where the browser exposes it), read a few frames late
+  gpuBegin() {
+    const gl = this.renderer.getContext();
+    if (this.gpuExt === undefined) this.gpuExt = gl.getExtension('EXT_disjoint_timer_query_webgl2') || null;
+    const ext = this.gpuExt; if (!ext) return;
+    this.gpuQ = this.gpuQ || [];
+    for (let i = this.gpuQ.length - 1; i >= 0; i--) {
+      const q = this.gpuQ[i];
+      if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) continue;
+      if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) { const ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; this.gpuMs = this.gpuMs ? this.gpuMs * 0.9 + ms * 0.1 : ms; }
+      gl.deleteQuery(q); this.gpuQ.splice(i, 1);
+    }
+    if (this.gpuQ.length > 4) return;
+    this.gpuCur = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, this.gpuCur);
+  }
+  gpuEnd() {
+    if (!this.gpuCur) return;
+    const gl = this.renderer.getContext();
+    gl.endQuery(this.gpuExt.TIME_ELAPSED_EXT); this.gpuQ.push(this.gpuCur); this.gpuCur = null;
+  }
+
   render(dt, showViewmodel) {
     this.updateDRS();
+    this.updateLightPool(dt);
+    // draw calls for the whole frame (every pass), for the performance readout
+    const info = this.renderer.info; info.autoReset = false;
+    this.drawCalls = info.render.calls; info.reset();
+    const timing = this.timing;   // only while the readout is on (a query per frame isn't free)
+    if (timing) this.gpuBegin();
+    this.renderInner(dt, showViewmodel);
+    if (timing) this.gpuEnd();
+  }
+
+  renderInner(dt, showViewmodel) {
     // the sun's shadow map is the single biggest pass: below Ultra it refreshes every other frame
     const sm = this.renderer.shadowMap;
     if (sm.enabled) {

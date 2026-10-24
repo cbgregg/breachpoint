@@ -169,6 +169,7 @@ export class Game {
   get live() { return this.state === 'playing' || (this.state === 'paused' && this.mode !== 'local'); }
 
   applySettings(s) {
+    this.renderer.timing = !!s.showFps;   // GPU timing only while the performance readout is shown
     const q = qualityFrom(s), qk = JSON.stringify(q);
     if (qk !== this.appliedQuality) {
       this.appliedQuality = qk; this.renderer.applyQuality(q); this.effects?.setQuality(q);
@@ -485,10 +486,16 @@ export class Game {
     // the menu's live background doesn't need more than 30 fps on the Mobile path (battery, heat), and behind
     // pictures (nothing drawn) the loop only ticks along
     const cap = this.state === 'menu' && this.menuStill ? 15
+      : this.state === 'paused' && this.mode === 'local' ? Math.min(this.fpsCap || 30, 30)   // a frozen scene behind the pause menu
       : this.state === 'menu' && this.renderer.quality && this.renderer.quality.fast ? Math.min(this.fpsCap || 30, 30) : this.fpsCap;
     if (!background && cap > 0) {
       const iv = 1000 / cap;
-      if (now < (this.nextFrameT || 0) - 1) return;
+      if (now < (this.nextFrameT || 0) - 1) {
+        // between capped frames in the menus, the controller is still read every display refresh (menu
+        // navigation at the capped rate felt sluggish). In a match, input waits for the next frame as before.
+        if (!this.live) { this.input.poll(Math.min(0.05, (now - (this.lastPoll || now)) / 1000)); this.lastPoll = now; }
+        return;
+      }
       this.nextFrameT = Math.max((this.nextFrameT || 0) + iv, now - iv);
     }
     if (background) {
@@ -499,10 +506,14 @@ export class Game {
       while (left > 0.0001 && this.live) { const st = Math.min(0.05, left); this.update(st); this.input.endFrame(); left -= st; }
       return;
     }
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const gap = now - this.last, dt = Math.min(0.05, gap / 1000);
     this.last = now;
     this.frameCount = (this.frameCount || 0) + 1;
-    this.input.poll(dt);
+    // performance readout (Options > Show FPS): the longest frame in each half second, and the main thread's own time
+    const pf = this.perf || (this.perf = { worst: 0, cpu: 0, n: 0 });
+    pf.worst = Math.max(pf.worst, Math.min(gap, 2000));
+    this.input.poll(this.live ? dt : Math.min(0.05, (now - (this.lastPoll || now)) / 1000));
+    this.lastPoll = now;
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
     if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
@@ -525,6 +536,7 @@ export class Game {
     // nothing drawn while a new map's shaders compile, or behind menus showing pictures (see main.js)
     if (!this.warming && !(this.menuStill && this.state === 'menu')) this.renderer.render(dt, showVm);
     this.input.endFrame();
+    pf.cpu += performance.now() - now; pf.n++;
   }
 
   // A new map's shaders compile without freezing the page (see warm.js), and nothing 3D is drawn until they're
@@ -1479,9 +1491,7 @@ export class Game {
     // doors come after the nav grid, so bots path through doorways (and open them on the way)
     if (this.world.doors) this.doors = new Doors(this, this.world.doors);
     setCharacterDetail(this.world.textures.fabric);
-    const lit = !this.renderer.quality || this.renderer.quality.lights !== false;
-    const lamps = !!this.renderer.quality && this.renderer.quality.lights !== false;
-    this.world.group.traverse(o => { if (o.isPointLight) o.visible = lit; if (o.userData.lampLight) o.visible = lamps; });
+    this.renderer.scanLights();   // the new map's lamps feed the light pool (render.js)
     this.renderer.applyAniso();
     for (const p of this.pickups) this.scene.remove(p.mesh);
     this.pickups = [];

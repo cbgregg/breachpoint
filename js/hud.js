@@ -107,7 +107,17 @@ export class HUD {
     const g = this.game, p = g.player;
     this.updateTags();
     this.frames++; this.fpsT += dt;
-    if (this.fpsT >= 0.5) { { const r = g.renderer; const sc = r.dynamic !== false && r.drs && r.drs.scale < 0.99 ? ` · ${Math.round(r.drs.scale * 100)}% RES` : ''; const pg = g.mode === 'guest' && g.player && g.player.ping > 0 ? ` · ${g.player.ping} MS` : ''; $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS${pg}${sc}`; } this.frames = 0; this.fpsT = 0; }
+    if (this.fpsT >= 0.5) {
+      // FPS, the slowest frame (stutter shows here first), the main thread's time per frame (game code plus
+      // handing the frame to the GPU), the GPU's own time where the browser can measure it, and draw calls
+      const r = g.renderer, pf = g.perf || { worst: 0, cpu: 0, n: 0 };
+      const sc = r.dynamic !== false && r.drs && r.drs.scale < 0.99 ? ` · ${Math.round(r.drs.scale * 100)}% RES` : '';
+      const pg = g.mode === 'guest' && g.player && g.player.ping > 0 ? ` · ${g.player.ping} MS` : '';
+      const gpu = r.gpuMs > 0 ? ` · GPU ${r.gpuMs.toFixed(1)}` : '';
+      $('fps').textContent = `${Math.round(this.frames / this.fpsT)} FPS · MAX ${Math.round(pf.worst)} MS · CPU ${(pf.cpu / Math.max(1, pf.n)).toFixed(1)}${gpu} · ${r.drawCalls || 0} DRAWS${pg}${sc}`;
+      pf.worst = 0; pf.cpu = 0; pf.n = 0;
+      this.frames = 0; this.fpsT = 0;
+    }
     this.sty('fps', 'display', g.settings.showFps ? 'block' : 'none');
 
     const mine = p.team, theirs = 1 - mine;

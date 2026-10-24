@@ -123,6 +123,9 @@ Loading never freezes the page: a map's shaders compile in the background where 
 
 | Optimization | Where it applies |
 |---|---|
+| **Light pool** (`render.js`) | Every lamp on a map (street lamps, shop lights, the station's strip lights) is only a marker. A fixed pool of real lights (8 on Ultra, 6 on High, 4 on Medium, none on Low and Mobile) follows the lamps nearest the camera, fading in as they swap. Before, every lit pixel looped over all 20-29 of a map's lamps; now it's a handful, and since the light count never changes, shaders never recompile mid-match |
+| **Asset cache** (`sw.js`) | A service worker keeps models, textures, fonts and three.js on the device, so later visits start without downloading ~40 MB again. The page, scripts and styles always come from the network, so updates are never stale |
+| Menus | No 3D is drawn behind the menus (map pictures instead) or behind the loading screen; the weapon preview turns at 30 fps; weapon card pictures are encoded off the main thread; no blur or full-screen animated layers |
 | **Mobile preset** (default on phones and tablets) | Draws straight to the screen with hardware 4× MSAA instead of the post-processing chain (no float render targets or full-screen passes, where mobile GPUs spend their bandwidth); damage and flash effects become a CSS overlay. Pixel budget of 1.25 MP, so 3× screens don't render 9× the pixels; dynamic resolution still drops further when frames run long. Hard 1K shadows refreshed every third frame. Low geometry detail. Distant players animate at 30 Hz from 14 m and 15 Hz from 32 m. The menu background runs at 30 fps |
 | Render path (Custom) | *Full post-processing* or *Fast (MSAA)*. Switching restarts the game from the menu, because MSAA belongs to the WebGL context |
 | Geometry detail (Custom) | *Low*: square-edged world boxes (12 triangles instead of ~108), 36-triangle sandbags instead of 300, a lighter distant mountain, small props stop casting sun shadows, other players' guns use flat boxes and fewer curve segments. The map rebuilds when it changes from the menu |
@@ -161,7 +164,9 @@ A breadcrumb over each page shows where you are (PLAY › SEARCH & DESTROY, OPTI
 
 **Play now vs bots** on the game-type screen starts a match against bots with your last setup (mode, map, difficulty): two presses from the title screen.
 
-The menus show slowly drifting screenshots of the maps instead of drawing the 3D map behind them, so browsing menus costs the graphics card almost nothing (and nothing at all is drawn behind the loading screen). Options → Graphics → *Menu background* → *Live 3D* brings the live view back.
+The menus follow Modern Warfare (2019 / III): the page name over large tabs, a player card at the top right, playlist tiles with map art, flat dark panels, a pale selection bar and the menu colour kept for the main actions (Start match, Play now). Fonts (Barlow and Barlow Condensed, OFL) ship in `assets/fonts`, so the look doesn't depend on a third-party font service. The style layer is `css/mw.css`, loaded after `css/style.css`.
+
+The menus show screenshots of the maps instead of drawing the 3D map behind them, so browsing menus costs the graphics card almost nothing (and nothing at all is drawn behind the loading screen). Options → Graphics → *Menu background* → *Live 3D* brings the live view back.
 
 ### When something goes wrong
 
@@ -390,6 +395,7 @@ npx serve .            # or: python3 -m http.server 8000
 
 - Developed by cbgregg. Artificial intelligence was used to assist with development of this project.
 - Soldier model and animations (`assets/models/soldier.glb`): the *Soldier* sample from the [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf), a Mixamo character. Mixamo assets are royalty-free for use in projects under Adobe's terms; check those terms before commercial use, or swap in your own rigged `.glb` with a Mixamo skeleton.
+- Fonts (`assets/fonts/`): [Barlow and Barlow Condensed](https://github.com/jpt/barlow) (The Barlow Project Authors), SIL Open Font License 1.1 (`assets/fonts/OFL.txt`), from the Fontsource packages.
 - Peer-to-peer matchmaking: [Trystero](https://github.com/dmotz/trystero) by Dan Motzenbecker (MIT), vendored in `lib/`.
 - First-person hands (`assets/models/hands.glb`, `assets/textures/hands/`): a rigged, textured hand model ("Rigged Hand", 2015) supplied by the project owner, converted to glTF with only the right hand kept (the left is the same mesh mirrored) and driven by the game's own grip poses and arm IK. Check the original model's license before commercial use.
 - Surface textures (`assets/textures/`): CC0 sets from [ambientCG](https://ambientcg.com) (Asphalt014, Concrete047A, Plaster003, CorrugatedSteel009, Ground037, Fabric049/061/066, Rubber001) and [Poly Haven](https://polyhaven.com) (red_brick_03, green_metal_rust, wood_planks, weathered_brown_planks, cobblestone_floor_08), resized and recolored for the maps. Floor and wall tile sets supplied by the project owner (tiles_0002, 0007, 0009, 0013, 0043, 0059, 0061, 0062, 0063, marble_0001, 0013): supermarket floors and walls, house floors.

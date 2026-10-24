@@ -895,7 +895,7 @@ const OPT_DESC = {
   'opt-gfxdetail': 'Low: the world uses square-edged boxes and lighter sandbags, small props stop casting shadows, and other players\' guns use simpler geometry. Rebuilds the map.',
   'opt-gfxres': 'Renders the 3D view at this share of your screen\'s pixels. Lower runs faster; over 100% supersamples for sharper edges.',
   'opt-gfxshadows': 'Resolution of the sun\'s shadows. Higher is crisper and costs more GPU time. Off is fastest.',
-  'opt-fps': 'Shows frames per second in the corner (and your ping when you join someone\'s online match).',
+  'opt-fps': 'Shows performance in the corner: frames per second, the slowest frame (stutters show up here), the time your CPU spends on each frame, the GPU\'s time where the browser can measure it, and draw calls. Your ping too when you join someone\'s online match. If the game feels slow, a screenshot of this tells us why.',
   'opt-fpscap': 'Caps the frame rate to save power and heat. Unlimited follows your display.',
   'opt-menubg': 'Pictures: screenshots of the maps behind the menus, nothing drawn in 3D until you play (smooth menus on any machine). Live 3D: the map itself, slowly flying round (uses the graphics card the whole time you are in the menus).',
   'opt-fov': 'How wide your view is. Higher shows more around you; lower makes distant targets bigger.',
@@ -2889,6 +2889,10 @@ syncAccount();
     else { afterSignin = () => openLobby(); openSignin(); }
   } else showScreen('title');
   account.refresh().then(() => heartbeat(true));
+}
+// models, textures and fonts stay on the device between visits (sw.js); not inside the desktop/offline build
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.BREACHPOINT_OFFLINE) {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* private mode or blocked: downloads as before */ });
 }
 // the game started: forget the start-up count (a few seconds on, so a crash drawing the first menu frames counts)
 setTimeout(() => {
