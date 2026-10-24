@@ -324,7 +324,7 @@ export async function auditMap(game, opts = {}) {
     for (const [name, p] of spots) {
       const body = physics.overlap(p.x, p.y + 0.05, p.z, 0.3, 1.7);
       let floor = false;
-      physics.near(p.x - 0.1, p.z - 0.1, p.x + 0.1, p.z + 0.1, (s) => { if (s.maxy <= p.y + 0.05 && s.maxy > p.y - 0.4 && p.x > s.minx && p.x < s.maxx && p.z > s.minz && p.z < s.maxz) floor = true; });
+      physics.near(p.x - 0.1, p.z - 0.1, p.x + 0.1, p.z + 0.1, (s) => { if (s.maxy <= p.y + 0.05 && s.maxy > p.y - 0.4 && p.x >= s.minx && p.x <= s.maxx && p.z >= s.minz && p.z <= s.maxz) floor = true; });
       if (body || !floor) report('bad-spot', p, { what: name, problem: body ? 'inside ' + (body.src || 'a box') : 'no floor under it' });
     }
 
