@@ -1,0 +1,250 @@
+/* =====================================================================================
+   MODERN WARFARE STYLE (loaded after style.css and overrides its menu look)
+   Flat, quiet panels; white selection; one accent colour used sparingly; condensed type with
+   modest tracking; no scanlines, glows, gradient slabs, clipped corners or blur. Everything here is
+   cheap to draw: no backdrop-filter, no full-screen animated layers.
+   ===================================================================================== */
+@font-face { font-family: 'Barlow Condensed'; font-weight: 500; font-display: swap; src: url('../assets/fonts/barlow-condensed-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 600; font-display: swap; src: url('../assets/fonts/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-display: swap; src: url('../assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-weight: 400; font-display: swap; src: url('../assets/fonts/barlow-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-weight: 500; font-display: swap; src: url('../assets/fonts/barlow-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-weight: 600; font-display: swap; src: url('../assets/fonts/barlow-latin-600-normal.woff2') format('woff2'); }
+
+:root {
+  --mw-panel: rgba(16, 18, 20, 0.8);
+  --mw-panel-2: rgba(24, 27, 30, 0.9);
+  --mw-hover: rgba(255, 255, 255, 0.07);
+  --mw-line: rgba(255, 255, 255, 0.09);
+  --mw-ink: #f2f2f0;
+  --mw-dim: #a9abac;
+  --mw-faint: #6f7275;
+  --mw-sel: #ecece8;          /* selection: a pale bar with dark text */
+  --mw-sel-ink: #0c0d0e;
+  --mw-acc: var(--bo, #f7941d);
+  --mw-pad: clamp(16px, 3.4vw, 64px);
+  --bo-panel: var(--mw-panel); --bo-panel2: var(--mw-panel-2); --bo-line: var(--mw-line);
+  --bo-ink: var(--mw-ink); --bo-dim: var(--mw-dim); --bo-faint: var(--mw-faint);
+}
+
+/* ---------- global clean-up ---------- */
+#bo-fx { display: none !important; }
+#menu-bg i.on { animation: none; }
+#menu-bg i { inset: 0; }
+#menu-bg::after { background: linear-gradient(90deg, rgba(7, 8, 9, 0.88) 0%, rgba(7, 8, 9, 0.55) 48%, rgba(7, 8, 9, 0.2) 100%), linear-gradient(0deg, rgba(7, 8, 9, 0.75) 0%, rgba(7, 8, 9, 0) 30%); }
+#pause, #end, #signin, #feedback, #report, #notice { backdrop-filter: none !important; }
+#pause, #end { background: rgba(6, 7, 8, 0.82); }
+#signin, #feedback, #report, #notice { background: rgba(6, 7, 8, 0.86); }
+.mw, .mw * { text-shadow: none; }
+#menu, #mode, #lobby { background: none; }
+:focus-visible, .pad-focus { outline: 2px solid var(--mw-ink); outline-offset: 2px; }
+
+/* ---------- type ---------- */
+.bo-title { gap: 2px; padding-bottom: 0; }
+.bo-title::after { display: none; }
+.bo-title b { font-family: var(--display); font-weight: 600; font-size: clamp(26px, 2.6vw, 38px); letter-spacing: 0.02em; line-height: 1; color: var(--mw-ink); }
+.bo-title small { order: -1; font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.14em; color: var(--mw-dim); }
+.pane-title { font-weight: 600; font-size: clamp(24px, 2.2vw, 32px); letter-spacing: 0.02em; color: var(--mw-ink); }
+.pane-sub, .pane-note { color: var(--mw-dim); font-size: 14px; line-height: 1.45; }
+.group, .sec-k { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.16em; color: var(--mw-dim); border-bottom: 1px solid var(--mw-line); padding-bottom: 4px; }
+
+/* ---------- menu frame: page name, big tabs, player card, prompts along the bottom ---------- */
+#menu .mw { padding: clamp(14px, 2.6vw, 40px) var(--mw-pad) clamp(10px, 2vw, 24px); gap: clamp(10px, 1.6vw, 20px); }
+#menu .mw-head { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px 24px; }
+#menu .mw-head .tabs { grid-row: 2; }
+.tabs { background: none; border: 0; padding: 0; gap: clamp(14px, 2vw, 32px); }
+.tab { font-family: var(--display); font-weight: 600; font-size: clamp(22px, 2.3vw, 34px); letter-spacing: 0.03em; padding: 2px 0 6px; color: var(--mw-faint); background: none !important; border-bottom: 3px solid transparent; transition: color .12s; }
+.tab:hover { color: var(--mw-dim); }
+.tab.on { color: var(--mw-ink); border-bottom-color: var(--mw-ink); }
+.tab.pad-focus { outline: none; color: var(--mw-ink); }
+
+/* player card */
+.pcard { background: var(--mw-panel); border: 1px solid var(--mw-line); border-right: 0; padding: 6px 16px 6px 6px; gap: 12px; }
+.pcard:hover, .pcard.pad-focus { background: var(--mw-hover); }
+.pc-emb { width: 44px; height: 44px; font-size: 24px; font-weight: 600; color: var(--mw-sel-ink); background: var(--mw-acc); clip-path: none; }
+.pc-txt b { font-weight: 600; font-size: 20px; letter-spacing: 0.03em; }
+.pc-txt small { font-size: 11px; letter-spacing: 0.12em; color: var(--mw-dim); }
+
+/* prompts */
+.mw-foot { background: none; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--mw-line); font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: 0.08em; color: var(--mw-dim); gap: 22px; }
+.mw-foot kbd, kbd { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 3px; color: var(--mw-ink); font-size: 12px; padding: 1px 6px; }
+.mw.narrow .mw-foot, .mw.wide .mw-foot { border-top: 0; }
+
+/* ---------- controls: one quiet panel style, pale selection ---------- */
+.menu-btn, .mp, .wcard, .mode-card, .row, .intel, .mw.narrow, .mw.wide, .notice, .prow, .pm-score, .gs-stats, .gs-view {
+  background: var(--mw-panel); border: 1px solid var(--mw-line); border-radius: 0; box-shadow: none; }
+.intel, .mw.narrow, .mw.wide { border-top: 1px solid var(--mw-line); }
+.menu-btn { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: 0.06em; padding: 12px 16px; color: var(--mw-ink); transition: background .1s, color .1s; }
+.menu-btn small { font-size: 11px; letter-spacing: 0.1em; color: var(--mw-dim); }
+.menu-btn:hover, .menu-btn.pad-focus, .menu-btn:focus-visible,
+.mp:hover, .mp.pad-focus, .mp:focus-visible,
+.wcard:hover, .wcard.pad-focus, .wcard:focus-visible,
+.keypad button:not(:disabled):hover, .keypad button.pad-focus, .keypad button:focus-visible,
+.prow button:hover, .prow button.pad-focus, .dbtn:hover,
+.wcard.wcard:is(.pad-focus, :hover, :focus-visible), .mp.mp:is(.pad-focus, :hover, :focus-visible), .menu-btn.psec:is(.pad-focus, :hover, :focus-visible) {
+  background: var(--mw-sel); color: var(--mw-sel-ink); border-color: var(--mw-sel); outline: none; }
+.menu-btn.pad-focus::before, .mp.pad-focus::before, .wcard.pad-focus::before, .mode-card.pad-focus::before, .psec.pad-focus::before { display: none; }
+.menu-btn.danger { color: #ff8f80; }
+.menu-btn.danger:hover, .menu-btn.danger.pad-focus { background: #d8392f; color: #fff; border-color: #d8392f; }
+.menu-btn.armed { background: #d8392f !important; color: #fff !important; border-color: #d8392f !important; }
+
+/* the primary action: a flat accent slab, no clipped corner */
+.cta { clip-path: none; background: var(--mw-acc); color: var(--mw-sel-ink); font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.08em; padding: 14px 20px; border: 2px solid transparent; transition: filter .1s; }
+.cta:hover, .cta.pad-focus, .cta:focus-visible { background: var(--mw-acc); filter: brightness(1.12); border-color: var(--mw-ink); box-shadow: none; outline: none; }
+body.mode-online #quick-btn { clip-path: none; background: var(--mw-acc); color: var(--mw-sel-ink); }
+body.mode-online #quick-btn:hover, body.mode-online #quick-btn.pad-focus { background: var(--mw-acc); filter: brightness(1.12); box-shadow: inset 0 0 0 2px var(--mw-ink); }
+
+/* option rows */
+.row { border: 0; border-left: 3px solid transparent; min-height: 48px; margin: 0; }
+.row:hover { background: var(--mw-hover); }
+.row:focus-within, .row.pad-row { background: rgba(255, 255, 255, 0.1); border-left-color: var(--mw-ink); }
+.row label { color: var(--mw-dim); font-size: 14px; letter-spacing: 0.04em; }
+.row.pad-row label, .row:focus-within label { color: var(--mw-ink); }
+.rows { gap: 2px; }
+select, input[type=text], input:not([type]) { background-color: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.14); font-weight: 600; letter-spacing: 0.03em; }
+select { background-image: linear-gradient(45deg, transparent 50%, var(--mw-ink) 50%), linear-gradient(135deg, var(--mw-ink) 50%, transparent 50%); }
+.pad-focus:is(select, input) { outline: 2px solid var(--mw-ink); }
+input[type=range], input[type=checkbox] { accent-color: var(--mw-acc); }
+
+/* ---------- Play: playlist tiles with map art (MW2019) ---------- */
+.tiles { gap: 6px; }
+.tile { min-height: 96px; padding: 14px 22px; border: 1px solid var(--mw-line); border-left: 0; background: #111315; transition: none; transform: none !important; }
+.tile::before { background: linear-gradient(90deg, rgba(10, 11, 12, 0.94) 0%, rgba(10, 11, 12, 0.72) 50%, rgba(10, 11, 12, 0.2) 100%); transition: none; }
+.tile .art { opacity: 0.9; transition: none; transform: none !important; }
+.tile small { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.14em; color: var(--mw-dim); }
+.tile b { font-weight: 600; font-size: clamp(24px, 2.2vw, 32px); letter-spacing: 0.02em; }
+.tile span { color: var(--mw-dim); font-size: 13px; }
+.tile:hover, .tile.pad-focus, .tile:focus-visible { outline: 2px solid var(--mw-ink); outline-offset: -2px; border-color: transparent; }
+.tile:hover::before, .tile.pad-focus::before, .tile:focus-visible::before { background: linear-gradient(90deg, rgba(10, 11, 12, 0.86) 0%, rgba(10, 11, 12, 0.5) 50%, rgba(10, 11, 12, 0) 100%); }
+.tile:hover span, .tile.pad-focus span { color: var(--mw-ink); }
+.tile.cur::after { top: 12px; right: 14px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; color: var(--mw-sel-ink); background: var(--mw-sel); padding: 2px 7px; }
+body.mode-online #play-tiles .tile { outline-offset: 2px; }
+body.mode-online #play-tiles .tile b { font-weight: 600; }
+
+/* intel panel (right) */
+.intel { padding: 16px; gap: 8px 14px; }
+.intel-k { color: var(--mw-faint); font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.14em; }
+.intel-v { font-weight: 600; font-size: 18px; letter-spacing: 0.02em; }
+.intel-map canvas { border: 0; }
+#menu .intel { border-top: 3px solid var(--mw-ink); }
+
+/* mode picker / weapon cards */
+.mode-pick .mp { background: var(--mw-panel); border: 1px solid var(--mw-line); border-bottom: 3px solid transparent; }
+.mode-pick .mp.on { background: rgba(255, 255, 255, 0.09); border-bottom-color: var(--mw-ink); }
+.mode-pick .mp b { font-weight: 600; letter-spacing: 0.03em; }
+.wcard { border: 1px solid var(--mw-line); border-left: 3px solid transparent; }
+.wcard.on { border-left-color: var(--mw-ink); background: rgba(255, 255, 255, 0.08); }
+.wcard.on .wa { color: var(--mw-ink); }
+.wcard .wn { font-weight: 600; letter-spacing: 0.03em; }
+.stat i b { background: var(--mw-ink); }
+
+/* ---------- title screen: logo low and left over the key art, a quiet prompt ---------- */
+#title { align-items: flex-start; justify-content: flex-end; padding: 0 var(--mw-pad) clamp(70px, 14vh, 150px);
+  background: linear-gradient(0deg, rgba(7, 8, 9, 0.9) 0%, rgba(7, 8, 9, 0.35) 45%, rgba(7, 8, 9, 0) 70%), linear-gradient(90deg, rgba(7, 8, 9, 0.6) 0%, rgba(7, 8, 9, 0) 60%); }
+.title-wrap { align-items: flex-start; text-align: left; padding: 0; gap: 8px; }
+.title-logo { font-weight: 700; font-size: clamp(48px, 7.4vw, 120px); letter-spacing: 0.06em; padding-left: 0; gap: 0.16em; }
+.title-logo .mark { width: 0.14em; height: 0.14em; background: var(--mw-acc); box-shadow: none; }
+.title-sub { font-weight: 600; font-size: clamp(13px, 1.4vw, 18px); letter-spacing: 0.24em; padding-left: 0; color: var(--mw-dim); }
+.title-pa { margin-top: 2px; }
+.title-press { margin-top: clamp(28px, 6vh, 60px); padding-left: 0; font-size: clamp(16px, 1.6vw, 20px); letter-spacing: 0.16em; color: var(--mw-ink); animation: pulse 2.4s ease-in-out infinite; }
+.title-foot { left: var(--mw-pad); right: auto; text-align: left; bottom: clamp(20px, 4vh, 40px); color: var(--mw-faint); }
+
+/* ---------- game type: big key-art cards (MW's launcher) ---------- */
+#mode .mode-wrap { justify-content: center; padding: clamp(16px, 3vw, 48px) var(--mw-pad); }
+.mode-wrap .mw-head { position: static; margin-bottom: clamp(10px, 2vh, 24px); }
+.mode-quick, .mode-card { position: relative; overflow: hidden; isolation: isolate; }
+.mode-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1180px; }
+.mode-card { min-height: clamp(220px, 34vh, 340px); padding: 22px 24px; justify-content: flex-end; border: 1px solid var(--mw-line); background: #111315 center / cover no-repeat; transition: none; }
+#mode-offline { background-image: url('../assets/loading/tarsa-1.jpg'); }
+#mode-online { background-image: url('../assets/loading/pioneer-1.jpg'); }
+.mode-card::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(8, 9, 10, 0.95) 0%, rgba(8, 9, 10, 0.55) 55%, rgba(8, 9, 10, 0.25) 100%); }
+.mode-card:hover, .mode-card.pad-focus, .mode-card:focus-visible { background-color: #111315; outline: 2px solid var(--mw-ink); outline-offset: -2px; transform: none; border-color: transparent; }
+.mode-card:hover::before, .mode-card.pad-focus::before { background: linear-gradient(0deg, rgba(8, 9, 10, 0.9) 0%, rgba(8, 9, 10, 0.3) 60%, rgba(8, 9, 10, 0.05) 100%); }
+.mode-card .mc-k { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.16em; color: var(--mw-dim) !important; }
+.mode-card .mc-t { font-weight: 600; font-size: clamp(30px, 3.2vw, 46px); letter-spacing: 0.02em; }
+.mode-card .mc-d { margin-top: 2px; color: var(--mw-dim); font-size: 14px; max-width: 46ch; }
+.mode-quick { max-width: 1180px; margin: 0 0 12px; min-height: 120px; padding: 20px 24px; align-items: flex-start; justify-content: flex-end; gap: 4px; text-align: left;
+  font-family: var(--display); font-weight: 700; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: 0.03em; color: var(--mw-sel-ink); background: var(--mw-acc); border: 2px solid transparent; }
+.mode-quick small { font-size: 12px; letter-spacing: 0.14em; color: rgba(12, 13, 14, 0.72); font-weight: 600; }
+.mode-quick:hover, .mode-quick.pad-focus, .mode-quick:focus-visible { background: var(--mw-acc); color: var(--mw-sel-ink); filter: brightness(1.1); border-color: var(--mw-ink); outline: none; }
+.mode-extra { max-width: 1180px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mode-extra .menu-btn { align-items: flex-start; font-size: 18px; padding: 14px 18px; }
+.mode-cf { display: none; }
+#mode .mw-foot { position: static; margin-top: clamp(10px, 2vh, 24px); max-width: 1180px; }
+@media (max-width: 700px) { .mode-cards, .mode-extra { grid-template-columns: 1fr; } .mode-card { min-height: 150px; } .mode-quick { min-height: 84px; } }
+
+/* ---------- pause, end, lobby, dialogs ---------- */
+.mw.narrow, .mw.wide { border-top: 3px solid var(--mw-ink); }
+.pause-nav .menu-btn { background: transparent; border-color: transparent; border-left: 3px solid transparent; }
+.menu-btn.psec.on { border-left-color: var(--mw-ink); background: rgba(255, 255, 255, 0.08); }
+.pause-nav .cta { font-size: 19px; }
+#end .mw.wide { border-top: 3px solid var(--mw-ink); }
+#end-title, .pm-team b { text-shadow: none; }
+#end-mvp { color: var(--mw-ink); }
+#lobby { background: linear-gradient(90deg, rgba(7, 8, 9, 0.9) 0%, rgba(7, 8, 9, 0.55) 50%, rgba(7, 8, 9, 0.2) 100%); }
+#notice .bo-title b, .signin .bo-title b { font-size: clamp(24px, 3vw, 34px); }
+
+/* ---------- loading: no glow, flat bar ---------- */
+.load-logo::before { box-shadow: none; }
+#loading .load-bar { height: 3px; }
+#loading .load-bar i { background: var(--mw-ink); box-shadow: none; }
+.ld-name { font-weight: 600; letter-spacing: 0.02em; }
+.ld-mode, .ld-tip b { color: var(--mw-dim); letter-spacing: 0.16em; }
+.ld-map { border: 0; border-top: 3px solid var(--mw-ink); }
+.ld-map canvas { filter: none; }
+
+/* ---------- small chrome ---------- */
+.pa-chip { background: transparent; color: var(--mw-dim); border: 1px solid rgba(255, 255, 255, 0.22); font-family: var(--display); font-weight: 600; letter-spacing: 0.14em; }
+.support { background: none !important; border: 0 !important; justify-content: flex-start !important; left: var(--mw-pad) !important; right: auto !important; width: auto !important; padding: 0 !important; bottom: 8px !important; opacity: 0.75; }
+.support .sp-msg { display: none; }
+.support .sp-coffee { color: var(--mw-dim); font-weight: 600; letter-spacing: 0.1em; }
+.side-btn { background: var(--mw-panel); border: 1px solid var(--mw-line); border-right: 0; box-shadow: none; }
+.side-btn:hover { background: var(--mw-hover); }
+.cf-badge { border-color: var(--mw-line); background: transparent; }
+.gpu-warn.offer { border: 1px solid var(--mw-line); border-left: 3px solid var(--mw-acc); background: rgba(16, 18, 20, 0.97); }
+.gpu-warn.offer b { color: var(--mw-ink); letter-spacing: 0.1em; }
+
+/* Inside the menus the theme colour is kept for the main actions (CTA, Play now, the player emblem); every
+   small label, border and tint that used it goes neutral, as in MW. (The HUD keeps the theme colour.) */
+body { --mw-acc: var(--bo); }
+.screen, #side, .side-btn, .support, .dd, .top-notes, #apply-dlg {
+  --bo: #e6e6e1; --bo-hi: #ffffff; --bo-deep: #b6b7b3; --bo-pale: #ffffff; --bo-rgb: 230, 230, 225; --amber: #e6e6e1; }
+.pc-emb, .title-logo .mark { background: var(--mw-acc); }
+.cls-row.eq .cr-n::before { color: var(--mw-acc); }
+.pips i { border-color: var(--mw-dim); } .pips i.on { background: var(--mw-ink); }
+/* lists sit in one panel, rows divided by hairlines (no see-through gaps) */
+.rows { gap: 0; background: var(--mw-panel); border: 1px solid var(--mw-line); }
+.rows > .row { background: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.rows > .row:last-child { border-bottom: 0; }
+.rows > .group { margin: 0; padding: 14px 12px 6px; border-bottom: 1px solid var(--mw-line); background: rgba(0, 0, 0, 0.2); }
+.rows > .row:hover { background: var(--mw-hover); }
+.rows > .row:focus-within, .rows > .row.pad-row { background: rgba(255, 255, 255, 0.1); }
+.subtab { font-family: var(--display); font-weight: 600; letter-spacing: 0.08em; }
+.opt-desc { border-top: 3px solid var(--mw-ink); }
+.crumbs { color: var(--mw-faint); }
+.crumbs b { color: var(--mw-ink); }
+/* the class editor's primary buttons */
+.cls-eq, #cls-equip { clip-path: none; }
+/* an equipped class: the button reads as a state, not an action */
+.cls-actions .cta.done { filter: none; background: transparent; color: var(--mw-ink); border: 1px solid var(--mw-line); }
+/* the pre-alpha tag already sits in the corner of every menu */
+.title-pa { display: none; }
+
+/* pause and end of match: the HUD (countdown, scores, minimap) doesn't show through, the support strip stays in
+   the main menus, and the pause panel scrolls inside the screen instead of running off the bottom */
+body:has(#pause.on) #hud, body:has(#end.on) #hud { visibility: hidden; }
+body:has(#pause.on) .support, body:has(#end.on) .support, body:has(#lobby.on) .support { display: none !important; }
+#pause, #end { background: rgba(6, 7, 8, 0.86); }
+.pause-body { grid-template-rows: minmax(0, 1fr); }
+.pause-panel { height: 100%; max-height: 100%; }
+.pause-nav .menu-btn { font-size: 18px; }
+/* narrow windows and phones: the card shrinks to its emblem beside the page name, tabs tighten, and the support
+   strip (also under Options > About) gives the space to the prompts */
+@media (max-width: 600px) {
+  .tabs { gap: 16px; }
+  .tab { font-size: 21px; }
+  .pcard { padding: 3px; }
+  .pc-emb { width: 34px; height: 34px; font-size: 18px; }
+  .support { display: none !important; }
+  .mode-quick { font-size: 24px; }
+}

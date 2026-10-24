@@ -20,7 +20,7 @@ export class GunPreview {
       this.r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
     } catch (_) { return false; }
     const r = this.r;
-    r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -72,6 +72,8 @@ export class GunPreview {
     const loop = (now) => {
       this.raf = 0;
       if (!this.canvas.offsetParent) return; // hidden: stop until shown again
+      // a slow turntable doesn't need more than 30 fps (it shares the GPU with the menus)
+      if (now - last < 31) { this.raf = requestAnimationFrame(loop); return; }
       this.t += Math.min(0.05, (now - last) / 1000);
       last = now;
       this.resize();
@@ -131,7 +133,9 @@ export async function gunThumb(id, att) {
     thumbCam.position.set(0, d * 0.08, d); thumbCam.lookAt(0, 0, 0);
     try { await compileGently(thumbR, thumbScene, thumbCam); } catch (_) { /* compiles on the draw instead */ }
     thumbR.render(thumbScene, thumbCam);
-    url = thumbR.domElement.toDataURL('image/png');
+    // encoded off the main thread (toDataURL blocked the page for each card)
+    const blob = await new Promise(r => thumbR.domElement.toBlob(r, 'image/webp', 0.9));
+    url = blob ? URL.createObjectURL(blob) : '';
     thumbScene.remove(g);
   } catch (_) { url = ''; }
   thumbCache.set(key, url);

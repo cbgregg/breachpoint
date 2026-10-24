@@ -233,7 +233,7 @@ export class Effects {
     this.scorchIdx = 0;
 
     this.lights = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 2; i++) {   // two: every light is paid for on every lit pixel, even when it's off
       const l = new THREE.PointLight(0xffb060, 0, 10, 2);
       scene.add(l);
       this.lights.push({ l, life: 0, max: 1, peak: 0 });

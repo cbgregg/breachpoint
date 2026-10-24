@@ -22,10 +22,11 @@
   <meta name="theme-color" content="#0b0d0e">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0d0e'/%3E%3Cpath d='M32 8v14M32 42v14M8 32h14M42 32h14' stroke='%23e8e4da' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23ff4d4d'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- fonts ship with the game (no third-party request, and never the fallback look when it's blocked) -->
+  <link rel="preload" href="assets/fonts/barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mw.css">
   <script type="importmap">
     {
       "imports": {
@@ -142,7 +143,7 @@
   <!-- ============ Offline / online ============ -->
   <div id="mode" class="screen">
     <div class="mw mode-wrap">
-      <header class="mw-head"><div class="bo-title"><b>BREACHPOINT</b><small>SELECT GAME TYPE</small></div></header>
+      <header class="mw-head"><div class="bo-title"><b>SELECT GAME TYPE</b><small>BREACHPOINT</small></div></header>
       <!-- straight into a match against bots with the last setup: two presses from the title screen -->
       <button class="menu-btn mode-quick" id="mode-quick" data-nav>▶ PLAY NOW VS BOTS <small id="mode-quick-d"></small></button>
       <div class="mode-cards">
@@ -464,7 +465,7 @@
             <div class="row"><label for="opt-fov">Field of view <output id="out-fov"></output></label><input type="range" id="opt-fov" min="65" max="110" step="1" data-nav></div>
             <div class="row touch-hide"><label for="opt-vmfov">Weapon FOV <output id="out-vmfov"></output></label><input type="range" id="opt-vmfov" min="55" max="90" step="1" data-nav></div>
             <div class="row"><label for="opt-dynres">Dynamic resolution<small>Lowers render resolution when the frame rate drops</small></label><input type="checkbox" id="opt-dynres" data-nav></div>
-            <div class="row"><label for="opt-fps">FPS counter</label><input type="checkbox" id="opt-fps" data-nav></div>
+            <div class="row"><label for="opt-fps">Performance readout</label><input type="checkbox" id="opt-fps" data-nav></div>
             <div class="row"><label for="opt-collision">Show collision<small>Outlines every wall and solid object, so invisible walls show up</small></label><input type="checkbox" id="opt-collision" data-nav></div>
             <div class="row touch-hide"><label for="opt-fullscreen">Fullscreen in matches<small>Lets Ctrl crouch safely: Ctrl+W can't close the tab. Hold Esc to leave fullscreen</small></label><input type="checkbox" id="opt-fullscreen" data-nav></div>
             <div class="group">AIMING</div>
