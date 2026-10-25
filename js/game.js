@@ -12,6 +12,10 @@ import { hitPower } from './motion.js';
 import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadout } from './attachments.js';
 const INF_LOADOUT = soloLoadout('blade');   // Infected: a combat knife in both slots (fire slashes)
 import { BotBrain } from './bot.js';
+// the five announcers and the twelve operator voices (recorded by tools/gen_voice.py: the same keys there)
+export const ANNOUNCERS = ['control', 'sable', 'ghost', 'hype', 'nova'];
+export const VOICES = ['emma', 'davis', 'aria', 'steffan', 'jenny', 'adam', 'tessa', 'tyler', 'mila', 'colin', 'tiana', 'jimmie'];
+const nameHash = (n) => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
 import { Effects } from './effects.js';
@@ -173,6 +177,10 @@ export class Game {
   get live() { return this.state === 'playing' || (this.state === 'paused' && this.mode !== 'local'); }
 
   applySettings(s) {
+    // the announcer: one of the five, or a different one every match; whichever is next loads ahead of time
+    this.announcerSetting = s.announcer || 'random';
+    this.operatorVoice = VOICES.includes(s.voice) ? s.voice : null;
+    if (!this.announcerPack || (this.announcerSetting !== 'random' && this.announcerPack !== this.announcerSetting)) this.pickAnnouncer();
     this.renderer.timing = !!s.showFps;   // GPU timing only while the performance readout is shown
     const q = qualityFrom(s), qk = JSON.stringify(q);
     if (qk !== this.appliedQuality) {
@@ -306,6 +314,9 @@ export class Game {
     this.setIntroLabel();
     // the announcer names the mode; a couple of your squad have something to say while the countdown runs
     this.leadTeam = -1;
+    this.matchAnnouncer = this.announcerPack;
+    if (this.announcerSetting === 'random') this.pickAnnouncer();   // (the next match's, loading now)
+    this.assignVoices();
     this.announce(`mode_${this.settings.mode}`);
     const squad = this.characters.filter(c => c.isBot && (this.ffa || c.team === this.player.team)), token = (this.matchToken = (this.matchToken || 0) + 1);
     for (const [i, ms] of [[0, 3500], [1, 6800]]) setTimeout(() => { if (this.matchToken === token && this.live && squad[i]) this.callout(squad[(i + ((Math.random() * squad.length) | 0)) % squad.length], 'banter'); }, ms);
@@ -1302,7 +1313,24 @@ export class Game {
   // announcer lines are named after the banner or medal they go with: 'DOUBLE KILL' -> vo/announcer/double_kill
   announce(what) {
     const id = String(what).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    if (id) this.audio.play('vo', null, { id: `vo/announcer/${id}`, ui: true, announcer: true });
+    if (id) this.audio.play('vo', null, { id: `vo/announcer/${this.matchAnnouncer || this.announcerPack}/${id}`, ui: true, announcer: true });
+  }
+  pickAnnouncer() {
+    const s = this.announcerSetting, others = ANNOUNCERS.filter(a => a !== this.announcerPack);
+    this.announcerPack = ANNOUNCERS.includes(s) ? s : others[(Math.random() * others.length) | 0];
+    this.audio.want(`vo/announcer/${this.announcerPack}/`);
+  }
+  // every character keeps one voice for the match, nobody sharing one while there are voices to go round; handed
+  // out by name, so every machine online gives the bots the same voices (yours is your choice in Options)
+  assignVoices() {
+    const used = new Set(), list = [...this.characters].sort((a, b) => (b === this.player) - (a === this.player) || String(a.name).localeCompare(String(b.name)));
+    for (const c of list) {
+      let i = nameHash(c.name) % VOICES.length;
+      for (let k = 0; k < VOICES.length && used.has(VOICES[i]); k++) i = (i + 1) % VOICES.length;
+      c.voice = c === this.player && this.operatorVoice ? this.operatorVoice : VOICES[i];
+      used.add(c.voice);
+      this.audio.want(`vo/chatter/${c.voice}/`);
+    }
   }
   // a character's callout (reloading, frag out, contact...), heard from where they are: not too often from
   // anyone, and not on top of each other
@@ -1311,7 +1339,8 @@ export class Game {
     const t = this.time;
     if (!remote && (t - (c.calloutT ?? -9) < 3.5 || t - (this.calloutT ?? -9) < 1.2)) return;
     c.calloutT = t; this.calloutT = t;
-    const id = `vo/${c.infected ? 'infected' : 'chatter'}/${kind}`, me = c === this.player;
+    if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
+    const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, me = c === this.player;
     this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 });
     if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);
   }

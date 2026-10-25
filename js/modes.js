@@ -576,6 +576,7 @@ class RoundMode {
         const sub = this.id === 'snd' ? (this.attack === mine ? 'ATTACK · PLANT THE BOMB AT A OR B' : 'DEFEND · PROTECT SITES A AND B')
           : 'SAME LOADOUT FOR EVERYONE · ONE LIFE';
         ui(last ? 'FINAL ROUND' : `ROUND ${this.round}`, mp ? `MATCH POINT · ${sub}` : sub, '');
+        if (mp) g.announce('match_point');
         break;
       }
       case 'half': g.hud.medal('SWITCHING SIDES', 'HALFTIME'); break;

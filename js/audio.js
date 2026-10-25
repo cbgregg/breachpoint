@@ -27,6 +27,7 @@ export class GameAudio {
     this.volume = 0.7;
     this.listener = { x: 0, y: 0, z: 0, yaw: 0 };
     this.voices = 0;
+    this.wanted = new Map();   // voice packs asked for: prefix -> { done }
   }
 
   init() {
@@ -79,19 +80,32 @@ export class GameAudio {
     this.loadSamples();
   }
 
-  // the recordings that exist (assets/audio/manifest.json: { "files": ["trainhorn", "vo/link/next_symphony", ...] })
+  // the recordings that exist (assets/audio/manifest.json: { "files": ["trainhorn", "vo/link/hold_on", ...] }).
+  // Voice packs (an announcer: vo/announcer/<pack>/..., an operator's voice: vo/chatter/<voice>/...) only load
+  // when something asks for them (want()): there are a thousand voice lines and a match uses a few voices.
   async loadSamples() {
     let list = [];
     try { const r = await fetch('assets/audio/manifest.json', { cache: 'no-cache' }); if (r.ok) list = (await r.json()).files || []; } catch (_) { return; }
-    for (const id of list.slice(0, 600)) {
-      if (typeof id !== 'string' || !/^[\w\/-]+$/.test(id)) continue;
-      fetch(`assets/audio/${id}.mp3`).then(r => (r.ok ? r.arrayBuffer() : null)).then(b => b && this.ctx.decodeAudioData(b)).then(buf => {
-        if (!buf) return;
-        const base = id.replace(/_\d+$/, '');
-        if (!this.samples.has(base)) this.samples.set(base, []);
-        this.samples.get(base).push(buf);
-      }).catch(() => { /* a bad file: the synthesized sound stays */ });
-    }
+    this.manifest = list.filter(id => typeof id === 'string' && /^[\w\/-]+$/.test(id)).slice(0, 4000);
+    for (const id of this.manifest) if (!/^vo\/(announcer|chatter)\/[\w-]+\//.test(id)) this.loadSample(id);
+    for (const [prefix, w] of this.wanted) w.resolve(Promise.all(this.manifest.filter(id => id.startsWith(prefix)).map(id => this.loadSample(id))));
+  }
+  loadSample(id) {
+    return fetch(`assets/audio/${id}.mp3`).then(r => (r.ok ? r.arrayBuffer() : null)).then(b => b && this.ctx.decodeAudioData(b)).then(buf => {
+      if (!buf) return;
+      const base = id.replace(/_\d+$/, '');
+      if (!this.samples.has(base)) this.samples.set(base, []);
+      this.samples.get(base).push(buf);
+    }).catch(() => { /* a bad file: the synthesized sound stays */ });
+  }
+  // load every recording under a prefix ('vo/announcer/sable/'), once; resolves when they're in
+  want(prefix) {
+    let w = this.wanted.get(prefix);
+    if (w) return w.done;
+    w = {}; w.done = new Promise(r => { w.resolve = r; });
+    this.wanted.set(prefix, w);
+    if (this.manifest) w.resolve(Promise.all(this.manifest.filter(id => id.startsWith(prefix)).map(id => this.loadSample(id))));
+    return w.done;
   }
   // inside a room or tunnel (0..1): the reverb send moves from the street to the room
   setIndoor(k) {
@@ -103,7 +117,11 @@ export class GameAudio {
   }
   playSample(bufs, sp, opts) {
     const ctx = this.ctx, src = ctx.createBufferSource();
-    src.buffer = bufs[(Math.random() * bufs.length) | 0];
+    // a random take, never the same one twice running
+    let i = (Math.random() * bufs.length) | 0;
+    if (bufs.length > 1 && i === bufs.last) i = (i + 1 + ((Math.random() * (bufs.length - 1)) | 0)) % bufs.length;
+    bufs.last = i;
+    src.buffer = bufs[i];
     src.playbackRate.value = (opts.rate || 1) * (opts.vary === false ? 1 : 0.97 + Math.random() * 0.06);
     const g = ctx.createGain(); g.gain.value = opts.vol ?? 1;
     src.connect(g).connect(this.out(sp.gain, sp.pan, sp.dist, opts.wet ?? 0.25, opts.muffle));

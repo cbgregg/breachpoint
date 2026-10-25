@@ -2,91 +2,40 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
-**Every voice line below is already generated** with Azure's HD text-to-speech voices by `tools/gen_voice.py` (the lines, voices and wording live in that script; it also rewrites the manifest). To regenerate: `AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/link` for one section). The key is read from the environment only; never commit it. A real recording saved over a generated file replaces it.
-
-## How to add a recording
-
-1. Record or export it as **MP3**, 44.1 or 48 kHz. Voice: mono, close mic, no music, about -16 LUFS (all lines at the same loudness), a few milliseconds of silence trimmed at each end. Effects: mono unless noted, peaks around -3 dB.
-2. Save it at `assets/audio/<id>.mp3`, where `<id>` is the name in the tables below. Folders in the id are real folders: `vo/announcer/victory` is `assets/audio/vo/announcer/victory.mp3`.
-3. Add the id to `assets/audio/manifest.json`, e.g. `{ "files": ["vo/announcer/victory", "trainhorn"] }`. The game only fetches the files listed there.
-4. **Several takes:** name them `<id>_1`, `<id>_2`, `<id>_3`… and list each one. The game picks one at random every time, so three or four takes of a line people hear often (reloading, contact, enemy down) keep it from getting old.
-
-Announcer lines queue up behind each other instead of talking over each other. Character lines come from where the character is, through walls and distance like any other sound.
+**Every voice line is already generated**: 1,029 of them, made with Azure's HD text-to-speech voices by `tools/gen_voice.py`, which holds the exact wording of every take. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The key is read from the environment only; never commit it. A real recording saved over a generated file replaces it.
 
 ---
 
-## 1. Announcer (`vo/announcer/...`)
+## 1. Announcers (`vo/announcer/<pack>/...`)
 
-One voice: a calm, clipped mission controller. Not shouty, apart from the medals.
+Five announcers, each a different character with their own wording and two or three ways of saying every announcement (`<id>_1`, `<id>_2`, `<id>_3`; the game never plays the same take twice running). Players pick one under Options > Audio > Announcer, or get a different one every match (the default; the next one loads while you play).
 
-### Match flow
-
-| id | Line | When |
+| Pack | Voice | Character |
 |---|---|---|
-| `mode_tdm` | "Team Deathmatch. Eliminate the enemy team." | Match intro |
-| `mode_ffa` | "Free-for-all. Trust no one." | Match intro |
-| `mode_gunfight` | "Gunfight. One life. Same loadout. Win the round." | Match intro |
-| `mode_snd` | "Search and Destroy. Plant the bomb, or stop them." | Match intro |
-| `mode_gungame` | "Gun Game. Every kill, a new weapon." | Match intro |
-| `mode_infected` | "Infected. Survive… or join them." | Match intro |
-| `fight` | "Fight!" (alt take: "Go, go, go!") | Countdown ends |
-| `one_minute` | "One minute remaining." | Last minute (timed modes) |
-| `lead_taken` | "We've taken the lead." | Team Deathmatch: your team goes ahead |
-| `lead_lost` | "We've lost the lead." | Team Deathmatch: the enemy goes ahead |
-| `victory` | "Victory." | You win |
-| `defeat` | "Defeat." | You lose |
+| `control` | Brian | A calm, clipped mission controller |
+| `sable` | Jane | A cool, dry, slightly sarcastic commander |
+| `ghost` | Vance | A gruff old drill sergeant |
+| `hype` | Alloy | An esports arena caster |
+| `nova` | Nova | Upbeat and playful |
 
-### Medals (said with energy)
+Every pack has these ids:
 
-| id | Line |
+| id | When |
 |---|---|
-| `double_kill` | "Double kill!" |
-| `triple_kill` | "Triple kill!" |
-| `fury_kill` | "Fury kill!" |
-| `frenzy_kill` | "Frenzy kill!" |
-| `killstreak` | "Killstreak!" (three in a row) |
-| `killing_spree` | "Killing spree!" (five) |
-| `rampage` | "Rampage!" (ten) |
-| `unstoppable` | "Unstoppable!" (fifteen) |
-| `legendary` | "Legendary!" (twenty) |
-
-### Gun Game
-
-| id | Line | When |
-|---|---|---|
-| `new_weapon` | "New weapon." | Every kill moves you up |
-| `final_weapon` | "Final weapon." | You reach the Knife Slingshot |
-| `humiliated` | "Humiliated." | You were knifed and dropped a gun |
-
-### Infected
-
-| id | Line | When |
-|---|---|---|
-| `you_are_infected` | "You are infected. Kill the survivors." | You start infected, or turn when patient zero leaves |
-| `infected` | "You've been infected." / to the killer: "Infected." (record one neutral take) | A survivor is killed and turns |
-| `last_survivor` | "You're the last survivor. Hold on." | Only you are left |
-
-### Round modes (Gunfight, Search & Destroy)
-
-| id | Line |
-|---|---|
-| `round_1_1` … `round_15_1` | "Round one." … "Round fifteen." (saved as take 1 of `round_3` etc., since a bare `round_3` would load as take 3 of `round`) |
-| `final_round` | "Final round." |
-| `switching_sides` | "Switching sides." |
-| `overtime` | "Overtime. Capture the flag." |
-| `round_won` | "You won the round." |
-| `round_lost` | "You lost the round." |
-| `round_draw` | "Round drawn." |
-| `bomb_planted` | "Bomb planted." |
-| `bomb_defused` | "Bomb defused." |
-| `target_destroyed` | "Target destroyed." |
-| `team_eliminated` | "Team eliminated." |
-| `flag_captured` | "Flag captured." |
-| `bomb_dropped` | "The bomb's been dropped." |
-| `you_have_the_bomb` | "You have the bomb." |
-| `bomb_picked_up` | "Bomb picked up." |
-
----
+| `mode_tdm`, `mode_ffa`, `mode_gunfight`, `mode_snd`, `mode_gungame`, `mode_infected` | Match intro |
+| `fight` | Countdown ends |
+| `one_minute` | Last minute (timed modes) |
+| `lead_taken`, `lead_lost` | Team Deathmatch: the lead changes |
+| `victory`, `defeat` | Match over |
+| `double_kill`, `triple_kill`, `fury_kill`, `frenzy_kill` | Multi-kill medals |
+| `killstreak`, `killing_spree`, `rampage`, `unstoppable`, `legendary` | 3, 5, 10, 15, 20 in a row |
+| `new_weapon`, `final_weapon`, `humiliated` | Gun Game |
+| `you_are_infected`, `infected`, `last_survivor` | Infected |
+| `round_1` … `round_15`, `final_round`, `match_point` | Round modes: a round starts (saved as `round_3_1`, `round_3_2`…) |
+| `switching_sides`, `overtime` | Halftime; Gunfight overtime |
+| `round_won`, `round_lost`, `round_draw` | A round ends ("won" lines avoid the words "round won", which sound like "round one") |
+| `bomb_planted`, `bomb_defused`, `target_destroyed`, `team_eliminated`, `flag_captured` | Heard by both teams, so they don't take a side |
+| `bomb_dropped`, `you_have_the_bomb`, `bomb_picked_up` | Search and Destroy, attackers only |
 
 ## 2. Link light rail announcements (`vo/link/...`)
 
@@ -108,22 +57,19 @@ In the style of Sound Transit's recorded announcements: a warm, neutral, unhurri
 
 ---
 
-## 3. Character chatter (`vo/chatter/...`)
+## 3. Operators (`vo/chatter/<voice>/...`)
 
-Four voices take turns (one take each), so the same line sounds like a different operator each time. Short, under breath, the way a squad talks in a firefight. Teammates and enemies both say these, from where they stand.
+Twelve operator voices, six women and six men: `emma`, `aria`, `jenny`, `tessa`, `mila`, `tiana`, `davis`, `steffan`, `adam`, `tyler`, `colin`, `jimmie`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). They're written to carry the moment: "Ugh, empty! Reloading!", "No! We lost one!", "Honestly? I'm terrified. Let's go."
 
-| id | Example lines (one per take) | When |
-|---|---|---|
-| `reloading` | "Reloading!" · "Changing mags!" · "Cover me, reloading!" · "I'm dry!" | Reloading a mostly empty mag |
-| `frag_out` | "Frag out!" · "Grenade!" · "Frag, frag!" | Throwing a frag |
-| `semtex_out` | "Semtex out!" · "Sticky out!" | Throwing semtex |
-| `knife_out` | "Knife!" · "Throwing!" | Throwing a throwing knife |
-| `shock_out` | "Shock stick out!" · "Zapper out!" | Throwing a shock stick |
-| `stun_out` | "Stun out!" · "Flash!" · "Stunning!" | Throwing a stun grenade |
-| `contact` | "Contact!" · "Enemy spotted!" · "Got eyes on one!" · "Tango!" | A bot spots an enemy |
-| `enemy_down` | "Enemy down." · "Got him." · "Tango down." · "Scratch one." | A bot gets a kill |
-| `man_down` | "Man down!" · "We lost one!" · "They got him!" | A teammate dies nearby |
-| `banter` | Record 10 or more: "Same as last time. Nobody dies." · "Check your corners." · "Anyone else hungry?" · "I've got a good feeling about this." · "Stay tight, stay quiet." · "Light them up." · "Who brought the snacks?" · "Eyes up, people." · "Let's make it quick." · "Last one back buys." | Pre-match countdown, a couple of your squad |
+| id | When |
+|---|---|
+| `reloading` | Reloading a mostly empty mag |
+| `frag_out`, `semtex_out`, `knife_out`, `shock_out`, `stun_out` | Throwing a lethal or a tactical |
+| `contact` | A bot spots an enemy |
+| `enemy_down` | A bot gets a kill |
+| `man_down` | A teammate dies nearby |
+| `hit` | A bot takes a heavy hit and survives |
+| `banter` | Pre-match countdown, a couple of your squad |
 
 ### Infected (`vo/infected/...`)
 

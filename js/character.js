@@ -540,7 +540,7 @@ export class Character {
     if (this.health <= 0) {
       this.health = 0;
       this.game.onKill(attacker, this, weaponId, headshot);
-    }
+    } else if (this.isBot && amount >= 20 && this.health < 55) this.game.callout(this, 'hit', 0.35);   // "I'm hit!"
   }
 
   updateCommon(dt) {

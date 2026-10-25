@@ -131,7 +131,7 @@ const bindings = [
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
@@ -241,6 +241,10 @@ $('ad-discard').addEventListener('click', () => { const f = closeApplyDlg(); dis
 $('ad-cancel').addEventListener('click', () => { closeApplyDlg(); if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('opt-apply-btn').offsetParent ? $('opt-apply-btn') : null) || focusFirst(), 0); });
 $('opt-apply-btn').addEventListener('click', applyOptions);
 $('opt-discard-btn').addEventListener('click', () => { discardOptions(); game.audio.play('ui', null, { ui: true }); });
+// picking an announcer or a voice plays one of their lines
+const voicePreview = (prefix, lines) => { game.audio.init(); game.audio.want(prefix).then(() => game.audio.play('vo', null, { id: prefix + lines[(Math.random() * lines.length) | 0], ui: true })); };
+$('opt-announcer').addEventListener('change', (e) => { if (e.target.value !== 'random') voicePreview(`vo/announcer/${e.target.value}/`, ['mode_tdm', 'double_kill', 'victory', 'killing_spree']); });
+$('opt-voice').addEventListener('change', (e) => { if (e.target.value !== 'auto') voicePreview(`vo/chatter/${e.target.value}/`, ['banter', 'reloading', 'frag_out', 'contact']); });
 const optionsOpen = () => (screen === 'menu' && tab === 'options') || (screen === 'pause' && pauseSec === 'options');
 
 for (const [id, key, type] of bindings) {
@@ -923,6 +927,8 @@ const OPT_DESC = {
   'opt-aa': 'With a controller, your aim slows over enemies and follows them slightly. Mouse aim is never assisted.',
   'opt-vib': 'Controller rumble on shots, hits and explosions.',
   'opt-vol': 'Volume of everything: weapons, footsteps, voices and music.',
+  'opt-announcer': 'Who calls the match: the mode, medals, rounds, the bomb. Each has their own way of saying it, and a few ways of saying each thing. Picking one plays a line.',
+  'opt-voice': 'The voice your operator calls out reloads, grenades and so on in. Any: whichever voice the match hands you. Picking one plays a line.',
   'opt-music': 'Volume of the menu and match music only.',
   'opt-touchsize': 'Size of the on-screen buttons on phones and tablets.',
   'opt-touchads': 'Tap: tap ADS to aim and tap again to stop. Hold: aim while your finger is on the button.',
