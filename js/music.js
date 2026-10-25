@@ -106,7 +106,7 @@ export class Music {
     if (!this.ensure()) return;
     this.name = name;
     if (this.track) this.track.stop(1.6);
-    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : this.recorded(name) || new ({ menu: MoodTrack }[name] || ActionTrack)(this);
+    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : this.recorded(name) || new ({ menu: MoodTrack, finale: FinaleTrack }[name] || ActionTrack)(this);
     this.track.start();
   }
 
@@ -415,8 +415,8 @@ const MOOD_HOOK = (() => {   // [bar, 16th, midi note, length in 16ths]
   return bars.flatMap((notes, bar) => notes.map(([s, n, l]) => [bar, s, n, l]));
 })();
 class MoodTrack extends Track {
-  constructor(m) {
-    super(m, 100);
+  constructor(m, bpm = 100) {
+    super(m, bpm);
     this.ahead = 2;   // (notes scheduled 2 s ahead: it plays through the menus while the game loads and builds things)
     const ctx = this.ctx;
     // a dotted-eighth echo, darkened on each repeat
@@ -485,6 +485,28 @@ class MoodTrack extends Track {
       const n = ch[[2, 1, 0][s === 0 ? 0 : s === 6 ? 1 : 2]] + 24;
       voice(ctx, this.counterBus, t, { freq: mtof(n), type: 'sine', attack: 0.012, hold: dt * 2, release: 0.8, gain: 0.03, cutoff: 5000 });
     }
+  }
+}
+
+// The last minute of a match (or a close finish): the menu theme's world, tense. 112 BPM over Dm Bb Gm A, a soft kick
+// on every beat and a driving eighth-note sub bass, the arpeggio, dark low pads, and every four bars the start of the
+// menu's hook on the bell, as a reminder. Quiet: it sits under the fight.
+const FINALE_CHORDS = ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A'];
+class FinaleTrack extends MoodTrack {
+  constructor(m) { super(m, 112); this.level = 0.7; }
+  start() { super.start(); this.bus.gain.cancelScheduledValues(this.ctx.currentTime); this.bus.gain.setTargetAtTime(this.level, this.ctx.currentTime, 1.2); }
+  play(step, t) {
+    const ctx = this.ctx, dt = this.dt, nb = this.m.audio.noise;
+    const bar = Math.floor(step / 16), s = step % 16, b8 = bar % 8;
+    const ch = CHORDS[FINALE_CHORDS[b8]], root = ch[0] - 12;
+    if (s % 4 === 0) this.kick(t, 0.45);
+    if (s % 4 === 2) noise(ctx, nb, this.kit, t, { type: 'bandpass', freq: 5500, q: 1.2, attack: 0.012, decay: 0.05, gain: 0.012 });
+    if (bar % 2 && (s === 4 || s === 12)) noise(ctx, nb, this.clapBus, t, { type: 'bandpass', freq: 1400, q: 0.8, attack: 0.004, decay: 0.12, gain: 0.07 });
+    if (s % 2 === 0) voice(ctx, this.bus, t, { freq: mtof(root), type: 'sine', attack: 0.012, hold: dt * 0.9, release: 0.08, gain: s % 4 === 0 ? 0.12 : 0.08, cutoff: 260 });
+    const arp = [ch[0] + 12, ch[1] + 12, ch[2] + 12, ch[1] + 12][step % 4];
+    voice(ctx, this.arpBus, t, { freq: mtof(arp), type: 'triangle', attack: 0.01, hold: dt * 0.35, release: 0.1, gain: 0.03, cutoff: 900 + 400 * Math.sin((step / 64) * Math.PI * 2) });
+    if (s === 0 && b8 % 2 === 0) for (const n of ch) for (const det of [-9, 9]) voice(ctx, this.padBus, t, { freq: mtof(n - 12), det, type: 'sawtooth', attack: 1.2, hold: dt * 32 - 1.2, release: 1.6, gain: 0.012, cutoff: 600 });
+    if (bar % 4 === 0) for (const [hb, hs, n, len] of MOOD_HOOK) if (hb < 2 && hb === bar % 2 && hs === s) voice(ctx, this.bellBus, t, { freq: mtof(n + 12), type: 'sine', attack: 0.01, hold: 0.02, release: len * dt * 1.8, gain: 0.02, cutoff: 6000 });
   }
 }
 

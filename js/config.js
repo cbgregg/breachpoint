@@ -304,6 +304,7 @@ export const DEFAULT_SETTINGS = {
   fullscreen: true,    // desktop matches go fullscreen with the keyboard locked (so Ctrl+W crouches instead of closing the tab)
   fillBots: true, chat: true,
   musicVolume: 0.5,
+  matchMusic: 'finale',   // in a match: 'finale' (the closing moments only, like Black Ops 2), 'off' or 'always'
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
   sightSize: 'large',  // how much of the screen the sight fills when aiming: normal | large | huge
   privateRelay: false, // route private matches through the TURN relay too (hides your IP)

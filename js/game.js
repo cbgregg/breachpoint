@@ -179,6 +179,7 @@ export class Game {
   applySettings(s) {
     // the announcer: one of the five, or a different one every match; whichever is next loads ahead of time
     this.announcerSetting = s.announcer || 'random';
+    this.musicMode = ['finale', 'off', 'always'].includes(s.matchMusic) ? s.matchMusic : 'finale';
     this.operatorVoice = VOICES.includes(s.voice) ? s.voice : null;
     if (!this.announcerPack || (this.announcerSetting !== 'random' && this.announcerPack !== this.announcerSetting)) this.pickAnnouncer();
     this.renderer.timing = !!s.showFps;   // GPU timing only while the performance readout is shown
@@ -339,8 +340,12 @@ export class Game {
     if (el) el.textContent = `${m.name} · ${w ? w.name : this.world.name || ''}`.toUpperCase();
   }
 
+  // in a match, like Black Ops 2: no music while you play, only for the closing moments (the setting can turn it off
+  // or have it all match)
   startMusic() {
     this.music.setDuck(false);
+    this.finaleOn = false;
+    if (this.musicMode !== 'always') { this.music.stop(); return; }
     this.music.setIntensity(0.35);
     this.music.intensity = 0.35;
     this.music.play(this.inf ? 'infected' : 'action');
@@ -720,8 +725,10 @@ export class Game {
       const p = this.player, t = this.time;
       const fight = p.alive && (t - p.lastFireT < 4 || t - p.lastDamageT < 5) ? 0.4 : 0;
       const lim = this.settings.scoreLimit || 75;
-      const finale = this.timeLeft < 60 || Math.max(...this.scores) >= lim - 5 ? 0.5 : 0;
-      this.music.setIntensity(0.35 + fight + finale);
+      // (round modes: match point)
+      const close = this.gm && this.gm.cfg && this.gm.cfg.winRounds ? Math.max(...this.scores) >= this.gm.cfg.winRounds - 1 : this.timeLeft < 60 || Math.max(...this.scores) >= lim - 5;
+      this.music.setIntensity(0.35 + fight + (close ? 0.5 : 0));
+      if (close && this.musicMode === 'finale' && !this.finaleOn && !this.frozen && this.endT <= 0) { this.finaleOn = true; this.music.play('finale'); }
     }
     this.audio.setListener(this.camera.position, this.player.alive ? this.player.yaw : 0);
     // rooms and tunnels sound like rooms and tunnels: the echo of the space you're in, the place's background, and

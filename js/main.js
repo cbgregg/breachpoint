@@ -131,7 +131,7 @@ const bindings = [
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-matchmusic', 'matchMusic', 'str'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
@@ -935,6 +935,7 @@ const OPT_DESC = {
   'opt-announcer': 'Who calls the match: the mode, medals, rounds, the bomb. Each has their own voice and wording, and a few ways of saying each thing. Picking one plays a line.',
   'opt-voice': 'The voice your operator calls out reloads, grenades and so on in. Any: whichever voice the match hands you. Picking one plays a line.',
   'opt-music': 'Volume of the menu and match music only.',
+  'opt-matchmusic': 'Closing moments only: quiet during play (you hear the fight), music for the last minute or a close finish. The whole match: music all the way through, building with the fighting.',
   'opt-touchsize': 'Size of the on-screen buttons on phones and tablets.',
   'opt-touchads': 'Tap: tap ADS to aim and tap again to stop. Hold: aim while your finger is on the button.',
   'opt-autofire': 'Fires automatically while your crosshair is on an enemy (touch only).',
