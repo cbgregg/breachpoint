@@ -480,6 +480,14 @@ export function setGunModel(name, scene, xf) {
       geo.setIndex(kept);
     }
     geo.applyMatrix4(bake);
+    // plain position / normal / uv only, indexed, not interleaved: what's needed to merge parts that share a material
+    for (const k of Object.keys(geo.attributes)) {
+      if (k !== 'position' && k !== 'normal' && k !== 'uv') geo.deleteAttribute(k);
+      else if (geo.attributes[k].isInterleavedBufferAttribute) geo.setAttribute(k, geo.attributes[k].clone());
+    }
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    if (!geo.index) geo.setIndex([...Array(geo.attributes.position.count).keys()]);
     geo.computeBoundingSphere();
     if (o.material.map) o.material.map.anisotropy = 8;
     parts.set(parts.has(key) ? key + parts.size : key, { geo, mat: o.material });
