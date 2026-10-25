@@ -326,7 +326,7 @@ export const BUILDS = {
     p.rbox(ss, 0.036, 0.006, 0.012, 0, 0.058, 0.02, 0.002);                                          // ambi safety
     notch(p, dark, -0.018, 0.072, SY, 0.02);
     p.rbox(dark, 0.0035, SY - 0.072, 0.008, 0, (SY + 0.072) / 2, -0.205, 0.001);
-    let sight = { sightY: SY - 0.0005, sightZ: 0.018, eyeRelief: -0.42, frontZ: -0.205 + 0.0045, postTop: SY };
+    let sight = { sightY: SY - 0.0005, sightZ: 0.018, eyeRelief: -0.28, frontZ: -0.205 + 0.0045, postTop: SY };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.075, 0.04, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.219, k.muzzleDevice(p, B, A.muzzle, 0.05, 0.218, 0.0095, 0.14));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, -0.002, 0.14, 0.022) : null;
@@ -364,7 +364,7 @@ export const BUILDS = {
     guard(p, blue, -0.002, 0.012, 0.07, 0.038, 0.008, dark);
     p.profile(wood, [[-0.034, 0.012], [0.02, 0.006], [0.017, -0.03, 0.01], [0.012, -0.1, 0.014], [-0.03, -0.106, 0.012], [-0.046, -0.08, 0.012], [-0.042, -0.02, 0.012]], 0.032, { bevel: 0.006, r: 0.01 });
     for (let i = 0; i < 2; i++) p.rbox(B.recess, 0.033, 0.003, 0.012, 0, -0.04 - i * 0.024, -0.016, 0.001);
-    let sight = { sightY: SY - 0.0005, sightZ: 0.0, eyeRelief: -0.4, frontZ: -0.213 + 0.0025, postTop: SY };
+    let sight = { sightY: SY - 0.0005, sightZ: 0.0, eyeRelief: -0.28, frontZ: -0.213 + 0.0025, postTop: SY };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.066, 0.03, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.226, k.muzzleDevice(p, B, A.muzzle, 0.047, 0.225, 0.0095, 0.13));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, 0.008, 0.16, 0.016) : null;
@@ -391,7 +391,7 @@ export const BUILDS = {
     p.rbox(dark, 0.004, 0.01, 0.012, -0.0158, 0.016, -0.004, 0.002);                                    // select-fire lever
     for (const x of [-0.0072, 0.0072]) p.rbox(dark, 0.0068, 0.0075, 0.007, x, 0.0665, 0.012, 0.0014);
     p.rbox(dark, 0.0038, 0.007, 0.005, 0, 0.0665, -0.215, 0.0012);
-    let sight = { sightY: 0.0695, sightZ: 0.012, eyeRelief: -0.4, frontZ: -0.215 + 0.003, postTop: 0.07 };
+    let sight = { sightY: 0.0695, sightZ: 0.012, eyeRelief: -0.27, frontZ: -0.215 + 0.003, postTop: 0.07 };
     if (A.optic === 'reflex') sight = { ...k.opticReflex(p, g, B, 0.0645, 0.035, 0.8), eyeRelief: -0.3 };
     const muzF = Math.max(0.236, k.muzzleDevice(p, B, A.muzzle, 0.047, 0.235, 0.0075, 0.13));
     const laser = A.laser === 'laser' ? k.laserModule(p, g, B, 0, 0.0, 0.16, 0.02) : null;
@@ -443,6 +443,49 @@ export const BUILDS = {
     k.eject.position.set(0, AX, 0.6);   // the venturi: backblast comes out here
     k.foregrip.position.set(0, -0.03, -0.27);
     return { muzF: 0.88, BY: AX, sight: { ...hs, sightX: SX, eyeRelief: -0.26 }, laser: null };
+  },
+
+  // ---------- Knife Slingshot: a walnut Y-fork, black surgical-tube bands to a leather pouch, a throwing knife
+  // loaded in it pointing out through the fork (the knife is the "magazine": it goes with the shot) ----------
+  sling(k) {
+    const { p, mp, B, tinted } = k;
+    const wood = B.wood || tinted(B.poly, 0x8a5a32), band = B.rubber, leather = tinted(B.poly, 0x5a3a22), steel = B.steel;
+    const AY = 0.097;                                                            // the shot line (fork gap, pouch)
+    p.profile(wood, k.GRIP, 0.03, { bevel: 0.006, r: 0.012 });                   // handle
+    p.add(wood, new THREE.CylinderGeometry(0.011, 0.013, 0.04, 12), 0, 0.016, 0);                             // stem
+    const arm = (sx) => {
+      const a = new THREE.Vector3(0, 0.032, 0), b = new THREE.Vector3(sx * 0.046, 0.108, 0), d = b.clone().sub(a);
+      const g = new THREE.CylinderGeometry(0.007, 0.0095, d.length(), 12);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()));
+      g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      p.add(wood, g, 0, 0, 0);
+      p.add(wood, new THREE.SphereGeometry(0.0085, 10, 8), b.x, b.y, b.z);   // rounded tip
+      p.add(band, new THREE.CylinderGeometry(0.0095, 0.0095, 0.012, 12), b.x, b.y - 0.01, b.z);   // band wrap at the tip
+      return b;
+    };
+    // drawn back to the left cheek, the way you aim one: the pouch sits back and to the left, out of the sight
+    // line through the fork (straight back, the pulling hand covered the whole view)
+    const pouch = new THREE.Vector3(-0.12, AY - 0.05, 0.16), aim = new THREE.Vector3(0, AY, 0).sub(pouch).normalize();
+    for (const sx of [-1, 1]) {
+      const t = arm(sx), d = pouch.clone().add(new THREE.Vector3(0, sx * 0.008, 0)).sub(t);
+      const g = new THREE.CylinderGeometry(0.0028, 0.0028, d.length(), 8);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()));
+      g.translate(t.x + d.x / 2, t.y - 0.01 + d.y / 2, t.z + d.z / 2);
+      p.add(band, g, 0, 0, 0);
+    }
+    const toAim = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), aim);
+    const pg = new THREE.BoxGeometry(0.026, 0.022, 0.03); pg.applyQuaternion(toAim); pg.translate(pouch.x, pouch.y, pouch.z);
+    p.add(leather, pg, 0, 0, 0);                                                  // pouch
+    // the knife: blade forward along the draw, out through the fork; handle back in the pouch
+    const blade = new THREE.Shape(); blade.moveTo(0, -0.011); blade.lineTo(0.15, -0.004); blade.lineTo(0.18, 0.0); blade.lineTo(0.15, 0.011); blade.lineTo(0, 0.011);
+    const bg = new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false }); bg.rotateY(Math.PI / 2); bg.translate(-0.0015, 0, -0.02);
+    bg.applyQuaternion(toAim); bg.translate(pouch.x, pouch.y, pouch.z);
+    mp.add(steel, bg, 0, 0, 0);
+    const hg = new THREE.BoxGeometry(0.011, 0.02, 0.07); hg.translate(0, 0, 0.015); hg.applyQuaternion(toAim); hg.translate(pouch.x, pouch.y, pouch.z);
+    mp.add(B.rubber, hg, 0, 0, 0);
+    k.eject.position.copy(pouch);
+    k.foregrip.position.copy(pouch).add(new THREE.Vector3(-0.01, -0.01, 0.025));   // the left hand pinches the pouch here
+    return { muzF: 0.07, BY: AY, sight: { sightY: AY, sightZ: 0, eyeRelief: -0.36 }, laser: null };   // the sight: the gap between the fork tips
   },
 };
 let yellow = null;

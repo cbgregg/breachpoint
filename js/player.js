@@ -10,6 +10,16 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const sm5 = (t) => { t = clamp(t, 0, 1); return t * t * t * (t * (t * 6 - 15) + 10); }; // quintic: no jolt at either end
+// tactical sprint (MW style): the gun held up by the right shoulder, muzzle high and turned in across the body,
+// the grip hand in view. [position (camera space), rotation (pitch up, yaw in, roll)] per kind of gun; the pose
+// is blended to as a whole (it used to be added on top of the normal sprint, which left every gun standing
+// straight up in the middle of the screen with the hand out of sight)
+const TAC_POSE = {
+  long: { p: [0.17, -0.2, -0.32], r: [0.8, 0.35, -0.4] },
+  pistol: { p: [0.13, -0.11, -0.3], r: [1.05, 0.15, -0.15] },
+  launcher: { p: [0.26, -0.26, -0.12], r: [0.25, 0.35, -0.1] },   // tube on the shoulder, out of the way
+};
+const _tacP = new THREE.Vector3(), _tacQ = new THREE.Quaternion(), _tacE = new THREE.Euler();
 const bump = (a, b, x) => smooth(a, a + (b - a) * 0.3, x) * (1 - smooth(b - (b - a) * 0.3, b, x));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _wish = new THREE.Vector3();
@@ -574,7 +584,7 @@ export class PlayerController {
     const bobAmt = Math.min(1, hs / 6) * (1 - 0.9 * a) * (c.onGround ? 1 : 0.2) * (c.slideT > 0 ? 0 : 1);
     const rp = w.reloadProgress;
     const sw = c.switchT > 0 ? sm5(c.switchT / 0.4) : 0;
-    const gren0 = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / 0.9, 0, 1) * Math.PI) : 0;
+    const gren0 = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / (c.throwDur || 0.9), 0, 1) * Math.PI) : 0;   // (a knife's throw is quicker: the swing used to start halfway, a jump)
     this.cookBlend = lerp(this.cookBlend, this.cookT !== null ? 1 : 0, Math.min(1, dt * 12));
     const gren = Math.max(gren0, this.cookBlend * 0.75);
     // inspect: turn the gun to show its left side, then roll it over to the ejection side and check the mag
@@ -647,13 +657,9 @@ export class PlayerController {
     // tactical sprint: gun swung up beside the face, muzzle high (MW style)
     const tk = this.tacK || 0;
     if (tk > 0.01) {
-      // undo most of the normal sprint pose, then swing the muzzle up, held off to the right
-      h.position.x += (0.07 + spr * 0.06) * tk;
-      h.position.y += (-0.07 + spr * 0.02) * tk + by * 0.8;
-      h.position.z += -0.12 * tk;
-      h.rotation.x += (0.85 + spr * 0.25) * tk;
-      h.rotation.y += (-0.35 - spr * 0.55) * tk;
-      h.rotation.z += (0.15 - spr * 0.55) * tk + bx * 4;
+      const T = TAC_POSE[G.type] || TAC_POSE.long, k = sm5(tk);
+      h.position.lerp(_tacP.set(T.p[0] + bx * 0.8, T.p[1] + by * 0.9, T.p[2]), k);
+      h.quaternion.slerp(_tacQ.setFromEuler(_tacE.set(T.r[0] + by * 1.5, T.r[1], T.r[2] + bx * 3)), k);
     }
     if (s1 + s2 > 0) {
       const w2 = Math.sin(ip * Math.PI * 3) * 0.04; // a little life in the hands
@@ -670,7 +676,7 @@ export class PlayerController {
     // The mag stays in the hand the whole time.
     const mag = gun.mag;
     mag.position.copy(gun.magHome);
-    mag.visible = !(G.type === 'launcher' && w.mag === 0);   // the warhead leaves with the shot
+    mag.visible = !((G.type === 'launcher' || w.def.sling) && w.mag === 0);   // the warhead (the slingshot's knife) leaves with the shot
     // bolt / pump cycling after a shot
     if (this.cycleT > 0) {
       this.cycleT -= dt;
@@ -707,10 +713,11 @@ export class PlayerController {
     handFrame(_R, _rq, gun.group, _gq, _v1.copy(type === 'pistol' ? RH_PISTOL : (gun.rh || RH_LONG)).add(FIT.R.push), GRIP_F, PALM_L);
     // left hand where it rests on the gun: support hand on a pistol, vertical grip, or palm up under the handguard / pump
     let lPose;
-    if (type === 'pistol') handFrame(_L, _lq, gun.group, _gq, _v1.copy(LH_PISTOL).add(FIT.L.push), LH_PISTOL_F, LH_PISTOL_P);
+    if (w.def.sling) handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position), VG_F, PALM_R);   // slingshot: pinching the pouch, drawn back
+    else if (type === 'pistol') handFrame(_L, _lq, gun.group, _gq, _v1.copy(LH_PISTOL).add(FIT.L.push), LH_PISTOL_F, LH_PISTOL_P);
     else if (A.under === 'vgrip') handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.foregrip.position).add(VG_OFF).add(FIT.L.push), VG_F, PALM_R);
     else handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(gun.pump ? SUP_OFF_PUMP : SUP_OFF).add(FIT.L.push), SUP_F, PALM_SUP);
-    lPose = FIT.L.pose;
+    lPose = w.def.sling ? POSES.fist : FIT.L.pose;
     let tPose = lPose, lk = 0, leftFree = false;
     const toward = (pos, q, pose, k) => { _L.lerp(pos, k); _lq.slerp(q, k); tPose = pose; lk = k; };
     const MH = G.magHold;
@@ -807,23 +814,29 @@ export class PlayerController {
       toward(_tp, _tq, POSES.fist, k);
       leftFree = k > 0.3;
     }
-    if (c.grenadeCd > 0.4) {
+    if (c.grenadeCd > (c.throwDur || 0.9) * 0.45) {
       handFrame(_tp, _tq, null, null, _a.set(-0.1, -0.05 - gren0 * 0.1, -0.45 + gren0 * 0.1), THROW_F, THROW_P);
       toward(_tp, _tq, POSES.open, 1);
     }
-    // cooking: the frag sits in the left hand, held up beside the lowered gun
-    if (!this.vmNade) {
-      this.vmNade = new THREE.Mesh(this.game.grenadeGeo, this.game.grenadeMat);
-      this.vmNade.scale.setScalar(0.55);
-      this.vmRoot.add(this.vmNade);
+    // holding the lethal button: what you're about to throw sits in the left hand, beside the lowered gun (the
+    // frag cooks there; a knife is held by the handle, blade forward). It used to be a frag whatever you carried.
+    const kind = EQUIPMENT[c.lethal] ? c.lethal : 'frag';
+    if (!this.vmItems) this.vmItems = {};
+    if (!this.vmItems[kind]) {
+      const m = kind === 'frag' ? new THREE.Mesh(this.game.grenadeGeo, this.game.grenadeMat) : this.game.equipMesh(kind);
+      m.scale.setScalar(kind === 'frag' ? 0.55 : kind === 'knife' ? 0.9 : 0.6);
+      m.traverse(o => { if (o.isMesh) o.castShadow = false; });
+      this.vmRoot.add(m);
+      this.vmItems[kind] = m;
     }
-    this.vmNade.visible = this.cookBlend > 0.3;
-    if (this.vmNade.visible) {
-      const shake = this.cookT !== null && this.cookT > GRENADE.fuse - 1.2 ? (Math.random() - 0.5) * 0.006 : 0;
+    for (const k in this.vmItems) this.vmItems[k].visible = k === kind && this.cookBlend > 0.3;
+    const item = this.vmItems[kind];
+    if (item.visible) {
+      const shake = this.cookT !== null && EQUIPMENT[kind].cook && this.cookT > EQUIPMENT[kind].fuse - 1.2 ? (Math.random() - 0.5) * 0.006 : 0;
       handFrame(_tp, _tq, null, null, _a.set(-0.17 + shake, -0.17 - (1 - this.cookBlend) * 0.2, -0.36), COOK_F, PALM_UP);
-      toward(_tp, _tq, POSES.cup, smooth(0.3, 0.8, this.cookBlend));
-      this.vmNade.position.copy(_tp).add(_a.set(0, 0.045, -0.012));
-      this.vmNade.rotation.set(0.4, 0.3, 0);
+      toward(_tp, _tq, kind === 'knife' ? POSES.fist : POSES.cup, smooth(0.3, 0.8, this.cookBlend));
+      if (kind === 'knife') { item.position.copy(_tp).add(_a.set(0.005, 0.055, -0.02)); item.rotation.set(1.15, 0.2, 0.1); }   // handle in the fist, blade standing up out of it
+      else { item.position.copy(_tp).add(_a.set(0, 0.045, -0.012)); item.rotation.set(0.4, 0.3, 0); }
     }
     blendPose(this.lPose, lPose, tPose, lk);
     poseArm(this.arms.R, SHOULDER_R, _R, _rq, FIT.R.pose, POLE_R);

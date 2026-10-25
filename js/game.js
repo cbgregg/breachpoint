@@ -783,6 +783,7 @@ export class Game {
       case 'kill': this.audio.play('kill', null, { ui: true }); inp.rumble(0.3, 0.6, 120); break;
       case 'score': hud.scoreEvent(a[0], a[1]); break;
       case 'medal': hud.medal(a[0], a[1]); break;
+      case 'kpick': if (this.mode === 'guest' && this.player) this.player.grenades++; hud.toast('+1 THROWING KNIFE'); this.audio.play('pickup', null, { ui: true }); break;
       case 'death': {
         inp.clearAds();
         const killer = this.charById ? this.charById(a[0]) : null;
@@ -841,6 +842,7 @@ export class Game {
 
   // ---------- combat ----------
   shoot(shooter, def, origin, dir, spread) {
+    if (def.sling) return this.slingShot(shooter, def, origin, dir);
     const ff = this.settings.friendlyFire;
     const isPlayer = shooter === this.player;
     const muzzle = isPlayer ? this.playerCtl.muzzleWorld(_m) : shooter.muzzleWorld(_m);
@@ -959,7 +961,10 @@ export class Game {
     const origin = c.eyePos(new THREE.Vector3());
     const f = c.forward(_d);
     const fuse = spec.knife ? 8 : Math.max(0, spec.fuse - cook);
-    origin.addScaledVector(f, fuse <= 0 ? 0.2 : 0.5);
+    // it leaves the hand half a metre out: not past a wall you're up against (it started inside it, and flew on
+    // through)
+    const out = fuse <= 0 ? 0.2 : 0.5, wallHit = this.physics.raycast(origin, f, out + 0.15);
+    origin.addScaledVector(f, wallHit ? Math.max(0, wallHit.t - 0.15) : out);
     let vel;
     if (spec.knife) {
       // a knife flies almost flat: aim straight at the target (bots lead a touch for the drop)
@@ -977,6 +982,22 @@ export class Game {
     if (fuse <= 0) vel.set(0, 0, 0); // cooked too long: it goes off in your hand
     this.spawnGrenade(id, origin, vel, c, fuse, type);
     this.emit(['gren', id, +origin.x.toFixed(2), +origin.y.toFixed(2), +origin.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), c.id, +fuse.toFixed(2), type]);
+  }
+
+  // the knife slingshot: a throwing knife straight down the aim line from the eye, no spread, a little drop
+  slingShot(shooter, def, origin, dir) {
+    this.audio.play('melee', shooter === this.player ? null : shooter.pos);   // the band's snap
+    if (shooter === this.player) this.playerCtl.addShake(0.08);
+    if (this.mode === 'guest') return;   // the host flies it and tells everyone
+    const S = def.sling, d = dir.clone().normalize();
+    const hit = this.physics.raycast(origin, d, 0.55);
+    const start = origin.clone().addScaledVector(d, hit ? Math.max(0, hit.t - 0.15) : 0.4);
+    const vel = d.multiplyScalar(S.speed);
+    const id = (this.grenadeSeq = (this.grenadeSeq || 0) + 1);
+    this.spawnGrenade(id, start, vel, shooter, 8, 'knife');
+    Object.assign(this.grenades[this.grenades.length - 1], { wid: 'sling', grav: S.drop, dmg: S.damage, noPick: true });
+    this.emit(['gren', id, +start.x.toFixed(2), +start.y.toFixed(2), +start.z.toFixed(2), +vel.x.toFixed(2), +vel.y.toFixed(2), +vel.z.toFixed(2), shooter.id, 8, 'knife']);
+    if (!def.quiet) this.reportIntel(this.ffa ? 1 : 1 - shooter.team, shooter.pos);
   }
 
   // one shared mesh per kind of thrown equipment
@@ -1087,7 +1108,7 @@ export class Game {
     const host = this.mode !== 'guest';
     if (!g.stuck && !g.attach) {
       g.prev.copy(g.pos);
-      g.vel.y -= GRAV * (spec.knife ? 0.3 : 1) * dt;
+      g.vel.y -= GRAV * (g.grav ?? (spec.knife ? 0.3 : 1)) * dt;
       const step = g.vel.length() * dt;
       if (step > 1e-5) {
         _d.copy(g.vel).normalize();
@@ -1095,6 +1116,7 @@ export class Game {
         let best = wall ? wall.t : step, who = null;
         for (const c of this.characters) {
           if (!c.alive || c === g.owner || c.hidden) continue;
+          if (spec.knife && g.owner && !this.foes(g.owner, c) && !this.settings.friendlyFire) continue;   // a knife flies past your own side
           if (c.pos.distanceToSquared(g.prev) > (step + 3) * (step + 3)) continue;
           const r = this.rayCharacter(g.prev, _d, c, best);
           if (r.t < best) { best = r.t; who = c; g.head = r.head; }
@@ -1105,7 +1127,7 @@ export class Game {
             if (host && (this.foes(g.owner || who, who) || this.settings.friendlyFire)) {
               const wasAlive = who.alive;
               who.hitReact(g.pos, _d, 1.6, !!g.head);
-              who.takeDamage(spec.damage, g.owner, 'knife', !!g.head, g.owner ? g.owner.pos : g.pos);
+              who.takeDamage(g.dmg ?? spec.damage, g.owner, g.wid || 'knife', !!g.head, g.owner ? g.owner.pos : g.pos);
               if (g.owner) this.notify(g.owner, 'hit', wasAlive && !who.alive, !!g.head);
               this.audio.play('meleehit', who.pos);
               this.emit(['boom', g.id, +g.pos.x.toFixed(2), +g.pos.y.toFixed(2), +g.pos.z.toFixed(2), 'knife']);
@@ -1117,10 +1139,17 @@ export class Game {
         } else if (wall) {
           g.stuck = true;
           this.audio.play(spec.knife ? 'impact' : 'bounce', g.pos);
-          if (spec.knife) g.fuse = Math.min(g.fuse, 6);
+          if (spec.knife) {
+            // point first and a few centimetres in, where it can be picked up again for a while
+            g.fuse = 20;
+            g.mesh.lookAt(_a.copy(g.pos).sub(g.vel));
+            g.pos.addScaledVector(_d, 0.06);
+          }
         }
       }
-      if (spec.knife) g.mesh.lookAt(_a.copy(g.pos).sub(g.vel)); else g.mesh.rotation.x += 12 * dt;
+      // in flight a knife turns end over end (about three turns a second), a grenade tumbles
+      if (spec.knife && !g.stuck) { g.mesh.lookAt(_a.copy(g.pos).sub(g.vel)); g.spin = (g.spin || 0) + dt * 19; g.mesh.rotateX(g.spin); }
+      else if (!spec.knife) g.mesh.rotation.x += 12 * dt;
     }
     if (g.attach) {
       if (g.attach.alive) g.pos.copy(g.attach.pos).add(g.off);
@@ -1128,6 +1157,18 @@ export class Game {
     }
     g.mesh.position.copy(g.pos);
     g.fuse -= dt;
+    if (spec.knife && g.stuck && host && !g.noPick) {
+      // walk over a knife in a wall or the floor to take it back (anyone carrying throwing knives, up to the max)
+      for (const c of this.characters) {
+        if (!c.alive || c.lethal !== 'knife' || c.grenades >= spec.max) continue;
+        const dx = c.pos.x - g.pos.x, dz = c.pos.z - g.pos.z, dy = g.pos.y - c.pos.y;
+        if (dx * dx + dz * dz > 1.4 * 1.4 || dy < -0.6 || dy > 2.0) continue;
+        c.grenades++;
+        this.notify(c, 'kpick');
+        this.emit(['boom', g.id, +g.pos.x.toFixed(2), +g.pos.y.toFixed(2), +g.pos.z.toFixed(2), 'kpick']);
+        return true;
+      }
+    }
     if (spec.knife) return g.fuse <= 0;
     // semtex light blinks faster as it's about to go
     if (g.mesh.children[1]) g.mesh.children[1].visible = Math.sin(this.time * (g.fuse < 0.8 ? 40 : 14)) > 0;

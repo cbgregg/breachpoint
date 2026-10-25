@@ -488,6 +488,7 @@ export class Character {
     const spec = EQUIPMENT[this.lethal];
     this.grenades--;
     this.grenadeCd = spec.knife ? 0.55 : GRENADE.cooldown;
+    this.throwDur = this.grenadeCd;   // the viewmodel's throw swing is timed to this (a knife is quicker than a frag)
     this.weapon.cancelReload();
     this.game.throwGrenade(this, target, spec.cook ? Math.max(0, Math.min(spec.fuse, cook || 0)) : 0, this.lethal);
     return true;
@@ -496,6 +497,7 @@ export class Character {
     if (!this.canTactical()) return false;
     this.tacticals--;
     this.grenadeCd = GRENADE.cooldown;
+    this.throwDur = this.grenadeCd;
     this.weapon.cancelReload();
     this.game.throwGrenade(this, target, 0, this.tactical);
     return true;

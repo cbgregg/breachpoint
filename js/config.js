@@ -175,6 +175,16 @@ export const WEAPONS = {
     rocket: { speed: 48, radius: 6.5, damage: 165, direct: 60 },
     model: { type: 'launcher', sight: 'iron' },
   },
+  sling: {
+    // Knife Slingshot: Gun Game's last weapon. Fires a throwing knife: no spread at all (hip or aimed), a fast
+    // flat flight with a little drop, and only a direct hit counts (one hit kills). One knife per draw.
+    id: 'sling', name: 'Knife Slingshot', short: 'SLINGSHOT', mode: 'KNIFE', auto: false, rpm: 75, damage: 0, headMult: 1,
+    mag: 1, reserve: 99, reload: 0.85, spread: 0, adsSpread: 0, moveSpread: 0,
+    recoilPitch: 0.006, recoilYaw: 0, range: 120, falloffStart: 120, falloffEnd: 120, falloffMin: 1,
+    pellets: 1, adsFov: 50, adsTime: 0.2, botRange: [4, 24], quiet: true,
+    sling: { speed: 58, drop: 0.15, damage: 200 },
+    model: { type: 'pistol', sight: 'iron' },
+  },
 };
 
 export const PRIMARIES = ['rifle', 'kv47', 'br308', 'hx60', 'smg', 'krv45', 'shotgun', 'sa12', 'mr14', 'sniper'];

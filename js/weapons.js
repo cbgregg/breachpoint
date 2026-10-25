@@ -651,7 +651,7 @@ export function buildGun(id, { forViewmodel = false, att = null, detail = null }
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0.012, 0.02, 0.1);
     // aimed at arm's length (not up against the eye like a rifle optic), so both hands show under the sights
     if (A.optic === 'reflex') sight({ ...opticReflex(p, g, M, 0.0755, 0.035, 0.8), eyeRelief: -0.3 });
-    else sight({ sightY: 0.07, sightZ: 0.02, eyeRelief: -0.32 });   // front post on the crosshair
+    else sight({ sightY: 0.07, sightZ: 0.02, eyeRelief: -0.26 });   // front post on the crosshair
     muzzle.position.set(0, 0.047, -muzF);
     eject.position.set(0.016, 0.062, -0.05);
   } else if (type === 'launcher') {
@@ -943,7 +943,7 @@ export function buildGun(id, { forViewmodel = false, att = null, detail = null }
     p.rbox(M.metal, 0.0315, 0.004, 0.006, 0, 0.022, -0.075, 0.0015);              // slide stop / takedown lever
     p.rbox(M.metal, 0.004, 0.004, 0.012, -0.0155, 0.032, -0.045, 0.0012);
     p.rbox(M.poly, 0.006, 0.008, 0.01, 0.0158, 0.003, -0.032, 0.002);              // mag release
-    sightY = 0.0695; sightZ = 0.012; eyeRelief = -0.32;
+    sightY = 0.0695; sightZ = 0.012; eyeRelief = -0.26;   // handguns: 26 cm out (at 32-42 cm the sights were a speck over two big hands)
     if (A.optic === 'reflex') sight({ ...opticReflex(p, g, M, 0.0625, 0.035, 0.8), eyeRelief: -0.3 });
     muzF = Math.max(0.18, muzzleDevice(p, M, A.muzzle, 0.047, 0.178, 0.0075, 0.13));
     if (A.laser === 'laser') laser = laserModule(p, g, M, 0, -0.002, 0.13, 0.02);

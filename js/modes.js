@@ -33,11 +33,11 @@ export const MODES = {
   },
   gungame: {
     id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true, ffa: true,
-    blurb: 'Free-for-all. Every kill moves you up to the next gun; a knife kill sends the victim back one. First kill with the last gun wins.',
+    blurb: 'Free-for-all. Every kill moves you up to the next gun; a knife kill sends the victim back one. The last one is the knife slingshot: one clean hit with it wins.',
   },
 };
 // Gun Game ladder: rifles down to handguns (free-for-all: each player climbs it on their own).
-export const GUN_LADDER = ['rifle', 'kv47', 'br308', 'smg', 'krv45', 'hx60', 'shotgun', 'sa12', 'mr14', 'sniper', 'monte', 'mp18', 'd50', 'r357', 'pistol'];
+export const GUN_LADDER = ['rifle', 'kv47', 'br308', 'smg', 'krv45', 'hx60', 'shotgun', 'sa12', 'mr14', 'sniper', 'monte', 'mp18', 'd50', 'r357', 'pistol', 'sling'];   // the knife slingshot last: a kill with it wins
 export const MODE_IDS = Object.keys(MODES);
 
 // bomb sites on team 1's side (+x); team 0's are point-mirrored, like the maps themselves

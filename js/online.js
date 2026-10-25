@@ -1223,6 +1223,7 @@ export class GuestSession {
         const [, id, x, y, z, kind] = ev;
         if (![x, y, z].every(fin)) return;
         if (kind !== 'shock') g.removeGrenade(id);   // a shock stick pulses a few times before it's done
+        if (kind === 'kpick') break;                  // a thrown knife picked back up: just gone
         g.equipFx(EQUIPMENT[kind] ? kind : 'frag', new THREE.Vector3(x, y, z));
         break;
       }
@@ -1261,6 +1262,7 @@ export class GuestSession {
       case 'hit': g.localNotify('hit', !!a, !!b, !!c); break;
       case 'dmg': g.localNotify('dmg', fin(a) ? a : null, fin(b) ? b : 0); break;
       case 'kill': g.localNotify('kill'); break;
+      case 'kpick': g.localNotify('kpick'); break;
       case 'score': g.localNotify('score', cleanLabel(a), fin(b) ? b | 0 : 0); break;
       case 'medal': g.localNotify('medal', cleanLabel(a), cleanLabel(b)); break;
       case 'death': g.localNotify('death', fin(a) ? a : -1, typeof b === 'string' ? b.slice(0, 12) : ''); break;
