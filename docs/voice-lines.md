@@ -47,7 +47,7 @@ In the style of Sound Transit's recorded announcements: a warm, neutral, unhurri
 | `this_is_symphony` | "Symphony Station." | Doors open at Symphony |
 | `this_is_chinatown` | "International District, Chinatown Station." | Doors open at Chinatown |
 | `doors_closing` | "Please stand clear. The doors are closing." | Doors start to close (on board and on the platform) |
-| `hold_on` | "Please hold on." | As the train pulls out |
+| `hold_on` | "Please hold on." (a real recording: `tools/gen_voice.py` never generates over it) | As the train pulls out |
 | `next_pioneer_left`, `next_pioneer_right` | "Next stop, Pioneer Square. Transfer available to First Hill Streetcar. Doors open on the left / right." | Three and a half seconds after pulling out |
 | `next_symphony_left`, `next_symphony_right` | "Next stop, Symphony Station. Doors open on the left / right." | Same |
 | `next_chinatown_left`, `next_chinatown_right` | "Next stop, International District, Chinatown. Transfer available to Sounder Commuter Rail and Amtrak at King Street Station. Doors open on the left / right." | Same |

@@ -15,7 +15,7 @@ What there is:
                                  player picks one in Options (or a random one each match)
   vo/chatter/<voice>/<kind>_<n>  twelve operator voices (six women, six men), three takes of every callout and
                                  five banter lines each; every character keeps one voice for the match
-  vo/link/<id>                   the Link light rail announcements
+  vo/link/<id>                   the Link light rail announcements ("Please hold on." is a real recording)
 """
 import difflib, json, os, re, subprocess, sys, threading, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -49,6 +49,8 @@ def t(text):
 
 
 LINES = {}   # id -> (voice, ssml body)
+# lines recorded by a person: never generated over, even with --force (the script stays here for reference)
+RECORDED = {'vo/link/hold_on'}
 
 
 def add(id_, voice, body):
@@ -478,7 +480,7 @@ def main():
     force, verify, verify_all = '--force' in sys.argv, '--no-verify' not in sys.argv, '--verify-all' in sys.argv
     jobs = []
     for id_ in LINES:
-        if only and not id_.startswith(only):
+        if (only and not id_.startswith(only)) or id_ in RECORDED:
             continue
         exists = os.path.exists(os.path.join(OUT, id_ + '.mp3'))
         if force or not exists:
