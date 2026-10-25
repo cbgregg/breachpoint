@@ -2,7 +2,7 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
-**Every voice line is already generated**: 1,029 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[panicked]`, `[dry, sarcastic]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
+**Every voice line is already generated**: 1,170 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[urgent, shaken]`, `[deadpan]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
 
 ---
 
@@ -10,13 +10,15 @@ Everything the game can play from a recording. Nothing here is required: until a
 
 Five announcers, each a different character with their own wording and two or three ways of saying every announcement (`<id>_1`, `<id>_2`, `<id>_3`; the game never plays the same take twice running). Players pick one under Options > Audio > Announcer, or get a different one every match (the default; the next one loads while you play).
 
+Grounded and terse, in the spirit of Black Ops 2: no hype, no jokes.
+
 | Pack | Voice | Character |
 |---|---|---|
 | `control` | Adam | A calm, clipped mission controller |
-| `sable` | Sanna Hartfield | A cool, dry, slightly sarcastic commander |
-| `ghost` | Austin Knox | A gruff drill sergeant (a deep Texan) |
-| `hype` | Kix | An esports arena caster |
-| `nova` | Jessica | Upbeat and playful |
+| `sable` | Lily | A cool, clipped British intelligence officer |
+| `ghost` | Austin Knox | A gruff veteran sergeant |
+| `warden` | Bill | An older commanding officer, measured and grave |
+| `echo` | Matilda | A crisp tactical radio operator |
 
 Every pack has these ids:
 
@@ -59,7 +61,7 @@ In the style of Sound Transit's recorded announcements: a warm, neutral, unhurri
 
 ## 3. Operators (`vo/chatter/<voice>/...`)
 
-Twelve operator voices, six women and six men: `sarah`, `laura`, `allison`, `piper`, `hope`, `samantha`, `harry`, `liam`, `charlie`, `callum`, `aiden`, `chris`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). Every callout is acted for its moment (grenades shouted, a teammate down panicked, a hit in pain), and every banter line has its own direction: "[nervous laugh] Honestly? I'm terrified. Let's go."
+Twelve operator voices, six women and six men: `sarah`, `laura`, `allison`, `piper`, `hope`, `samantha`, `harry`, `liam`, `charlie`, `callum`, `aiden`, `chris`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). Callouts are short and military; each is acted for its moment (grenades shouted, a teammate down urgent, a hit strained). Banter is the one place for humour: dry and deadpan, delivered completely straight, Airplane! rather than a sitcom ("[deadpan] I'm not saying we're outnumbered. I'm saying there's more of them.").
 
 | id | When |
 |---|---|
@@ -69,6 +71,9 @@ Twelve operator voices, six women and six men: `sarah`, `laura`, `allison`, `pip
 | `enemy_down` | A bot gets a kill |
 | `man_down` | A teammate dies nearby |
 | `hit` | A bot takes a heavy hit and survives |
+| `planting`, `defusing` | Search and Destroy: someone starts planting or defusing the bomb |
+| `last_alive` | Round modes: the last one left alive on a team ("It's just me.") |
+| `grenade` | A frag or semtex about to go off next to a bot ("Grenade! Move!") |
 | `banter` | Pre-match countdown, a couple of your squad |
 
 ### Infected (`vo/infected/...`)
