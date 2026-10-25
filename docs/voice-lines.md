@@ -2,6 +2,8 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
+**Every voice line below is already generated** with Azure's HD text-to-speech voices by `tools/gen_voice.py` (the lines, voices and wording live in that script; it also rewrites the manifest). To regenerate: `AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/link` for one section). The key is read from the environment only; never commit it. A real recording saved over a generated file replaces it.
+
 ## How to add a recording
 
 1. Record or export it as **MP3**, 44.1 or 48 kHz. Voice: mono, close mic, no music, about -16 LUFS (all lines at the same loudness), a few milliseconds of silence trimmed at each end. Effects: mono unless noted, peaks around -3 dB.
@@ -68,12 +70,12 @@ One voice: a calm, clipped mission controller. Not shouty, apart from the medals
 
 | id | Line |
 |---|---|
-| `round_1` … `round_15` | "Round one." … "Round fifteen." |
+| `round_1_1` … `round_15_1` | "Round one." … "Round fifteen." (saved as take 1 of `round_3` etc., since a bare `round_3` would load as take 3 of `round`) |
 | `final_round` | "Final round." |
 | `switching_sides` | "Switching sides." |
 | `overtime` | "Overtime. Capture the flag." |
-| `round_won` | "Round won." |
-| `round_lost` | "Round lost." |
+| `round_won` | "You won the round." |
+| `round_lost` | "You lost the round." |
 | `round_draw` | "Round drawn." |
 | `bomb_planted` | "Bomb planted." |
 | `bomb_defused` | "Bomb defused." |
@@ -88,28 +90,27 @@ One voice: a calm, clipped mission controller. Not shouty, apart from the medals
 
 ## 2. Link light rail announcements (`vo/link/...`)
 
-In the style of Sound Transit's recorded announcements: a warm, neutral, unhurried voice. The on-board lines come from the car (you hear them riding or standing beside it). The platform line comes from the platform.
+In the style of Sound Transit's recorded announcements: a warm, neutral, unhurried voice (Ava on board, Andrew on the platform). The on-board lines come from the car (you hear them riding or standing beside it). The platform lines come from the platform.
 
 | id | Line | When |
 |---|---|---|
 | `this_is_pioneer` | "Pioneer Square Station." | Doors open at Pioneer Square |
 | `this_is_symphony` | "Symphony Station." | Doors open at Symphony |
 | `this_is_chinatown` | "International District, Chinatown Station." | Doors open at Chinatown |
-| `doors_left` | "Doors to my left." | Two seconds after the station name |
-| `doors_right` | "Doors to my right." | Two seconds after the station name |
 | `doors_closing` | "Please stand clear. The doors are closing." | Doors start to close (on board and on the platform) |
-| `next_pioneer` | "Next stop: Pioneer Square." | Four seconds after pulling out |
-| `next_symphony` | "Next stop: Symphony." | Four seconds after pulling out |
-| `next_chinatown` | "Next stop: International District, Chinatown." | Four seconds after pulling out |
-| `pa_arriving_pioneer` | "Now arriving: a train to Pioneer Square." | Platform PA as a train runs in |
-| `pa_arriving_symphony` | "Now arriving: a train to Symphony." | Platform PA as a train runs in |
-| `pa_arriving_chinatown` | "Now arriving: a train to International District, Chinatown." | Platform PA as a train runs in |
+| `hold_on` | "Please hold on." | As the train pulls out |
+| `next_pioneer_left`, `next_pioneer_right` | "Next stop, Pioneer Square. Transfer available to First Hill Streetcar. Doors open on the left / right." | Three and a half seconds after pulling out |
+| `next_symphony_left`, `next_symphony_right` | "Next stop, Symphony Station. Doors open on the left / right." | Same |
+| `next_chinatown_left`, `next_chinatown_right` | "Next stop, International District, Chinatown. Transfer available to Sounder Commuter Rail and Amtrak at King Street Station. Doors open on the left / right." | Same |
+| `pa_arriving_pioneer` | "Now arriving: 1 Line to Pioneer Square. Please step back from the edge of the platform." | Platform PA as a train runs in |
+| `pa_arriving_symphony` | "Now arriving: 1 Line to Symphony. Please step back from the edge of the platform." | Same |
+| `pa_arriving_chinatown` | "Now arriving: 1 Line to International District, Chinatown. Please step back from the edge of the platform." | Same |
 
 ---
 
 ## 3. Character chatter (`vo/chatter/...`)
 
-All operators share one voice set for now, so record three or four takes of each. Short, under breath, the way a squad talks in a firefight. Teammates and enemies both say these, from where they stand.
+Four voices take turns (one take each), so the same line sounds like a different operator each time. Short, under breath, the way a squad talks in a firefight. Teammates and enemies both say these, from where they stand.
 
 | id | Example lines (one per take) | When |
 |---|---|---|
@@ -122,7 +123,7 @@ All operators share one voice set for now, so record three or four takes of each
 | `contact` | "Contact!" · "Enemy spotted!" · "Got eyes on one!" · "Tango!" | A bot spots an enemy |
 | `enemy_down` | "Enemy down." · "Got him." · "Tango down." · "Scratch one." | A bot gets a kill |
 | `man_down` | "Man down!" · "We lost one!" · "They got him!" | A teammate dies nearby |
-| `banter` | Record 10 or more: "Same as last time. Nobody dies." · "Check your corners." · "Anyone else hungry?" · "I've got a good feeling about this." · "Stay tight, stay quiet." · "Light 'em up." · "Who brought the snacks?" · "Eyes up, people." · "Let's make it quick." · "Last one back buys." | Pre-match countdown, a couple of your squad |
+| `banter` | Record 10 or more: "Same as last time. Nobody dies." · "Check your corners." · "Anyone else hungry?" · "I've got a good feeling about this." · "Stay tight, stay quiet." · "Light them up." · "Who brought the snacks?" · "Eyes up, people." · "Let's make it quick." · "Last one back buys." | Pre-match countdown, a couple of your squad |
 
 ### Infected (`vo/infected/...`)
 

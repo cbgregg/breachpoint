@@ -730,12 +730,14 @@ function build(ctx) {
       if (ph !== tr.phase) {
         const pos = new THREE.Vector3(X, Y + 1.5, Z), here = STATION_KEY[s.st], nxt = STATION_KEY[s.next];
         const plat = new THREE.Vector3(X + ds * 3, Y + 1.6, Z);   // the platform beside the doors
-        // doors to the rider's left or right, facing the way the car runs (facing +z, your right is -x)
-        const side = ds === (DIRZ[tr.d] > 0 ? -1 : 1) ? 'right' : 'left';
-        if (ph === 'open') { sounds.push(['traindoor', pos], ['trainchime', pos], ['vo', pos, { id: `vo/link/this_is_${here}` }], ['vo', pos, { id: `vo/link/doors_${side}`, delay: 2.2 }]); }
+        // as Link does it: pulling out, "please hold on", then the next stop with its transfers and which side its
+        // doors open on (facing the way the car runs: facing +z, your right is -x); the station's name on arrival;
+        // "please stand clear" as the doors close; the platform PA as a train runs in
+        const side2 = STATIONS[s.next].doors[tr.d] === (DIRZ[tr.d] > 0 ? -1 : 1) ? 'right' : 'left';
+        if (ph === 'open') sounds.push(['traindoor', pos], ['trainchime', pos], ['vo', pos, { id: `vo/link/this_is_${here}` }]);
         if (ph === 'shut' && tr.phase === 'open') sounds.push(['trainchime', pos], ['traindoor', pos, { close: true }], ['vo', pos, { id: 'vo/link/doors_closing' }], ['vo', plat, { id: 'vo/link/doors_closing' }]);
         if (ph === 'shut' && tr.phase === 'in') sounds.push(['trainbrake', pos]);
-        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos], ['vo', pos, { id: `vo/link/next_${nxt}`, delay: 4 }]);
+        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos], ['vo', pos, { id: 'vo/link/hold_on', delay: 0.6 }], ['vo', pos, { id: `vo/link/next_${nxt}_${side2}`, delay: 3.5 }]);
         if (ph === 'in') sounds.push(['trainbell', pos], ['vo', plat, { id: `vo/link/pa_arriving_${STATION_KEY[s.next]}` }]);
         tr.phase = ph;
       }
