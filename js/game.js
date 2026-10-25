@@ -13,7 +13,7 @@ import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadou
 const INF_LOADOUT = soloLoadout('blade');   // Infected: a combat knife in both slots (fire slashes)
 import { BotBrain } from './bot.js';
 // the five announcers and the twelve operator voices (recorded by tools/gen_voice.py: the same keys there)
-export const ANNOUNCERS = ['control', 'sable', 'ghost', 'hype', 'nova'];
+export const ANNOUNCERS = ['control', 'sable', 'ghost', 'warden', 'echo'];
 export const VOICES = ['sarah', 'harry', 'laura', 'liam', 'allison', 'charlie', 'piper', 'callum', 'hope', 'aiden', 'samantha', 'chris'];
 const nameHash = (n) => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 import { PROPS } from './props.js';
@@ -554,7 +554,7 @@ export class Game {
       // (a world can say how well a sound carries to where you are: a train under the street, in another station)
       const ear = this.camera.position, aud = this.world.audible;
       if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) {
-        const k = aud && pos ? aud(pos, ear) : 1;
+        const k = aud && pos ? aud(pos, ear, name) : 1;
         if (k > 0.02) this.audio.play(name, pos, k < 1 ? { ...opts, occl: Math.sqrt(k), muffle: 1 - k } : opts);
       }
       this.world.sounds.length = 0;
@@ -1114,6 +1114,12 @@ export class Game {
         continue;
       }
       const spec = g.spec || EQUIPMENT.frag;
+      // a frag or semtex about to go off next to a bot: "grenade! move!"
+      if (this.mode !== 'guest' && !g.warned && (g.type === 'frag' || g.type === 'semtex') && g.fuse < 2) {
+        g.warned = true;
+        const near = this.characters.find(c => c.isBot && c.alive && c !== g.owner && c.pos.distanceTo(g.pos) < 7);
+        if (near) this.callout(near, 'grenade', 0.8, false, true);
+      }
       if (spec.knife || spec.sticky) { if (this.updateStickyOrKnife(g, spec, dt)) { this.scene.remove(g.mesh); this.grenades.splice(i, 1); } continue; }
       for (let s = 0; s < 2; s++) {
         const h = dt / 2;
@@ -1334,10 +1340,11 @@ export class Game {
   }
   // a character's callout (reloading, frag out, contact...), heard from where they are: not too often from
   // anyone, and not on top of each other
-  callout(c, kind, chance = 1, remote = false) {
+  callout(c, kind, chance = 1, remote = false, urgent = false) {
     if (!c || !c.alive || Math.random() > chance) return;
     const t = this.time;
-    if (!remote && (t - (c.calloutT ?? -9) < 3.5 || t - (this.calloutT ?? -9) < 1.2)) return;
+    // (urgent ones, a grenade at someone's feet or the last one alive, only wait for that character)
+    if (!remote && (t - (c.calloutT ?? -9) < (urgent ? 1.2 : 3.5) || (!urgent && t - (this.calloutT ?? -9) < 1.2))) return;
     c.calloutT = t; this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
     const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, me = c === this.player;
@@ -1407,7 +1414,12 @@ export class Game {
     if (this.inf) this.infectedKill(killer, victim);
     // chatter: the killer calls it, a teammate of the fallen nearby calls that
     if (enemyKill && killer && killer.isBot) this.callout(killer, 'enemy_down', 0.35);
-    if (!this.ffa) { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.5); }
+    if (!this.ffa) {
+      // round modes: the last one left on a team says so; otherwise a teammate nearby calls the loss
+      const left = this.gm ? this.characters.filter(c => c.alive && c !== victim && c.team === victim.team) : [];
+      if (left.length === 1 && left[0].isBot) this.callout(left[0], 'last_alive', 0.9, false, true);
+      else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.5); }
+    }
     // Team Deathmatch: the lead changing hands
     if (!this.gm && !this.ffa && !this.inf && enemyKill && this.player) {
       const lead = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;

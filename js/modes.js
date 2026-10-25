@@ -315,6 +315,7 @@ class RoundMode {
     if (this.act) {
       const ac = this.act;
       ac.c.busy = true;
+      if (!ac.said) { ac.said = true; this.g.callout(ac.c, ac.kind === 'plant' ? 'planting' : 'defusing', 0.8, false, true); }   // "planting, cover me!"
       ac.t += dt;
       const need = ac.kind === 'plant' ? cfg.plantTime : cfg.defuseTime;
       this.progress = Math.min(1, ac.t / need);

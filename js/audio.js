@@ -377,12 +377,12 @@ export class GameAudio {
       // Link light rail (the station piece and Link Loop): the two-tone horn, the bell, wheel and motor rumble, the door chime
       case 'trainhorn': {
         const o = dry(0.5);
-        for (const [f, dt0] of [[311, 0], [370, 0], [311, 0.75], [370, 0.75]]) this.tone(o, t + dt0, { freq: f, type: 'sawtooth', decay: 0.6, gain: 0.18, attack: 0.03 });
+        for (const [f, dt0] of [[311, 0], [370, 0], [311, 0.75], [370, 0.75]]) this.tone(o, t + dt0, { freq: f, type: 'sawtooth', decay: 0.6, gain: 0.12, attack: 0.03 });
         break;
       }
       case 'trainbell': {
         const o = dry(0.4);
-        for (let i = 0; i < 6; i++) this.tone(o, t + i * 0.32, { freq: 1180, type: 'triangle', decay: 0.28, gain: 0.25 });
+        for (let i = 0; i < 6; i++) this.tone(o, t + i * 0.32, { freq: 1180, type: 'triangle', decay: 0.28, gain: 0.16 });
         break;
       }
       case 'trainrumble': {
@@ -395,12 +395,12 @@ export class GameAudio {
       case 'trainmotor': {
         const o = dry(0.25), v = opts.speed || 0, acc = opts.acc || 0, k = Math.min(1, v / 16);
         const f = 140 + v * 38 + (acc < 0 ? 40 : 0);
-        this.tone(o, t, { freq: f, end: f * (acc > 0 ? 1.04 : acc < 0 ? 0.96 : 1), type: 'sawtooth', decay: 0.42, gain: (0.04 + 0.05 * Math.min(1, Math.abs(acc))) * (0.4 + 0.6 * k), attack: 0.12 });
-        this.tone(o, t, { freq: f * 2.01, type: 'sine', decay: 0.42, gain: 0.025 * (0.4 + 0.6 * k), attack: 0.12 });
-        this.noiseBurst(o, t, { freq: 140 + 160 * k, decay: 0.5, gain: 0.25 + 0.3 * k, attack: 0.12 });   // wheels on rail
+        this.tone(o, t, { freq: f, end: f * (acc > 0 ? 1.04 : acc < 0 ? 0.96 : 1), type: 'sawtooth', decay: 0.42, gain: (0.025 + 0.03 * Math.min(1, Math.abs(acc))) * (0.4 + 0.6 * k), attack: 0.12 });
+        this.tone(o, t, { freq: f * 2.01, type: 'sine', decay: 0.42, gain: 0.015 * (0.4 + 0.6 * k), attack: 0.12 });
+        this.noiseBurst(o, t, { freq: 140 + 160 * k, decay: 0.5, gain: 0.14 + 0.16 * k, attack: 0.12 });   // wheels on rail
         break;
       }
-      case 'trainclack': { const o = dry(0.3); for (const dt0 of [0, 0.11]) { this.noiseBurst(o, t + dt0, { freq: 420, decay: 0.07, gain: 0.45 }); this.tone(o, t + dt0, { freq: 95, end: 60, decay: 0.08, gain: 0.25 }); } break; }
+      case 'trainclack': { const o = dry(0.3); for (const dt0 of [0, 0.11]) { this.noiseBurst(o, t + dt0, { freq: 420, decay: 0.07, gain: 0.28 }); this.tone(o, t + dt0, { freq: 95, end: 60, decay: 0.08, gain: 0.16 }); } break; }
       case 'trainbrake': { const o = dry(0.3); this.noiseBurst(o, t, { type: 'highpass', freq: 2500, decay: 0.9, gain: 0.12, attack: 0.05 }); this.tone(o, t + 0.1, { freq: 2350, end: 2200, type: 'sine', decay: 0.5, gain: 0.025, attack: 0.05 }); break; }
       case 'traindoor': { const o = dry(0.2); this.noiseBurst(o, t, { type: 'bandpass', freq: 650, q: 1.5, decay: 0.9, gain: 0.12, attack: 0.15 }); this.tone(o, t + (opts.close ? 0.85 : 0.9), { freq: 120, end: 80, decay: 0.12, gain: 0.25 }); break; }
       case 'trainchime': {

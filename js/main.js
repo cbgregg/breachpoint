@@ -927,7 +927,7 @@ const OPT_DESC = {
   'opt-aa': 'With a controller, your aim slows over enemies and follows them slightly. Mouse aim is never assisted.',
   'opt-vib': 'Controller rumble on shots, hits and explosions.',
   'opt-vol': 'Volume of everything: weapons, footsteps, voices and music.',
-  'opt-announcer': 'Who calls the match: the mode, medals, rounds, the bomb. Each has their own way of saying it, and a few ways of saying each thing. Picking one plays a line.',
+  'opt-announcer': 'Who calls the match: the mode, medals, rounds, the bomb. Each has their own voice and wording, and a few ways of saying each thing. Picking one plays a line.',
   'opt-voice': 'The voice your operator calls out reloads, grenades and so on in. Any: whichever voice the match hands you. Picking one plays a line.',
   'opt-music': 'Volume of the menu and match music only.',
   'opt-touchsize': 'Size of the on-screen buttons on phones and tablets.',

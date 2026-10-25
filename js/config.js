@@ -324,7 +324,7 @@ export const DEFAULT_SETTINGS = {
   autoSprint: false, // sprint whenever you push fully forward (not crouched / aiming / firing)
   fov: 80,
   volume: 0.7,
-  announcer: 'random',   // control, sable, ghost, hype, nova, or a different one every match
+  announcer: 'random',   // control, sable, ghost, warden, echo, or a different one every match
   voice: 'auto',         // your operator's voice in callouts (auto: whichever the match hands you)
   showFps: false,
   friendlyFire: false,

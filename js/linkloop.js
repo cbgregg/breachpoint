@@ -863,15 +863,23 @@ function build(ctx) {
     return Math.hypot(b.pos.x - waitX, b.pos.z - doorZ) < 2.5 && Math.abs(b.pos.y - st.py) < 0.6 ? { wish: toward(waitX, doorZ, 0.5) } : null;
   }
 
-  // how well a train is heard from where you are: not at all from another station, nor from up on Pioneer
-  // Square's plaza when it's in the hall below (a little at the top of a stairwell, muffled)
-  const audible = (pos, ear) => {
+  // how well a train's sound reaches you (0..1; the rest is muffled): not at all from another station; riding,
+  // the car is sealed, so its own motors and rails are a hum through the floor (its announcements stay clear) and
+  // anything outside is faint; a train in the tunnel only near the mouth, or with you in the tunnel; not from
+  // up on Pioneer Square's plaza when it's in the hall below (a little at the top of a stairwell); and it fades
+  // out across the station instead of carrying everywhere
+  const audible = (pos, ear, name) => {
     const a = stationOf(pos), b = stationOf(ear);
     if (a < 0 || a !== b) return 0;
-    if (a !== 0) return 1;
-    const under = pos.y < -2, earUnder = ear.y < -2.5;
-    if (under === earUnder) return 1;
-    return P_STAIRS.some(([x, z]) => Math.hypot(ear.x - (STATIONS[0].ox + x), ear.z - z) < 7) ? 0.25 : 0;
+    const st = STATIONS[a], quiet = name === 'trainmotor' || name === 'trainclack' || name === 'trainbrake';
+    const ride = trains.find(tr => inside(tr, ear));
+    if (ride) return Math.abs(pos.x - ride.x) < H + 0.6 && Math.abs(pos.z - ride.z) < L2 + 1 ? (quiet ? 0.22 : 1) : 0.12;
+    let k = 1;
+    const tunnel = (p) => p.z < st.mouth[0] - 2 || p.z > st.mouth[1] + 2;
+    if (tunnel(pos) && !tunnel(ear)) k *= 0.5 * Math.max(0, 1 - Math.min(Math.abs(pos.z - st.mouth[0]), Math.abs(pos.z - st.mouth[1])) / 25);
+    if (a === 0 && (pos.y < -2) !== (ear.y < -2.5)) k *= P_STAIRS.some(([x, z]) => Math.hypot(ear.x - (st.ox + x), ear.z - z) < 7) ? 0.25 : 0;
+    const d = pos.distanceTo(ear);
+    return k * (d < 20 ? 1 : Math.max(0, 1 - (d - 20) / 40));
   };
   // rooms for the reverb: Symphony's hall, Pioneer's vault, any tunnel
   const indoorAt = (p) => {
