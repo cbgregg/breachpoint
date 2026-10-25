@@ -1,0 +1,43 @@
+{
+ "intro": {
+  "file": "assets/music/intro.mp3",
+  "loop": false,
+  "len": 12.617,
+  "hit": 8.08
+ },
+ "menu": {
+  "file": "assets/music/menu.mp3",
+  "loop": true,
+  "len": 140.539
+ },
+ "action_low": {
+  "file": "assets/music/action_low.mp3",
+  "loop": true,
+  "len": 105.038
+ },
+ "action_high": {
+  "file": "assets/music/action_high.mp3",
+  "loop": true,
+  "len": 120.059
+ },
+ "infected": {
+  "file": "assets/music/infected.mp3",
+  "loop": true,
+  "len": 120.059
+ },
+ "win": {
+  "file": "assets/music/win.mp3",
+  "loop": false,
+  "len": 9.038
+ },
+ "lose": {
+  "file": "assets/music/lose.mp3",
+  "loop": false,
+  "len": 7.523
+ },
+ "muzak": {
+  "file": "assets/music/muzak.mp3",
+  "loop": true,
+  "len": 120.059
+ }
+}

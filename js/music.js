@@ -1,4 +1,8 @@
-// Original score, synthesized live with WebAudio (no recordings, so nothing to license).
+// The score. Recorded tracks (assets/music/tracks.json, composed by tools/gen_music.py) when they're there:
+//   menu, action (two layers, a tense bed and a firefight, mixed by the game's intensity), infected, the countdown
+//   build-up (its impact lands on the countdown's last tick), the win and lose stings, and the supermarket's muzak.
+// Long tracks stream (an <audio> element each, not decoded into memory) and loop by cross-fading their end into
+// their start. Otherwise, or when a file won't load, the original score synthesized live with WebAudio:
 //   menu   — slow D-minor theme: low drone, string pad, a sparse motif with a flattened 2nd, taiko hits
 //   action — 112 BPM: driving 16th bass, syncopated kit, string ostinato, brass stabs, risers.
 //            An intensity value (0..1) set by the game adds and removes layers as fights heat up.
@@ -17,6 +21,52 @@ export class Music {
     this.name = null;
     this.duck = 1;
     this.buffers = {};
+    // the recorded score, if there is one ({} if not); a synthesized track playing when it arrives is swapped out
+    this.files = null;
+    this.ready = fetch('assets/music/tracks.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(f => {
+      this.files = f && typeof f === 'object' ? f : {};
+      if (this.ctx) this.preload();
+      this.warm('menu');
+      if (this.track && this.track.synth && this.recorded(this.name)) { const n = this.name; this.name = null; this.play(n); }
+      if (this.amb && this.amb.synth && this.files.muzak) { const n = this.ambName; this.ambName = null; this.amb.stop(1); this.amb = null; this.ambient(n); }
+    });
+  }
+  // fetch a long track ahead of when it plays (so it starts at once instead of a couple of seconds late): the menu
+  // as the page loads, a match's while it loads and counts down
+  warm(name) {
+    const f = this.files;
+    if (!f) { this.ready.then(() => this.warm(name)); return; }
+    for (const id of name === 'action' ? ['action_low', 'action_high'] : [name]) {
+      if (!f[id] || (this.warmed = this.warmed || new Set()).has(id)) continue;
+      this.warmed.add(id);
+      fetch(f[id].file).catch(() => {});   // (into the browser's cache; the player streams it from there)
+    }
+  }
+  // the short ones are decoded up front (they have to land on time); the long ones stream
+  preload() {
+    for (const id of ['intro', 'win', 'lose']) {
+      const f = this.files && this.files[id];
+      if (f && !this.buffers[f.file]) this.buffers[f.file] = fetch(f.file).then(r => r.arrayBuffer()).then(b => this.ctx.decodeAudioData(b)).catch(() => null);
+    }
+  }
+  recorded(name) {
+    const f = this.files;
+    if (!f || MUSIC_FILES && MUSIC_FILES[name]) return null;
+    if (name === 'action' && f.action_low && f.action_high) return new LayerTrack(this, f.action_low, f.action_high);
+    return f[name] && f[name].loop ? new StreamLoop(this, f[name]) : null;
+  }
+  // a short recorded cue (decoded), started at `when` (optionally from `offset` into it); returns its bus, or null
+  cue(id, when, offset = 0, level = 0.85) {
+    const f = this.files && this.files[id], p = f && this.buffers[f.file];
+    if (!p) return null;
+    const bus = this.ctx.createGain(); bus.gain.value = level; bus.connect(this.out);
+    p.then(buf => {
+      if (!buf || bus.dead) return;
+      const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(bus);
+      const now = this.ctx.currentTime, at = Math.max(now, when), skip = offset + Math.max(0, now - when);
+      if (skip < buf.duration) src.start(at, skip);
+    });
+    return bus;
   }
 
   get ctx() { return this.audio.ctx; }
@@ -42,6 +92,7 @@ export class Music {
     const wet = ctx.createGain();
     wet.gain.value = 0.55;
     this.hall.connect(wet).connect(this.out);
+    if (this.files) this.preload();
     return true;
   }
 
@@ -56,7 +107,7 @@ export class Music {
     if (!this.ensure()) return;
     this.name = name;
     if (this.track) this.track.stop(1.6);
-    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : new (name === 'menu' ? MenuTrack : ActionTrack)(this);
+    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : this.recorded(name) || new (name === 'menu' ? MenuTrack : ActionTrack)(this);
     this.track.start();
   }
 
@@ -75,7 +126,8 @@ export class Music {
     this.ambDuck = name ? 0.4 : 1;
     this.apply();
     if (!name || !this.ensure()) return;
-    this.amb = new MuzakTrack(this);
+    // (the recorded muzak through the same small ceiling speakers)
+    this.amb = this.files && this.files.muzak ? new StreamLoop(this, this.files.muzak, { speaker: true }) : new MuzakTrack(this);
     this.amb.start();
   }
   ambientLevel(v) { if (this.amb) this.amb.level(v); }
@@ -87,6 +139,9 @@ export class Music {
     this.cancelHype();
     const ctx = this.ctx, nb = this.audio.noise;
     const t0 = ctx.currentTime + 0.05, end = t0 + secs;
+    // recorded: started so its impact lands on the end of the countdown (a short countdown joins it part-way)
+    const rec = this.files && this.files.intro;
+    if (rec && this.buffers[rec.file]) { this.hypeBus = this.cue('intro', end - rec.hit, 0, 0.95); if (this.hypeBus) return; }
     const bus = ctx.createGain();
     bus.gain.value = 0.95;
     bus.connect(this.out);
@@ -132,7 +187,7 @@ export class Music {
     if (!this.hypeBus) return;
     const g = this.hypeBus.gain, t = this.ctx.currentTime;
     g.cancelScheduledValues(t); g.setTargetAtTime(0.0001, t, 0.08);
-    const b = this.hypeBus; setTimeout(() => { try { b.disconnect(); } catch (_) { /* gone */ } }, 600);
+    const b = this.hypeBus; b.dead = true; setTimeout(() => { try { b.disconnect(); } catch (_) { /* gone */ } }, 600);
     this.hypeBus = null;
   }
 
@@ -141,6 +196,12 @@ export class Music {
     if (!this.ensure()) return;
     this.stop();
     const ctx = this.ctx, t = ctx.currentTime + 0.05;
+    const rec = this.files && this.files[win ? 'win' : 'lose'];
+    if (rec && this.cue(win ? 'win' : 'lose', t)) {
+      clearTimeout(this.stingT);
+      this.stingT = setTimeout(() => { if (!this.name) this.play('menu'); }, (rec.len + 0.6) * 1000);
+      return;
+    }
     const bus = ctx.createGain();
     bus.gain.value = 0.9;
     bus.connect(this.out); bus.connect(this.hall);
@@ -226,6 +287,7 @@ class Track {
   constructor(music, bpm) {
     this.m = music;
     this.ctx = music.ctx;
+    this.synth = true;   // (swapped for the recorded track once that's known to exist)
     this.bpm = bpm;
     this.dt = 60 / bpm / 4;
     this.step = 0;
@@ -438,6 +500,73 @@ class MuzakTrack extends Track {
       }
     }
   }
+}
+
+// a recorded track (tracks.json entry: { file, len }), streamed, looping by cross-fading its end into its start:
+// two <audio> elements take turns. `speaker`: through a shop's small ceiling speakers. level(v): 0..1.
+class StreamLoop {
+  constructor(m, f, { speaker = false, level = 0.8 } = {}) {
+    this.m = m; this.ctx = m.ctx; this.f = f; this.base = level; this.target = 1;
+    this.xf = Math.min(4, f.len / 4);
+    this.bus = this.ctx.createGain(); this.bus.gain.value = 0.0001;
+    if (speaker) {
+      const spk = this.ctx.createBiquadFilter(); spk.type = 'bandpass'; spk.frequency.value = 1300; spk.Q.value = 0.45;
+      this.bus.connect(spk).connect(m.out);
+    } else this.bus.connect(m.out);
+    this.els = [this.makeEl(), this.makeEl()]; this.turn = 0;
+  }
+  makeEl() {
+    const el = new Audio(); el.preload = 'auto'; el.src = this.f.file;
+    const g = this.ctx.createGain(); g.gain.value = 0;
+    this.ctx.createMediaElementSource(el).connect(g).connect(this.bus);
+    // (a background tab can hold the cross-fade timer back past the end: carry on from there)
+    el.addEventListener('ended', () => { if (!this.stopped && this.els[this.turn].el === el) this.next(); });
+    return { el, g };
+  }
+  start() {
+    this.bus.gain.setTargetAtTime(Math.max(0.0001, this.base * this.target), this.ctx.currentTime, 0.5);
+    this.next(true);
+  }
+  // the next pass: it fades in as the last one fades out, and the one after is set up
+  next(first = false) {
+    if (this.stopped) return;
+    const prev = this.els[this.turn]; this.turn ^= 1;
+    const cur = this.els[this.turn], t = this.ctx.currentTime, xf = first ? 0.05 : this.xf;
+    cur.el.currentTime = 0;
+    const p = cur.el.play(); if (p) p.catch(() => {});
+    cur.g.gain.cancelScheduledValues(t); cur.g.gain.setValueAtTime(0, t); cur.g.gain.linearRampToValueAtTime(1, t + xf);
+    if (!first) {
+      prev.g.gain.cancelScheduledValues(t); prev.g.gain.setValueAtTime(prev.g.gain.value, t); prev.g.gain.linearRampToValueAtTime(0, t + xf);
+      setTimeout(() => { if (this.els[this.turn] !== prev) prev.el.pause(); }, (xf + 0.3) * 1000);
+    }
+    // the next cross-fade, timed from when this pass really starts playing (streaming can take a moment)
+    clearTimeout(this.timer);
+    const arm = () => { if (this.els[this.turn] !== cur || this.stopped) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.next(), Math.max(1, this.f.len - this.xf - cur.el.currentTime) * 1000); };
+    cur.el.addEventListener('playing', arm, { once: true });
+    this.timer = setTimeout(arm, 8000);   // (and if it never says so)
+  }
+  level(v) { this.target = v; this.bus.gain.setTargetAtTime(Math.max(0.0001, this.base * v), this.ctx.currentTime, 0.5); }
+  stop(fade) {
+    this.stopped = true;
+    clearTimeout(this.timer);
+    const t = this.ctx.currentTime;
+    this.bus.gain.cancelScheduledValues(t); this.bus.gain.setTargetAtTime(0.0001, t, fade / 3);
+    setTimeout(() => { for (const { el } of this.els) { el.pause(); el.removeAttribute('src'); el.load(); } try { this.bus.disconnect(); } catch (_) { /* gone */ } }, (fade + 0.5) * 1000);
+  }
+}
+
+// in a match: a tense bed and a firefight track running together, the firefight brought up as the game's
+// intensity rises (as the synthesized score adds layers)
+class LayerTrack {
+  constructor(m, low, high) { this.m = m; this.low = new StreamLoop(m, low); this.high = new StreamLoop(m, high); }
+  start() { this.low.start(); this.high.start(); this.mix(); this.timer = setInterval(() => this.mix(), 250); }
+  mix() {
+    const m = this.m;
+    m.intensity += (m.target - m.intensity) * 0.06;
+    const k = Math.max(0, Math.min(1, (m.intensity - 0.4) / 0.35)), h = k * k * (3 - 2 * k);
+    this.high.level(h); this.low.level(1 - 0.55 * h);
+  }
+  stop(fade) { clearInterval(this.timer); this.low.stop(fade); this.high.stop(fade); }
 }
 
 // a user-supplied audio file, looped

@@ -322,6 +322,7 @@ export class Game {
     // the countdown, the announcer naming the mode and the squad's banter all wait for everyone to be in (tryIntro)
     this.matchToken = (this.matchToken || 0) + 1;
     this.introHold = true; this.introHoldT = 0; this.introLocal = false;
+    this.music.warm(this.inf ? 'infected' : 'action');   // (the match's music, fetched while it loads and counts down)
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -342,7 +343,7 @@ export class Game {
     this.music.setDuck(false);
     this.music.setIntensity(0.35);
     this.music.intensity = 0.35;
-    this.music.play('action');
+    this.music.play(this.inf ? 'infected' : 'action');
   }
 
   startGuest(start) {
