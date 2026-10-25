@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Generate every voice line in the game with Azure text-to-speech, and check each one by ear (speech-to-text).
+"""Generate every voice line in the game, and check each one by ear (speech-to-text).
 
-    AZURE_SPEECH_KEY=... [AZURE_SPEECH_REGION=westus2] python3 tools/gen_voice.py [--only vo/link] [--force]
-                                                                                  [--no-verify] [--verify-all]
+    ELEVENLABS_API_KEY=... AZURE_SPEECH_KEY=... [AZURE_SPEECH_REGION=westus2] python3 tools/gen_voice.py
+                                                        [--only vo/link] [--force] [--no-verify] [--verify-all]
 
-Writes assets/audio/<id>.mp3 (24 kHz, 48 kbit/s mono MP3, padding trimmed, loudness matched) for each line below
+The announcers and operators are ElevenLabs voices (they act: an acting tag in front of each line, [shouting],
+[panicked], [dry]..., sets the delivery and isn't spoken); the Link announcements are Azure's, in the calm,
+unhurried Sound Transit style. Azure's speech-to-text checks every clip either way.
+
+Writes assets/audio/<id>.mp3 (24 kHz, 48 kbit/s mono MP3, padding trimmed, long pauses shortened, loudness matched) for each line below
 and lists every file that exists in assets/audio/manifest.json, which is what the game loads. Lines that already
 have a file are skipped unless --force. Every clip made is transcribed back and re-made (up to three more times)
 until the transcript matches the script; --verify-all re-checks the clips already there too. The key is read from
-the environment only: never put it in this file.
+the environment only: never put them in this file.
 
 What there is:
   vo/announcer/<pack>/<id>_<n>   five announcers, each with two or three ways of saying every announcement; the
@@ -27,9 +31,16 @@ FORMAT = 'audio-24khz-48kbitrate-mono-mp3'
 
 
 # ---------- voices ----------
-# Azure's Dragon HD voices: they read a line for its meaning, so the emotion is in the writing (an exclamation, a
-# "Phew!", a dry aside) rather than in styles and pitch shifts, which made the older voices sound synthetic and
-# which HD voices ignore anyway. A voice here is just its name.
+# Link: Azure's Dragon HD voices (a voice is its name). Announcers and operators: ElevenLabs voices, el(voice id).
+# Azure's natural voices can't act (asked to whisper or shout they measure the same as plain speech), and its
+# voices that can sounded synthetic; ElevenLabs' v4 model takes acting tags and speaks at a natural pace.
+EL_MODEL = 'eleven_v4'
+
+
+def el(voice_id, speed=1.06):
+    return ('el', voice_id, speed)
+
+
 def hd(name):
     return f'en-US-{name}:DragonHDLatestNeural'
 
@@ -48,6 +59,9 @@ def t(text):
     return escape(text).replace('Semtex', SEMTEX)
 
 
+TAG = re.compile(r'\[[^\]]*\]\s*')   # an ElevenLabs acting tag: [shouting] (never spoken)
+
+
 LINES = {}   # id -> (voice, ssml body)
 # lines recorded by a person: never generated over, even with --force (the script stays here for reference)
 RECORDED = {'vo/link/hold_on'}
@@ -63,7 +77,7 @@ def add(id_, voice, body):
 NUM = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen']
 ANNOUNCERS = {
     # a calm, clipped mission controller
-    'control': (hd('Brian'), {
+    'control': (el('pNInz6obpgDQGcFmaJgB'), {       # Adam
         'mode_tdm': ['Team Deathmatch. Eliminate the enemy team.', 'Team Deathmatch. First team to the score limit wins. Stay sharp.'],
         'mode_ffa': ['Free-for-all. Trust no one.', 'Free-for-all. Every operator is a target. Good luck.'],
         'mode_gunfight': ['Gunfight. One life. Same loadout. Win the round.', 'Gunfight. Identical loadouts, no respawns. Make every shot count.'],
@@ -109,7 +123,7 @@ ANNOUNCERS = {
         'bomb_picked_up': ['Bomb picked up.', 'We have the bomb again.'],
     }),
     # a cool, dry, slightly sarcastic commander
-    'sable': (hd('Jane'), {
+    'sable': (el('ui0NMIinCTg8KvB4ogeV'), {         # Sanna Hartfield
         'mode_tdm': ['Team Deathmatch. Kill more of them than they kill of you. Simple.', 'Team Deathmatch. Their team, our team. You know what to do.'],
         'mode_ffa': ['Free-for-all. No friends out here.', "Free-for-all. Everyone's an enemy. Even the nice ones."],
         'mode_gunfight': ['Gunfight. Same guns, one life. No excuses.', "Gunfight. Everyone gets the same kit. Prove you're better."],
@@ -155,7 +169,7 @@ ANNOUNCERS = {
         'bomb_picked_up': ['Bomb picked up.', "We've got the bomb back."],
     }),
     # a gruff old drill sergeant
-    'ghost': (hd('Vance'), {
+    'ghost': (el('Bj9UqZbhQsanLzgalpEG'), {         # Austin Knox: a deep Texan
         'mode_tdm': ['Team Deathmatch! Put the enemy in the dirt!', 'Team Deathmatch. Stick with your squad and drop every one of them.'],
         'mode_ffa': ['Free-for-all! Every soldier for themselves!', "Free-for-all. Nobody's got your back out here. Move!"],
         'mode_gunfight': ['Gunfight. One life, same rifle as the other guy. Earn it.', 'Gunfight! No second chances!'],
@@ -201,7 +215,7 @@ ANNOUNCERS = {
         'bomb_picked_up': ['Bomb picked up!', "We've got the bomb again!"],
     }),
     # an esports arena caster
-    'hype': (hd('Alloy'), {
+    'hype': (el('0MmmY3MXTyPRLNhYh5Wb', 1.1), {     # Kix: on-air hype
         'mode_tdm': ["Ladies and gentlemen, it's Team Deathmatch! Let's go!", 'Team Deathmatch is on! Two teams, one winner!'],
         'mode_ffa': ["It's Free-for-all! Everybody against everybody!", 'Free-for-all, folks! No teams, no mercy!'],
         'mode_gunfight': ['Gunfight! Same loadouts, one life, pure skill!', "It's Gunfight time! Who's got the aim?"],
@@ -247,7 +261,7 @@ ANNOUNCERS = {
         'bomb_picked_up': ['Bomb picked up!', "We've got the bomb back!"],
     }),
     # upbeat and playful
-    'nova': (hd('Nova'), {
+    'nova': (el('cgSgspJ2msm6clMCkdW9', 1.08), {     # Jessica
         'mode_tdm': ['Team Deathmatch! Stick together and have fun out there!', "Team Deathmatch! Let's show them how it's done!"],
         'mode_ffa': ["Free-for-all! It's every operator for themselves!", 'Free-for-all! No teammates, no problem!'],
         'mode_gunfight': ['Gunfight! Same gear, one life. Ready?', 'Gunfight! May the best aim win!'],
@@ -293,15 +307,30 @@ ANNOUNCERS = {
         'bomb_picked_up': ['Bomb picked up!', "We've got the bomb again!"],
     }),
 }
+# how each one talks, and the mood of the moment (a line that starts with its own [tag] keeps it)
+MANNER = {'control': '[calm, measured]', 'sable': '[dry, sarcastic]', 'ghost': '[gruff drill sergeant, barking]',
+          'hype': '[hyped arena announcer, excited]', 'nova': '[cheerful, playful]'}
+MEDALS = {'double_kill', 'triple_kill', 'fury_kill', 'frenzy_kill', 'killstreak', 'killing_spree', 'rampage', 'unstoppable', 'legendary'}
+MOOD = {'victory': '[triumphant]', 'defeat': '[disappointed]', 'lead_taken': '[pleased]', 'lead_lost': '[urgent]', 'round_won': '[pleased]',
+        'round_lost': '[disappointed]', 'one_minute': '[urgent]', 'last_survivor': '[tense]', 'bomb_planted': '[tense]', 'bomb_defused': '[relieved]',
+        'humiliated': '[amused]', 'fight': '[energetic]', 'you_are_infected': '[menacing]', 'mode_infected': '[ominous]', 'final_round': '[intense]',
+        'match_point': '[intense]', 'overtime': '[intense]', 'final_weapon': '[intense]', 'new_weapon': '[upbeat]', **{m: '[excited]' for m in MEDALS}}
+
+
+def act(pack, id_, line):
+    mood = '[grudgingly impressed]' if pack == 'sable' and id_ in MEDALS else MOOD.get(id_, '')
+    return line if line.startswith('[') else f'{MANNER[pack]} {mood} {line}'.replace('  ', ' ')
+
+
 for pack, (voice, lines) in ANNOUNCERS.items():
     for id_, takes in lines.items():
         if id_ == 'round':   # round_3_1, round_3_2: takes of round_3 (and never of a bare "round")
             for i, w in enumerate(NUM, 1):
                 for k, line in enumerate(takes, 1):
-                    add(f'vo/announcer/{pack}/round_{i}_{k}', voice, t(line.format(n=w)))
+                    add(f'vo/announcer/{pack}/round_{i}_{k}', voice, act(pack, id_, line.format(n=w)))
             continue
         for k, line in enumerate(takes, 1):
-            add(f'vo/announcer/{pack}/{id_}_{k}', voice, t(line))
+            add(f'vo/announcer/{pack}/{id_}_{k}', voice, act(pack, id_, line))
 
 # ---------- 2. Link light rail ----------
 STATIONS = {
@@ -324,7 +353,16 @@ for key, (short, full, transfer) in STATIONS.items():
 
 # ---------- 3. operators: callouts and banter ----------
 # The order matters: js/game.js gives each character one of these by its name (VOICES there lists the same keys).
-SQUAD = ['emma', 'davis', 'aria', 'steffan', 'jenny', 'adam', 'tessa', 'tyler', 'mila', 'colin', 'tiana', 'jimmie']
+# A line is plain text with an acting tag in front.
+SQUAD = {   # (ElevenLabs voice, how fast they talk)
+    'sarah': el('EXAVITQu4vr4xnSDxMaL'), 'harry': el('SOYHLrjzK2X1ezoPC6cr'), 'laura': el('FGY2WhTYpPnrIDTdsKH5'),
+    'liam': el('TX3LPaxmHKxFdv7VOQHJ'), 'allison': el('xctasy8XvGp2cVO9HL9k'), 'charlie': el('IKne3meq5aSn9XLyUdCD'),
+    'piper': el('DtsPFCrhbCbbJkwZsb3d'), 'callum': el('N2lVS1w4EtoT3dr4eOWO'), 'hope': el('uYXf8XasLslADfZ2MB4u'),
+    'aiden': el('4zVVKJJRwoOAAeUwtCQ1'), 'samantha': el('KTbNvEb5YONPDyllJN8N'), 'chris': el('iP95p4xoKVk53GoZ742B'),
+}
+KIND = {'reloading': '[urgent, hurried]', 'frag_out': '[shouting]', 'semtex_out': '[shouting]', 'knife_out': '[grunting, throwing]',
+        'shock_out': '[shouting]', 'stun_out': '[shouting]', 'contact': '[alarmed, shouting]', 'enemy_down': '[satisfied]',
+        'man_down': '[panicked]', 'hit': '[in pain]'}
 CHATTER = {   # each voice gets three of each pool, starting at a different place, so voices don't all say the same thing
     'reloading': ['Reloading!', 'Changing mags, cover me!', "I'm dry, I'm dry!", 'Reloading, hold them off!', 'Mag out! Give me a second!',
                   'Cover me, reloading!', 'Out of ammo! Reloading!', 'Swapping mags!', 'Hang on, reloading!', 'Ugh, empty! Reloading!',
@@ -348,36 +386,44 @@ CHATTER = {   # each voice gets three of each pool, starting at a different plac
     'hit': ["I'm hit!", 'Taking fire!', "Agh! I'm hit!", 'Taking heavy fire!', "I'm hurt!", 'Ow! That hurt!', "They're hitting me!",
             "I'm bleeding here!", 'Under fire!', 'I need cover!', "Ugh! I'm hit, I'm hit!", "I'm taking damage!"],
 }
-BANTER = ['Same as last time. Nobody dies.', 'Check your corners.', 'Anyone else hungry?', "I've got a good feeling about this.",
-          'Stay tight, stay quiet.', 'Light them up.', 'Who brought the snacks?', 'Eyes up, people.', "Let's make it quick.", 'Last one back buys.',
-          'I swear, if I get spawn killed again...', 'My hands are shaking. Is that normal?', "Okay, okay. Deep breaths. We've got this.",
-          'Did anyone else hear that? No? Just me?', "I just cleaned this rifle. Don't let me get it dirty.", 'Remember the plan? Yeah, me neither.',
-          'Whoever gets the most kills picks dinner.', "Ha! They don't stand a chance.", "I hate this map. I love this map. I can't decide.",
-          "My mom thinks I'm at a book club.", 'If I go down, tell my cat I loved her.', "Let's give them something to remember.",
-          "Watch each other's backs out there.", 'Ugh, my boots are still wet from last time.', 'No heroes today. Just win.',
-          'Is it just me, or is it cold in here?', "Okay team, bring it in. Let's go win this thing.", "I'm feeling lucky. Dangerously lucky.",
-          "They've been talking trash all week. Time to shut them up.", 'Try not to shoot me this time, alright?',
-          'Ten bucks says I top the scoreboard.', 'Stay frosty.', 'This is going to be fun. For us, anyway.', 'Nobody touch my grenades.',
-          "Just once, I'd like a quiet day.", 'Alright, who forgot to reload? Seriously, check.',
-          'Smells like victory. Or the vending machine. One of those.', "Let's keep it clean and fast.", 'Heads on a swivel, everyone.',
-          "I've been waiting all day for this.", "Honestly? I'm terrified. Let's go.", "Follow my lead. Or don't. Your call.",
-          "We win this, I'm buying the first round.", 'Okay, focus. Focus. What were we doing?', "They won't know what hit them.",
-          'Breathe in. Breathe out. Squeeze the trigger.', "Hey, whatever happens, it's been an honor.", "Don't make me carry the whole team again.",
-          'Ready when you are.', "Can we win quickly? I've got plans tonight.", "Coffee's wearing off. Let's hurry.",
-          'Nobody panic. Unless I panic. Then panic.', 'Last match, I got the winning kill. Just saying.', "This one's for the squad.",
-          'Hands up if you actually slept last night.', 'Lock it down. No mistakes.', "I've got a new trick. You'll see.",
-          "Don't wander off this time.", 'Here we go again.', "Let's ruin their day."]
-for v, name in enumerate(SQUAD):
-    voice = hd(name.capitalize())
+BANTER = ['[confident] Same as last time. Nobody dies.', '[serious] Check your corners.', '[casual] Anyone else hungry?',
+          "[optimistic] I've got a good feeling about this.", '[whispers] Stay tight, stay quiet.', '[eager] Light them up.',
+          '[curious] Who brought the snacks?', '[firm] Eyes up, people.', "[impatient] Let's make it quick.", '[playful] Last one back buys.',
+          '[annoyed] I swear, if I get spawn killed again...', '[nervous] My hands are shaking. Is that normal?',
+          "[nervous, steadying] Okay, okay. Deep breaths. We've got this.", '[uneasy] Did anyone else hear that? No? Just me?',
+          "[mock serious] I just cleaned this rifle. Don't let me get it dirty.", '[laughs] Remember the plan? Yeah, me neither.',
+          '[competitive] Whoever gets the most kills picks dinner.', "[laughs] Ha! They don't stand a chance.",
+          "[torn] I hate this map. I love this map. I can't decide.", "[sheepish] My mom thinks I'm at a book club.",
+          '[dramatic] If I go down, tell my cat I loved her.', "[determined] Let's give them something to remember.",
+          "[sincere] Watch each other's backs out there.", '[grumbling] Ugh, my boots are still wet from last time.',
+          '[stern] No heroes today. Just win.', '[shivering] Is it just me, or is it cold in here?',
+          "[rallying] Okay team, bring it in. Let's go win this thing.", "[cocky] I'm feeling lucky. Dangerously lucky.",
+          "[fired up] They've been talking trash all week. Time to shut them up.", '[wary] Try not to shoot me this time, alright?',
+          '[cocky] Ten bucks says I top the scoreboard.', '[cool] Stay frosty.', '[mischievous] This is going to be fun. For us, anyway.',
+          '[protective] Nobody touch my grenades.', "[sighs] Just once, I'd like a quiet day.",
+          '[suspicious] Alright, who forgot to reload? Seriously, check.', '[sniffs] Smells like victory. Or the vending machine. One of those.',
+          "[focused] Let's keep it clean and fast.", '[alert] Heads on a swivel, everyone.', "[excited] I've been waiting all day for this.",
+          "[nervous laugh] Honestly? I'm terrified. Let's go.", "[shrugs] Follow my lead. Or don't. Your call.",
+          "[cheerful] We win this, I'm buying the first round.", '[distracted] Okay, focus. Focus. What were we doing?',
+          "[confident] They won't know what hit them.", '[calm, slow] Breathe in. Breathe out. Squeeze the trigger.',
+          "[sincere] Hey, whatever happens, it's been an honor.", "[exasperated] Don't make me carry the whole team again.",
+          '[calm] Ready when you are.', "[impatient] Can we win quickly? I've got plans tonight.", "[yawns] Coffee's wearing off. Let's hurry.",
+          '[anxious, joking] Nobody panic. Unless I panic. Then panic.', '[smug] Last match, I got the winning kill. Just saying.',
+          "[proud] This one's for the squad.", '[teasing] Hands up if you actually slept last night.', '[firm] Lock it down. No mistakes.',
+          "[mysterious] I've got a new trick. You'll see.", "[warning] Don't wander off this time.", '[sighs] Here we go again.',
+          "[grinning] Let's ruin their day."]
+for v, (name, voice) in enumerate(SQUAD.items()):
     for kind, pool in CHATTER.items():
         for k in range(3):
-            add(f'vo/chatter/{name}/{kind}_{k + 1}', voice, t(pool[(v * 3 + k) % len(pool)]))
+            add(f'vo/chatter/{name}/{kind}_{k + 1}', voice, f'{KIND[kind]} {pool[(v * 3 + k) % len(pool)]}')
     for k in range(5):
-        add(f'vo/chatter/{name}/banter_{k + 1}', voice, t(BANTER[v * 5 + k]))
+        add(f'vo/chatter/{name}/banter_{k + 1}', voice, BANTER[v * 5 + k])
 
 
 # ---------- making and checking ----------
 def synth(key, region, voice, body):
+    if isinstance(voice, tuple):
+        return synth_el(voice, body)
     req = urllib.request.Request(f'https://{region}.tts.speech.microsoft.com/cognitiveservices/v1', data=ssml(voice, body).encode('utf-8'),
                                  headers={'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml',
                                           'X-Microsoft-OutputFormat': FORMAT, 'User-Agent': 'breachpoint-voice'})
@@ -393,12 +439,31 @@ def synth(key, region, voice, body):
             raise RuntimeError(f'{code} {e}')
 
 
+def synth_el(voice, text):
+    _, vid, speed = voice
+    req = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128',
+                                 data=json.dumps({'text': text, 'model_id': EL_MODEL, 'voice_settings': {'speed': speed}}).encode(),
+                                 headers={'xi-api-key': os.environ['ELEVENLABS_API_KEY'], 'Content-Type': 'application/json'})
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r:
+                return r.read()
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            code = getattr(e, 'code', 0)
+            if code in (0, 429, 500, 502, 503, 504) and attempt < 5:
+                time.sleep(2 ** attempt + 1)
+                continue
+            raise RuntimeError(f'{code} {e.read()[:300] if hasattr(e, "read") else e}')
+
+
 def finish(path):
-    # the service pads every clip with most of a second of silence: cut it to 40 ms at each end, and bring every
-    # voice to the same loudness (-16 LUFS) so no announcer or operator is louder than the rest
+    # cut the padding to 40 ms at each end, shorten any pause inside a line to about 0.2 s (long gaps between
+    # sentences sound slow and awkward in a game), and bring every voice to the same loudness (-16 LUFS)
     tmp = path + '.tmp.mp3'
     f = ('silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.04,areverse,'
-         'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.04,areverse,loudnorm=I=-16:TP=-1.5:LRA=11')
+         'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.04,areverse,'
+         'silenceremove=stop_periods=-1:stop_threshold=-45dB:stop_duration=0.22:stop_silence=0.18,'   # no pause over ~0.2 s
+         'loudnorm=I=-16:TP=-1.5:LRA=11')
     r = subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', path, '-af', f, '-ar', '24000', '-ac', '1', '-b:a', '48k', tmp])
     if r.returncode == 0 and os.path.getsize(tmp) > 400:
         os.replace(tmp, path)
@@ -412,7 +477,7 @@ SAME = {'1': 'one', '2': 'two', '3': 'three', '4': 'four', '5': 'five', '6': 'si
 
 
 def words(s):
-    s = re.sub(r'<[^>]+>', ' ', s.replace('&apos;', "'").replace('&amp;', '&')).lower().replace('-', ' ')
+    s = TAG.sub(' ', re.sub(r'<[^>]+>', ' ', s.replace('&apos;', "'").replace('&amp;', '&'))).lower().replace('-', ' ')
     s = re.sub(r"[^a-z0-9' ]", ' ', s).replace("'", '')
     return ' '.join(SAME.get(w, w) for w in s.split()).split()
 
@@ -474,8 +539,8 @@ def make(key, region, id_, verify, regen=True):
 
 def main():
     key, region = os.environ.get('AZURE_SPEECH_KEY'), os.environ.get('AZURE_SPEECH_REGION', 'westus2')
-    if not key:
-        sys.exit('set AZURE_SPEECH_KEY')
+    if not key or not os.environ.get('ELEVENLABS_API_KEY'):
+        sys.exit('set AZURE_SPEECH_KEY and ELEVENLABS_API_KEY')
     only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv else ''
     force, verify, verify_all = '--force' in sys.argv, '--no-verify' not in sys.argv, '--verify-all' in sys.argv
     jobs = []
@@ -488,7 +553,7 @@ def main():
         elif verify_all:
             jobs.append((id_, False))
     off = []
-    with ThreadPoolExecutor(6) as pool:
+    with ThreadPoolExecutor(4) as pool:
         for n, (id_, s, got) in enumerate(pool.map(lambda j: make(key, region, j[0], verify, j[1]), jobs), 1):
             with lock:
                 print(f'[{n}/{len(jobs)}] {id_}' + ('' if s in (1.0, None) else f'   (closest: "{got}")'), flush=True)
@@ -504,7 +569,7 @@ def main():
     if off:
         print(f'{len(off)} never transcribed exactly (listen to these):')
         for s, id_, got in sorted(off):
-            print(f'  {s:.2f}  {id_}  script: "{re.sub(r"<[^>]+>", "", LINES[id_][1])}"  heard: "{got}"')
+            print(f'  {s:.2f}  {id_}  script: "{TAG.sub("", re.sub(r"<[^>]+>", "", LINES[id_][1]))}"  heard: "{got}"')
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
-**Every voice line is already generated**: 1,029 of them, made with Azure's HD text-to-speech voices by `tools/gen_voice.py`, which holds the exact wording of every take. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The key is read from the environment only; never commit it. A real recording saved over a generated file replaces it.
+**Every voice line is already generated**: 1,029 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[panicked]`, `[dry, sarcastic]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
 
 ---
 
@@ -12,11 +12,11 @@ Five announcers, each a different character with their own wording and two or th
 
 | Pack | Voice | Character |
 |---|---|---|
-| `control` | Brian | A calm, clipped mission controller |
-| `sable` | Jane | A cool, dry, slightly sarcastic commander |
-| `ghost` | Vance | A gruff old drill sergeant |
-| `hype` | Alloy | An esports arena caster |
-| `nova` | Nova | Upbeat and playful |
+| `control` | Adam | A calm, clipped mission controller |
+| `sable` | Sanna Hartfield | A cool, dry, slightly sarcastic commander |
+| `ghost` | Austin Knox | A gruff drill sergeant (a deep Texan) |
+| `hype` | Kix | An esports arena caster |
+| `nova` | Jessica | Upbeat and playful |
 
 Every pack has these ids:
 
@@ -59,7 +59,7 @@ In the style of Sound Transit's recorded announcements: a warm, neutral, unhurri
 
 ## 3. Operators (`vo/chatter/<voice>/...`)
 
-Twelve operator voices, six women and six men: `emma`, `aria`, `jenny`, `tessa`, `mila`, `tiana`, `davis`, `steffan`, `adam`, `tyler`, `colin`, `jimmie`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). They're written to carry the moment: "Ugh, empty! Reloading!", "No! We lost one!", "Honestly? I'm terrified. Let's go."
+Twelve operator voices, six women and six men: `sarah`, `laura`, `allison`, `piper`, `hope`, `samantha`, `harry`, `liam`, `charlie`, `callum`, `aiden`, `chris`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). Every callout is acted for its moment (grenades shouted, a teammate down panicked, a hit in pain), and every banter line has its own direction: "[nervous laugh] Honestly? I'm terrified. Let's go."
 
 | id | When |
 |---|---|

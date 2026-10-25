@@ -14,7 +14,7 @@ const INF_LOADOUT = soloLoadout('blade');   // Infected: a combat knife in both 
 import { BotBrain } from './bot.js';
 // the five announcers and the twelve operator voices (recorded by tools/gen_voice.py: the same keys there)
 export const ANNOUNCERS = ['control', 'sable', 'ghost', 'hype', 'nova'];
-export const VOICES = ['emma', 'davis', 'aria', 'steffan', 'jenny', 'adam', 'tessa', 'tyler', 'mila', 'colin', 'tiana', 'jimmie'];
+export const VOICES = ['sarah', 'harry', 'laura', 'liam', 'allison', 'charlie', 'piper', 'callum', 'hope', 'aiden', 'samantha', 'chris'];
 const nameHash = (n) => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
