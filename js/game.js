@@ -1319,7 +1319,11 @@ export class Game {
   // announcer lines are named after the banner or medal they go with: 'DOUBLE KILL' -> vo/announcer/double_kill
   announce(what) {
     const id = String(what).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    if (id) this.audio.play('vo', null, { id: `vo/announcer/${this.matchAnnouncer || this.announcerPack}/${id}`, ui: true, announcer: true });
+    if (!id) return;
+    const pack = `vo/announcer/${this.matchAnnouncer || this.announcerPack}/`, play = () => this.audio.play('vo', null, { id: pack + id, ui: true, announcer: true });
+    // (an announcer still loading, a match started straight after the last: wait a moment for it rather than skip the line)
+    if (!this.audio.manifest || this.audio.samples.has(pack + id)) play();
+    else { const t0 = performance.now(); this.audio.want(pack).then(() => { if (performance.now() - t0 < 3000) play(); }); }
   }
   pickAnnouncer() {
     const s = this.announcerSetting, others = ANNOUNCERS.filter(a => a !== this.announcerPack);
@@ -1348,7 +1352,10 @@ export class Game {
     c.calloutT = t; this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
     const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, me = c === this.player;
-    this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 });
+    const say = () => { if (c.alive) this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 }); };
+    // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
+    if (c.infected || !this.audio.manifest || this.audio.samples.has(id)) say();
+    else { const t0 = performance.now(); this.audio.want(`vo/chatter/${c.voice}/`).then(() => { if (performance.now() - t0 < 1500) say(); }); }
     if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);
   }
 
