@@ -895,6 +895,15 @@ function build(ctx) {
     menuCam(t, cam) { cam.position.set(STATIONS[1].ox - 21 + Math.sin(t * 0.2) * 1.5, GY + 1.7, -30 + Math.sin(t * 0.13) * 4); cam.lookAt(STATIONS[1].ox + 4, 1.2, -6); },
     // spawns face into their station (the west clusters east, the east clusters west)
     spawnYaw: [-Math.PI / 2, Math.PI / 2],
+    // anyone spawns anywhere, at the start too: any level of any station, never on the tracks or in a tunnel,
+    // facing into the station
+    randomSpawns: true,
+    spawnOk: (p) => {
+      const si = stationOf(p), st = STATIONS[si];
+      if (!st || p.z < st.mouth[0] + 3 || p.z > st.mouth[1] - 3) return false;
+      return !(Math.abs(p.y - st.py) < 1.5 && st.tx.some(x => Math.abs(p.x - (st.ox + x)) < 2.8));
+    },
+    spawnYawAt: (p) => { const st = STATIONS[stationOf(p)] || STATIONS[1]; return Math.atan2(p.x - (st.ox + 4), p.z - STOP_Z); },
   });
   return world;
 }

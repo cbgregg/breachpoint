@@ -291,9 +291,11 @@ export class Game {
     this.endT = 0;
     this.damageFx = 0;
 
-    if (this.ffa) {
+    // free-for-all, and maps that spawn anyone anywhere (Link Loop: all three stations, every level, from the
+    // first second): one at a time, each away from the enemies already placed
+    if (this.anywhere()) {
       this.buildFfaSpawns();
-      for (const c of shuffle([...this.characters])) c.spawn(this.chooseSpawn(c.team), this.spawnYawOut);
+      for (const c of shuffle([...this.characters])) { this.infectedKit(c); c.spawn(this.chooseSpawn(c.team), this.spawnYawOut); this.infectedKit(c, true); }
     } else for (const t of [0, 1]) {
       const spots = shuffle([...this.world.spawns[t]]);
       this.characters.filter(c => c.team === t).forEach((c, i) => { this.infectedKit(c); c.spawn(spots[i % spots.length], this.world.spawnYaw[t]); this.infectedKit(c, true); });
@@ -391,8 +393,10 @@ export class Game {
 
   // Free-for-All spawns: spread over the whole map (the team spawns plus open ground everywhere players can
   // walk to), at least 7 m apart
+  anywhere() { return this.ffa || (!!this.world.randomSpawns && !this.gm); }
   buildFfaSpawns() {
-    const nav = this.world.nav, V = (x, z) => new THREE.Vector3(x, 0, z);
+    const nav = this.world.nav, V = (x, z) => new THREE.Vector3(x, 0, z), ok = this.world.spawnOk || (() => true);
+    const many = this.world.randomSpawns ? 110 : 70, apart = (p, pts) => pts.every(o => o.distanceTo(p) > 7);
     const base = [...this.world.spawns[0], ...this.world.spawns[1]];
     const pts = [...base];
     if (nav && nav.openCells && base.length) {
@@ -401,13 +405,26 @@ export class Game {
       for (const b of base) { const i = Math.floor((b.x - nav.minX) / nav.cell), j = Math.floor((b.z - nav.minZ) / nav.cell); const k = j * nav.cols + i; if (nav.isOpen(i, j) && !seen[k]) { seen[k] = 1; q.push(k); } }
       while (q.length) { const k = q.pop(), i = k % nav.cols, j = (k / nav.cols) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + di, jj = j + dj, kk = jj * nav.cols + ii; if (ii >= 0 && jj >= 0 && ii < nav.cols && jj < nav.rows && !seen[kk] && nav.isOpen(ii, jj)) { seen[kk] = 1; q.push(kk); } } }
       const cells = nav.openCells.filter(k => seen[k] && nav.isOpen((k % nav.cols) + 1, (k / nav.cols) | 0) && nav.isOpen((k % nav.cols) - 1, (k / nav.cols) | 0) && nav.isOpen(k % nav.cols, ((k / nav.cols) | 0) + 1) && nav.isOpen(k % nav.cols, ((k / nav.cols) | 0) - 1));
-      for (let t = 0; t < 600 && pts.length < 70; t++) {
+      for (let t = 0; t < 900 && pts.length < many; t++) {
         const k = cells[(Math.random() * cells.length) | 0]; if (k === undefined) break;
         const p = V(nav.cx(k % nav.cols), nav.cz((k / nav.cols) | 0));
-        if (pts.every(o => Math.hypot(o.x - p.x, o.z - p.z) > 7)) pts.push(p);
+        if (ok(p) && apart(p, pts)) pts.push(p);
+      }
+      // the other levels too where the map asks for it (Link Loop's platforms under Pioneer Square, the galleries
+      // and footbridges): cells with open floor all round
+      if (this.world.randomSpawns) for (const L of nav.levels || []) {
+        const gd = L.grid, open = (i, j) => gd.isOpen(i, j);
+        if (!gd || !gd.openCells) continue;
+        const lc = gd.openCells.filter(k => { const i = k % gd.cols, j = (k / gd.cols) | 0; return open(i + 1, j) && open(i - 1, j) && open(i, j + 1) && open(i, j - 1); });
+        for (let t = 0; t < 300 && lc.length; t++) {
+          const k = lc[(Math.random() * lc.length) | 0], p = V(gd.cx(k % gd.cols), gd.cz((k / gd.cols) | 0));
+          p.y = L.y;
+          if (ok(p) && apart(p, pts)) pts.push(p);
+        }
       }
     }
-    this.ffaSpawns = pts;
+    this.ffaSpawns = pts.filter(ok);
+    if (!this.ffaSpawns.length) this.ffaSpawns = pts;   // (never none)
   }
 
   addBot(team) {
@@ -1524,7 +1541,7 @@ export class Game {
   // there, and how close friendlies are. The yaw to face comes back in this.spawnYawOut.
   chooseSpawn(team) {
     const flip = !this.gm;
-    const sets = this.ffa ? ['ffa'] : flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
+    const sets = this.anywhere() ? ['ffa'] : flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
     let best = null, bestScore = -Infinity, bestYaw = this.world.spawnYaw[team];
     this.recentDeaths = (this.recentDeaths || []).filter(d => this.time - d.t < 8);
     for (const set of sets) {
@@ -1543,13 +1560,15 @@ export class Game {
             threat += facing > 0.5 ? 70 : facing > 0 ? 40 : 20;
           }
         }
-        let score = Math.min(minEnemy, 45) - threat - (crowd ? 200 : 0) + Math.random() * 5;
+        // maps that spawn anyone anywhere: any spot 25 m clear of enemies (and out of their sight) is as good as
+        // any other, so it's a real random pick across the map, teams mixed; otherwise as far as it can, near the team
+        let score = (this.world.randomSpawns ? Math.min(minEnemy, 25) * 2 + Math.random() * 40 : Math.min(minEnemy, 45) + Math.random() * 5) - threat - (crowd ? 200 : 0);
         if (minEnemy < 12) score -= 60;                                  // never right next to an enemy
-        if (minEnemy > 18) score += Math.min(friends, 3) * 5;            // near the team, away from the fight
+        if (minEnemy > 18 && !this.world.randomSpawns) score += Math.min(friends, 3) * 5;   // near the team, away from the fight
         for (const dth of this.recentDeaths) if (Math.hypot(dth.x - s.x, dth.z - s.z) < 10) score -= 15;
         if (set !== team && set !== 'ffa') score -= 8;                   // home spawns win ties
-        if (minEnemy >= 80) score += Math.random() * 30;                 // nobody around yet: spread out
-        if (score > bestScore) { bestScore = score; best = s; bestYaw = set === 'ffa' ? Math.atan2(s.x, s.z) : this.world.spawnYaw[set]; }
+        if (minEnemy >= 80 && !this.world.randomSpawns) score += Math.random() * 30;   // nobody around yet: spread out
+        if (score > bestScore) { bestScore = score; best = s; bestYaw = set === 'ffa' ? (this.world.spawnYawAt ? this.world.spawnYawAt(s) : Math.atan2(s.x, s.z)) : this.world.spawnYaw[set]; }
       }
     }
     this.spawnYawOut = bestYaw;
