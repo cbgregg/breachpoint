@@ -572,7 +572,7 @@ export class Game {
       // (a world can say how well a sound carries to where you are: a train under the street, in another station)
       const ear = this.camera.position, aud = this.world.audible;
       if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) {
-        const k = aud && pos ? aud(pos, ear, name) : 1;
+        const k = aud && pos ? aud(pos, ear, name, opts) : 1;
         if (k > 0.02) this.audio.play(name, pos, k < 1 ? { ...opts, occl: Math.sqrt(k), muffle: 1 - k } : opts);
       }
       this.world.sounds.length = 0;

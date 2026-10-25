@@ -729,16 +729,18 @@ function build(ctx) {
       const ph = s.v === 0 ? (s.open ? 'open' : 'shut') : s.arriving ? 'in' : 'out';
       if (ph !== tr.phase) {
         const pos = new THREE.Vector3(X, Y + 1.5, Z), here = STATION_KEY[s.st], nxt = STATION_KEY[s.next];
-        const plat = new THREE.Vector3(X + ds * 3, Y + 1.6, Z);   // the platform beside the doors
+        const plat = new THREE.Vector3(X + ds * 3, Y + 1.6, STOP_Z);   // the platform beside where it stops (not the car, still in the tunnel)
         // as Link does it: pulling out, "please hold on", then the next stop with its transfers and which side its
         // doors open on (facing the way the car runs: facing +z, your right is -x); the station's name on arrival;
-        // "please stand clear" as the doors close; the platform PA as a train runs in
-        const side2 = STATIONS[s.next].doors[tr.d] === (DIRZ[tr.d] > 0 ? -1 : 1) ? 'right' : 'left';
-        if (ph === 'open') sounds.push(['traindoor', pos], ['trainchime', pos], ['vo', pos, { id: `vo/link/this_is_${here}` }]);
-        if (ph === 'shut' && tr.phase === 'open') sounds.push(['trainchime', pos], ['traindoor', pos, { close: true }], ['vo', pos, { id: 'vo/link/doors_closing' }], ['vo', plat, { id: 'vo/link/doors_closing' }]);
+        // "please stand clear" as the doors close; the platform PA as a train runs in. The car's announcements come
+        // from its own speakers (onboard: heard riding it, or faintly right by an open door); the PA only near the
+        // platform it's for
+        const side2 = STATIONS[s.next].doors[tr.d] === (DIRZ[tr.d] > 0 ? -1 : 1) ? 'right' : 'left', ob = { onboard: tr };
+        if (ph === 'open') sounds.push(['traindoor', pos], ['trainchime', pos], ['vo', pos, { id: `vo/link/this_is_${here}`, ...ob }]);
+        if (ph === 'shut' && tr.phase === 'open') sounds.push(['trainchime', pos], ['traindoor', pos, { close: true }], ['vo', pos, { id: 'vo/link/doors_closing', ...ob }]);
         if (ph === 'shut' && tr.phase === 'in') sounds.push(['trainbrake', pos]);
-        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos], ['vo', pos, { id: 'vo/link/hold_on', delay: 0.6 }], ['vo', pos, { id: `vo/link/next_${nxt}_${side2}`, delay: 3.5 }]);
-        if (ph === 'in') sounds.push(['trainbell', pos], ['vo', plat, { id: `vo/link/pa_arriving_${STATION_KEY[s.next]}` }]);
+        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos], ['vo', pos, { id: 'vo/link/hold_on', delay: 0.6, ...ob }], ['vo', pos, { id: `vo/link/next_${nxt}_${side2}`, delay: 3.5, ...ob }]);
+        if (ph === 'in') sounds.push(['trainbell', pos], ['vo', plat, { id: `vo/link/pa_arriving_${STATION_KEY[s.next]}`, platform: true }]);
         tr.phase = ph;
       }
       if (s.v > 0.5) {
@@ -868,9 +870,20 @@ function build(ctx) {
   // anything outside is faint; a train in the tunnel only near the mouth, or with you in the tunnel; not from
   // up on Pioneer Square's plaza when it's in the hall below (a little at the top of a stairwell); and it fades
   // out across the station instead of carrying everywhere
-  const audible = (pos, ear, name) => {
+  const audible = (pos, ear, name, opts) => {
     const a = stationOf(pos), b = stationOf(ear);
     if (a < 0 || a !== b) return 0;
+    // the car's own announcements: its speakers are inside it
+    if (opts && opts.onboard) {
+      const tr = opts.onboard;
+      if (inside(tr, ear)) return 1;
+      return tr.open > 0.5 && Math.abs(ear.x - tr.x) < H + 2 && Math.abs(ear.z - tr.z) < L2 ? 0.08 : 0;   // (right at an open door: barely)
+    }
+    // the platform PA: for the people on that platform
+    if (opts && opts.platform) {
+      const d = pos.distanceTo(ear);
+      return Math.abs(ear.y - pos.y) > 3 ? 0 : d < 12 ? 1 : Math.max(0, 1 - (d - 12) / 14);
+    }
     const st = STATIONS[a], quiet = name === 'trainmotor' || name === 'trainclack' || name === 'trainbrake';
     const ride = trains.find(tr => inside(tr, ear));
     if (ride) return Math.abs(pos.x - ride.x) < H + 0.6 && Math.abs(pos.z - ride.z) < L2 + 1 ? (quiet ? 0.22 : 1) : 0.12;

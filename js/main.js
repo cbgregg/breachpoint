@@ -358,10 +358,12 @@ function usePreset(q) {
 }
 // in a match: if the frame rate stays low for a while, say so (once) and offer the next lighter preset back in
 // the menu, where it's one click
-let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false, perfOffer = null;
+// (measured only while playing: the clock restarts each time a match is (re)entered, the first seconds of loading
+// in are skipped, a frame cap you've set counts as smooth, and it takes two slow stretches in a row)
+let perfNoteT = 0, perfFrames = 0, perfTime = 0, perfShown = false, perfOffer = null, perfLow = 0, perfWarm = 0;
 setInterval(() => {
   if (perfShown || game.state !== 'playing' || document.hidden) {
-    perfFrames = perfTime = 0;
+    perfFrames = perfTime = 0; perfNoteT = 0; perfLow = 0; perfWarm = 0;
     if (perfOffer && game.state === 'menu' && $('offer').hidden) {
       const { fps: f, better: b } = perfOffer; perfOffer = null;
       offer('LOW FRAME RATE', `Your last match ran at about ${f} FPS. The ${QUALITY[b].label} preset should run smoother.`, () => usePreset(b), `USE ${QUALITY[b].label.toUpperCase()}`);
@@ -369,11 +371,14 @@ setInterval(() => {
     return;
   }
   const now = performance.now();
+  if (perfWarm < 3) { perfWarm++; perfNoteT = { t: now, f: game.frameCount }; return; }   // the first 6 s: shaders, loading
   if (perfNoteT) { perfFrames += game.frameCount - (perfNoteT.f || 0); perfTime += (now - perfNoteT.t) / 1000; }
   perfNoteT = { t: now, f: game.frameCount };
   if (perfTime < 20) return;
   const fps = perfFrames / perfTime; perfFrames = perfTime = 0;
-  if (fps < 40) {
+  const cap = +settings.fpsCap || 0, floor = cap > 0 ? Math.min(40, cap * 0.8) : 40;
+  perfLow = fps < floor ? perfLow + 1 : 0;
+  if (perfLow >= 2) {
     perfShown = true;
     const cur = settings.quality, better = PRESET_RANK[cur] > PRESET_RANK[GPU.best] ? GPU.best : PRESET_RANK[cur] > 0 ? Object.keys(PRESET_RANK)[PRESET_RANK[cur] - 1] : null;
     game.hud.toast(GPU.soft ? 'LOW FRAME RATE: TURN ON HARDWARE ACCELERATION IN YOUR BROWSER' : better ? `LOW FRAME RATE (${Math.round(fps)} FPS): TRY THE ${better.toUpperCase()} PRESET OR FSR IN OPTIONS` : `LOW FRAME RATE (${Math.round(fps)} FPS): TRY FSR PERFORMANCE IN OPTIONS`);
