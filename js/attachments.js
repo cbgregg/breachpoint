@@ -55,7 +55,8 @@ export const GUNSMITH = {
   r357: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp'], laser: ['none', 'laser'] },
   mp18: { optic: ['iron', 'reflex'], muzzle: ['none', 'comp', 'sup'], mag: ['std', 'ext', 'fast'], laser: ['none', 'laser'] },
   monte: { optic: ['iron'] },
-  sling: { optic: ['iron'] },   // Gun Game's knife slingshot: nothing to change
+  sling: { optic: ['iron'] },
+  blade: { optic: ['iron'] },   // the infected's combat knife   // Gun Game's knife slingshot: nothing to change
 };
 
 export function defaultsFor(id) {
@@ -125,7 +126,7 @@ export function parseLoadout(str) {
   const [a, b, e] = typeof str === 'string' ? str.split('/') : [];
   const [le, ta] = typeof e === 'string' ? e.split('.') : [];
   const lethal = LETHALS.includes(le) ? le : 'frag', tactical = TACTICALS.includes(ta) ? ta : 'stun';
-  const any = [...PRIMARIES, ...SECONDARIES, 'sling'];   // Gun Game puts any gun in either slot (and ends on the knife slingshot)
+  const any = [...PRIMARIES, ...SECONDARIES, 'sling', 'blade'];   // Gun Game puts any gun in either slot (and ends on the knife slingshot)
   const prim = parsePart(a, any) || { id: 'rifle', att: defaultsFor('rifle') };
   const sec = parsePart(b, any) || { id: 'pistol', att: defaultsFor('pistol') };
   return { primary: prim.id, att: prim.att, secondary: sec.id, pistolAtt: sec.att, lethal, tactical, str: part(prim.id, prim.att) + '/' + part(sec.id, sec.att) + '/' + equipPart(lethal, tactical) };

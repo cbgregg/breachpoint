@@ -112,6 +112,7 @@ export class BotBrain {
     }
     if (best) {
       if (best !== this.target || !this.visible) {
+        if (!this.visible && g.time - this.lastKnownT > 4) g.callout(this.bot, 'contact', 0.6);   // a fresh sighting: "contact!"
         this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible || g.time - this.lastKnownT < 1.5 ? 0.5 : 1);
         this.seenT = 0;
         this.newAimError(best);
@@ -168,6 +169,8 @@ export class BotBrain {
     if (this.idleT > 0) this.idleT -= dt;
     if (this.visible && this.target) { this.goalKind = 'engage'; this.idleT = 0; return; }
     if (this.goalKind === 'engage') { this.goalKind = 'hunt'; this.goal = null; }
+    // Infected: survivors hide, the infected go looking for them
+    if (g.inf && this.infectedGoal(dt)) return;
     // round modes hand out objectives: plant, defuse, guard a site, take the flag
     const og = g.gm && g.gm.botGoal(this, b);
     if (og) {
@@ -227,6 +230,48 @@ export class BotBrain {
     }
   }
 
+  // Infected. A survivor finds a hiding spot (a corner or a wall at its back, away from the infected, apart from
+  // the other survivors) and holds it, crouched, watching; it moves on when an infected comes within 14 m or after
+  // a while. An infected heads for where the nearest survivor roughly is. Returns true when it set the goal.
+  infectedGoal(dt) {
+    const b = this.bot, g = this.game, nav = g.world.nav;
+    const infected = g.characters.filter(c => c.alive && c.team === 1), survivors = g.characters.filter(c => c.alive && c.team === 0 && c !== b);
+    if (b.team === 1) {
+      if (this.goalKind === 'intel' && this.goal && this.goalT > 0 && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 3) return true;
+      let best = null, bd = 1e9;
+      for (const c of [...survivors, ...(b === g.player ? [] : [g.player])]) if (c && c.alive && c.team === 0) { const d = c.pos.distanceTo(b.pos); if (d < bd) { bd = d; best = c; } }
+      if (!best) return false;
+      const a = Math.random() * Math.PI * 2, r = Math.min(8, bd * 0.25);
+      _e.copy(best.pos).add(_a.set(Math.cos(a) * r, 0, Math.sin(a) * r));
+      if (!nav.isOpenAt(_e.x, _e.z)) _e.copy(best.pos);
+      this.goal = null; this.setGoal(_e, 'intel'); this.goalT = rand(5, 9);
+      return true;
+    }
+    if (b.health < 45) return false;   // (the usual: go for a health pickup)
+    const near = infected.reduce((m, c) => Math.min(m, c.pos.distanceTo(b.pos)), 1e9);
+    const at = this.goalKind === 'hide' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 1.5;
+    if (this.goalKind === 'hide' && this.goal && near > 14 && this.goalT > 0) {
+      if (at) this.goalT -= dt * 0.5;   // (time at the spot counts slower: they sit tight)
+      return true;
+    }
+    // a new spot: the best of a dozen candidates
+    let best = null, bs = -1e9;
+    for (let k = 0; k < 14; k++) {
+      const q = k < 2 && g.world.upperPoint ? g.world.upperPoint() : nav.randomOpenPoint(g.world.sameArea ? (p => g.world.sameArea(p, b.pos)) : null);
+      if (!q) continue;
+      let cover = 0;
+      const gr = nav.gridAt(q);   // (an upstairs spot: that floor's grid)
+      for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2; if (!gr.isOpenAt(q.x + Math.cos(an) * 1.3, q.z + Math.sin(an) * 1.3)) cover++; }
+      const dInf = infected.reduce((m, c) => Math.min(m, c.pos.distanceTo(q)), 60);
+      const dMate = survivors.reduce((m, c) => { const br = g.brains.get(c), p = br && br.goal ? br.goal : c.pos; return Math.min(m, Math.hypot(p.x - q.x, p.z - q.z)); }, 12);
+      const sc = Math.min(cover, 7) * 3 + Math.min(dInf, 40) * 0.8 + Math.min(dMate, 8) * 0.3 - q.distanceTo(b.pos) * 0.12;
+      if (sc > bs) { bs = sc; best = q; }
+    }
+    if (!best) return false;
+    this.goal = null; this.setGoal(best, 'hide'); this.goalT = rand(30, 55);
+    return true;
+  }
+
   // teammates (bots) whose goal is within r of p
   matesHeading(p, r) {
     let n = 0;
@@ -277,12 +322,12 @@ export class BotBrain {
     if (tv) {
       if (tv.wish.lengthSq() > 0.04) this.steer(tv.wish);
       b.wantCrouch = !!tv.crouch; b.wantProne = false;
-      b.updateMovement(dt, tv.wish, !!tv.sprint && !this.visible, false, false, false);
+      b.updateMovement(dt, tv.wish, !!tv.sprint && !this.visible, !!tv.jump, false, false);
       return;
     }
     // objective spots: stop there (and hold the button to plant / defuse); guard / push spots: settle into
     // a stance and check angles until the mode hands out the next spot
-    const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6, push: 2 }[this.goalKind];
+    const hold = { plant: 0.8, defuse: 0.9, flag: 1.4, guard: 1.6, push: 2, hide: 1.2 }[this.goalKind];
     const idle = this.idleT > 0 && this.goalKind !== 'engage';
     if (idle || (hold && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < hold)) {
       if (this.goalKind === 'plant' || this.goalKind === 'defuse') { b.useHeld = true; this.crouch = this.goalKind === 'defuse'; }
@@ -291,6 +336,7 @@ export class BotBrain {
           const r = Math.random();
           this.holdStance = r < 0.45 ? 0 : r < 0.8 ? 1 : 2;   // stand / crouch / prone
           if (idle) this.holdStance = Math.min(this.holdStance, 1);
+          if (this.goalKind === 'hide') this.holdStance = Math.random() < 0.75 ? 1 : 0;   // hiding: mostly crouched
           this.pickLook(true);
         }
         this.holding = true;
@@ -310,6 +356,7 @@ export class BotBrain {
     if (this.goalKind === 'engage' && this.target && b.infected) {
       // infected: no gun, so straight at them (along the path round corners), sprinting until they're close
       const t = this.target, dist = b.pos.distanceTo(t.pos);
+      this.game.callout(b, 'growl', 0.01);
       const dir = dist > 3 ? this.followPath(t.pos, dt) : null;
       if (dir) wish.copy(dir); else wish.set(t.pos.x - b.pos.x, 0, t.pos.z - b.pos.z).normalize();
       b.wantCrouch = false; b.wantProne = false;

@@ -515,8 +515,11 @@ export class PlayerController {
     this.shake = Math.max(0, this.shake - dt * 4);
     const sh = this.shake * this.shake * 0.018 * (1 - 0.8 * c.adsT);   // aimed: the view barely jitters, so the reticle stays on the target
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
+    // the head leans a touch into a strafe (smoothed; much less aimed in), and sways side to side with the steps
+    const strafe = (c.vel.x * Math.cos(c.yaw) - c.vel.z * Math.sin(c.yaw)) / PLAYER.sprint;
+    this.camLean = lerp(this.camLean || 0, -strafe * 0.011 * (1 - 0.7 * c.adsT), Math.min(1, dt * 6));
     cam.rotation.order = 'YXZ';
-    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.005 * bobAmt + slideRoll);
+    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.007 * bobAmt + slideRoll + this.camLean);
     this.tacK = lerp(this.tacK || 0, c.tacSprinting ? 1 : 0, Math.min(1, dt * 8));
     // sprint widens the view a little, eased in and out over about half a second (never a snap)
     const sprintGoal = c.sprinting ? 1 : 0;
@@ -547,7 +550,7 @@ export class PlayerController {
 
   updateViewmodel(dt, mdx, mdy) {
     const c = this.c;
-    this.guns.forEach((g, i) => { g.holder.visible = i === c.cur; g.gun.group.visible = !c.infected; });   // infected: hands only
+    this.guns.forEach((g, i) => { g.holder.visible = i === c.cur; });
     const G = this.guns[c.cur];
     const h = G.holder, gun = G.gun;
     const w = c.weapon;
@@ -576,8 +579,12 @@ export class PlayerController {
     for (const [k, v] of [['y', 'vy'], ['r', 'vr'], ['z', 'vz']]) { J[v] += (-260 * J[k] - 22 * J[v]) * dt; J[k] += J[v] * dt; }
     this.kick *= Math.exp(-dt * 18);
     this.kickRot *= Math.exp(-dt * 11);
-    this.swayX = lerp(this.swayX, clamp(-mdx * 0.0006, -0.035, 0.035), Math.min(1, dt * 9));
-    this.swayY = lerp(this.swayY, clamp(mdy * 0.0006, -0.035, 0.035), Math.min(1, dt * 9));
+    // look sway on a spring (the gun has weight): it trails a turn, overshoots a touch when you stop, settles
+    const SW = this.swS || (this.swS = { x: 0, y: 0, vx: 0, vy: 0 });
+    const sdt = Math.min(dt, 0.04);
+    SW.vx += ((clamp(-mdx * 0.0006, -0.035, 0.035) - SW.x) * 150 - SW.vx * 13) * sdt; SW.x += SW.vx * sdt;
+    SW.vy += ((clamp(mdy * 0.0006, -0.035, 0.035) - SW.y) * 150 - SW.vy * 13) * sdt; SW.y += SW.vy * sdt;
+    this.swayX = SW.x; this.swayY = SW.y;
     const hs = Math.hypot(c.vel.x, c.vel.z);
     const a = c.adsT;
     const ae = a * a * (3 - 2 * a);
@@ -630,8 +637,45 @@ export class PlayerController {
       spr * 0.55 + tilt * RP_.ry + this.swayX * 1.6 * (1 - ae * 0.9) + mel * 0.3 + (1 - a) * (G.type === 'pistol' ? 0.035 : VM_TUNE.yawBy[G.type] ?? VM_TUNE.yaw),
       tilt * RP_.rz + spr * 0.55 - mel * 0.7 + slide * 0.25 + this.swayX * 0.6 * (1 - ae * 0.9),
     );
+    // ---- the body moving the gun: weight and inertia ----
+    {
+      const fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
+      const vS = (c.vel.x * rx + c.vel.z * rz) / PLAYER.sprint, vF = (c.vel.x * fx + c.vel.z * fz) / PLAYER.sprint;
+      const MV = this.mv || (this.mv = { f: 0, fv: 0, s: 0, sv: 0, cr: 0, ae: 0 });
+      const mdt = Math.min(dt, 0.04);
+      // the gun follows your motion on a spring: speed up and it hangs back, stop and it swings on past
+      MV.fv += ((vF - MV.f) * 55 - MV.fv * 9) * mdt; MV.f += MV.fv * mdt;
+      MV.sv += ((vS - MV.s) * 55 - MV.sv * 9) * mdt; MV.s += MV.sv * mdt;
+      const lagF = vF - MV.f, lagS = vS - MV.s, mw = 1 - ae * 0.75, vy = clamp(c.vel.y, -8, 8);
+      h.position.x += (-vS * 0.012 - lagS * 0.022) * mw;
+      h.position.y += -Math.abs(lagF) * 0.006 * mw - vy * 0.0025 * mw;
+      h.position.z += lagF * 0.032 * mw;
+      h.rotation.x += (lagF * 0.045 + vy * 0.004) * mw;
+      h.rotation.y += lagS * 0.03 * mw;
+      h.rotation.z += (-vS * 0.065 - lagS * 0.09) * mw;   // leans into a strafe
+      // walking: a figure-eight of roll and pitch with each step, on top of the bob
+      h.rotation.z += Math.sin(this.bobT) * 0.014 * bobAmt;
+      h.rotation.x += (Math.abs(Math.cos(this.bobT)) - 0.5) * 0.012 * bobAmt;
+      // crouching / standing: the gun dips and comes back with the body; aiming in: a small settle at the end
+      J.vy -= (c.crouchT - MV.cr) * 1.3; MV.cr = c.crouchT;
+      if (MV.ae < 0.9 && ae >= 0.9) { J.vy -= 0.05; J.vr += 0.22; }
+      MV.ae = ae;
+      // a living hand: a slow drift that never quite repeats (much smaller aimed in)
+      const lt = this.breathT, life = 1 - ae * 0.85;
+      h.position.x += (Math.sin(lt * 0.83) * 0.6 + Math.sin(lt * 1.91 + 2) * 0.4) * 0.0013 * life;
+      h.position.y += (Math.sin(lt * 0.67 + 1) * 0.6 + Math.sin(lt * 1.37) * 0.4) * 0.0012 * life;
+      h.rotation.z += Math.sin(lt * 0.51 + 0.5) * 0.004 * life;
+    }
     // weapon raise after a switch: comes up from low right, muzzle down and rolled, and settles into the hip pose
-    if (mWind + mHit > 0) {
+    if (mWind + mHit > 0 && w.def.melee) {
+      // a knife slash: cocked back and up to the right, then across and down to the left
+      h.position.x += 0.06 * mWind - 0.2 * mHit;
+      h.position.y += 0.035 * mWind - 0.06 * mHit;
+      h.position.z += 0.03 * mWind - 0.13 * mHit;
+      h.rotation.x += -0.25 * mWind + 0.5 * mHit;
+      h.rotation.y += -0.35 * mWind + 0.95 * mHit;
+      h.rotation.z += 0.75 * mWind - 1.15 * mHit;
+    } else if (mWind + mHit > 0) {
       h.position.x += (0.03 * mWind - 0.08 * mHit) * mk;
       h.position.y += (-0.015 * mWind + 0.01 * mHit) * mk;
       h.position.z += (0.02 * mWind - 0.15 * mHit) * mk;
@@ -719,6 +763,11 @@ export class PlayerController {
     else handFrame(_L, _lq, gun.group, _gq, _v1.copy(gun.pump ? gun.pump.position : gun.foregrip.position).add(gun.pump ? SUP_OFF_PUMP : SUP_OFF).add(FIT.L.push), SUP_F, PALM_SUP);
     lPose = w.def.sling ? POSES.fist : FIT.L.pose;
     let tPose = lPose, lk = 0, leftFree = false;
+    // the combat knife: the left hand is free, a loose fist held low and to the left (guarding), breathing with you
+    if (w.def.melee) {
+      handFrame(_L, _lq, null, null, _a.set(-0.17, -0.25 + 0.006 * Math.sin(this.breathT * 1.6) + by * 0.6, -0.31 + bx * 0.5), SPRINT_F, SPRINT_P);
+      lPose = tPose = POSES.fist; leftFree = true;
+    }
     const toward = (pos, q, pose, k) => { _L.lerp(pos, k); _lq.slerp(q, k); tPose = pose; lk = k; };
     const MH = G.magHold;
     if (s2 > 0.05 && MH) {

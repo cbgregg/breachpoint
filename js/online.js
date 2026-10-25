@@ -1173,7 +1173,7 @@ export class GuestSession {
           }
           else if (Array.isArray(k) && [k[1], k[2], k[3]].every(fin)) {
             g.effects.impact(end, new THREE.Vector3(k[1], k[2], k[3]), String(k[0]).slice(0, 12));
-            if (first) g.audio.play('impact', end);
+            if (first) g.audio.play('impact', end, { surface: String(k[0]).slice(0, 12) });
           }
           first = false;
           const p = g.player;
@@ -1227,6 +1227,7 @@ export class GuestSession {
         g.equipFx(EQUIPMENT[kind] ? kind : 'frag', new THREE.Vector3(x, y, z));
         break;
       }
+      case 'co': { const c = g.charById(ev[1]); if (c && typeof ev[2] === 'string') g.callout(c, ev[2].slice(0, 24).replace(/[^a-z_]/g, ''), 1, true); break; }
       case 'melee': {
         const c = g.charById(ev[1]);
         if (!c || c === g.player) return;

@@ -441,7 +441,10 @@ export class Character {
 
   reload() {
     if (this.meleeT > 0) return;
-    if (this.weapon.startReload()) this.game.audio.play('reload', this.spos, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
+    if (this.weapon.startReload()) {
+      this.game.audio.play('reload', this.spos, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
+      if (this.weapon.mag <= this.weapon.def.mag * 0.3 && this.weapon.def.mag >= 5) this.game.callout(this, 'reloading', this.isBot ? 0.5 : 0.8);
+    }
   }
 
   currentSpread() {
@@ -459,7 +462,7 @@ export class Character {
   }
 
   tryFire(origin, dir) {
-    if (this.infected) return this.melee();   // the infected have no gun: fire is a knife strike
+    if (this.infected || this.weapon.def.melee) { this.melee(); return false; }   // the knife: fire slashes (no shot, no muzzle flash)
     const w = this.weapon;
     if (!this.alive || this.switchT > 0 || w.reloading || w.cooldown > 0 || this.meleeT > 0) return false;
     if (w.mag <= 0) {
@@ -489,6 +492,7 @@ export class Character {
     this.grenades--;
     this.grenadeCd = spec.knife ? 0.55 : GRENADE.cooldown;
     this.throwDur = this.grenadeCd;   // the viewmodel's throw swing is timed to this (a knife is quicker than a frag)
+    this.game.callout(this, `${this.lethal}_out`, 0.9);
     this.weapon.cancelReload();
     this.game.throwGrenade(this, target, spec.cook ? Math.max(0, Math.min(spec.fuse, cook || 0)) : 0, this.lethal);
     return true;
@@ -498,6 +502,7 @@ export class Character {
     this.tacticals--;
     this.grenadeCd = GRENADE.cooldown;
     this.throwDur = this.grenadeCd;
+    this.game.callout(this, `${this.tactical}_out`, 0.9);
     this.weapon.cancelReload();
     this.game.throwGrenade(this, target, 0, this.tactical);
     return true;
@@ -681,7 +686,12 @@ export class Character {
       const stride = this.sprinting ? 2.5 : 1.9;
       if (this.stepAccum > stride) {
         this.stepAccum = 0;
-        if (this.crouchT < 0.5) this.game.audio.play('step', this.spos, { self: this.local, run: this.sprinting });
+        if (this.crouchT < 0.5) {
+          // what's underfoot decides the sound (the floor box under the feet)
+          const hit = this.game.physics.raycast(_stepO.set(this.pos.x, this.pos.y + 0.2, this.pos.z), _down, 0.6);
+          const sf = hit && hit.box.surface, surface = sf === 'ground' ? (this.game.world && this.game.world.groundSurface) || 'concrete' : sf;
+          this.game.audio.play('step', this.spos, { self: this.local, run: this.sprinting, surface });
+        }
       }
     }
     if (this.pos.y < -15) this.takeDamage(999, null, 'fall', false, this.pos);
@@ -689,7 +699,6 @@ export class Character {
 
   updateModel(dt, showName, lod = 1) {
     if (!this.model) return;
-    this.model.gunHolder.visible = !this.infected;   // the infected go at you with bare hands and a knife
     if (this.model.soldier) {
       // level of detail: off-screen bots only move their root; distant ones animate at a lower rate
       const m = this.model;
@@ -784,6 +793,7 @@ export class Character {
 }
 
 // ---------- rigged soldier (Mixamo skeleton) ----------
+const _stepO = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
 const _w1 = new THREE.Vector3(), _w2 = new THREE.Vector3(), _w3 = new THREE.Vector3(), _w4 = new THREE.Vector3(), _rtIK = new THREE.Vector3(), _ltIK = new THREE.Vector3();
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _qAim = new THREE.Quaternion();
 const _eu = new THREE.Euler(0, 0, 0, 'YXZ');

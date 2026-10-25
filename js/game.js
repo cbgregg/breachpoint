@@ -10,7 +10,7 @@ import { buildWorld, renderMinimap, MAPS, MAP_IDS, setWorldDetail, worldDetailLo
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
 import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadout } from './attachments.js';
-const INF_LOADOUT = soloLoadout('pistol');   // Infected: the gun is never drawn (fire strikes with the knife)
+const INF_LOADOUT = soloLoadout('blade');   // Infected: a combat knife in both slots (fire slashes)
 import { BotBrain } from './bot.js';
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
@@ -113,6 +113,7 @@ export class Game {
     this.effects.onCasing = (p) => this.audio.play('casing', p);
     this.input = new Input(this.renderer.renderer.domElement);
     this.hud = new HUD(this);
+    this.hud.onAnnounce = (t) => this.announce(t);   // medals and banners get the announcer
 
     this.settings = null;
     this.state = 'menu';
@@ -303,6 +304,11 @@ export class Game {
     this.countdownT = INTRO_SECS;
     this.lastBeep = Math.ceil(INTRO_SECS) + 1;
     this.setIntroLabel();
+    // the announcer names the mode; a couple of your squad have something to say while the countdown runs
+    this.leadTeam = -1;
+    this.announce(`mode_${this.settings.mode}`);
+    const squad = this.characters.filter(c => c.isBot && (this.ffa || c.team === this.player.team)), token = (this.matchToken = (this.matchToken || 0) + 1);
+    for (const [i, ms] of [[0, 3500], [1, 6800]]) setTimeout(() => { if (this.matchToken === token && this.live && squad[i]) this.callout(squad[(i + ((Math.random() * squad.length) | 0)) % squad.length], 'banter'); }, ms);
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -534,7 +540,12 @@ export class Game {
     if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
     // the world's own sounds (the station's trains), only in a match
     if (this.world.sounds && this.world.sounds.length) {
-      if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) this.audio.play(name, pos, opts);
+      // (a world can say how well a sound carries to where you are: a train under the street, in another station)
+      const ear = this.camera.position, aud = this.world.audible;
+      if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) {
+        const k = aud && pos ? aud(pos, ear) : 1;
+        if (k > 0.02) this.audio.play(name, pos, k < 1 ? { ...opts, occl: Math.sqrt(k), muffle: 1 - k } : opts);
+      }
       this.world.sounds.length = 0;
     }
     // in-world music (the supermarket's speakers): only during a match, loud inside, faint outside
@@ -618,6 +629,7 @@ export class Game {
       }
       this.hud.countdown(Math.max(0, n), this.intro);
     } else {
+      if (this.timeLeft > 60 && this.timeLeft - dt <= 60 && !this.gm) this.announce('one_minute');
       this.timeLeft = Math.max(0, this.timeLeft - dt);
       if (this.timeLeft <= 0 && !guest && !this.gm) {
         if (this.inf) this.hud.medal(this.player.team === 0 && !this.player.infectNext ? 'VICTORY' : 'DEFEAT', 'THE SURVIVORS HELD OUT');
@@ -681,6 +693,13 @@ export class Game {
       this.music.setIntensity(0.35 + fight + finale);
     }
     this.audio.setListener(this.camera.position, this.player.alive ? this.player.yaw : 0);
+    // rooms and tunnels sound like rooms and tunnels
+    this.audio.setIndoor(this.world.indoorAt ? this.world.indoorAt(this.camera.position) : 0);
+    // badly hurt: your heartbeat, and your breath
+    if (this.player.alive && this.player.health < 35) {
+      this.heartT = (this.heartT || 0) - dt;
+      if (this.heartT <= 0) { const k = 1 - this.player.health / 35; this.heartT = 1.05 - 0.35 * k; this.audio.play('heartbeat', null, { ui: true, k: 0.5 + 0.5 * k }); if (Math.random() < 0.4) this.audio.play('breath', null, { ui: true, k }); }
+    }
 
     // screen damage effect follows missing health
     const p = this.player;
@@ -913,7 +932,7 @@ export class Game {
         kind = 'b';
       } else if (w) {
         this.effects.impact(w.point, w.normal, w.box.surface);
-        if (p === 0) this.audio.play('impact', w.point);
+        if (p === 0) this.audio.play('impact', w.point, { surface: w.box.surface });
         kind = [w.box.surface || 'concrete', +w.normal.x.toFixed(2), +w.normal.y.toFixed(2), +w.normal.z.toFixed(2)];
       } else kind = 0;
       if (this.session && !cosmetic) ends.push([+_end.x.toFixed(2), +_end.y.toFixed(2), +_end.z.toFixed(2), kind]);
@@ -1229,6 +1248,7 @@ export class Game {
   explosionFx(pos) {
     this.effects.explosion(pos);
     this.audio.play('explosion', pos);
+    if (this.player && this.player.alive && this.player.pos.distanceTo(pos) < 8) this.audio.play('tinnitus', null, { ui: true, k: 1 - this.player.pos.distanceTo(pos) / 10 });   // ears ringing
     if (this.player && this.player.alive) {
       const d = this.player.pos.distanceTo(pos);
       if (d < 20) {
@@ -1276,6 +1296,24 @@ export class Game {
       c.stun(sec); this.notify(c, 'stun', +sec.toFixed(2));
       if (g.owner && c !== g.owner) this.notify(g.owner, 'hit', false, false);
     }
+  }
+
+  // ---------- voice: the announcer and the characters' callouts (recordings, docs/voice-lines.md) ----------
+  // announcer lines are named after the banner or medal they go with: 'DOUBLE KILL' -> vo/announcer/double_kill
+  announce(what) {
+    const id = String(what).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (id) this.audio.play('vo', null, { id: `vo/announcer/${id}`, ui: true, announcer: true });
+  }
+  // a character's callout (reloading, frag out, contact...), heard from where they are: not too often from
+  // anyone, and not on top of each other
+  callout(c, kind, chance = 1, remote = false) {
+    if (!c || !c.alive || Math.random() > chance) return;
+    const t = this.time;
+    if (!remote && (t - (c.calloutT ?? -9) < 3.5 || t - (this.calloutT ?? -9) < 1.2)) return;
+    c.calloutT = t; this.calloutT = t;
+    const id = `vo/${c.infected ? 'infected' : 'chatter'}/${kind}`, me = c === this.player;
+    this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 });
+    if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);
   }
 
   onDamaged(victim, attacker, amount, headshot, fromPos) {
@@ -1338,6 +1376,15 @@ export class Game {
       this.notify(victim, 'death', killer ? killer.id : -1, weaponId);
     }
     if (this.inf) this.infectedKill(killer, victim);
+    // chatter: the killer calls it, a teammate of the fallen nearby calls that
+    if (enemyKill && killer && killer.isBot) this.callout(killer, 'enemy_down', 0.35);
+    if (!this.ffa) { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.5); }
+    // Team Deathmatch: the lead changing hands
+    if (!this.gm && !this.ffa && !this.inf && enemyKill && this.player) {
+      const lead = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;
+      if (lead !== this.leadTeam && lead >= 0) this.announce(lead === this.player.team ? 'lead_taken' : 'lead_lost');
+      this.leadTeam = lead;
+    }
     if (this.gm) this.gm.onKill(killer, victim);
     else if (Math.random() < 0.5 && !(this.inf && victim.team === 1)) this.dropAmmo(victim.pos);
     const reached = this.ffa ? (this.gg ? killer && killer.ggLevel : killer && killer.kills) >= this.settings.scoreLimit : killer && this.scores[killer.team] >= this.settings.scoreLimit;

@@ -31,6 +31,7 @@ const STATIONS = [
   { name: 'Chinatown International District', short: 'CHINATOWN-ID', ox: 95, py: 0, tx: [1.5, 6.5], doors: [-1, 1], mouth: [-44, 22], pit: [0, 8] },
 ];
 const HX = 140, HZ = 50;
+const STATION_KEY = ['pioneer', 'symphony', 'chinatown'];   // (names of the announcement recordings)
 const STOP_Z = -11;           // where a stopped car's middle is (the same in every station)
 const GY = 5;                 // footbridges and galleries
 const PIT_D = 0.9, TUN_H = 5.6;   // track bed under the platform, tunnel height over the bed
@@ -95,12 +96,13 @@ function makeCar(dirIdx) {
     glass: new THREE.MeshStandardMaterial({ color: 0x8aa4b4, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
     lamp: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 2.2 }),
     head: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e0, emissiveIntensity: 6 }),
+    tail: new THREE.MeshStandardMaterial({ color: 0xff2010, emissive: 0xff2010, emissiveIntensity: 3 }),
     door: std({ color: 0xdfe2e0, roughness: 0.35, metalness: 0.2 }),
   };
   const dest = canvasTex(512, 64, (g, w, h) => {
     g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#ffb21e'; g.font = `bold 36px ${FONT}`; g.textBaseline = 'middle'; g.textAlign = 'center';
-    g.fillText(dirIdx ? 'LOOP · EAST TRACK' : 'LOOP · WEST TRACK', w / 2, h / 2);
+    g.fillText(dirIdx ? '1 LINE  LOOP · EAST' : '1 LINE  LOOP · WEST', w / 2, h / 2);
   });
   mats.dest = new THREE.MeshStandardMaterial({ map: dest, emissiveMap: dest, emissive: 0xffffff, emissiveIntensity: 1.6 });
   const logo = canvasTex(512, 128, (g, w, h) => {
@@ -140,7 +142,25 @@ function makeCar(dirIdx) {
     }
   }
   box(mats.body, -H, T_TOP, -L2, H, T_TOP + 0.08, L2);                                // roof skin
-  box(mats.grey, -0.8, T_TOP + 0.08, -L2 * 0.5, 0.8, T_TOP + 0.35, L2 * 0.5);         // roof equipment
+  // roof (Siemens S70): HVAC pods over each end, the traction equipment, the pantograph just ahead of the joint
+  const rod = (mat, a, b, r) => { const d = new THREE.Vector3(...b).sub(new THREE.Vector3(...a)); const g = new THREE.CylinderGeometry(r, r, d.length(), 6); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())); g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); add(mat, g); };
+  for (const zc of [-L2 + 4.2, L2 - 4.2]) box(mats.grey, -0.85, T_TOP + 0.08, zc - 1.8, 0.85, T_TOP + 0.42, zc + 1.8);
+  box(mats.grey, -0.7, T_TOP + 0.08, -6.5, 0.7, T_TOP + 0.3, -2.2);
+  {
+    const R = T_TOP + 0.08, Z = 2.2;
+    box(mats.black, -0.45, R, Z - 0.6, 0.45, R + 0.12, Z + 0.6);                                   // base frame
+    for (const sx of [-0.35, 0.35]) for (const sz of [-0.5, 0.5]) rod(mats.lamp, [sx, R + 0.12, Z + sz], [sx, R + 0.26, Z + sz], 0.035);   // insulators
+    rod(mats.grey, [0, R + 0.28, Z - 0.4], [0, R + 0.95, Z + 0.55], 0.04);                         // lower arm
+    rod(mats.grey, [0, R + 0.95, Z + 0.55], [0, R + 1.55, Z - 0.2], 0.03);                         // upper arm
+    box(mats.black, -0.75, R + 1.55, Z - 0.28, 0.75, R + 1.6, Z - 0.12);                          // pan head (the contact strip)
+    rod(mats.grey, [-0.3, R + 1.56, Z - 0.2], [0, R + 1.5, Z - 0.2], 0.012); rod(mats.grey, [0.3, R + 1.56, Z - 0.2], [0, R + 1.5, Z - 0.2], 0.012);
+  }
+  // the articulation: a short accordion bellows ring round the body at the middle of the car
+  for (let i = -3; i <= 3; i++) {
+    const z = i * 0.09;
+    for (const sx of [-1, 1]) box(mats.black, sx > 0 ? H - 0.02 : -H - 0.03, YP - 0.3, z - 0.035, sx > 0 ? H + 0.03 : -H + 0.02, T_TOP + 0.02, z + 0.035);
+    box(mats.black, -H, T_TOP + 0.02, z - 0.035, H, T_TOP + 0.07, z + 0.035);
+  }
   box(mats.floor, -H + 0.05, YP - 0.02, -L2 + 0.3, H - 0.05, YP + 0.005, L2 - 0.3);   // floor
   plane(mats.wall, TW - 0.1, L2 * 2 - 0.6, 0, T_TOP - 0.06, 0, 0, Math.PI / 2);       // ceiling
   for (const lz of [-9, -3, 3, 9]) box(mats.lamp, -0.25, T_TOP - 0.1, lz - 2.2, 0.25, T_TOP - 0.06, lz + 2.2);   // light panels
@@ -158,7 +178,17 @@ function makeCar(dirIdx) {
     box(mats.black, H - 0.3, WIN0, ez - (end > 0 ? 0.3 : 0), H - 0.065, WIN1, ez + (end > 0 ? 0 : 0.3));
     plane(mats.glass, TW - 0.6, WIN1 - WIN0, 0, (WIN0 + WIN1) / 2, ez + end * 0.01, end > 0 ? 0 : Math.PI);
     plane(mats.dest, 1.6, 0.22, 0, T_TOP - 0.35, ez + end * 0.02, end > 0 ? 0 : Math.PI);
-    for (const hx of [-0.85, 0.85]) box(mats.head, hx - 0.14, YP + 0.3, ez + end * 0.01, hx + 0.14, YP + 0.43, ez + end * 0.04);
+    // the S70's nose: a raked windscreen over a rounded anticlimber, light clusters either side of it; white
+    // headlights at the leading end (local +z is always the way it runs), red tail lights at the back
+    const ws = new THREE.PlaneGeometry(TW - 0.5, WIN1 - WIN0 + 0.25); ws.rotateX(end * -0.22); if (end < 0) ws.rotateY(Math.PI); ws.translate(0, (WIN0 + WIN1) / 2 + 0.05, ez + end * 0.13); add(mats.glass, ws);
+    box(mats.black, -H + 0.12, WIN0 - 0.08, ez + (end > 0 ? 0 : -0.26), H - 0.12, WIN0, ez + (end > 0 ? 0.26 : 0));
+    box(mats.body, -H + 0.08, YP - 0.45, ez + (end > 0 ? 0 : -0.32), H - 0.08, WIN0 - 0.08, ez + (end > 0 ? 0.32 : 0));
+    box(mats.grey, -0.95, YP - 0.55, ez + (end > 0 ? 0.2 : -0.42), 0.95, YP - 0.25, ez + (end > 0 ? 0.42 : -0.2));      // anticlimber / coupler cover
+    box(mats.blue, -H + 0.08, YP - 0.25, ez + end * 0.32 - 0.004 * end, H - 0.08, YP + 0.1, ez + end * 0.325);
+    for (const hx of [-0.85, 0.85]) {
+      box(end > 0 ? mats.head : mats.tail, hx - 0.16, YP + 0.25, ez + end * 0.32, hx + 0.16, YP + 0.42, ez + end * 0.335);
+      box(end > 0 ? mats.head : mats.tail, hx * 0.8 - 0.06, T_TOP - 0.18, ez + end * 0.01, hx * 0.8 + 0.06, T_TOP - 0.1, ez + end * 0.035);   // marker lights
+    }
   }
   const group = new THREE.Group();
   for (const [mat, list] of parts) {
@@ -195,7 +225,13 @@ function enclosure(tints, stone, portal) {
   ROW.forEach(([x, w], i) => out.push([x, 25.5, w, 7, 20 + ((i + 1) % 2) * 6, 0, 'brick', { tint: t(i + 1), stone: stone && !(i % 2) }]));
   [[-34, -27, 7, 34], [-34, 6, 7, 32]].forEach(([x, z, w, d], i) => out.push([x + 2.5, z, w, d, 24 + i * 4, 0, 'brick', { tint: t(i + 2) }]));
   [[42, -27, 7, 34], [42, 6, 7, 32]].forEach(([x, z, w, d], i) => out.push([x - 2.5, z, w, d, 26 - i * 4, 0, 'brick', { tint: t(i + 3) }]));
-  out.push([4, -51.5, 80, 1, 30, 0, 'boundary'], [4, 29.5, 80, 1, 30, 0, 'boundary'], [-35.5, -11, 1, 80, 30, 0, 'boundary'], [43.5, -11, 1, 80, 30, 0, 'boundary']);
+  // the outer walls; with a portal, the end walls leave the track's way through (a train carried its riders
+  // into a 30 m wall there, and the wall threw them out on top of it)
+  for (const z of [-51.5, 29.5]) {
+    if (portal) out.push([(-36 + portal[0]) / 2, z, portal[0] + 36, 1, 30, 0, 'boundary'], [(portal[1] + 44) / 2, z, 44 - portal[1], 1, 30, 0, 'boundary']);
+    else out.push([4, z, 80, 1, 30, 0, 'boundary']);
+  }
+  out.push([-35.5, -11, 1, 80, 30, 0, 'boundary'], [43.5, -11, 1, 80, 30, 0, 'boundary']);
   return out;
 }
 
@@ -384,7 +420,8 @@ function build(ctx) {
     for (const tx of st.tx) {
       for (const o of [-0.72, 0.72]) put(flatBox(0.08, RAIL + PIT_D, 280, 0), steel, ox + tx + o, PIT + (RAIL + PIT_D) / 2, STOP_Z, 0, { grime: 0, cast: false });
       for (let z = m0 - 50; z <= m1 + 50; z += 0.9) put(flatBox(2.4, 0.12, 0.22, 0), M.concrete, ox + tx, PIT + 0.06, z, 0, { grime: 0.2, tint: 0x7a7670, cast: false });
-      put(flatBox(0.03, 0.03, 280, 0), dark, ox + tx, TOP - 0.4, STOP_Z, 0, { grime: 0, cast: false });
+      put(flatBox(0.03, 0.03, 280, 0), dark, ox + tx, TOP - 0.08, STOP_Z, 0, { grime: 0, cast: false });   // contact wire, at the pantograph's height
+      put(flatBox(0.012, 0.012, 280, 0), dark, ox + tx, TOP - 0.02, STOP_Z, 0, { grime: 0, cast: false });  // the messenger above it
     }
     // the tunnels past both mouths: lit near the station, dark (unlit) beyond, little blue marker lights
     const x0 = ox + p0 - 0.3, x1 = ox + p1 + 0.3;
@@ -535,6 +572,8 @@ function build(ctx) {
       wall(M.dark, X(x - 0.35), 0, z - 0.5, X(x + 0.35), 1.85, z + 0.5, { surf: 'metal' });
       put(new THREE.PlaneGeometry(0.6, 0.4), lampMat, X(x) + (x < 4 ? 0.36 : -0.36), 1.35, z, x < 4 ? Math.PI / 2 : -Math.PI / 2, { grime: 0, cast: false });
     }
+    // overhead line hung from the ceiling over each track
+    for (let z = hz0 + 3; z < hz1; z += 10) for (const tx of st.tx) box(steel, X(tx) - 0.02, TOP - 0.08, z - 0.02, X(tx) + 0.02, HH - 0.7, z + 0.02, { cast: false });
     // light: rows of big globes hung from the ceiling, a few real lights
     for (let z = hz0 + 6; z < hz1; z += 12) for (const x of [-12, 4, 20]) lamp(X(x), 8.6, z, 0.45, HH - 0.7 - 8.6 - 0.45);
     for (const [x, y, z] of [[4, 7.5, -24], [4, 7.5, 4], [-12, 7, -11], [20, 7, -11]]) light(X(x), y, z, 10, 26, 0xfff0dc);
@@ -566,6 +605,15 @@ function build(ctx) {
       for (const x of [-1.5, 8.3]) wall(M.concrete, X(x), PIT, face - (f < 0 ? 0 : 0.5), X(x + 1.2), TOP + 0.9, face + (f < 0 ? 0.5 : 0), { tint: 0x8a8680, grime: 0.4 });
       box(M.concrete, X(-1.5), TOP, face - (f < 0 ? 0 : 0.5), X(9.5), TOP + 0.9, face + (f < 0 ? 0.5 : 0), { tint: 0x8a8680, grime: 0.4 });
       sign(nameTex(st.name), 6, 1.12, X(4), TOP + 2.0, face - f * 0.02, f < 0 ? 0 : Math.PI, 0.6);
+    }
+    // overhead line: a pole between the tracks every 12 m with a cantilever out to each contact wire
+    for (let z = m0 + 4; z < m1 - 2; z += 12) {
+      if (z > C_CROSS[0] - 2 && z < C_CROSS[1] + 2) continue;
+      wall(M.dark, X(3.85), PIT, z - 0.15, X(4.15), TOP + 0.9, z + 0.15, { surf: 'metal' }).navIgnore = true;
+      for (const tx of st.tx) {
+        box(steel, Math.min(X(4), X(tx)), TOP + 0.6, z - 0.03, Math.max(X(4), X(tx)), TOP + 0.66, z + 0.03, { cast: false });
+        box(steel, X(tx) - 0.015, TOP - 0.08, z - 0.015, X(tx) + 0.015, TOP + 0.62, z + 0.015, { cast: false });
+      }
     }
     // the level crossing: rubber panels between the rails, signals both sides that flash while a train is near
     put(new THREE.PlaneGeometry(8, C_CROSS[1] - C_CROSS[0]), M.rubber, X(4), 0.008, (C_CROSS[0] + C_CROSS[1]) / 2, 0, { rx: -Math.PI / 2, grime: 0.3, cast: false });
@@ -675,16 +723,28 @@ function build(ctx) {
         bx.b.miny = Y + bx.y0; bx.b.maxy = Y + bx.y1;
         bx.b.minz = Z + bx.z0; bx.b.maxz = Z + bx.z1;
       }
-      // sounds: the chime as the doors move, the horn pulling out, a bell running in, the rumble under way
+      // sounds: door motors and the chime, the horn pulling out, the bell running in, brakes at the stop; under
+      // way the traction motors' whine (rising as it speeds up, falling as it slows) and the clack of the rail
+      // joints; and the announcements (recordings: see docs/voice-lines.md), on board and on the platform
       const ph = s.v === 0 ? (s.open ? 'open' : 'shut') : s.arriving ? 'in' : 'out';
       if (ph !== tr.phase) {
-        const pos = new THREE.Vector3(X, Y + 1.5, Z);
-        if ((ph === 'open' || (ph === 'shut' && tr.phase === 'open'))) sounds.push(['trainchime', pos]);
-        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos]);
-        if (ph === 'in') sounds.push(['trainbell', pos]);
+        const pos = new THREE.Vector3(X, Y + 1.5, Z), here = STATION_KEY[s.st], nxt = STATION_KEY[s.next];
+        const plat = new THREE.Vector3(X + ds * 3, Y + 1.6, Z);   // the platform beside the doors
+        // doors to the rider's left or right, facing the way the car runs (facing +z, your right is -x)
+        const side = ds === (DIRZ[tr.d] > 0 ? -1 : 1) ? 'right' : 'left';
+        if (ph === 'open') { sounds.push(['traindoor', pos], ['trainchime', pos], ['vo', pos, { id: `vo/link/this_is_${here}` }], ['vo', pos, { id: `vo/link/doors_${side}`, delay: 2.2 }]); }
+        if (ph === 'shut' && tr.phase === 'open') sounds.push(['trainchime', pos], ['traindoor', pos, { close: true }], ['vo', pos, { id: 'vo/link/doors_closing' }], ['vo', plat, { id: 'vo/link/doors_closing' }]);
+        if (ph === 'shut' && tr.phase === 'in') sounds.push(['trainbrake', pos]);
+        if (ph === 'out' && tr.phase === 'shut') sounds.push(['trainhorn', pos], ['vo', pos, { id: `vo/link/next_${nxt}`, delay: 4 }]);
+        if (ph === 'in') sounds.push(['trainbell', pos], ['vo', plat, { id: `vo/link/pa_arriving_${STATION_KEY[s.next]}` }]);
         tr.phase = ph;
       }
-      if (s.v > 1) { tr.rumble = (tr.rumble || 0) - dt; if (tr.rumble <= 0) { tr.rumble = 0.45; sounds.push(['trainrumble', new THREE.Vector3(X, Y + 1, Z), { speed: s.v }]); } }
+      if (s.v > 0.5) {
+        tr.rumble = (tr.rumble || 0) - dt;
+        if (tr.rumble <= 0) { tr.rumble = 0.38; sounds.push(['trainmotor', new THREE.Vector3(X, Y + 0.4, Z), { speed: s.v, acc: s.arriving ? -1 : s.v < VMAX - 0.2 ? 1 : 0 }]); }
+        tr.clack = (tr.clack || 0) + s.v * dt;
+        if (tr.clack > 18 && s.v > 4) { tr.clack = 0; for (const e of [-1, 1]) sounds.push(['trainclack', new THREE.Vector3(X, Y, Z + e * (L2 - 3))]); }
+      }
     }
     // tunnel mouths open while a train is near them
     for (const gt of gates) {
@@ -745,6 +805,19 @@ function build(ctx) {
   function botTravel(br, dt) {
     const b = br.bot, goal = br.goal;
     const ride = aboard(b.pos);
+    // down in a track bed (knocked in, or a boarding cut short): out onto the nearest platform before anything else
+    if (!ride) {
+      const si = stationOf(b.pos), st = STATIONS[si];
+      if (st && b.pos.y < st.py - 0.45 && b.pos.y > st.py - PIT_D - 0.6) {
+        const lx = b.pos.x - st.ox, bed = beds(st).find(([a, c]) => lx > a - 0.2 && lx < c + 0.2);
+        if (bed) {
+          const edge = lx - bed[0] < bed[1] - lx ? bed[0] : bed[1], out = edge === bed[0] ? -1 : 1;
+          const dist = Math.abs(lx - edge);
+          br.ride = null;
+          return { wish: _w.set(out, 0, 0), sprint: false, jump: dist < 0.9 };
+        }
+      }
+    }
     const toward = (x, z, k = 1) => _w.set(x - b.pos.x, 0, z - b.pos.z).normalize().multiplyScalar(k);
     if (ride) {
       const s = ride.st, gs = goal ? stationOf(goal) : -1;
@@ -782,12 +855,31 @@ function build(ctx) {
     _t.set(waitX, st.py, doorZ);
     if (br.rideKey !== `${d}${here}`) { br.rideKey = `${d}${here}`; br.repathT = 0; br.path = []; }
     if (onPlatform && Math.hypot(b.pos.x - waitX, b.pos.z - doorZ) < 1.2) return { wish: _w.set(0, 0, 0) };
+    // only along a path: straight at the wait spot was straight across the tracks when it was on the far platform
     const dir = br.followPath(_t, dt);
-    return { wish: dir ? _w.copy(dir) : toward(waitX, doorZ), sprint: true };
+    if (dir) return { wish: _w.copy(dir), sprint: true };
+    return Math.hypot(b.pos.x - waitX, b.pos.z - doorZ) < 2.5 && Math.abs(b.pos.y - st.py) < 0.6 ? { wish: toward(waitX, doorZ, 0.5) } : null;
   }
 
+  // how well a train is heard from where you are: not at all from another station, nor from up on Pioneer
+  // Square's plaza when it's in the hall below (a little at the top of a stairwell, muffled)
+  const audible = (pos, ear) => {
+    const a = stationOf(pos), b = stationOf(ear);
+    if (a < 0 || a !== b) return 0;
+    if (a !== 0) return 1;
+    const under = pos.y < -2, earUnder = ear.y < -2.5;
+    if (under === earUnder) return 1;
+    return P_STAIRS.some(([x, z]) => Math.hypot(ear.x - (STATIONS[0].ox + x), ear.z - z) < 7) ? 0.25 : 0;
+  };
+  // rooms for the reverb: Symphony's hall, Pioneer's vault, any tunnel
+  const indoorAt = (p) => {
+    const si = stationOf(p), st = STATIONS[si];
+    if (!st) return 0;
+    if (p.z < st.mouth[0] || p.z > st.mouth[1]) return 1;
+    return si === 1 || (si === 0 && p.y < -1.5) ? 1 : 0;
+  };
   Object.assign(world, {
-    update, trainHit, trainShift, sounds, botTravel, upper: levels, trains, stationOf,
+    update, trainHit, trainShift, sounds, botTravel, upper: levels, trains, stationOf, audible, indoorAt,
     sameArea: (a, b) => stationOf(a) === stationOf(b),
     // the menu's live view: Symphony's hall from the north gallery, over the island as the trains come and go
     menuCam(t, cam) { cam.position.set(STATIONS[1].ox - 21 + Math.sin(t * 0.2) * 1.5, GY + 1.7, -30 + Math.sin(t * 0.13) * 4); cam.lookAt(STATIONS[1].ox + 4, 1.2, -6); },

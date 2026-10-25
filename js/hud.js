@@ -143,10 +143,10 @@ export class HUD {
     // ammo
     const w = p.weapon;
     this.txt('weapon-name', w.def.name.toUpperCase());
-    this.txt('ammo-mag', w.mag);
+    this.txt('ammo-mag', w.def.melee ? '—' : w.mag);   // the knife: nothing to count
     this.cls('ammo-mag', 'low', w.mag > 0 && w.mag <= Math.ceil(w.def.mag * 0.25));
     this.cls('ammo-mag', 'empty', w.mag === 0);
-    this.txt('ammo-res', w.reserve);
+    this.txt('ammo-res', w.def.melee ? '' : w.reserve);
     this.txt('fire-mode', w.def.mode);
     this.txt('grenades', p.grenades);
     this.txt('tacticals', p.tacticals | 0);
@@ -383,6 +383,7 @@ export class HUD {
   }
 
   medal(title, sub = '') {
+    if (this.onAnnounce) this.onAnnounce(title);   // the announcer says it (when there's a recording of it)
     const box = $('medal');
     box.innerHTML = '';
     const d = document.createElement('div');

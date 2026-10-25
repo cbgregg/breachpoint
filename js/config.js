@@ -175,6 +175,14 @@ export const WEAPONS = {
     rocket: { speed: 48, radius: 6.5, damage: 165, direct: 60 },
     model: { type: 'launcher', sight: 'iron' },
   },
+  blade: {
+    // the infected's combat knife: fire slashes (a one-hit kill up close); no ammo, no reload
+    id: 'blade', name: 'Combat Knife', short: 'KNIFE', mode: 'MELEE', melee: true, auto: false, rpm: 80, damage: 0, headMult: 1,
+    mag: 1, reserve: 0, reload: 1, spread: 0, adsSpread: 0, moveSpread: 0,
+    recoilPitch: 0, recoilYaw: 0, range: 2.3, falloffStart: 2, falloffEnd: 2.3, falloffMin: 1,
+    pellets: 1, adsFov: 70, adsTime: 0.15, botRange: [0, 2],
+    model: { type: 'pistol', sight: 'iron' },
+  },
   sling: {
     // Knife Slingshot: Gun Game's last weapon. Fires a throwing knife: no spread at all (hip or aimed), a fast
     // flat flight with a little drop, and only a direct hit counts (one hit kills). One knife per draw.

@@ -2600,6 +2600,9 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (LAYOUT.lower) world.upper = LAYOUT.lower;                    // a second nav level (here below ground)
   if (custom) Object.assign(world, custom); // update(), menuCam, sites, ambient music, ...
   if (!world.spawnYaw) world.spawnYaw = [-Math.PI / 2, Math.PI / 2];
+  // rooms and tunnels (for the reverb): below the street is underground (the Seattle Underground); maps say more
+  if (!world.indoorAt) world.indoorAt = (p) => (p.y < -1 ? 1 : 0);
+  if (!world.groundSurface) world.groundSurface = mapId === 'drivein' ? 'dirt' : 'concrete';
   world.nav = new NavGrid(physics, MAP, 1, 0.45);
   world.nav.warm();   // (while the map loads, not in the first firefight)
   // more levels bots can use (Freshway's offices, the Underground, Link Loop's stations): each its own grid, joined

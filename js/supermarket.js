@@ -1428,6 +1428,7 @@ function build(ctx) {
       { kind: 'swing', x: -17, z: -20.0, y: UP, axis: 'z', w: 1.6, h: 2.15, tint: 0x8a6a4a },   // break room | office
       { kind: 'swing', x: -13.0, z: Z0 - T / 2, y: UP, axis: 'x', w: 1.6, h: 2.15, tint: 0x5a6a5a }, // out to the alley stair
     ],
+    indoorAt: (p) => (Math.abs(p.x) < 22 && Math.abs(p.z) < 24 && p.y < 6 ? 1 : 0),   // the store: a room's reverb
     menuCam(t, cam) {
       cam.position.set(Math.cos(t) * 44 - 4, 13 + Math.sin(t * 0.7) * 2, Math.sin(t) * 38);
       cam.lookAt(0, 1.5, 0);

@@ -584,17 +584,19 @@ class RoundMode {
         const why = { elim: 'TEAM ELIMINATED', time: 'TIME EXPIRED', bomb: 'TARGET DESTROYED', defused: 'BOMB DEFUSED', flag: 'FLAG CAPTURED', health: 'MORE HEALTH REMAINING' }[b] || '';
         const t = a === mine ? 'ROUND WON' : a === 0 || a === 1 ? 'ROUND LOST' : 'ROUND DRAW';
         ui(t, b === 'health' && a !== 0 && a !== 1 ? 'EQUAL HEALTH' : why, a === mine ? 'win' : a === 0 || a === 1 ? 'lose' : '');
+        if (b === 'defused' || b === 'bomb' || b === 'flag' || b === 'elim') g.announce(why);   // then why: "bomb defused", "team eliminated"...
         g.audio.play('horn', null, { ui: true });
         break;
       }
       case 'planted': g.audio.play('beep', null, { ui: true, freq: 660 }); ui('BOMB PLANTED', `SITE ${a === 1 ? 'B' : 'A'} · ${this.attack === mine ? 'DEFEND THE BOMB' : 'DEFUSE IT'}`, 'warn'); break;
-      case 'drop': if (this.attack === mine) g.hud.message('BOMB DROPPED'); break;
-      case 'pickup': if (this.attack === mine) g.hud.message(a === me.id ? 'YOU HAVE THE BOMB' : 'BOMB PICKED UP'); break;
+      case 'drop': if (this.attack === mine) { g.hud.message('BOMB DROPPED'); g.announce('BOMB DROPPED'); } break;
+      case 'pickup': if (this.attack === mine) { const m = a === me.id ? 'YOU HAVE THE BOMB' : 'BOMB PICKED UP'; g.hud.message(m); g.announce(m); } break;
       default: break;
     }
   }
 
   banner(title, sub, cls) {
+    this.g.announce(title);   // ROUND 3, BOMB PLANTED, ROUND WON...
     const el = this.ui.querySelector('#gm-banner');
     el.querySelector('#gm-bt').textContent = title;
     el.querySelector('#gm-bs').textContent = sub || '';

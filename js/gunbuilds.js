@@ -445,6 +445,21 @@ export const BUILDS = {
     return { muzF: 0.88, BY: AX, sight: { ...hs, sightX: SX, eyeRelief: -0.26 }, laser: null };
   },
 
+  // ---------- Combat Knife (the infected): hammer grip, the blade standing up and forward out of the fist ----------
+  blade(k) {
+    const { p, B, tinted } = k;
+    const steel = tinted(B.steel, 0x9aa0a4), dark = B.rubber;
+    p.profile(dark, [[-0.014, 0.002], [0.022, 0.002], [0.024, -0.03, 0.006], [0.02, -0.07, 0.008], [0.016, -0.1, 0.006], [-0.016, -0.104, 0.006], [-0.02, -0.07, 0.008], [-0.018, -0.03, 0.006]], 0.026, { r: 0.008, bevel: 0.004 });   // grip
+    for (let i = 0; i < 5; i++) p.rbox(B.recess, 0.027, 0.0025, 0.03, 0, -0.018 - i * 0.017, 0.0, 0.001);                                             // grip rings
+    p.rbox(steel, 0.03, 0.006, 0.05, 0, 0.005, -0.008, 0.002);                    // guard
+    p.rbox(steel, 0.022, 0.012, 0.028, 0, -0.108, 0.0, 0.004);                   // pommel
+    p.profile(steel, [[-0.012, 0.008], [0.03, 0.008], [0.045, 0.06], [0.052, 0.12], [0.044, 0.17], [0.03, 0.188], [0.02, 0.15], [0.006, 0.09], [-0.012, 0.03]], 0.004, { r: 0.002, bevel: 0.0012 });   // clip-point blade
+    p.profile(tinted(B.steel, 0xd8dcde), [[0.03, 0.01], [0.034, 0.01], [0.05, 0.12], [0.042, 0.168], [0.04, 0.16], [0.046, 0.12]], 0.0044, { r: 0.001 });           // the honed edge
+    k.eject.position.set(0, 0.05, 0);
+    k.foregrip.position.set(0, -0.05, 0);
+    return { muzF: 0.05, BY: 0.1, sight: { sightY: 0.09, sightZ: 0, eyeRelief: -0.3 }, laser: null };
+  },
+
   // ---------- Knife Slingshot: a walnut Y-fork, black surgical-tube bands to a leather pouch, a throwing knife
   // loaded in it pointing out through the fork (the knife is the "magazine": it goes with the shot) ----------
   sling(k) {
