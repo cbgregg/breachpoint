@@ -1,9 +1,9 @@
 // The score. Recorded tracks (assets/music/tracks.json, composed by tools/gen_music.py) when they're there:
-//   menu, action (two layers, a tense bed and a firefight, mixed by the game's intensity), infected, the countdown
+//   action (two layers, a tense bed and a firefight, mixed by the game's intensity), infected, the countdown
 //   build-up (its impact lands on the countdown's last tick), the win and lose stings, and the supermarket's muzak.
 // Long tracks stream (an <audio> element each, not decoded into memory) and loop by cross-fading their end into
-// their start. Otherwise, or when a file won't load, the original score synthesized live with WebAudio:
-//   menu   — slow D-minor theme: low drone, string pad, a sparse motif with a flattened 2nd, taiko hits
+// their start. The menu theme is composed note by note and synthesized live (MoodTrack, below): the AI-composed
+// ones sounded AI-composed. Otherwise, or when a file won't load, the original score synthesized live:
 //   action — 112 BPM: driving 16th bass, syncopated kit, string ostinato, brass stabs, risers.
 //            An intensity value (0..1) set by the game adds and removes layers as fights heat up.
 // To use your own tracks instead, set MUSIC_FILES in config.js to audio files in the repo.
@@ -26,7 +26,6 @@ export class Music {
     this.ready = fetch('assets/music/tracks.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({})).then(f => {
       this.files = f && typeof f === 'object' ? f : {};
       if (this.ctx) this.preload();
-      this.warm('menu');
       if (this.track && this.track.synth && this.recorded(this.name)) { const n = this.name; this.name = null; this.play(n); }
       if (this.amb && this.amb.synth && this.files.muzak) { const n = this.ambName; this.ambName = null; this.amb.stop(1); this.amb = null; this.ambient(n); }
     });
@@ -107,7 +106,7 @@ export class Music {
     if (!this.ensure()) return;
     this.name = name;
     if (this.track) this.track.stop(1.6);
-    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : this.recorded(name) || new (name === 'menu' ? MenuTrack : ActionTrack)(this);
+    this.track = MUSIC_FILES && MUSIC_FILES[name] ? new FileTrack(this, MUSIC_FILES[name]) : this.recorded(name) || new ({ menu: MoodTrack }[name] || ActionTrack)(this);
     this.track.start();
   }
 
@@ -313,7 +312,7 @@ class Track {
     const ctx = this.ctx;
     // background tabs throttle timers; skip ahead instead of bursting a backlog of notes
     if (this.next < ctx.currentTime - 0.5) this.next = ctx.currentTime + 0.05;
-    while (this.next < ctx.currentTime + 0.3) {
+    while (this.next < ctx.currentTime + (this.ahead || 0.3)) {
       this.play(this.step, this.next);
       this.next += this.dt;
       this.step++;
@@ -349,51 +348,6 @@ class Track {
 }
 
 const CHORDS = { Dm: [50, 53, 57], Bb: [46, 50, 53], F: [53, 57, 60], C: [48, 52, 55], Gm: [43, 46, 50], A: [45, 49, 52] };
-
-class MenuTrack extends Track {
-  constructor(m) {
-    super(m, 68);
-    this.prog = ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'Gm', 'A'];
-    // [bar within 8, 16th step, midi, length in steps] — D minor with a flattened 2nd (E♭) for colour
-    this.motif = [
-      [0, 0, 69, 6], [0, 6, 74, 4], [0, 10, 72, 6], [1, 0, 69, 12],
-      [2, 0, 65, 6], [2, 6, 70, 4], [2, 10, 69, 6], [3, 0, 65, 4], [3, 4, 64, 4], [3, 8, 63, 8],
-      [4, 0, 62, 6], [4, 6, 69, 4], [4, 10, 67, 6], [5, 0, 65, 12],
-      [6, 0, 67, 4], [6, 4, 65, 4], [6, 8, 63, 8], [7, 0, 61, 6], [7, 6, 62, 10],
-    ];
-  }
-
-  start() {
-    super.start();
-    this.drone(mtof(26), 'sawtooth', 0.05, 260, 0.05);
-    this.drone(mtof(26) * 1.004, 'sawtooth', 0.04, 220, 0.07);
-    this.drone(mtof(33), 'triangle', 0.035, 500, 0.03);
-  }
-
-  play(step, t) {
-    const ctx = this.ctx, dt = this.dt;
-    const bar = Math.floor(step / 16), s = step % 16, phrase = Math.floor(bar / 8);
-    // string pad, one chord per bar
-    if (s === 0) {
-      const ch = CHORDS[this.prog[bar % 8]];
-      for (const n of ch) for (const det of [-7, 7]) voice(ctx, this.bus, t, { freq: mtof(n), det, attack: 1.4, hold: dt * 16 - 1.2, release: 1.8, gain: 0.022, cutoff: 1100 });
-      voice(ctx, this.bus, t, { freq: mtof(ch[0] - 12), type: 'triangle', attack: 0.8, hold: dt * 16 - 0.6, release: 1.4, gain: 0.05, cutoff: 600 });
-    }
-    // motif: comes in after the first phrase, rests every third phrase
-    if (phrase > 0 && phrase % 3 !== 2) {
-      for (const [b, st, n, len] of this.motif) {
-        if (b === bar % 8 && st === s) {
-          voice(ctx, this.bus, t, { freq: mtof(n), type: 'triangle', attack: 0.01, hold: 0.05, release: len * dt * 1.4, gain: 0.07, cutoff: 3000 });
-          voice(ctx, this.bus, t, { freq: mtof(n + 12), type: 'sine', attack: 0.005, hold: 0.02, release: len * dt * 0.6, gain: 0.025, cutoff: 6000 });
-        }
-      }
-    }
-    // percussion
-    if (s === 0 && bar % 2 === 0) drum(ctx, this.bus, this.m.audio.noise, t, 'taiko', 0.7);
-    if (phrase > 0 && s === 10 && bar % 2 === 1) drum(ctx, this.bus, this.m.audio.noise, t, 'taiko', 0.35);
-    if (phrase > 1 && s % 4 === 2) drum(ctx, this.bus, this.m.audio.noise, t, 'hat', 0.35);
-  }
-}
 
 class ActionTrack extends Track {
   constructor(m) {
@@ -444,6 +398,93 @@ class ActionTrack extends Track {
     }
     // riser into the next phrase
     if (I > 0.55 && bar % 8 === 7 && s === 0) noise(ctx, nb, this.bus, t, { type: 'bandpass', freq: 400, q: 2, attack: dt * 15, decay: 0.05, gain: 0.12, sweep: 6000 });
+  }
+}
+
+// The menu theme: moody electronic in D minor, 100 BPM, composed note by note. A soft kick and a clap, an offbeat
+// sub bass, a rolling arpeggio through a dotted-eighth delay, warm pads, one hook that keeps coming back on piano
+// (a bell joins it later), all in a big hall. 16-bar progression Dm Bb F C | Dm Bb Gm A; four passes (piano, piano
+// and bell, the arpeggio and a high counter-line on their own, piano and bell), about 2.5 minutes, then round again.
+const MOOD_CHORDS = ['Dm', 'Dm', 'Bb', 'Bb', 'F', 'F', 'C', 'C', 'Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A'];
+const MOOD_HOOK = (() => {   // [bar, 16th, midi note, length in 16ths]
+  const a = [[[0, 57, 4], [4, 62, 4], [8, 65, 2], [10, 64, 2], [12, 62, 4]], [[0, 60, 6], [6, 57, 10]],
+    [[0, 57, 4], [4, 62, 4], [8, 65, 2], [10, 67, 2], [12, 65, 4]], [[0, 64, 6], [6, 62, 10]],
+    [[0, 60, 4], [4, 65, 4], [8, 69, 2], [10, 67, 2], [12, 65, 4]], [[0, 64, 6], [6, 60, 10]]];
+  const bars = [...a, [[0, 55, 4], [4, 60, 4], [8, 64, 2], [10, 62, 2], [12, 60, 4]], [[0, 64, 8], [8, 62, 8]],
+    ...a, [[0, 55, 4], [4, 58, 4], [8, 62, 2], [10, 60, 2], [12, 58, 4]], [[0, 57, 8], [8, 61, 8]]];
+  return bars.flatMap((notes, bar) => notes.map(([s, n, l]) => [bar, s, n, l]));
+})();
+class MoodTrack extends Track {
+  constructor(m) {
+    super(m, 100);
+    this.ahead = 2;   // (notes scheduled 2 s ahead: it plays through the menus while the game loads and builds things)
+    const ctx = this.ctx;
+    // a dotted-eighth echo, darkened on each repeat
+    this.dly = ctx.createDelay(1); this.dly.delayTime.value = this.dt * 3;
+    const fb = ctx.createGain(); fb.gain.value = 0.34;
+    const dark = ctx.createBiquadFilter(); dark.type = 'lowpass'; dark.frequency.value = 2400;
+    const wet = ctx.createGain(); wet.gain.value = 0.32;
+    this.dly.connect(dark).connect(fb).connect(this.dly); dark.connect(wet).connect(this.bus);
+    // drums a little muted (it sits under the menus)
+    this.kit = ctx.createBiquadFilter(); this.kit.type = 'lowpass'; this.kit.frequency.value = 3200; this.kit.connect(this.bus);
+    // a big hall: 5 s, a touch of pre-delay, darker as it dies; the piano, pads, arpeggio and clap go into it (the kick
+    // and the bass stay dry, or it all turns to mud), and the general score hall is turned down for this one
+    this.send.gain.value = 0.08;
+    const sr = ctx.sampleRate, n = Math.floor(sr * 5), ir = ctx.createBuffer(2, n, sr);
+    for (let c = 0; c < 2; c++) {
+      const x = ir.getChannelData(c); let lp = 0;
+      for (let i = 0; i < n; i++) { const k = i / n, v = i < sr * 0.022 ? 0 : (Math.random() * 2 - 1) * Math.pow(1 - k, 2.4); lp += (0.55 - 0.4 * k) * (v - lp); x[i] = lp * 0.6; }
+    }
+    this.hall = ctx.createConvolver(); this.hall.buffer = ir;
+    const hallOut = ctx.createGain(); hallOut.gain.value = 0.85; this.hall.connect(hallOut).connect(this.bus);
+    // a part's channel: dry level, how much goes to the echo and to the hall
+    const part = (dry, echo, hall) => {
+      const g = ctx.createGain(); g.gain.value = dry; g.connect(this.bus);
+      if (echo) { const e = ctx.createGain(); e.gain.value = echo; g.connect(e).connect(this.dly); }
+      if (hall) { const h = ctx.createGain(); h.gain.value = hall; g.connect(h).connect(this.hall); }
+      return g;
+    };
+    this.arpBus = part(0.8, 1, 0.7); this.pianoBus = part(1, 0.35, 0.9); this.bellBus = part(0.8, 0.6, 1);
+    this.padBus = part(1, 0, 0.9); this.clapBus = part(1, 0, 0.6); this.counterBus = part(0.9, 1, 1);
+  }
+  // a soft kick: just the thump (the stock kick's click on every beat was too much here)
+  kick(t, v) {
+    const ctx = this.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(44, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+    o.connect(g).connect(this.bus); o.start(t); o.stop(t + 0.42);
+  }
+  play(step, t) {
+    const ctx = this.ctx, dt = this.dt, nb = this.m.audio.noise;
+    const bar = Math.floor(step / 16), s = step % 16, b16 = bar % 16, pass = Math.floor(bar / 16) % 4;
+    const ch = CHORDS[MOOD_CHORDS[b16]];
+    // drums: a soft kick on the beat, a clap on 2 and 4 (into the hall), quiet offbeat hats
+    if (s % 4 === 0) this.kick(t, 0.5);
+    if (s === 4 || s === 12) { noise(ctx, nb, this.clapBus, t, { type: 'bandpass', freq: 1400, q: 0.8, attack: 0.004, decay: 0.12, gain: 0.1 }); noise(ctx, nb, this.clapBus, t + 0.014, { type: 'bandpass', freq: 1600, q: 0.8, attack: 0.004, decay: 0.16, gain: 0.07 }); }
+    if (s % 4 === 2) noise(ctx, nb, this.kit, t, { type: 'bandpass', freq: 5500, q: 1.2, attack: 0.012, decay: 0.05, gain: 0.014 });   // (a soft shaker)
+    // sub bass on the offbeats (the pump), the root held under the downbeat
+    const root = ch[0] - 12;
+    if (s % 4 === 2) { voice(ctx, this.bus, t, { freq: mtof(root), type: 'sine', attack: 0.015, hold: dt * 1.2, release: 0.12, gain: 0.16, cutoff: 300 }); voice(ctx, this.bus, t, { freq: mtof(root + 12), type: 'triangle', attack: 0.015, hold: dt, release: 0.1, gain: 0.035, cutoff: 800 }); }
+    if (s === 0) voice(ctx, this.bus, t, { freq: mtof(root), type: 'sine', attack: 0.02, hold: dt * 1.5, release: 0.2, gain: 0.1, cutoff: 200 });
+    // the arpeggio: chord tones an octave up, rolling in 16ths, its filter breathing over eight bars (a rounded tone
+    // that eases in: no tick on every note)
+    const arp = [ch[0] + 12, ch[1] + 12, ch[2] + 12, ch[0] + 24, ch[2] + 12, ch[1] + 12][step % 6];
+    const cut = 1000 + 500 * Math.sin((step / 128) * Math.PI * 2);
+    voice(ctx, this.arpBus, t, { freq: mtof(arp), type: 'triangle', attack: 0.012, hold: dt * 0.4, release: 0.14, gain: 0.04, cutoff: cut });
+    // pads on each chord change: detuned saws, slow to open
+    if (s === 0 && b16 % 2 === 0) for (const n of ch) for (const det of [-7, 7]) voice(ctx, this.padBus, t, { freq: mtof(n), det, type: 'sawtooth', attack: 0.9, hold: dt * 32 - 0.9, release: 1.8, gain: 0.014, cutoff: 900 });
+    // the hook: on piano from the start; from the second pass a soft bell an octave up joins it; on the third it rests
+    if (pass !== 2) for (const [hb, hs, n, len] of MOOD_HOOK) {
+      if (hb !== b16 || hs !== s) continue;
+      voice(ctx, this.pianoBus, t, { freq: mtof(n), type: 'triangle', attack: 0.006, hold: 0.03, release: len * dt * 1.4, gain: 0.07, cutoff: 3000 });
+      voice(ctx, this.pianoBus, t, { freq: mtof(n + 12), type: 'sine', attack: 0.005, hold: 0.01, release: len * dt * 0.7, gain: 0.016, cutoff: 6000 });
+      if (pass !== 0) voice(ctx, this.bellBus, t, { freq: mtof(n + 12), type: 'sine', attack: 0.01, hold: 0.02, release: len * dt * 1.8, gain: 0.022, cutoff: 6000 });
+    }
+    // third pass: the hook rests; a high counter-line answers on the off-bars instead
+    if (pass === 2 && b16 % 2 === 1 && (s === 0 || s === 6 || s === 10)) {
+      const n = ch[[2, 1, 0][s === 0 ? 0 : s === 6 ? 1 : 2]] + 24;
+      voice(ctx, this.counterBus, t, { freq: mtof(n), type: 'sine', attack: 0.012, hold: dt * 2, release: 0.8, gain: 0.03, cutoff: 5000 });
+    }
   }
 }
 

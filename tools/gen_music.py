@@ -20,9 +20,7 @@ STYLE = ('Instrumental only, no vocals, no choir words. Modern military shooter 
 
 # id: (prompt, length in seconds, loudness LUFS, loops)
 TRACKS = {
-    'menu': (STYLE + 'Main menu theme. D minor, 90 BPM. Opens with a low synth drone and a slow, sparse piano motif, '
-             'then pulsing arpeggiated synths and low staccato strings build into a steady, brooding groove with deep '
-             'percussion hits; tension without release. Even energy throughout so it can loop.', 150, -18, True),
+    # (no 'menu': the menu theme is composed note by note in js/music.js; the AI-composed ones sounded AI-composed)
     'action_low': (STYLE + 'In-match tension bed, 110 BPM, D minor. Quiet and tense: a ticking synth pulse, muted '
                    'low strings, a soft sub-bass heartbeat, sparse metallic percussion, no big drums. Steady energy '
                    'throughout so it can loop.', 120, -20, True),

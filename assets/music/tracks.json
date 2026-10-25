@@ -5,11 +5,6 @@
   "len": 12.617,
   "hit": 8.08
  },
- "menu": {
-  "file": "assets/music/menu.mp3",
-  "loop": true,
-  "len": 140.539
- },
  "action_low": {
   "file": "assets/music/action_low.mp3",
   "loop": true,
