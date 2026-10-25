@@ -290,6 +290,7 @@ export class Renderer {
     this.drs = { scale: 1, slow: 0, fast: 0, ema: 1 / 60, last: 0, ceil: 1, grace: 3 };
     this.applyPR();
     this.renderer.shadowMap.enabled = q.shadows > 0;
+    this.shadowDirty = true;   // (static shadows: draw them for the new settings)
     this.renderer.shadowMap.type = q.softShadows === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (q.shadows > 0 && this.sun.shadow.mapSize.x !== q.shadows) {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
@@ -474,12 +475,28 @@ export class Renderer {
   renderInner(dt, showViewmodel) {
     // the sun's shadow map is the single biggest pass: below Ultra it refreshes every other frame
     const sm = this.renderer.shadowMap;
+    let baked = null;
     if (sm.enabled) {
-      const every = (this.quality && this.quality.shadowEvery) || 2;
       sm.autoUpdate = false;
-      this.shadowTick = ((this.shadowTick || 0) + 1) % every;
-      if (this.shadowTick === 0) sm.needsUpdate = true;
+      if (this.quality && this.quality.staticShadows) {
+        // Mobile: drawn once, when asked (refreshShadows), without whatever was named to leave out (the characters)
+        if (this.shadowDirty) {
+          this.shadowDirty = false; sm.needsUpdate = true; baked = [];
+          for (const root of this.shadowExclude || []) root.traverse(o => { if (o.isMesh && o.castShadow) { o.castShadow = false; baked.push(o); } });
+        }
+      } else {
+        const every = (this.quality && this.quality.shadowEvery) || 2;
+        this.shadowTick = ((this.shadowTick || 0) + 1) % every;
+        if (this.shadowTick === 0) sm.needsUpdate = true;
+      }
     }
+    this.renderPass(dt, showViewmodel);
+    if (baked) for (const o of baked) o.castShadow = true;
+  }
+  // (Mobile) draw the shadows again on the next frame, leaving out `exclude` (object roots)
+  refreshShadows(exclude = []) { this.shadowDirty = true; this.shadowExclude = exclude; }
+
+  renderPass(dt, showViewmodel) {
     this.time += dt;
     this.grade.time.value = this.time;
     if (this.quality && this.quality.fast) { this.renderFast(showViewmodel); return; }

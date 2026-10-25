@@ -214,8 +214,9 @@ export const QUALITY = {
   // phones and tablets: draws straight to the screen with hardware MSAA (near free on mobile GPUs) instead of the
   // post-processing chain, flat-edged world geometry, hard 1K shadows refreshed every third frame, and a pixel
   // budget so high-DPI screens don't render 3-4x more pixels than they can show. Distant players animate at a
-  // lower rate; the menu background runs at 30 fps.
-  mobile: { label: 'Mobile', pixelRatio: 1.5, shadows: 1024, softShadows: false, shadowEvery: 3, ao: false, bloom: false, aa: true, lights: false, motes: 0, aniso: 4, fast: true, lowPoly: true, maxPixels: 1.25e6 },
+  // lower rate; the menu background runs at 30 fps. Its shadows are drawn once when the match starts (the map
+  // doesn't move; characters don't cast), and small props far off aren't drawn.
+  mobile: { label: 'Mobile', pixelRatio: 1.5, shadows: 1024, softShadows: false, shadowEvery: 3, staticShadows: true, cullSmall: 45, ao: false, bloom: false, aa: true, lights: false, motes: 0, aniso: 4, fast: true, lowPoly: true, maxPixels: 1.25e6 },
 };
 // Custom graphics: each preset written out as the individual settings (render resolution is % of the
 // screen's native pixels, so it means the same thing on every display), and the reverse for 'custom'.

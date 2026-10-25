@@ -357,6 +357,8 @@ export class Input {
     this.rbHeld = false; this.mouseMid = false; this.touchGren = false;
   }
 
+  touchZoom() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tb-zoom')) || 0.7; }
+
   setupTouch() {
     const ui = document.getElementById('touch');
     ui.classList.add('on');
@@ -389,8 +391,9 @@ export class Input {
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
           stickId = t.identifier; sx = t.clientX; sy = t.clientY;
-          const z = parseFloat(getComputedStyle(ui).zoom) || 1; // the touch layer can be scaled down (Options)
-          stick.style.left = `${sx / z - 60}px`; stick.style.top = `${sy / z - 60}px`;
+          const z = this.touchZoom();   // (the controls' size from Options; the stick is 120 px across at full size)
+          const r = ui.getBoundingClientRect();   // (the layer is inset from the screen's edges on an iPhone)
+          stick.style.left = `${sx - r.left - 60 * z}px`; stick.style.top = `${sy - r.top - 60 * z}px`;
           stick.classList.add('show');
         } else if (lookId === null) {
           lookStart(t);
@@ -408,7 +411,8 @@ export class Input {
           const sprint = len > R * 1.02 && -dy > Math.abs(dx) * 1.2;
           if (sprint !== this.touchSprint) { this.touchSprint = sprint; stick.classList.toggle('sprint', sprint); }
           if (len > R) { dx *= R / len; dy *= R / len; }
-          knob.style.transform = `translate(${dx}px, ${dy}px)`;
+          const z = this.touchZoom();
+          knob.style.transform = `translate(${dx * z}px, ${dy * z}px)`;
           this.touchMoveX = dx / R; this.touchMoveY = -dy / R;
         } else if (t.identifier === lookId) {
           lookMove(t);

@@ -487,13 +487,23 @@ export function setGunModel(name, scene, xf) {
   GUN_MODELS[name] = { parts };
 }
 export function hasGunModel(name) { return !!GUN_MODELS[name]; }
+// (the parts going into one group are merged into one mesh per material: the rifle alone was a hundred meshes, a
+// hundred draw calls every frame in your hands; what moves on its own, a mag or a bolt, is already its own group)
 function addModelParts(name, target, filter, cast) {
+  const byMat = new Map();
   for (const [k, { geo, mat }] of GUN_MODELS[name].parts) {
     if (!filter(k)) continue;
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = cast; mesh.receiveShadow = true;
-    mesh.name = k;
-    target.add(mesh);
+    if (!byMat.has(mat)) byMat.set(mat, []);
+    byMat.get(mat).push(geo);
+  }
+  for (const [mat, geos] of byMat) {
+    let merged = null;
+    if (geos.length > 1) try { merged = mergeGeometries(geos, false); } catch (_) { /* attributes don't line up */ }
+    for (const geo of merged ? [merged] : geos) {   // (parts that can't merge stay separate)
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = cast; mesh.receiveShadow = true;
+      target.add(mesh);
+    }
   }
 }
 

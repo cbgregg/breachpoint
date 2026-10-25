@@ -33,6 +33,7 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3
 const _gf = new THREE.Vector3(), _gs = new THREE.Vector3(), _gt = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(new THREE.Vector3(), 1.3);
+const _cullV = new THREE.Vector3();
 const ZERO = new THREE.Vector3();
 const GRAV = 20;
 const AUDIT = typeof location !== 'undefined' && new URLSearchParams(location.search).has('audit');   // map audit on every map load (js/audit.js)
@@ -303,6 +304,8 @@ export class Game {
     }
     if (this.inf) this.infTally();
     for (const brain of this.brains.values()) brain.reset();
+    // (Mobile: the map's shadows, drawn once now everyone's placed, without the characters, who move)
+    this.renderer.refreshShadows(this.characters.map(c => c.model && (c.model.root || c.model.group || c.model)).filter(r => r && r.traverse));
 
     this.countdownT = 3;
     this.lastBeep = 4;
@@ -571,6 +574,7 @@ export class Game {
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
     if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
+    this.cullSmall();
     if (this.state !== 'playing' && this.state !== 'paused') this.audio.setAmbience(null);   // (a place's background: only in a match)
     // the world's own sounds (the station's trains), only in a match
     if (this.world.sounds && this.world.sounds.length) {
@@ -1730,6 +1734,33 @@ export class Game {
     sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6));
   }
 
+  // Mobile: small props (under 3 m across) aren't drawn beyond quality.cullSmall metres, a few pixels on a phone
+  // screen but each one a draw call. Checked a few times a second; only what this hid is shown again.
+  buildCullList() {
+    for (const o of this.culled || []) o.visible = true;
+    this.culled = new Set(); this.cullList = [];
+    if (!this.world) return;
+    this.world.group.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || !o.geometry) return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const bs = o.geometry.boundingSphere, sc = o.getWorldScale(new THREE.Vector3());
+      if (bs.radius * Math.max(sc.x, sc.y, sc.z) < 1.5) this.cullList.push(o);
+    });
+  }
+  cullSmall() {
+    const far = this.renderer.quality && this.renderer.quality.cullSmall;
+    if (!far) { if (this.culled && this.culled.size) { for (const o of this.culled) o.visible = true; this.culled.clear(); } return; }
+    this.cullT = (this.cullT || 0) + 1;
+    if (this.cullT % 15 || !this.cullList) return;   // (every 15 frames)
+    const cam = this.camera.position, f2 = far * far;
+    for (const o of this.cullList) {
+      _cullV.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld);
+      const out = _cullV.distanceToSquared(cam) > f2;
+      if (out && o.visible) { o.visible = false; this.culled.add(o); }
+      else if (!out && this.culled.has(o)) { o.visible = true; this.culled.delete(o); }
+    }
+  }
+
   // Options > Show collision: outline every solid box in the world (finds the "invisible walls")
   setCollisionView(on, rebuild = false) {
     if (this.colLines && (!on || rebuild)) { this.scene.remove(this.colLines); this.colLines.geometry.dispose(); this.colLines = null; }
@@ -1775,6 +1806,8 @@ export class Game {
     const sc = this.renderer.sun.shadow.camera;
     if (sc.right !== ext) { sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.far = Math.max(200, ext * 3.2); sc.updateProjectionMatrix(); this.renderer.sun.position.copy(SUN_DIR).multiplyScalar(Math.max(80, ext * 1.6)); }
     this.fitShadows();
+    this.renderer.refreshShadows();
+    this.buildCullList();
     if (this.collisionView) this.setCollisionView(true, true);
     this.renderer.setLook(this.world.look);
     this.minimap = null;

@@ -258,33 +258,35 @@ tr.dead td { opacity: 0.45; }
 
 /* ---------- touch ---------- */
 #touch { position: fixed; inset: 0; z-index: 11; display: none; }
+/* (kept clear of an iPhone's rounded corners and Dynamic Island: the page runs edge to edge) */
+#touch { top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px); left: env(safe-area-inset-left, 0px); }
 body.ingame #touch.on { display: block; }
-#stick { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06); display: none; pointer-events: none; }
+#stick { position: absolute; width: calc(120px * var(--tb-zoom, 0.7)); height: calc(120px * var(--tb-zoom, 0.7)); border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06); display: none; pointer-events: none; }
 #stick.show { display: block; }
-#stick-knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
-.tb { position: absolute; width: 58px; height: 58px; border-radius: 50%; padding: 0; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; }
-.tb.big { width: 88px; height: 88px; font-size: 15px; background: rgba(255, 77, 77, 0.3); }
-.tb.small { width: 48px; height: 34px; border-radius: 4px; }
+#stick-knob { position: absolute; left: calc(35px * var(--tb-zoom, 0.7)); top: calc(35px * var(--tb-zoom, 0.7)); width: calc(50px * var(--tb-zoom, 0.7)); height: calc(50px * var(--tb-zoom, 0.7)); border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.tb { position: absolute; width: calc(58px * var(--tb-zoom, 0.7)); height: calc(58px * var(--tb-zoom, 0.7)); border-radius: 50%; padding: 0; font-family: var(--display); font-weight: 600; font-size: calc(11px * var(--tb-zoom, 0.7)); letter-spacing: 0.08em; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; }
+.tb.big { width: calc(88px * var(--tb-zoom, 0.7)); height: calc(88px * var(--tb-zoom, 0.7)); font-size: calc(15px * var(--tb-zoom, 0.7)); background: rgba(255, 77, 77, 0.3); }
+.tb.small { width: calc(48px * var(--tb-zoom, 0.7)); height: calc(34px * var(--tb-zoom, 0.7)); border-radius: calc(4px * var(--tb-zoom, 0.7)); }
 .tb.down, .tb.active { background: rgba(255, 255, 255, 0.35); }
-#tb-pause { top: 10px; right: 70px; }
-#tb-score { top: 10px; right: 12px; }
-#tb-fire { right: 22px; bottom: 92px; }
-#tb-jump { right: 22px; bottom: 16px; }
-#tb-ads { right: 122px; bottom: 156px; }
-#tb-reload { right: 122px; bottom: 86px; }
-#tb-crouch { right: 92px; bottom: 12px; }
-#tb-swap { right: 192px; bottom: 30px; }
-#tb-frag { right: 192px; bottom: 106px; }
-#tb-tac { right: 192px; bottom: 182px; }
-#tb-melee { right: 34px; bottom: 196px; }
-#tb-sprint { left: 22px; bottom: 112px; }
+#tb-pause { top: calc(10px * var(--tb-zoom, 0.7)); right: calc(70px * var(--tb-zoom, 0.7)); }
+#tb-score { top: calc(10px * var(--tb-zoom, 0.7)); right: calc(12px * var(--tb-zoom, 0.7)); }
+#tb-fire { right: calc(22px * var(--tb-zoom, 0.7)); bottom: calc(92px * var(--tb-zoom, 0.7)); }
+#tb-jump { right: calc(22px * var(--tb-zoom, 0.7)); bottom: calc(16px * var(--tb-zoom, 0.7)); }
+#tb-ads { right: calc(122px * var(--tb-zoom, 0.7)); bottom: calc(156px * var(--tb-zoom, 0.7)); }
+#tb-reload { right: calc(122px * var(--tb-zoom, 0.7)); bottom: calc(86px * var(--tb-zoom, 0.7)); }
+#tb-crouch { right: calc(92px * var(--tb-zoom, 0.7)); bottom: calc(12px * var(--tb-zoom, 0.7)); }
+#tb-swap { right: calc(192px * var(--tb-zoom, 0.7)); bottom: calc(30px * var(--tb-zoom, 0.7)); }
+#tb-frag { right: calc(192px * var(--tb-zoom, 0.7)); bottom: calc(106px * var(--tb-zoom, 0.7)); }
+#tb-tac { right: calc(192px * var(--tb-zoom, 0.7)); bottom: calc(182px * var(--tb-zoom, 0.7)); }
+#tb-melee { right: calc(34px * var(--tb-zoom, 0.7)); bottom: calc(196px * var(--tb-zoom, 0.7)); }
+#tb-sprint { left: calc(22px * var(--tb-zoom, 0.7)); bottom: calc(112px * var(--tb-zoom, 0.7)); }
 #stick.sprint { border-color: rgba(var(--bo-rgb), 0.9); box-shadow: 0 0 0 2px rgba(var(--bo-rgb), 0.35); }
 #stick.sprint #stick-knob { background: rgba(var(--bo-rgb), 0.55); }
 /* while aiming: a bigger fire button, plus a second one on the left so the right thumb can hold ADS and aim */
 #tb-fire, #tb-fire2 { transition: width .12s, height .12s; }
-#tb-fire2 { left: 24px; bottom: 92px; width: 92px; height: 92px; display: none; }
+#tb-fire2 { left: calc(24px * var(--tb-zoom, 0.7)); bottom: calc(92px * var(--tb-zoom, 0.7)); width: calc(92px * var(--tb-zoom, 0.7)); height: calc(92px * var(--tb-zoom, 0.7)); display: none; }
 body.ads-on #tb-fire2 { display: block; }
-body.ads-on #tb-fire { width: 104px; height: 104px; right: 18px; bottom: 86px; }
+body.ads-on #tb-fire { width: calc(104px * var(--tb-zoom, 0.7)); height: calc(104px * var(--tb-zoom, 0.7)); right: calc(18px * var(--tb-zoom, 0.7)); bottom: calc(86px * var(--tb-zoom, 0.7)); }
 
 @media (pointer: coarse) {
   #tl { width: 116px; top: 8px; left: 8px; gap: 5px; }
@@ -854,7 +856,8 @@ body.mode-online #quick-btn.pad-focus, body.mode-online #quick-btn:hover { backg
 #count-label.on ~ #countdown { top: 40%; }
 @media (max-height: 520px) { #count-label { top: 12%; } #count-label b { font-size: 16px; } #count-label span { font-size: 11px; } #count-label.on ~ #countdown { font-size: 80px; top: 42%; } }
 /* ---------- phones: smaller touch controls and HUD, more room to look around ---------- */
-#touch { zoom: var(--tb-zoom, 0.7); }
+/* (the touch controls are sized by --tb-zoom in their own rules, not with CSS zoom: Safari on iPhone hit-tests
+   zoomed elements in the wrong place, so presses landed off the buttons) */
 @media (pointer: coarse) {
   .tb { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.22); }
   .tb.big { background: rgba(var(--bo-rgb), 0.22); border-color: rgba(var(--bo-rgb), 0.45); }
