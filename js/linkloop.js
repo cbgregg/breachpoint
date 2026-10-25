@@ -888,8 +888,38 @@ function build(ctx) {
     if (p.z < st.mouth[0] || p.z > st.mouth[1]) return 1;
     return si === 1 || (si === 0 && p.y < -1.5) ? 1 : 0;
   };
+  // ---------- how each place sounds ----------
+  // the space you're in, for its echo: a car, a tunnel, Pioneer's brick vault (its plaza is street), Symphony's
+  // hall, Chinatown's open-air platforms
+  const tunnelDepth = (p, st) => Math.max(st.mouth[0] - p.z, p.z - st.mouth[1], 0);
+  const spaceAt = (p) => {
+    const si = stationOf(p), st = STATIONS[si];
+    if (!st) return 'street';
+    if (trains.some(tr => inside(tr, p))) return 'car';
+    if (tunnelDepth(p, st) > 1) return 'tunnel';
+    return si === 0 ? (p.y < -1.5 ? 'vault' : 'street') : si === 1 ? 'hall' : 'open';
+  };
+  // how much of a station you hear from where you are (0..1): all of the one you're in; riding down a tunnel the
+  // station behind fades away, and past the hand-over the next one fades up as the train runs in. (Whatever's
+  // within 20 m, your own car and whoever's in it, stays at full.)
+  const presence = (ear, si) => stationOf(ear) !== si ? 0 : Math.max(0, 1 - tunnelDepth(ear, STATIONS[si]) / 75);
+  const areaGain = (pos, ear) => {
+    const si = stationOf(pos);
+    if (si < 0 || pos.distanceTo(ear) < 20) return 1;
+    return presence(ear, si);
+  };
+  // each place's background: traffic over Chinatown and Pioneer's plaza, the city rumbling through Pioneer's vault,
+  // Symphony's air handling, the tunnel's rumble; quieter from inside a car (it's sealed)
+  const ambience = (ear) => {
+    const si = stationOf(ear), st = STATIONS[si];
+    if (!st) return {};
+    const k = presence(ear, si), sealed = trains.some(tr => inside(tr, ear)) ? 0.35 : 1, out = {};
+    out[si === 0 ? (ear.y < -1.5 ? 'vault' : 'city') : si === 1 ? 'hall' : 'city'] = k * sealed;
+    out.tunnel = Math.min(1, tunnelDepth(ear, st) / 25) * sealed;
+    return out;
+  };
   Object.assign(world, {
-    update, trainHit, trainShift, sounds, botTravel, upper: levels, trains, stationOf, audible, indoorAt,
+    update, trainHit, trainShift, sounds, botTravel, upper: levels, trains, stationOf, audible, indoorAt, spaceAt, areaGain, ambience,
     sameArea: (a, b) => stationOf(a) === stationOf(b),
     // the menu's live view: Symphony's hall from the north gallery, over the island as the trains come and go
     menuCam(t, cam) { cam.position.set(STATIONS[1].ox - 21 + Math.sin(t * 0.2) * 1.5, GY + 1.7, -30 + Math.sin(t * 0.13) * 4); cam.lookAt(STATIONS[1].ox + 4, 1.2, -6); },

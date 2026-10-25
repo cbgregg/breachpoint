@@ -566,6 +566,7 @@ export class Game {
     if (this.live) this.update(dt);
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
     if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
+    if (this.state !== 'playing' && this.state !== 'paused') this.audio.setAmbience(null);   // (a place's background: only in a match)
     // the world's own sounds (the station's trains), only in a match
     if (this.world.sounds && this.world.sounds.length) {
       // (a world can say how well a sound carries to where you are: a train under the street, in another station)
@@ -721,8 +722,13 @@ export class Game {
       this.music.setIntensity(0.35 + fight + finale);
     }
     this.audio.setListener(this.camera.position, this.player.alive ? this.player.yaw : 0);
-    // rooms and tunnels sound like rooms and tunnels
-    this.audio.setIndoor(this.world.indoorAt ? this.world.indoorAt(this.camera.position) : 0);
+    // rooms and tunnels sound like rooms and tunnels: the echo of the space you're in, the place's background, and
+    // (Link Loop) a station you're riding away from fading out as the next fades in
+    const ear = this.camera.position, w = this.world;
+    if (w.spaceAt) this.audio.setSpace(w.spaceAt(ear));
+    else this.audio.setIndoor(w.indoorAt ? w.indoorAt(ear) : 0);
+    this.audio.setAmbience(w.ambience ? w.ambience(ear) : null);
+    this.audio.areaGain = w.areaGain ? (pos) => w.areaGain(pos, ear) : null;
     // badly hurt: your heartbeat, and your breath
     if (this.player.alive && this.player.health < 35) {
       this.heartT = (this.heartT || 0) - dt;

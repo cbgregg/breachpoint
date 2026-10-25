@@ -45,36 +45,11 @@ export class GameAudio {
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    // reverb: slapback-heavy impulse to suggest buildings around the player
-    const irLen = Math.floor(ctx.sampleRate * 1.8);
-    const ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const x = ir.getChannelData(ch);
-      for (let i = 0; i < irLen; i++) {
-        const t = i / ctx.sampleRate;
-        let v = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3.2) * 0.5;
-        for (const [at, amp] of [[0.045, 0.6], [0.11, 0.4], [0.19, 0.28], [0.31, 0.16]]) {
-          if (Math.abs(t - at - ch * 0.007) < 0.004) v += (Math.random() * 2 - 1) * amp;
-        }
-        x[i] = v;
-      }
-    }
-    this.reverb = ctx.createConvolver();
-    this.reverb.buffer = ir;
-    this.reverbGain = ctx.createGain();
-    this.reverbGain.gain.value = 0.32;
-    this.reverb.connect(this.reverbGain).connect(this.master);
-    // indoors (the supermarket, the stations, the Underground): a short, dense, boomy room instead of the street's
-    // slapback; the two cross-fade as you go in and out
-    const rLen = Math.floor(ctx.sampleRate * 0.9), rir = ctx.createBuffer(2, rLen, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const x = rir.getChannelData(ch);
-      for (let i = 0; i < rLen; i++) { const t = i / ctx.sampleRate; x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / rLen, 2.2) * (t < 0.012 ? 0.2 : 0.7); }
-    }
-    this.room = ctx.createConvolver(); this.room.buffer = rir;
-    this.roomGain = ctx.createGain(); this.roomGain.gain.value = 0;
-    this.room.connect(this.roomGain).connect(this.master);
-    this.indoor = 0;
+    // the space you're in: every sound's echo goes through one of these (cross-fading as you move between them)
+    this.wetBus = ctx.createGain();
+    this.spaces = {}; this.spaceKey = null; this.indoor = 0;
+    this.setSpace('street');
+    this.beds = {};   // ambience: looping background (traffic, a hall's air handling, tunnel rumble)
     this.samples = new Map();   // name -> [AudioBuffer] (recorded takes)
     this.voQueue = []; this.voUntil = 0;
     this.loadSamples();
@@ -107,13 +82,103 @@ export class GameAudio {
     if (this.manifest) w.resolve(Promise.all(this.manifest.filter(id => id.startsWith(prefix)).map(id => this.loadSample(id))));
     return w.done;
   }
-  // inside a room or tunnel (0..1): the reverb send moves from the street to the room
-  setIndoor(k) {
-    if (!this.ctx || Math.abs(k - this.indoor) < 0.01) return;
-    this.indoor = k;
+  // ---------- spaces: how a place echoes ----------
+  // An impulse response per kind of space, made up rather than recorded: a diffuse tail (its length and how dark it
+  // is: brick and people soak up the top), its early reflections (walls, arches, the buildings across a street),
+  // and for a tunnel the flutter of sound bouncing between two close parallel walls.
+  //   street: slapback off the buildings; room: a short boomy room; vault: Pioneer Square's brick vault, warm and
+  //   dense; hall: Symphony's grand hall, long and smooth; tunnel: long, metallic, fluttering; car: inside a
+  //   light rail car, small and dry; open: open air under the sky, a couple of clear echoes off the buildings
+  static SPACES = {
+    street: { len: 1.8, curve: 3.2, tail: 0.5, dark: 0, early: [[0.045, 0.6], [0.11, 0.4], [0.19, 0.28], [0.31, 0.16]], level: 0.32 },
+    room: { len: 0.9, curve: 2.2, tail: 0.7, dark: 0.2, pre: 0.012, early: [], level: 0.42 },
+    vault: { len: 1.8, curve: 2.0, tail: 0.75, dark: 0.55, pre: 0.01, early: [[0.017, 0.5], [0.029, 0.42], [0.044, 0.35], [0.063, 0.25]], level: 0.5 },
+    hall: { len: 3.0, curve: 1.7, tail: 0.6, dark: 0.3, pre: 0.035, early: [[0.041, 0.35], [0.067, 0.28], [0.098, 0.2]], level: 0.46 },
+    tunnel: { len: 2.6, curve: 1.9, tail: 0.55, dark: 0.1, pre: 0.008, early: [], flutter: [0.027, 0.5], level: 0.55 },
+    car: { len: 0.32, curve: 3.0, tail: 0.5, dark: 0.35, early: [[0.004, 0.5], [0.009, 0.4], [0.015, 0.25]], level: 0.35 },
+    open: { len: 0.9, curve: 3.5, tail: 0.18, dark: 0.15, early: [[0.14, 0.38], [0.29, 0.22], [0.47, 0.11]], level: 0.3 },
+  };
+  makeIR(sp) {
+    const ctx = this.ctx, sr = ctx.sampleRate, n = Math.floor(sr * sp.len), ir = ctx.createBuffer(2, n, sr), pre = sp.pre || 0;
+    for (let ch = 0; ch < 2; ch++) {
+      const x = ir.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        let v = t < pre ? 0 : (Math.random() * 2 - 1) * Math.pow(1 - i / n, sp.curve) * sp.tail;
+        lp += (1 - sp.dark * 0.92) * (v - lp); v = lp;   // darker: a one-pole low-pass on the tail
+        for (const [at, amp] of sp.early) if (Math.abs(t - at - ch * 0.006) < 0.003) v += (Math.random() * 2 - 1) * amp;
+        if (sp.flutter) { const [per, amp] = sp.flutter, ph = (t + ch * 0.004) % per; if (ph < 0.0025) v += (Math.random() * 2 - 1) * amp * Math.pow(1 - i / n, 2.4); }
+        x[i] = v;
+      }
+    }
+    return ir;
+  }
+  // move to a space: its echo fades in, the last one fades out (and stops costing anything a moment later)
+  setSpace(key) {
+    if (!this.ctx || key === this.spaceKey || !GameAudio.SPACES[key]) return;
     const t = this.ctx.currentTime;
-    this.reverbGain.gain.setTargetAtTime(0.32 * (1 - k), t, 0.25);
-    this.roomGain.gain.setTargetAtTime(0.42 * k, t, 0.25);
+    this.spaceKey = key;
+    for (const [k, s] of Object.entries(this.spaces)) {
+      if (k === key) continue;
+      s.gain.gain.setTargetAtTime(0, t, 0.3);
+      clearTimeout(s.off); s.off = setTimeout(() => { if (this.spaceKey !== k && s.on) { this.wetBus.disconnect(s.conv); s.on = false; } }, 2500);
+    }
+    let s = this.spaces[key];
+    if (!s) {
+      s = this.spaces[key] = { conv: this.ctx.createConvolver(), gain: this.ctx.createGain(), on: false };
+      s.conv.buffer = this.makeIR(GameAudio.SPACES[key]);
+      s.gain.gain.value = 0;
+      s.conv.connect(s.gain).connect(this.master);
+    }
+    clearTimeout(s.off);
+    if (!s.on) { this.wetBus.connect(s.conv); s.on = true; }
+    s.gain.gain.setTargetAtTime(GameAudio.SPACES[key].level, t, 0.3);
+  }
+  // (maps that only know indoors from out: a room or the street)
+  setIndoor(k) { this.setSpace(k > 0.5 ? 'room' : 'street'); }
+
+  // ---------- ambience: a place's background, at a level per bed (0..1) that follows you around ----------
+  setAmbience(levels) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const t = this.ctx.currentTime;
+    for (const key of new Set([...Object.keys(this.beds), ...Object.keys(levels || {})])) {
+      const want = Math.max(0, Math.min(1, (levels && levels[key]) || 0));
+      let b = this.beds[key];
+      if (!b) { if (want < 0.01) continue; b = this.beds[key] = this.makeBed(key); }
+      if (Math.abs(want - b.level) > 0.005) { b.level = want; b.gain.gain.setTargetAtTime(want * b.base, t, 0.6); }
+    }
+  }
+  // a bed: looping noise (a few seconds of it, so the loop isn't heard) shaped into the sound of a place
+  makeBed(key) {
+    const ctx = this.ctx;
+    if (!this.bedNoise) {
+      const n = ctx.sampleRate * 5; this.bedNoise = ctx.createBuffer(1, n, ctx.sampleRate);
+      const d = this.bedNoise.getChannelData(0); let b = 0;
+      for (let i = 0; i < n; i++) { b = 0.985 * b + 0.12 * (Math.random() * 2 - 1); d[i] = b; }   // brownish
+      const f = 2000; for (let i = 0; i < f; i++) { const k = i / f; d[i] = d[i] * k + d[n - f + i] * (1 - k); }   // seamless loop
+    }
+    const gain = ctx.createGain(); gain.gain.value = 0; gain.connect(this.master);
+    const voice = (type, freq, q, g, rate = 1) => {
+      const src = ctx.createBufferSource(); src.buffer = this.bedNoise; src.loop = true; src.playbackRate.value = rate;
+      src.loopStart = Math.random() * 2;
+      const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+      const v = ctx.createGain(); v.gain.value = g;
+      src.connect(f).connect(v).connect(gain); src.start(ctx.currentTime, Math.random() * 4);
+      return v;
+    };
+    const base = { city: 0.5, hall: 0.35, vault: 0.4, tunnel: 0.6 }[key] || 0.3;
+    if (key === 'city') {            // traffic a street or two away, swelling and easing
+      const v = voice('lowpass', 420, 0.6, 1); voice('bandpass', 1400, 0.8, 0.12, 1.3);
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.35; lfo.connect(lg).connect(v.gain); lfo.start();
+    } else if (key === 'hall') {     // a big building's air handling, and the faint hiss of the room
+      voice('bandpass', 240, 0.7, 1); voice('highpass', 4500, 0.5, 0.06, 1.7);
+    } else if (key === 'vault') {    // the city rumbling overhead, through the brick
+      voice('lowpass', 110, 0.8, 1.2); voice('bandpass', 520, 1.2, 0.08);
+    } else if (key === 'tunnel') {   // a deep rumble and air moving down the bore
+      voice('lowpass', 70, 0.9, 1.4); voice('bandpass', 850, 6, 0.06, 0.9);
+    }
+    return { gain, level: 0, base };
   }
   playSample(bufs, sp, opts) {
     const ctx = this.ctx, src = ctx.createBufferSource();
@@ -173,8 +238,7 @@ export class GameAudio {
     if (wet > 0) {
       const send = ctx.createGain();
       send.gain.value = wet * (0.6 + Math.min(1, dist / 40));
-      g.connect(send).connect(this.reverb);
-      if (this.room) g.connect(send).connect(this.room);
+      g.connect(send).connect(this.wetBus);
     }
     return head;
   }
@@ -218,6 +282,7 @@ export class GameAudio {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const sp = opts.ui ? { gain: 1, pan: 0, dist: 0 } : this.spatial(pos);
     if (opts.occl !== undefined) sp.gain *= opts.occl;   // heard through a floor or a wall
+    if (!opts.ui && pos && this.areaGain) sp.gain *= this.areaGain(pos);   // a place you're leaving, or not in
     if (sp.gain < 0.05) return;
     // voice lines: recordings only; announcer lines wait their turn instead of talking over each other
     if (name === 'vo') {
