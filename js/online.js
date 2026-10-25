@@ -520,6 +520,9 @@ export class Lobby {
       case 'in':
         if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.input(id, m);
         break;
+      case 'rdy': // a guest finished loading the match: the intro countdown can go once everyone has
+        if (this.players.has(id) && this.game.mode === 'host' && this.game.session) { const r = this.game.session.remotes.get(id); if (r) r.ready = true; this.game.tryIntro(); }
+        break;
       case 'rs': // a guest pressed respawn
         if (this.players.has(id) && this.game.mode === 'host' && this.game.session) this.game.session.respawnReq(id);
         break;

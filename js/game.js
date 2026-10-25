@@ -319,9 +319,9 @@ export class Game {
     this.matchAnnouncer = this.announcerPack;
     if (this.announcerSetting === 'random') this.pickAnnouncer();   // (the next match's, loading now)
     this.assignVoices();
-    this.announce(`mode_${this.settings.mode}`);
-    const squad = this.characters.filter(c => c.isBot && (this.ffa || c.team === this.player.team)), token = (this.matchToken = (this.matchToken || 0) + 1);
-    for (const [i, ms] of [[0, 3500], [1, 6800]]) setTimeout(() => { if (this.matchToken === token && this.live && squad[i]) this.callout(squad[(i + ((Math.random() * squad.length) | 0)) % squad.length], 'banter'); }, ms);
+    // the countdown, the announcer naming the mode and the squad's banter all wait for everyone to be in (tryIntro)
+    this.matchToken = (this.matchToken || 0) + 1;
+    this.introHold = true; this.introHoldT = 0; this.introLocal = false;
     this.hud.reset();
     this.hud.show(true);
     this.audio.init();
@@ -330,7 +330,6 @@ export class Game {
     this.input.enabled = true;
     if (this.input.lastDevice !== 'pad') this.input.lock();
     if (this.session) this.session.startAll();
-    this.music.hype(INTRO_SECS);
   }
 
   setIntroLabel() {
@@ -643,8 +642,10 @@ export class Game {
     // H / D-pad right: straight to Change Class (applies on the next spawn)
     if (this.state === 'playing' && inp.action('loadout')) { this.wantLoadout = true; this.pause(); if (this.mode === 'local') return; }
 
+    if (this.introHold) { this.introHoldT += dt; this.tryIntro(); }
+    else this.walkByBanter(dt);
     if (this.countdownT > 0) {
-      this.countdownT -= dt;
+      if (!this.introHold) this.countdownT -= dt;
       const n = Math.ceil(this.countdownT);
       if (n !== this.lastBeep) {
         this.lastBeep = n;
@@ -1367,19 +1368,57 @@ export class Game {
   }
   // a character's callout (reloading, frag out, contact...), heard from where they are: not too often from
   // anyone, and not on top of each other
+  // Returns about how long the line runs (0 if nothing was said), so banter can wait for it.
   callout(c, kind, chance = 1, remote = false, urgent = false) {
-    if (!c || !c.alive || Math.random() > chance) return;
+    if (!c || !c.alive || Math.random() > chance) return 0;
     const t = this.time;
     // (urgent ones, a grenade at someone's feet or the last one alive, only wait for that character)
-    if (!remote && (t - (c.calloutT ?? -9) < (urgent ? 1.2 : 3.5) || (!urgent && t - (this.calloutT ?? -9) < 1.2))) return;
+    if (!remote && (t - (c.calloutT ?? -9) < (urgent ? 1.2 : 3.5) || (!urgent && t - (this.calloutT ?? -9) < 1.2))) return 0;
     c.calloutT = t; this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
     const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, me = c === this.player;
-    const say = () => { if (c.alive) this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 }); };
-    // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
-    if (c.infected || !this.audio.manifest || this.audio.samples.has(id)) say();
-    else { const t0 = performance.now(); this.audio.want(`vo/chatter/${c.voice}/`).then(() => { if (performance.now() - t0 < 1500) say(); }); }
+    const say = () => (c.alive ? this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 }) || 0 : 0);
     if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);
+    // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
+    if (c.infected || !this.audio.manifest || this.audio.samples.has(id)) return say() || 2.5;
+    const t0 = performance.now(); this.audio.want(`vo/chatter/${c.voice}/`).then(() => { if (performance.now() - t0 < 1500) say(); });
+    return 3;
+  }
+
+  // ---------- the match intro: held until everyone's in, then the countdown, the announcer and the squad ----------
+  // The countdown waits for this machine's loading screen and, hosting online, for every player to report they've
+  // loaded (20 s at most: someone stuck doesn't hold everyone).
+  introReady() { this.introLocal = true; this.tryIntro(); }
+  tryIntro() {
+    if (!this.introHold || (!this.introLocal && this.introHoldT < 12)) return;   // (12 s: a loading screen that never reported back)
+    const waiting = this.session && this.session.remotes ? [...this.session.remotes.values()].some(r => !r.ready) : false;
+    if (waiting && this.introHoldT < 20) return;
+    this.introHold = false;
+    this.music.hype(this.countdownT);
+    this.announce(`mode_${this.settings.mode}`);
+    // then a few of your squad, one after another (each waits for the last to finish), while the countdown runs
+    const squad = shuffle(this.characters.filter(c => c.isBot && c.alive && (this.ffa || c.team === this.player.team))), token = this.matchToken;
+    let i = 0;
+    const next = (gap) => setTimeout(() => {
+      if (this.matchToken !== token || !this.live || this.countdownT < 2.2 || i >= Math.min(3, squad.length)) return;
+      const c = squad[i++]; c.calloutT = -9; this.calloutT = -9;
+      next(this.callout(c, 'banter') + 0.7 + Math.random() * 0.6);
+    }, gap * 1000);
+    next(2.6);   // (after the announcer has named the mode)
+  }
+  // walking past a teammate who isn't fighting: now and then, by chance, they've got something to say
+  walkByBanter(dt) {
+    this.walkByT = (this.walkByT || 0) - dt;
+    const p = this.player;
+    if (this.walkByT > 0 || !p || !p.alive || this.frozen || this.ffa || this.mode === 'guest') return;
+    this.walkByT = 0.5;
+    if (this.time - (this.walkBySaid ?? -99) < 25 || this.time - p.lastFireT < 6) return;
+    for (const c of this.characters) {
+      if (!c.isBot || !c.alive || c.team !== p.team || c.pos.distanceTo(p.pos) > 4.5 || this.time - c.lastFireT < 6 || this.time - (c.walkByT ?? -99) < 60) continue;
+      c.walkByT = this.time;   // (each teammate gets one roll a minute, so standing next to one isn't a jukebox)
+      if (Math.random() < 0.2 && this.callout(c, 'banter')) this.walkBySaid = this.time;
+      return;
+    }
   }
 
   onDamaged(victim, attacker, amount, headshot, fromPos) {

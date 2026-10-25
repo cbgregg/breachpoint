@@ -1083,6 +1083,10 @@ function launchMatch(cfg, online) {
     step(100, 'Ready');
     await wait(Math.max(online && online.mode === 'guest' ? 150 : 450, 1300 - (performance.now() - t0)));
     if (screen === 'loading') showScreen(null);
+    // loaded: hosting or offline, the intro countdown can start (online, once every guest says the same); a guest
+    // tells the host
+    if (online && online.mode === 'guest') { if (lobby.hostId) lobby.net.send({ t: 'rdy' }, lobby.hostId); }
+    else game.introReady();
   })();
 }
 function deploy() {

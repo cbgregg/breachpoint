@@ -167,7 +167,7 @@ export class GameAudio {
       src.connect(f).connect(v).connect(gain); src.start(ctx.currentTime, Math.random() * 4);
       return v;
     };
-    const base = { city: 0.5, hall: 0.35, vault: 0.4, tunnel: 0.6 }[key] || 0.3;
+    const base = { city: 0.06, hall: 0.04, vault: 0.05, tunnel: 0.08 }[key] || 0.04;   // a background: felt more than heard
     if (key === 'city') {            // traffic a street or two away, swelling and easing
       const v = voice('lowpass', 420, 0.6, 1); voice('bandpass', 1400, 0.8, 0.12, 1.3);
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 0.35; lfo.connect(lg).connect(v.gain); lfo.start();
@@ -294,7 +294,7 @@ export class GameAudio {
         const dur = this.playSample(bufs, sp, { vary: false, wet: 0.05, ...opts });
         this.voUntil = now + dur + 0.15;
         setTimeout(() => { const q = this.voQueue.shift(); if (q) this.play('vo', q[0], q[1]); }, (dur + 0.2) * 1000);
-      } else this.playSample(bufs, sp, { vary: false, ...opts });
+      } else return this.playSample(bufs, sp, { vary: false, ...opts });   // (how long it runs: banter waits for it)
       return;
     }
     // a recording of this sound (per weapon for shots and reloads) plays instead of the synthesized one
