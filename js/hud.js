@@ -132,7 +132,7 @@ export class HUD {
     this.txt('timer', fmtTime(g.timeLeft));
     this.cls('timer', 'low', g.timeLeft < 30);
     this.txt('limit', g.settings.scoreLimit);
-    this.txt('mode-short', g.gm ? g.gm.cfg.short : g.gg ? 'GUN GAME' : g.ffa ? 'FFA' : 'TDM');
+    this.txt('mode-short', g.gm ? g.gm.cfg.short : g.gg ? 'GUN GAME' : g.ffa ? 'FFA' : g.inf ? 'INFECTED' : 'TDM');
 
     // health: only shown while hurt
     const hurt = p.alive && p.health < PLAYER.maxHealth - 0.5;

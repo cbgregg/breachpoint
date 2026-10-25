@@ -23,7 +23,7 @@ export const MART = {
   skyline: false,
   mountain: false,
   blurb: 'Indoor supermarket: tall aisles, frozen foods, produce, deli, bakery, upstairs offices, doors that open and close; parking lot and loading yard',
-  photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg'],
+  photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg', 'assets/loading/mart-3.jpg'],
   bounds: { hx: 42, hz: 34 },   // wider side lanes: the parking strip (+z) and the service alley (-z)
   spawns2: [
     // tight two-by-four blocks, like a real FPS spawn: A by the street at the far end of the lot, B in the loading yard by the stockroom roll-up

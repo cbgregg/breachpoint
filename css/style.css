@@ -601,6 +601,7 @@ body.rounds.fixed-loadout #death-loadout, body.rounds.fixed-loadout #spawn-hint 
 @media (max-width: 760px) { .gm-top { top: 70px; } }
 body[data-gmode="gungame"] .row:has(#opt-score) { display: none; }
 body[data-gmode="gunfight"] .tdm-snd, body[data-gmode="gunfight"] .tdm-only, body[data-gmode="snd"] .tdm-only { display: none; }
+body[data-gmode="infected"] .tdm-only, body[data-gmode="infected"] .row:has(#opt-score), body[data-gmode="infected"] .row:has(#opt-time) { display: none; }   /* Infected: 5 minutes, no score limit */
 /* game mode picker on the Play tab */
 .mode-pick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 @media (max-width: 700px) { .mode-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1433,6 +1434,8 @@ body.mode-online #menu[data-pv="root"] .intel-tile { display: none; }
 .motd-date { color: var(--bo-faint); letter-spacing: 0.1em; }
 .motd-t { font-family: var(--display); font-size: 22px; letter-spacing: 0.04em; color: #fff; line-height: 1.1; }
 .motd-b { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--bo-dim); }
+.motd-fb { align-self: flex-start; margin-top: 4px; }
+#nt-fb { margin-top: 10px; width: 100%; }
 #menu:not([data-pv="root"]) #motd-menu, body.mode-offline #motd-menu { display: none; }
 body.mode-online #menu[data-pv="root"] #motd-menu { display: flex; }
 #lobby .motd { margin: 14px 0 0 34px; max-width: 520px; }

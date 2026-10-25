@@ -537,7 +537,7 @@ export class PlayerController {
 
   updateViewmodel(dt, mdx, mdy) {
     const c = this.c;
-    this.guns.forEach((g, i) => { g.holder.visible = i === c.cur; });
+    this.guns.forEach((g, i) => { g.holder.visible = i === c.cur; g.gun.group.visible = !c.infected; });   // infected: hands only
     const G = this.guns[c.cur];
     const h = G.holder, gun = G.gun;
     const w = c.weapon;

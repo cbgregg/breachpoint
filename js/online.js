@@ -22,7 +22,7 @@ import { GUN_LADDER } from './modes.js';
 
 export const MAX_HUMANS = 8;
 export const PROTO = 1;
-export const QUICK_MODES = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame'];
+export const QUICK_MODES = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'];
 export const QUICK_SEARCH_MS = 10000;   // look for an open lobby this long, then open one
 export const QUICK_COUNTDOWN = 30;      // a new public lobby counts down (with the map vote) this many seconds
 const SNAP_HZ = 30;
@@ -643,7 +643,7 @@ export class HostSession {
 
   // called by game.startMatch for each accepted player
   createRemote(p) {
-    const c = new Character(this.game, { name: p.name, team: this.game.ffa ? 1 : p.team, isBot: false, primary: p.primary, remote: true });
+    const c = new Character(this.game, { name: p.name, team: this.game.ffa ? 1 : this.game.inf ? 0 : p.team, isBot: false, primary: p.primary, remote: true });
     c.uid = p.uid || '';
     this.bind(p.peerId, c);
     return c;
@@ -1205,6 +1205,12 @@ export class GuestSession {
         const [, id, ox, oy, oz, vx, vy, vz, owner] = ev;
         if (![id, ox, oy, oz, vx, vy, vz].every(fin) || g.grenades.length > 40) return;
         g.spawnRocket(id, new THREE.Vector3(ox, oy, oz), new THREE.Vector3(vx, vy, vz), g.charById(owner), WEAPONS.monte.rocket);
+        break;
+      }
+      case 'team': {   // Infected: someone changed sides
+        const [, id, t] = ev;
+        const c = g.charById(id);
+        if (c) c.setTeam(t === 1 ? 1 : 0);
         break;
       }
       case 'lo': {

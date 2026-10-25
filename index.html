@@ -350,7 +350,7 @@
             <div class="sec-k">MATCH SETTINGS <small class="mo-on">used when you host</small></div>
             <div class="rows" id="play-rows">
             <div class="row mo-on"><label for="opt-mode">Mode</label><select id="opt-mode" data-nav>
-              <option value="tdm">Team Deathmatch</option><option value="ffa">Free-for-All</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option></select></div>
+              <option value="tdm">Team Deathmatch</option><option value="ffa">Free-for-All</option><option value="gunfight">Gunfight · 2v2</option><option value="snd">Search &amp; Destroy</option><option value="gungame">Gun Game</option><option value="infected">Infected</option></select></div>
             <div class="row"><label for="opt-map">Map</label><select id="opt-map" data-nav>
               <option value="tarsa">Tarsa Market</option><option value="shuran">Shuran Yard · 3 lanes</option><option value="pioneer">Pioneer Square</option><option value="mart">Freshway · indoor</option><option value="drivein">Drive-In</option><option value="link">Link Loop · trains</option><option value="random">Random</option></select></div>
             <div class="row tdm-snd"><label for="opt-team">Match size</label><select id="opt-team" data-nav>
@@ -548,7 +548,7 @@
 
         <aside class="intel">
           <div class="intel-tile" id="intel-tile"><small id="it-k"></small><b id="it-t"></b><p id="it-d"></p></div>
-          <div class="motd" id="motd-menu" hidden><div class="motd-k">MESSAGE OF THE DAY <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p></div>
+          <div class="motd" id="motd-menu" hidden><div class="motd-k"><span class="motd-kind">PRE-ALPHA</span> <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p><button class="menu-btn small motd-fb" data-nav>SEND FEEDBACK</button></div>
           <div class="intel-map"><canvas id="intel-map" width="336" height="240"></canvas></div>
           <div class="intel-k">MAP</div><div class="intel-v" id="intel-mapname">TARSA MARKET</div>
           <div class="intel-k">MODE</div><div class="intel-v" id="intel-mode">TEAM DEATHMATCH</div>
@@ -627,6 +627,7 @@
       <header class="mw-head"><div class="bo-title"><b id="nt-title">NOTICE</b><small id="nt-sub">ACCOUNT</small></div></header>
       <p class="nt-text" id="nt-text"></p>
       <button id="nt-ok" class="cta" data-nav><span>CONTINUE</span><span class="glyph" data-act="accept"></span></button>
+      <button id="nt-fb" class="menu-btn" data-nav hidden>SEND FEEDBACK</button>
     </div>
   </div>
 
@@ -705,7 +706,7 @@
         <div class="cl-count" id="cl-count"></div>
         <div class="cl-list" id="cl-list"></div>
         <div class="cl-note" id="cl-note"></div>
-        <div class="motd" id="motd-lobby" hidden><div class="motd-k">MESSAGE OF THE DAY <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p></div>
+        <div class="motd" id="motd-lobby" hidden><div class="motd-k"><span class="motd-kind">PRE-ALPHA</span> <span class="motd-date"></span></div><b class="motd-t"></b><p class="motd-b"></p><button class="menu-btn small motd-fb" data-nav>SEND FEEDBACK</button></div>
       </div>
       <div class="cl-editor" id="cl-editor">
         <div class="cl-setup-h">GAME SETUP</div>
@@ -820,7 +821,7 @@
   <div id="loading" class="screen on boot has-photo">
     <!-- a screenshot from the game shows the moment the page opens (before any script runs) -->
     <div class="ld-bg on kb" id="ld-bg" style="background-image:url('assets/loading/drivein-1.jpg')"></div>
-    <script>(function () { var l = ['drivein-1', 'drivein-2', 'pioneer-1', 'pioneer-3']; document.getElementById('ld-bg').style.backgroundImage = "url('assets/loading/" + l[(Math.random() * l.length) | 0] + ".jpg')"; })();</script>
+    <script>(function () { var l = ['drivein-1', 'link-1', 'pioneer-1', 'tarsa-1', 'shuran-1', 'mart-2']; document.getElementById('ld-bg').style.backgroundImage = "url('assets/loading/" + l[(Math.random() * l.length) | 0] + ".jpg')"; })();</script>
     <div class="ld-top"><div class="load-logo">BREACHPOINT</div></div>
     <div class="ld-map"><canvas id="ld-mapc" width="336" height="240"></canvas></div>
     <div class="ld-info">

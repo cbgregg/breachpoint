@@ -25,6 +25,12 @@ export const MODES = {
     id: 'snd', name: 'Search & Destroy', short: 'S&D', blurb: 'One life. Attackers plant the bomb at A or B, defenders stop them. First to 4 rounds.',
     rounds: true, winRounds: 4, maxRounds: 7, halftime: 3, roundTime: 120, freeze: 5, bombTime: 45, plantTime: 5, defuseTime: 7.5, siteRadius: 2.4, defuseRadius: 1.8,
   },
+  // Infected: everyone starts a survivor but one. Whoever the infected kill comes back infected (a knife and a
+  // throwing knife, a step faster). Survivors win if anyone's still alive when the time runs out.
+  infected: {
+    id: 'infected', name: 'Infected', short: 'INFECTED', infected: true, timeLimit: 5,
+    blurb: 'One player starts infected. Anyone they kill joins them. Survive 5 minutes, or be the last one standing.',
+  },
   gungame: {
     id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true, ffa: true,
     blurb: 'Free-for-all. Every kill moves you up to the next gun; a knife kill sends the victim back one. First kill with the last gun wins.',

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { ROUTE_SEEDS } from './nav.js';
 import { DIFFICULTY, PLAYER } from './config.js';
+const MELEE_REACH = 2.1;   // Infected bots strike from here (the knife reaches 2.3 m to the chest)
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -306,6 +307,15 @@ export class BotBrain {
     }
     if (this.holding) { this.holding = false; this.lookYaw = null; }
 
+    if (this.goalKind === 'engage' && this.target && b.infected) {
+      // infected: no gun, so straight at them (along the path round corners), sprinting until they're close
+      const t = this.target, dist = b.pos.distanceTo(t.pos);
+      const dir = dist > 3 ? this.followPath(t.pos, dt) : null;
+      if (dir) wish.copy(dir); else wish.set(t.pos.x - b.pos.x, 0, t.pos.z - b.pos.z).normalize();
+      b.wantCrouch = false; b.wantProne = false;
+      b.updateMovement(dt, wish, dist > 2.5, Math.random() < 0.01, false, false);
+      return;
+    }
     if (this.goalKind === 'engage' && this.target) {
       const t = this.target;
       const dist = b.pos.distanceTo(t.pos);
@@ -517,6 +527,12 @@ export class BotBrain {
     }
 
     if (!engaging || this.reactT > 0) return;
+    if (b.infected) {
+      // the knife up close; the throwing knife at a runner now and then
+      if (dist < MELEE_REACH && b.meleeCd <= 0 && this.aimOff < 0.5) b.melee();
+      else if (dist > 6 && dist < 18 && b.grenades > 0 && b.grenadeCd <= 0 && Math.random() < 0.02) b.throwGrenade(this.target.pos.clone(), 0);
+      return;
+    }
     if (dist < 1.7 && b.meleeCd <= 0 && Math.random() < 0.5) { b.melee(); return; }
     // pick the right tool for the range
     const primary = b.weapons[0], pistol = b.weapons[1];

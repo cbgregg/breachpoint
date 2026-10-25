@@ -94,6 +94,10 @@ What you see is what stops you. Props have collision shaped like what's drawn (c
 
 In the game, add `?audit` to the URL: markers appear on the map, and the report goes to the console (`__game.audit()` re-runs it). For every map headless, serve the repo and run `node tools/map_audit.mjs --url http://localhost:3000`. That needs Playwright. It writes `audit/report.md` and `audit/report.json`; `--shots N` adds screenshots of each kind of issue, taken from where it was seen, and `--maps tarsa,pioneer` limits the maps. `--selftest` plants one defect of each kind in a map and checks the audit finds every one, so run it after changing a rule. All five maps currently audit clean.
 
+### Map photos
+
+The loading-screen and menu pictures (`assets/loading/<map>-<n>.jpg`) and the map thumbnails (`assets/loading/thumbs/<map>.jpg`, used on the lobby's map card) are rendered in the engine at Ultra by `node tools/map_photos.mjs --url http://localhost:3000` (needs Playwright). The camera spots are the `SHOTS` table at the top of the file; the first shot of each map is also its thumbnail. `--plan` renders four automatic views of each map for picking new spots, `--maps link` limits the maps, and `--redo` re-renders single shots.
+
 ## Controllers
 
 Xbox, PlayStation and most other controllers work over USB or Bluetooth. The browser decides each controller's button layout. Chrome, Edge and Safari give the standard layout for Xbox and PlayStation pads. Firefox and some Mac drivers report their own button numbers, so buttons, triggers or the D-pad can land in the wrong place.
@@ -111,7 +115,7 @@ Xbox, PlayStation and most other controllers work over USB or Bluetooth. The bro
 |---|---|
 | Public Match | Opens the lobby and searches for an open lobby in your game modes (press **X** / X button in the lobby to choose them). If none turns up within 10 seconds, the lobby opens itself in one of those modes at random, advertises itself and starts a 30-second countdown with a map vote. Players searching meanwhile drop in, and bots fill the rest when it starts. |
 | Match Browser | Multiplayer › Match Browser lists every public match right now: host, mode, map (or "Voting"), players and whether it's in the lobby or already playing. Filter by mode, and pick one to join. If it's gone or full, matchmaking carries on in your modes. |
-| Message of the day | Shown on the Multiplayer menu and in lobbies. It comes from `motd.json` in the site root; edit it and push to change it. |
+| Welcome message | Pops up once per visit after the title screen, and is shown on the Multiplayer menu and in lobbies, each with a **Send Feedback** button. It comes from `motd.json` in the site root (`title`, `kind`: the label over it, now PRE-ALPHA, `date`, `body`); edit it and push to change it. |
 | First load | The loading screen shows a screenshot from the game the moment the page opens, before any script runs. |
 
 The Multiplayer menus use the pre-match lobby's look: plain list items, a ▸ description and the live 3D background behind. The painted globe is gone.
@@ -217,7 +221,7 @@ Browsers only expose a controller after you press a button on it, so press any b
 
 ## Game modes
 
-Pick a mode on the Play tab. All three work offline against bots and online.
+Pick a mode on the Play tab. Every mode works offline against bots and online.
 
 | Mode | Teams | How you win a round | Match |
 |---|---|---|---|
@@ -225,6 +229,7 @@ Pick a mode on the Play tab. All three work offline against bots and online.
 | **Gunfight** | 2v2 | One life each. Everyone gets the same random loadout (new every two rounds). After 40 s a flag appears in the middle: hold it for 3 s to win, or the team with more health left after 10 s of overtime takes the round | First to 6 rounds |
 | **Search & Destroy** | 2v2 to 8v8 | One life each. Attackers carry a bomb to site A or B and hold **R / F** (controller **X**) for 5 s to plant; it goes off 45 s later. Defenders hold the same button for 7.5 s to defuse. Wipe the other team, run out the clock (defenders), or detonate / defuse | First to 4 rounds, sides switch at halftime |
 | **Gun Game** | 2v2 to 8v8 | Respawns on, no class choice, no grenades. Everyone starts on the MK-4; every kill moves you up a gun right away, through all 15 guns (The Monte included) down to the P-45. A knife kill sends the victim back one gun. The team score is its best player's rung | First kill with the P-45 wins |
+| **Infected** | 4 to 16 players | One player starts infected; everyone else is a survivor with their own class. Anyone the infected kill comes back infected. The infected have no gun: fire is a one-hit knife strike, they carry one throwing knife and move 12% faster. The last survivor gets a medal and a bonus. | 5 minutes: if anyone survives, the survivors win; if the last one falls, the infected win. If patient zero leaves, a survivor turns. |
 
 In round modes there are no pickups, the bomb carrier drops it on death (any attacker can pick it up), and once you're out you spectate a living teammate (**Space / click / A** to switch). Bots play the objective: they plant, defuse and rush the overtime flag; defenders hold their site but keep moving between angles every few seconds, one in three plays a forward roaming role, and anyone may rotate to the other site. Attackers that reach a site without the bomb sweep it and the approaches.
 

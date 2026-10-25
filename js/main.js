@@ -382,8 +382,9 @@ function syncModeRows() {
   const m = MODES[settings.mode] || MODES.tdm;
   document.body.dataset.gmode = m.id;
   // match size reads as a player count in the free-for-all modes
-  $('opt-team').closest('.row').querySelector('label').firstChild.textContent = m.ffa ? 'Players' : 'Match size';
-  for (const o of $('opt-team').options) o.textContent = m.ffa ? `${o.value * 2} players` : `${o.value}v${o.value}`;
+  const solo = m.ffa || m.infected;   // (Infected: teams are made during the match)
+  $('opt-team').closest('.row').querySelector('label').firstChild.textContent = solo ? 'Players' : 'Match size';
+  for (const o of $('opt-team').options) o.textContent = solo ? `${o.value * 2} players` : `${o.value}v${o.value}`;
   document.querySelectorAll('.mode-pick .mp').forEach(b => { const on = b.dataset.mode === m.id; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
   $('intel-mode').textContent = m.name.toUpperCase();
   $('play-title').textContent = m.name.toUpperCase();
@@ -763,7 +764,7 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 // Level 1 is a column of playlist tiles; each opens its own page (Back returns). Offline the tiles are the
 // game modes and open the match setup; online they're Quick Play, Private Match, Friends and Combat Training.
 let playView = 'root', tileSel = null;
-const TILE_ART = { modes: 'shuran-1', tdm: 'tarsa-1', gunfight: 'shuran-1', snd: 'pioneer-1', gungame: 'mart-1', ffa: 'pioneer-3', browser: 'shuran-1', quick: 'drivein-2', private: 'tarsa-2', friends: 'pioneer-2', training: 'mart-2', online: 'drivein-1' };
+const TILE_ART = { modes: 'shuran-2', tdm: 'tarsa-2', gunfight: 'shuran-3', snd: 'pioneer-3', gungame: 'mart-2', ffa: 'drivein-2', infected: 'link-2', browser: 'tarsa-3', quick: 'drivein-1', private: 'pioneer-2', friends: 'link-1', training: 'mart-3', online: 'link-4' };
 function playTiles() {
   if (playMode === 'online') return [
     { id: 'quick', k: `PUBLIC · ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}`, t: 'QUICK MATCH', d: 'Drop into a public match in your modes. If none is open within 10 seconds, a lobby starts and counts down with a map vote while players drop in.' },
@@ -773,7 +774,7 @@ function playTiles() {
     { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
     { id: 'training', k: 'OFFLINE · VERSUS BOTS', t: 'COMBAT TRAINING', d: 'Switch to offline matches against bots. No account needed.' },
   ];
-  return [...['tdm', 'ffa', 'gunfight', 'snd', 'gungame'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
+  return [...['tdm', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
     { id: 'online', k: 'ONLINE · PLAYERS', t: 'MULTIPLAYER', d: 'Quick play with anyone, or a private match with friends. Sign in with your email, no password.' }];
 }
 function tilePreview(t) {
@@ -821,7 +822,8 @@ const tileHover = (e) => { const b = e.target.closest('.tile'); if (b) { tileSel
 $('play-tiles').addEventListener('mouseover', tileHover);
 $('play-tiles').addEventListener('focusin', tileHover);
 
-// ---------- message of the day (motd.json in the site root: edit it and push to change it) ----------
+// ---------- welcome / message of the day (motd.json in the site root: edit it and push to change it) ----------
+// kind: the small label over the heading (PRE-ALPHA now; MESSAGE OF THE DAY when there's no kind)
 let motdData = null, motdShown = false;
 fetch('motd.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).then(m => {
   if (!m || !m.body) return;
@@ -831,6 +833,7 @@ fetch('motd.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).th
     el.querySelector('.motd-t').textContent = String(m.title || '').slice(0, 80);
     el.querySelector('.motd-b').textContent = String(m.body).slice(0, 600);
     el.querySelector('.motd-date').textContent = m.date ? `· ${String(m.date).slice(0, 10)}` : '';
+    el.querySelector('.motd-kind').textContent = String(m.kind || 'MESSAGE OF THE DAY').slice(0, 40).toUpperCase();
     el.hidden = false;
   }
 }).catch(() => { /* offline: no message */ });
@@ -1342,7 +1345,7 @@ function renderLobby() {
     $('lobby-back').style.display = inMatch ? '' : 'none';
     $('host-note').textContent = inMatch
       ? 'Players you accept now drop straight into the match, taking a bot\'s place.'
-      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : (MODES[settings.mode] || {}).ffa ? `${settings.teamSize * 2} players` : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : settings.mode === 'ffa' ? ` · 30 kills · ${settings.timeLimit} min` : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change them with Game Mode, Map and Game Setup; ${settings.fillBots === false ? 'no bots: only real players.' : 'bots fill empty slots.'}`;
+      : `${(MODES[settings.mode] || MODES.tdm).name} · ${MAPS[settings.map] ? MAPS[settings.map].name : 'Random map'} · ${settings.mode === 'gunfight' ? '2v2' : ((MODES[settings.mode] || {}).ffa || settings.mode === 'infected') ? `${settings.teamSize * 2} players` : `${settings.teamSize}v${settings.teamSize}`}${settings.mode === 'tdm' || !settings.mode ? ` · ${settings.scoreLimit} kills · ${settings.timeLimit} min` : settings.mode === 'ffa' ? ` · 30 kills · ${settings.timeLimit} min` : settings.mode === 'infected' ? ' · 5 min' : ''}${settings.friendlyFire ? ' · friendly fire' : ''}. Change them with Game Mode, Map and Game Setup; ${settings.fillBots === false ? 'no bots: only real players.' : 'bots fill empty slots.'}`;
     $('lobby-leave').textContent = inMatch ? 'END SESSION' : lobby.public ? 'CANCEL MATCHMAKING' : 'CLOSE LOBBY';
     $('lobby-leave').classList.toggle('cancel', !inMatch && !!lobby.public);
   } else {
@@ -1386,7 +1389,7 @@ lobby.onUpdate = () => { renderLobby(); noteRecent(lobbyPeople()); syncChat(); }
 let clDescText = '', clEditing = false, clSetup = false, clModes = false;
 const classicOn = () => !quickIntro && (lobby.role === 'host' || lobby.role === 'guest' || !!lobby.quickMode);
 const mapCard = (id, modeName, extra = '') => {
-  const m = MAPS[id], ph = m && m.photos && m.photos[0];
+  const m = MAPS[id], ph = m && `assets/loading/thumbs/${id}.jpg`;   // the map's thumbnail (its first photo, small)
   return m
     ? `<div class="cl-map" style="${ph ? `background-image:url('${ph}')` : ''}">${extra}<span class="cl-mn"><b>${esc(m.name.toUpperCase())}</b><small>${esc(modeName)}</small></span></div>`
     : `<div class="cl-map classified">${extra}<span class="cl-mn"><b>MAP CLASSIFIED</b><small>${esc(modeName)}</small></span></div>`;
@@ -2041,13 +2044,15 @@ function titleGo() {
   if (motdData && !motdShown) {
     motdShown = true;
     const head = String(motdData.title || 'MESSAGE OF THE DAY').slice(0, 80).toUpperCase();
+    const kind = String(motdData.kind || 'MESSAGE OF THE DAY').slice(0, 40).toUpperCase();
     $('nt-title').textContent = head;
     // the small line under the heading: what this is, and when (never the heading twice)
-    $('nt-sub').textContent = [head === 'MESSAGE OF THE DAY' ? 'BREACHPOINT' : 'MESSAGE OF THE DAY', motdData.date ? String(motdData.date).slice(0, 10) : ''].filter(Boolean).join(' · ');
+    $('nt-sub').textContent = [head === kind ? 'BREACHPOINT' : kind, motdData.date ? String(motdData.date).slice(0, 10) : ''].filter(Boolean).join(' · ');
+    $('nt-fb').hidden = false;
     $('nt-text').textContent = String(motdData.body).slice(0, 600);
     $('notice').classList.remove('bad');
     $('notice').classList.add('motd-pop');
-    noticeDone = () => { $('notice').classList.remove('motd-pop'); openMode(); };
+    noticeDone = () => { $('notice').classList.remove('motd-pop'); $('nt-fb').hidden = true; openMode(); };
     showScreen('notice');
     if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('nt-ok')), 0);
     return;
@@ -2372,6 +2377,9 @@ $('side-btn').addEventListener('click', openSide);
 // about / support
 const openLink = (url) => { try { window.open(url, '_blank', 'noopener'); } catch (_) { location.href = url; } };
 $('feedback-btn').addEventListener('click', () => openFeedback());
+// the welcome message's own Send Feedback buttons (the pop-up after the title screen, the menu and lobby cards)
+$('nt-fb').addEventListener('click', () => openFeedback());
+document.querySelectorAll('.motd-fb').forEach(b => b.addEventListener('click', () => openFeedback()));
 
 // ---------- feedback form ----------
 let fbFrom = 'menu', fbKind = 'feature', fbBusy = false;

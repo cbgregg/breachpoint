@@ -10,6 +10,7 @@ import { buildWorld, renderMinimap, MAPS, MAP_IDS, setWorldDetail, worldDetailLo
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
 import { loadoutFromSettings, randomLoadout, parseLoadout, weaponDef, soloLoadout } from './attachments.js';
+const INF_LOADOUT = soloLoadout('pistol');   // Infected: the gun is never drawn (fire strikes with the knife)
 import { BotBrain } from './bot.js';
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
@@ -212,6 +213,8 @@ export class Game {
     if (modeCfg.rounds) this.settings.scoreLimit = modeCfg.winRounds;
     this.gg = !!modeCfg.ladder;   // Gun Game: every kill is the next gun; first to finish the ladder wins
     this.ffa = !!modeCfg.ffa;     // Free-for-All and Gun Game: everyone for themselves
+    this.inf = !!modeCfg.infected;  // Infected: survivors (team 0) against the infected (team 1), who grow with every kill
+    if (this.inf) this.settings.timeLimit = modeCfg.timeLimit;
     if (this.ffa && !this.gg) this.settings.scoreLimit = modeCfg.killLimit || 30;
     if (this.gg) {
       this.settings.scoreLimit = GUN_LADDER.length;
@@ -244,7 +247,7 @@ export class Game {
 
     const N = this.gm && this.gm.cfg.teamSize ? this.gm.cfg.teamSize : Math.max(1, Math.min(8, settings.teamSize | 0));
     // Free-for-All: everyone is on team 1, so everyone wears the enemy colours and every check goes through foes()
-    const myTeam = this.ffa ? 1 : this.mode === 'host' ? online.lobby.hostTeam : 0;
+    const myTeam = this.ffa ? 1 : this.inf ? 0 : this.mode === 'host' ? online.lobby.hostTeam : 0;
     this.player = new Character(this, { name: settings.name || 'Operator', team: myTeam, isBot: false, primary: loadoutFromSettings(settings) });
     this.player.uid = online && online.lobby ? online.lobby.myUid : '';
     this.characters = [this.player];
@@ -256,7 +259,15 @@ export class Game {
     // private online matches can be humans only (host's "Fill empty slots with bots" switch)
     const fill = !(this.mode === 'host' && settings.fillBots === false);
     if (this.ffa) { for (let i = this.characters.length; fill && i < 2 * N; i++) this.addBot(1); }
-    else for (let t = 0; t < 2; t++) {
+    else if (this.inf) {
+      // everyone a survivor, then one picked at random to start infected
+      for (const c of this.characters) c.setTeam(0);
+      for (let i = this.characters.length; fill && i < 2 * N; i++) this.addBot(0);
+      const zero = this.characters[(Math.random() * this.characters.length) | 0];
+      zero.setTeam(1);
+      for (const c of this.characters) c.infectNext = false;
+      this.settings.scoreLimit = this.characters.length;
+    } else for (let t = 0; t < 2; t++) {
       const humans = this.characters.filter(c => c.team === t).length;
       for (let i = humans; fill && i < N; i++) this.addBot(t);
     }
@@ -265,7 +276,7 @@ export class Game {
 
     this.scores = [0, 0];
     this.time = 0;
-    this.timeLeft = settings.timeLimit * 60;
+    this.timeLeft = this.settings.timeLimit * 60;   // (the mode can set its own: Infected runs 5 minutes)
     this.intel.forEach(i => { i.time = -99; });
     this.multi = 0; this.lastKillT = -99;
     this.endT = 0;
@@ -276,8 +287,9 @@ export class Game {
       for (const c of shuffle([...this.characters])) c.spawn(this.chooseSpawn(c.team), this.spawnYawOut);
     } else for (const t of [0, 1]) {
       const spots = shuffle([...this.world.spawns[t]]);
-      this.characters.filter(c => c.team === t).forEach((c, i) => c.spawn(spots[i % spots.length], this.world.spawnYaw[t]));
+      this.characters.filter(c => c.team === t).forEach((c, i) => { this.infectedKit(c); c.spawn(spots[i % spots.length], this.world.spawnYaw[t]); this.infectedKit(c, true); });
     }
+    if (this.inf) this.infTally();
     for (const brain of this.brains.values()) brain.reset();
 
     this.countdownT = 3;
@@ -463,6 +475,7 @@ export class Game {
     this.renderer.grade.damage.value = 0;
     this.audio.play('horn', null, { ui: true });
     let winner = this.scores[0] > this.scores[1] ? 0 : this.scores[1] > this.scores[0] ? 1 : -1;
+    if (this.inf) winner = this.characters.some(c => c.team === 0 && !c.infectNext) ? 0 : 1;   // anyone left alive: the survivors won
     let sorted = [...this.characters].sort((a, b) => b.score - a.score);
     let ffaPlace = 0, winnerId = -1;
     if (this.ffa) {
@@ -476,7 +489,7 @@ export class Game {
     }
     this.music.setDuck(false);
     this.music.sting(winner === this.player.team);
-    const result = { winner, scores: [...this.scores], players: sorted, mvp: sorted[0], playerTeam: this.player.team, mode: this.mode, ffa: this.ffa, place: ffaPlace, winnerId, count: this.characters.length };
+    const result = { winner, scores: [...this.scores], players: sorted, mvp: sorted[0], playerTeam: this.inf && this.player.infectNext ? 1 : this.player.team, mode: this.mode, ffa: this.ffa, place: ffaPlace, winnerId, count: this.characters.length };
     if (this.mode === 'host' && this.session) this.session.sendEnd(result);
     if (this.onEnd) this.onEnd(result);
   }
@@ -606,7 +619,11 @@ export class Game {
       this.hud.countdown(Math.max(0, n), this.intro);
     } else {
       this.timeLeft = Math.max(0, this.timeLeft - dt);
-      if (this.timeLeft <= 0 && !guest && !this.gm) { this.endMatch(); return; }
+      if (this.timeLeft <= 0 && !guest && !this.gm) {
+        if (this.inf) this.hud.medal(this.player.team === 0 && !this.player.infectNext ? 'VICTORY' : 'DEFEAT', 'THE SURVIVORS HELD OUT');
+        this.endMatch(); return;
+      }
+      if (this.inf && !guest) { this.infT = (this.infT || 0) - dt; if (this.infT <= 0) { this.infT = 0.5; this.infTally(); } }
     }
     if (this.endT > 0 && !guest) { this.endT -= dt; if (this.endT <= 0) { this.endMatch(); return; } }
 
@@ -1245,7 +1262,7 @@ export class Game {
       const bonus = (headshot ? SCORE.headshot : 0) + (weaponId === 'melee' ? SCORE.melee : 0);
       killer.score += SCORE.kill + bonus;
       if (this.gg) this.ggPromote(killer, weaponId, victim);
-      else if (!this.gm && !this.ffa) this.scores[killer.team]++; // round modes score rounds, not kills; FFA scores players
+      else if (!this.gm && !this.ffa && !this.inf) this.scores[killer.team]++; // round modes score rounds, not kills; FFA scores players; Infected counts heads
       if (!killer.isBot) {
         this.notify(killer, 'kill');
         this.notify(killer, 'score', 'KILL', SCORE.kill);
@@ -1279,10 +1296,11 @@ export class Game {
       victim.lastKiller = killer && killer !== victim ? killer : null;
       this.notify(victim, 'death', killer ? killer.id : -1, weaponId);
     }
+    if (this.inf) this.infectedKill(killer, victim);
     if (this.gm) this.gm.onKill(killer, victim);
-    else if (Math.random() < 0.5) this.dropAmmo(victim.pos);
+    else if (Math.random() < 0.5 && !(this.inf && victim.team === 1)) this.dropAmmo(victim.pos);
     const reached = this.ffa ? (this.gg ? killer && killer.ggLevel : killer && killer.kills) >= this.settings.scoreLimit : killer && this.scores[killer.team] >= this.settings.scoreLimit;
-    if (!this.gm && enemyKill && reached && this.endT <= 0) {
+    if (!this.gm && !this.inf && enemyKill && reached && this.endT <= 0) {
       this.endT = 1.4;
       this.hud.medal((this.ffa ? killer === this.player : killer.team === this.player.team) ? 'VICTORY' : 'DEFEAT', this.gg ? `${killer.name.toUpperCase()} FINISHED THE LADDER` : 'SCORE LIMIT REACHED');
     }
@@ -1309,12 +1327,56 @@ export class Game {
     }
   }
 
+  // ---------- Infected ----------
+  // a survivor killed comes back infected; tally who's left, end the match when nobody survives
+  infectedKill(killer, victim) {
+    if (victim.team === 0 && !victim.infectNext) {
+      victim.infectNext = true;
+      if (!victim.isBot) this.notify(victim, 'medal', 'INFECTED', 'YOU COME BACK AS ONE OF THEM');
+      if (killer && killer !== victim && killer.team === 1 && !killer.isBot) { this.notify(killer, 'medal', 'INFECTED', victim.name.toUpperCase()); this.notify(killer, 'score', 'INFECTED', 50); killer.score += 50; }
+    }
+    this.infTally();
+  }
+  infTally() {
+    if (!this.inf || this.mode === 'guest') return;
+    const surv = this.characters.filter(c => c.team === 0 && !c.infectNext);
+    // nobody infected (patient zero left the match): a survivor turns, there and then
+    if (surv.length > 1 && !this.characters.some(c => c.team === 1 || c.infectNext)) {
+      const z = surv.splice((Math.random() * surv.length) | 0, 1)[0];
+      z.setTeam(1); this.emit(['team', z.id, 1]);
+      this.infectedKit(z); if (z.pendingLoadout) { z.setLoadout(z.pendingLoadout); z.pendingLoadout = null; this.emit(['lo', z.id, z.loadout]); }
+      this.infectedKit(z, true);
+      if (!z.isBot) this.notify(z, 'medal', 'YOU ARE INFECTED', 'KILL THE SURVIVORS');
+    }
+    this.scores = [surv.length, this.characters.length - surv.length];
+    this.settings.scoreLimit = this.characters.length;
+    if (surv.length === 1 && !surv[0].lastSurvivor) {
+      surv[0].lastSurvivor = true;
+      if (!surv[0].isBot) this.notify(surv[0], 'medal', 'LAST SURVIVOR', 'HOLD ON');
+      surv[0].score += 100;
+    }
+    if (!surv.length && this.live && this.endT <= 0) {
+      this.endT = 1.4;
+      this.hud.medal('VICTORY', 'NO SURVIVORS LEFT');   // by now everyone (you too) is infected
+    }
+  }
+  // the infected's kit: a knife (fire strikes, no gun), a throwing knife, no tactical. before: set the loadout
+  // to apply at the spawn; after (true): the equipment, once the spawn has refilled everything
+  infectedKit(c, after = false) {
+    if (!this.inf || c.team !== 1) return;
+    if (!after) { if (c.loadout !== INF_LOADOUT) c.pendingLoadout = INF_LOADOUT; return; }
+    c.lethal = 'knife'; c.grenades = 1; c.tactical = c.tactical || 'stun'; c.tacticals = 0;
+  }
+
   respawn(c) {
+    if (this.inf && c.infectNext) { c.infectNext = false; c.setTeam(1); this.emit(['team', c.id, 1]); }
+    this.infectedKit(c);
     const p = this.chooseSpawn(c.team);
     if (this.gg) c.pendingLoadout = soloLoadout(GUN_LADDER[Math.min(c.ggLevel || 0, GUN_LADDER.length - 1)]);
     else if (c.isBot && Math.random() < 0.3) c.pendingLoadout = botLoadout(c.primaryId);
     const before = c.loadout;
     c.spawn(p, this.spawnYawOut);
+    this.infectedKit(c, true);
     if (c.loadout !== before) this.emit(['lo', c.id, c.loadout]);
     if (c.isBot) this.brains.get(c).reset();
     if (!c.isBot) this.notify(c, 'spawn', +c.pos.x.toFixed(2), +c.pos.y.toFixed(2), +c.pos.z.toFixed(2), +c.yaw.toFixed(3));

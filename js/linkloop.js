@@ -827,6 +827,6 @@ export const LINKLOOP = {
   ],
   // search & destroy: both sites at Symphony, one on the island platform, one on the north footbridge
   sites: [[STATIONS[1].ox + 4, -6, 0], [STATIONS[1].ox + 4, -33, GY]],
-  photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg'],
+  photos: ['assets/loading/link-1.jpg', 'assets/loading/link-2.jpg', 'assets/loading/link-3.jpg', 'assets/loading/link-4.jpg'],
   build,
 };

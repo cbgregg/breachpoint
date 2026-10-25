@@ -37,7 +37,7 @@ export const DRIVEIN = {
     { type: 'ammo', pos: [33, 0, -25] },
     { type: 'ammo', pos: [-33, 0, 25] },
   ],
-  photos: ['assets/loading/drivein-1.jpg', 'assets/loading/drivein-2.jpg'],
+  photos: ['assets/loading/drivein-1.jpg', 'assets/loading/drivein-2.jpg', 'assets/loading/drivein-3.jpg'],
   build,
 };
 

@@ -155,8 +155,8 @@ body.mode-online #play-tiles .tile b { font-weight: 600; }
 .mode-quick, .mode-card { position: relative; overflow: hidden; isolation: isolate; }
 .mode-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1180px; }
 .mode-card { min-height: clamp(220px, 34vh, 340px); padding: 22px 24px; justify-content: flex-end; border: 1px solid var(--mw-line); background: #111315 center / cover no-repeat; transition: none; }
-#mode-offline { background-image: url('../assets/loading/tarsa-1.jpg'); }
-#mode-online { background-image: url('../assets/loading/pioneer-1.jpg'); }
+#mode-offline { background-image: url('../assets/loading/tarsa-2.jpg'); }
+#mode-online { background-image: url('../assets/loading/link-1.jpg'); }
 .mode-card::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(8, 9, 10, 0.95) 0%, rgba(8, 9, 10, 0.55) 55%, rgba(8, 9, 10, 0.25) 100%); }
 .mode-card:hover, .mode-card.pad-focus, .mode-card:focus-visible { background-color: #111315; outline: 2px solid var(--mw-ink); outline-offset: -2px; transform: none; border-color: transparent; }
 .mode-card:hover::before, .mode-card.pad-focus::before { background: linear-gradient(0deg, rgba(8, 9, 10, 0.9) 0%, rgba(8, 9, 10, 0.3) 60%, rgba(8, 9, 10, 0.05) 100%); }

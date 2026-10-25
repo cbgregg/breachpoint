@@ -360,6 +360,21 @@ export class Character {
   }
 
   get weapon() { return this.weapons[this.cur]; }
+  // Infected: team 1 are the infected (knife only, a step faster)
+  get infected() { return !!this.game.inf && this.team === 1; }
+  // change sides mid-match (Infected): the third-person model is rebuilt in the new team's kit
+  setTeam(t) {
+    if (t === this.team) return;
+    this.team = t;
+    if (this.model) {
+      const vis = this.model.root.visible;
+      this.game.scene.remove(this.model.root);
+      this.model = buildSoldierModel(t, this.weapon.def, this.name) || buildOperator(t, this.weapon.def, this.name);
+      this.game.scene.add(this.model.root);
+      this.model.root.visible = vis;
+      setOperatorWeapon(this.model, this.weapon.def);
+    }
+  }
   // the character this machine looks through; its sounds play unpositioned
   get local() { return this === this.game.player; }
   get spos() { return this.local ? null : this.pos; }
@@ -444,6 +459,7 @@ export class Character {
   }
 
   tryFire(origin, dir) {
+    if (this.infected) return this.melee();   // the infected have no gun: fire is a knife strike
     const w = this.weapon;
     if (!this.alive || this.switchT > 0 || w.reloading || w.cooldown > 0 || this.meleeT > 0) return false;
     if (w.mag <= 0) {
@@ -634,6 +650,7 @@ export class Character {
       this.tacSprinting = !!tac && this.sprinting && this.tacFuel > 0.05;
       let speed = this.proneT > 0.05 ? PLAYER.proneSpeed * (prone ? 1 : 0.4) : this.crouchT > 0.5 ? PLAYER.crouchSpeed : this.tacSprinting ? PLAYER.tacSprint : this.sprinting ? PLAYER.sprint : PLAYER.walk;
       speed *= lerp(1, PLAYER.adsSpeedMult, this.adsT);
+      if (this.infected) speed *= 1.12;
       if (this.stunT > 0) speed *= 1 - 0.5 * Math.min(1, this.stunT / 1.5);
       const accel = this.onGround ? PLAYER.accelGround : PLAYER.accelAir;
       const tx = wish.x * speed, tz = wish.z * speed;
@@ -670,6 +687,7 @@ export class Character {
 
   updateModel(dt, showName, lod = 1) {
     if (!this.model) return;
+    this.model.gunHolder.visible = !this.infected;   // the infected go at you with bare hands and a knife
     if (this.model.soldier) {
       // level of detail: off-screen bots only move their root; distant ones animate at a lower rate
       const m = this.model;
