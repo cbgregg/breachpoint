@@ -2,7 +2,7 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
-**Every voice line is already generated**: 1,452 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[urgent, shaken]`, `[deadpan]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
+**Every voice line is already generated**: 1,776 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[urgent, shaken]`, `[deadpan]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
 
 ---
 
@@ -72,6 +72,10 @@ How often they talk follows Black Ops: rarely, and only when it tells you someth
 - **Rates**: contact 30%, reloading 15%, enemy down 15%, man down 40%, hit 10%; throws 90%.
 - **Banter**: up to three squad lines over the countdown, and at most one walk-by line a match.
 - **The announcer** stays quiet for a double kill, a three-kill streak and each new Gun Game weapon (the medal still shows), and calls the lead changing hands at most once a minute.
+
+### Explicit language (`x_<id>`)
+
+Off by default. You choose it when you make your account (a checkbox under the Name Tag), and it's kept with the account from then on, on every device. Without an account, it's a checkbox in Options > Audio on this device. With it on, about half of the callouts that have one play the explicit take instead of the clean one; everything else (when, how often, who hears it) is unchanged. Each voice has two explicit takes of `reloading`, `contact`, `enemy_down`, `man_down`, `hit`, `grenade`, `last_alive` and `frag_out`, drawn from a pool of twelve per callout, plus two explicit banter lines (thirty-six in all). The swearing is the ordinary kind a squad does under fire ("Fuck, I'm hit!", "Shit, man down!"); never slurs, and nothing aimed at who anyone is.
 
 | id | When |
 |---|---|

@@ -323,10 +323,12 @@ export const DEFAULT_SETTINGS = {
   sensitivity: 1,
   adsMode: 'hold', // 'hold' or 'toggle'
   adsSens: 1,       // look sensitivity while aiming, relative to the hip (mouse and stick)
+  cameraMotion: 'full',  // head bob, sway and lean: 'full' or 'reduced'
   autoSprint: false, // sprint whenever you push fully forward (not crouched / aiming / firing)
   fov: 80,
   volume: 0.7,
   announcer: 'random',   // control, sable, ghost, warden, echo, or a different one every match
+  explicit: false,       // operators swear (signed in: kept with the account; otherwise this device)
   voice: 'auto',         // your operator's voice in callouts (auto: whichever the match hands you)
   showFps: false,
   friendlyFire: false,

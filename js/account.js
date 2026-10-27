@@ -167,6 +167,12 @@ export class Account {
     this.persist();
     return this.user;
   }
+  // explicit language in callouts: chosen when the account is made, kept with it from then on
+  async setExplicit(on) {
+    this.user = (await this.call('/prefs', { explicit: !!on }, true)).user;
+    this.persist();
+    return this.user;
+  }
   async setDisplay(name) {
     this.user = (await this.call('/display', { name }, true)).user;
     this.persist();

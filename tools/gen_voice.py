@@ -495,6 +495,76 @@ for v, (name, voice) in enumerate(SQUAD.items()):
     for k in range(5):
         add(f'vo/chatter/{name}/banter_{k + 1}', voice, BANTER[v * 5 + k])
 
+# explicit language (Options > Audio, or chosen when the account is made): the same moments with the swearing a
+# squad actually does under fire. Profane, never hateful: no slurs, nothing aimed at who anyone is.
+# x_<kind> takes play in place of the clean ones about half the time when it's on.
+CHATTER_X = {
+    'reloading': ['Reloading, shit!', "Fuck, I'm dry!", 'Changing mags, cover my ass!', "Shit, I'm empty!", 'Reloading, God damn it!',
+                  'Out of fucking ammo!', 'Mag out, cover me, damn it!', 'Shit, reloading!', "I'm dry, fuck!", "Hold them off, I'm fucking reloading!",
+                  'Empty! Shit!', 'Reloading, hold the damn line!'],
+    'contact': ['Contact, shit!', 'Fuck, contact!', 'Enemy, right fucking there!', "Shit, they're here!", 'Contact front, God damn it!',
+                'Right there, shit!', 'Fuck, I see one!', 'Hostile, shit, hostile!', 'Contact! Son of a bitch!', "There's one, fuck!",
+                'Shit, eyes on!', 'Damn it, contact!'],
+    'enemy_down': ['Got the bastard.', 'Fucker is down.', 'Scratch that son of a bitch.', 'Down, and stay down.', 'Hell yeah, got one.',
+                   'Eat that.', "That one's fucked.", 'Down. Damn right.', 'Bye, asshole.', 'Enemy down, fuck yeah.', 'Stay down, prick.',
+                   'Got you, you bastard.'],
+    'man_down': ['Shit, man down!', 'Fuck, we lost one!', 'God damn it, they got one of ours!', 'Man down, shit!', "Son of a bitch, we're one short!",
+                 'Fuck! Friendly down!', 'Damn it, man down!', "They're picking us off, shit!", 'Shit, shit, man down!', 'Bastards got one of ours!',
+                 'God damn it, operator down!', 'Fuck, teammate down!'],
+    'hit': ["Fuck, I'm hit!", "Shit, I'm hit!", 'Ah, God damn it!', "Son of a bitch, I'm hit!", 'Fuck, that hurt!', 'Shit, taking fire!',
+            'Fuck! Need cover!', "Damn it, I'm hit!", "Shit, shit, I'm hit!", 'Bastards hit me!', "Fuck, I'm bleeding!", 'God damn it, taking hits!'],
+    'grenade': ['Grenade! Shit!', 'Fuck, grenade!', 'Shit, get clear!', 'Grenade, fuck, move!', 'Oh shit, grenade!', 'Fuck! Frag!',
+                'Move, God damn it, grenade!', 'Shit! Incoming!', 'Grenade, fucking move!', 'Oh fuck, grenade!', 'Get back, shit!', 'Frag at my feet, fuck!'],
+    'last_alive': ["Well, shit. It's just me.", "Fuck. I'm the last one.", 'Great. Just me. Fantastic.', 'Shit. All on me now.', 'Just me left. Fuck it.',
+                   "Damn it. I'm alone.", 'Well, fuck. Last one standing.', "Of course it's me. Shit.", 'Alright. Just me. Hell.', 'Fuck. Nobody left but me.',
+                   'Last one. God damn it.', "It's on me. Shit."],
+    'frag_out': ['Frag out, eat this!', 'Fire in the hole, motherfuckers!', 'Frag out, fuck you!', 'Grenade out, get some!', 'Eat this, frag out!',
+                 'Frag out, shit, get down!', 'Fire in the hole, damn it!', 'Catch, assholes!', 'Frag out! Suck on that!', 'Grenade out, eat it!',
+                 'Frag going in, fuckers!', 'Catch this, frag out!'],
+}
+BANTER_X = ["[deadpan] I was told this would be a shit show. I was not told I'd be running it.",
+            "[completely serious] Whatever happens, don't fuck it up. That's the whole briefing.",
+            '[deadpan] My therapist said I should swear less. My therapist has never been here.',
+            '[completely serious] Stay frosty. Or at least be less shit than last time.',
+            "[deadpan] The plan is simple. Go in, shoot the bad guys, don't get fucking shot.",
+            "[completely serious] If you die, I'm keeping your shit.",
+            '[deadpan] Well. This is a hell of a way to spend a Tuesday.',
+            '[completely serious] Nobody panic. Panic later. On your own damn time.',
+            "[deadpan] I didn't get out of bed for this shit. Actually, I did.",
+            '[completely serious] We are going to kick their ass. Politely. Then very rudely.',
+            '[deadpan] Command says morale is high. Command can kiss my ass.',
+            "[completely serious] Check your corners. Last guy didn't. He's a fucking statistic now.",
+            "[deadpan] I've got a bad feeling about this. I've also got a gun, so, fuck it.",
+            '[completely serious] Remember your training. Or just shoot the bastards. Either works.',
+            '[deadpan] Hell of a day for it.',
+            '[completely serious] If anyone asks, this was always the fucking plan.',
+            "[deadpan] I'm not saying we're screwed. I'm saying I've stopped counting.",
+            "[completely serious] Rule one. Don't shoot me. Rule two. See rule one, damn it.",
+            '[deadpan] They gave us the shit map again. Lovely.',
+            '[completely serious] Keep your head down and your mouth shut. Mostly the damn mouth.',
+            '[deadpan] I asked for backup. They sent me you sorry bastards.',
+            '[completely serious] Today we make history. Or a hell of a mess.',
+            '[deadpan] Did somebody bring snacks? No? Then what the hell are we doing.',
+            "[completely serious] Let's go to work. And try not to fuck up the paint.",
+            '[deadpan] The enemy is well armed, well trained, and extremely pissed off. So are we, mostly.',
+            '[completely serious] I want this clean. Clean as hell.',
+            "[deadpan] Good news, we've got them surrounded. Bad news, shit, it's from the inside.",
+            "[completely serious] If I go down, tell my mother I said a lot of bad words. She'll understand.",
+            "[deadpan] I was promised a parade. Where's my damn parade.",
+            '[completely serious] Nobody touch anything. Especially the shit that ticks.',
+            '[deadpan] Last time we did this, it went to hell in four seconds. New record to beat.',
+            "[completely serious] Move like you mean it. Shoot like you're pissed.",
+            "[deadpan] I'm getting too old for this shit. And I'm the youngest one here.",
+            '[completely serious] Whatever you hear on the radio, ignore it. Except me, damn it.',
+            "[deadpan] We're the best they've got. That's a terrifying fucking sentence.",
+            "[completely serious] Alright, everybody. Let's go ruin somebody's God damn day."]
+for v, (name, voice) in enumerate(SQUAD.items()):
+    for kind, pool in CHATTER_X.items():
+        for k in range(2):
+            add(f'vo/chatter/{name}/x_{kind}_{k + 1}', voice, f'{KIND[kind]} {pool[(v * 2 + k * 5) % len(pool)]}')
+    for k in range(2):
+        add(f'vo/chatter/{name}/x_banter_{k + 1}', voice, BANTER_X[v * 2 + k])
+
 
 # ---------- making and checking ----------
 def synth(key, region, voice, body):
@@ -549,7 +619,8 @@ def finish(path):
 
 SAME = {'1': 'one', '2': 'two', '3': 'three', '4': 'four', '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine', '10': 'ten',
         '11': 'eleven', '12': 'twelve', '13': 'thirteen', '14': 'fourteen', '15': 'fifteen', '20': 'twenty', '60': 'sixty', 'ok': 'okay',
-        'killstreak': 'kill streak', 'overtime': 'over time', 'diffused': 'defused', 'diffuse': 'defuse', 'gonna': 'going to', 'wanna': 'want to', 'hooah': 'hoo ah', 'kaboom': 'ka boom'}
+        'killstreak': 'kill streak', 'overtime': 'over time', 'diffused': 'defused', 'diffuse': 'defuse', 'gonna': 'going to', 'wanna': 'want to', 'hooah': 'hoo ah', 'kaboom': 'ka boom',
+        'goddamn': 'god damn', 'goddamned': 'god damned', 'shitshow': 'shit show', 'motherfuckers': 'mother fuckers'}
 
 
 def words(s):
@@ -562,7 +633,7 @@ def heard(key, region, path):
     # speech-to-text drops the first word of a clip with no lead-in: give it 0.6 s of silence either side
     wav = subprocess.run(['ffmpeg', '-loglevel', 'error', '-i', path, '-af', 'adelay=600,apad=pad_dur=0.6', '-ar', '16000', '-ac', '1', '-f', 'wav', '-'],
                          capture_output=True).stdout
-    req = urllib.request.Request(f'https://{region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=simple',
+    req = urllib.request.Request(f'https://{region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=simple&profanity=raw',
                                  data=wav, headers={'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000'})
     for attempt in range(6):
         try:

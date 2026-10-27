@@ -129,9 +129,9 @@ const bindings = [
   ['opt-quality', 'quality', 'str'], ['opt-gfxres', 'gfxRes', 'int'], ['opt-gfxshadows', 'gfxShadows', 'str'], ['opt-gfxsoft', 'gfxSoftShadows', 'bool'], ['opt-gfxrate', 'gfxShadowRate', 'str'],
   ['opt-gfxao', 'gfxAO', 'bool'], ['opt-gfxbloom', 'gfxBloom', 'bool'], ['opt-gfxaa', 'gfxAA', 'bool'], ['opt-gfxlights', 'gfxLights', 'bool'], ['opt-gfxaniso', 'gfxAniso', 'str'], ['opt-gfxdust', 'gfxDust', 'str'], ['opt-gfxpath', 'gfxPath', 'str'], ['opt-gfxmsaa', 'gfxMsaa', 'str'], ['opt-fsr', 'fsr', 'str'], ['opt-fsrsharp', 'fsrSharp', 'int'], ['opt-gfxdetail', 'gfxDetail', 'str'], ['opt-fpscap', 'fpsCap', 'int'], ['opt-menubg', 'menuBg', 'str'],
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
-  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
+  ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-cammotion', 'cameraMotion', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-matchmusic', 'matchMusic', 'str'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-matchmusic', 'matchMusic', 'str'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-explicit', 'explicit', 'bool'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
 ];
 const outputs = {
   'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
@@ -193,7 +193,7 @@ let optBase = optState();
 const optDirty = () => optState() !== optBase;
 function syncApplyBar() { $('opt-apply').hidden = !optDirty(); }
 // options that take effect mid-match (the match keeps its own copy of the settings)
-const LIVE_KEYS = ['vmFov', 'sensitivity', 'padSensitivity', 'fov', 'invertY', 'aimAssist', 'showFps', 'adsZoom', 'sightSize', 'adsSens', 'autoSprint', 'adsMode', 'padDeadzone', 'vibration'];
+const LIVE_KEYS = ['vmFov', 'sensitivity', 'padSensitivity', 'fov', 'invertY', 'aimAssist', 'showFps', 'adsZoom', 'sightSize', 'adsSens', 'autoSprint', 'adsMode', 'padDeadzone', 'vibration', 'cameraMotion'];
 function syncLive() { if (game.settings) for (const k of LIVE_KEYS) if (settings[k] !== undefined) game.settings[k] = settings[k]; }
 // Reset tab to defaults: puts this tab's options back to their defaults, staged like any change (Apply / X)
 $('opt-reset').addEventListener('click', () => {
@@ -209,6 +209,8 @@ $('opt-reset').addEventListener('click', () => {
 function applyOptions() {
   if (!optDirty()) return;
   saveSettings(settings);
+  // signed in, explicit language is kept with the account (any device), not just this browser
+  if (account.signedIn && account.user && account.user.explicit !== !!settings.explicit) account.setExplicit(settings.explicit).catch(() => game.hud.toast('COULDN\'T SAVE TO YOUR ACCOUNT: SAVED ON THIS DEVICE'));
   applyTheme();
   game.applySettings(settings);
   syncLive();
@@ -926,6 +928,8 @@ const OPT_DESC = {
   'opt-sens': 'How fast the view turns with the mouse.',
   'opt-invert': 'Moving the mouse or stick up looks down.',
   'opt-adssens': 'How fast the view turns while aiming down sights, compared with the hip (mouse and stick). Lower it for steadier long-range aim.',
+  'opt-cammotion': 'Full: the view bobs with your stride, sways foot to foot, leans into strafes and dips on landings. Reduced: much less of all of it, for anyone it makes queasy.',
+  'opt-explicit': 'Operators swear in the heat of the fight, about half the time. Off: clean callouts only. Signed in, the choice is kept with your account on every device.',
   'opt-autosprint': 'Sprint automatically whenever you push fully forward. Aiming, firing or crouching stops it; tactical sprint still works.',
   'opt-padsens': 'How fast the view turns with the right stick.',
   'opt-deadzone': 'Ignores small stick movements so the view doesn\'t drift. Raise it if your controller drifts.',
@@ -2189,6 +2193,12 @@ function syncAccount() {
   const u = account.signedIn ? account.user : null;
   // one name everywhere: once you have a Name Tag, offline matches use it too
   if (u && u.tag && settings.name !== u.tag) { settings.name = u.tag; saveSettings(settings); }
+  // the account's explicit-language choice wins over this device's (it follows you everywhere)
+  if (u && typeof u.explicit === 'boolean' && settings.explicit !== u.explicit) {
+    settings.explicit = u.explicit; saveSettings(settings); game.applySettings(settings);
+    $('opt-explicit').checked = u.explicit;
+    const b = JSON.parse(optBase); b.explicit = u.explicit; optBase = JSON.stringify(b);   // (not an unapplied change)
+  }
   document.body.classList.toggle('has-account', !!u);
   $('acct-email').textContent = u ? u.email : '';
   $('title-acct').textContent = u && u.tag ? `Signed in as ${u.tag}` : '';
@@ -2302,7 +2312,11 @@ async function siName() {
   const name = $('si-name-in').value.trim();
   siBusy(true);
   siStatus('<span class="spin"></span>Saving…');
-  try { await account.setTag(name); siBusy(false); signedIn(); }
+  try {
+    await account.setTag(name);
+    if (account.user.explicit === null) await account.setExplicit($('si-explicit').checked).catch(() => {});   // chosen once, with the account
+    siBusy(false); signedIn();
+  }
   catch (e) { siBusy(false); siStatus(esc(e.message), 'bad'); }
 }
 // 6-digit code from the email (works on any device: the email can be on your phone)

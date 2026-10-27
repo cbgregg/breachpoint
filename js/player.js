@@ -15,7 +15,7 @@ const sm5 = (t) => { t = clamp(t, 0, 1); return t * t * t * (t * (t * 6 - 15) + 
 // is blended to as a whole (it used to be added on top of the normal sprint, which left every gun standing
 // straight up in the middle of the screen with the hand out of sight)
 const TAC_POSE = {
-  long: { p: [0.25, -0.25, -0.33], r: [1.2, 0.1, 0.06] },   // near upright, off to the right: the middle of the screen stays clear
+  long: { p: [0.245, -0.16, -0.25], r: [1.42, 0.3, 0.02] },   // MW: stood up close against the right edge, side-on, muzzle off the top
   pistol: { p: [0.17, -0.13, -0.3], r: [1.15, 0.08, 0.04] },
   launcher: { p: [0.26, -0.26, -0.12], r: [0.25, 0.35, -0.1] },   // tube on the shoulder, out of the way
 };
@@ -319,7 +319,14 @@ export class PlayerController {
     // the exact command that produced this frame's movement (sent to the host when playing online)
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
     this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, tac: tac ? 1 : 0, cr: c.wantCrouch ? 1 : 0, pr: c.wantProne ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };
-    if (!this.wasGround && c.onGround) this.landDip = 1;
+    // landing: the harder you come down, the deeper the dip and the bigger the jolt through the gun
+    if (!c.onGround) this.fallV = Math.min(this.fallV || 0, c.vel.y);
+    if (!this.wasGround && c.onGround) {
+      const k = clamp(-(this.fallV || 0) / 7, 0.45, 1.5);
+      this.landDip = k; this.fallV = 0;
+      if (this.jolt) { this.jolt.vy -= 0.35 * k; this.jolt.vr += 1.2 * k; }
+    }
+    if (this.wasGround && !c.onGround && c.vel.y > 0 && this.jolt) { this.jolt.vy -= 0.18; this.jolt.vr -= 0.6; }   // pushing off: the gun sinks then lifts
     this.wasGround = c.onGround;
 
     // ---- weapons ----
@@ -506,20 +513,24 @@ export class PlayerController {
     const c = this.c, cam = this.camera, s = this.game.settings;
     const hs = Math.hypot(c.vel.x, c.vel.z);
     if (c.onGround && c.slideT <= 0) this.bobT += hs * dt * 1.55;
-    const bobAmt = Math.min(1, hs / 6) * (1 - 0.85 * c.adsT);
-    this.landDip = Math.max(0, this.landDip - dt * 4);
+    const cm = s.cameraMotion === 'reduced' ? 0.4 : 1;   // Options > Controls: less of it for anyone it makes queasy
+    const bobAmt = Math.min(1.35, hs / 6) * (1 - 0.85 * c.adsT) * cm;
+    this.landDip = Math.max(0, this.landDip - dt * 3.2);
     c.eyePos(cam.position);
     if (c.stepOff) cam.position.y += c.stepOff; // stairs: ease the eye over each step
     if (this.correction) { cam.position.add(this.correction); this.correction.multiplyScalar(Math.max(0, 1 - dt * 12)); }
-    cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.03 * bobAmt - Math.sin(this.landDip * Math.PI) * 0.07;
+    const dip = Math.sin(Math.min(1, this.landDip) * Math.PI) * Math.max(1, this.landDip);
+    cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.045 * bobAmt - dip * 0.1 * cm;
+    _a.set(Math.cos(c.yaw), 0, -Math.sin(c.yaw)); cam.position.addScaledVector(_a, Math.sin(this.bobT) * 0.018 * bobAmt);   // weight moving foot to foot
     this.shake = Math.max(0, this.shake - dt * 4);
     const sh = this.shake * this.shake * 0.018 * (1 - 0.8 * c.adsT);   // aimed: the view barely jitters, so the reticle stays on the target
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     // the head leans a touch into a strafe (smoothed; much less aimed in), and sways side to side with the steps
     const strafe = (c.vel.x * Math.cos(c.yaw) - c.vel.z * Math.sin(c.yaw)) / PLAYER.sprint;
-    this.camLean = lerp(this.camLean || 0, -strafe * 0.011 * (1 - 0.7 * c.adsT), Math.min(1, dt * 6));
+    this.camLean = lerp(this.camLean || 0, -strafe * 0.024 * cm * (1 - 0.7 * c.adsT), Math.min(1, dt * 6));
     cam.rotation.order = 'YXZ';
-    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.007 * bobAmt + slideRoll + this.camLean);
+    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.014 * bobAmt + slideRoll * cm + this.camLean);
+    cam.rotation.x += (Math.abs(Math.cos(this.bobT)) - 0.5) * 0.008 * bobAmt - dip * 0.025 * cm;   // the head nods with each step and with a landing
     this.tacK = lerp(this.tacK || 0, c.tacSprinting ? 1 : 0, Math.min(1, dt * 8));
     // sprint widens the view a little, eased in and out over about half a second (never a snap)
     const sprintGoal = c.sprinting ? 1 : 0;
@@ -582,13 +593,13 @@ export class PlayerController {
     // look sway on a spring (the gun has weight): it trails a turn, overshoots a touch when you stop, settles
     const SW = this.swS || (this.swS = { x: 0, y: 0, vx: 0, vy: 0 });
     const sdt = Math.min(dt, 0.04);
-    SW.vx += ((clamp(-mdx * 0.0006, -0.035, 0.035) - SW.x) * 150 - SW.vx * 13) * sdt; SW.x += SW.vx * sdt;
-    SW.vy += ((clamp(mdy * 0.0006, -0.035, 0.035) - SW.y) * 150 - SW.vy * 13) * sdt; SW.y += SW.vy * sdt;
+    SW.vx += ((clamp(-mdx * 0.0009, -0.05, 0.05) - SW.x) * 140 - SW.vx * 11) * sdt; SW.x += SW.vx * sdt;
+    SW.vy += ((clamp(mdy * 0.0009, -0.05, 0.05) - SW.y) * 140 - SW.vy * 11) * sdt; SW.y += SW.vy * sdt;
     this.swayX = SW.x; this.swayY = SW.y;
     const hs = Math.hypot(c.vel.x, c.vel.z);
     const a = c.adsT;
     const ae = a * a * (3 - 2 * a);
-    const bobAmt = Math.min(1, hs / 6) * (1 - 0.9 * a) * (c.onGround ? 1 : 0.2) * (c.slideT > 0 ? 0 : 1);
+    const bobAmt = Math.min(1.35, hs / 6) * (1 - 0.9 * a) * (c.onGround ? 1 : 0.2) * (c.slideT > 0 ? 0 : 1);
     const rp = w.reloadProgress;
     const sw = c.switchT > 0 ? sm5(c.switchT / 0.4) : 0;
     const gren0 = c.grenadeCd > 0 ? Math.sin(clamp(c.grenadeCd / (c.throwDur || 0.9), 0, 1) * Math.PI) : 0;   // (a knife's throw is quicker: the swing used to start halfway, a jump)
@@ -624,7 +635,7 @@ export class PlayerController {
       if (e && hit(0.84)) { J.vz += 0.28; J.vr += 1.2; J.vy -= 0.08; }  // charging handle / slide released
     }
     J.prevRp = w.reloading ? rp : 0;
-    const bx = Math.sin(this.bobT) * 0.01 * bobAmt, by = -Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;
+    const bx = Math.sin(this.bobT) * 0.016 * bobAmt, by = -Math.abs(Math.cos(this.bobT)) * 0.02 * bobAmt;
 
     h.position.set(
       // reload: the gun comes up and in, canted so you see the hands work the magazine (CoD style)
@@ -647,15 +658,16 @@ export class PlayerController {
       MV.fv += ((vF - MV.f) * 55 - MV.fv * 9) * mdt; MV.f += MV.fv * mdt;
       MV.sv += ((vS - MV.s) * 55 - MV.sv * 9) * mdt; MV.s += MV.sv * mdt;
       const lagF = vF - MV.f, lagS = vS - MV.s, mw = 1 - ae * 0.75, vy = clamp(c.vel.y, -8, 8);
-      h.position.x += (-vS * 0.012 - lagS * 0.022) * mw;
-      h.position.y += -Math.abs(lagF) * 0.006 * mw - vy * 0.0025 * mw;
-      h.position.z += lagF * 0.032 * mw;
-      h.rotation.x += (lagF * 0.045 + vy * 0.004) * mw;
-      h.rotation.y += lagS * 0.03 * mw;
-      h.rotation.z += (-vS * 0.065 - lagS * 0.09) * mw;   // leans into a strafe
+      h.position.x += (-vS * 0.018 - lagS * 0.036) * mw;
+      h.position.y += -Math.abs(lagF) * 0.01 * mw - vy * 0.004 * mw;
+      h.position.z += lagF * 0.05 * mw;
+      h.rotation.x += (lagF * 0.07 + vy * 0.007) * mw;
+      h.rotation.y += lagS * 0.05 * mw;
+      h.rotation.z += (-vS * 0.1 - lagS * 0.14) * mw;   // leans into a strafe
       // walking: a figure-eight of roll and pitch with each step, on top of the bob
-      h.rotation.z += Math.sin(this.bobT) * 0.014 * bobAmt;
-      h.rotation.x += (Math.abs(Math.cos(this.bobT)) - 0.5) * 0.012 * bobAmt;
+      h.rotation.z += Math.sin(this.bobT) * 0.026 * bobAmt;
+      h.rotation.x += (Math.abs(Math.cos(this.bobT)) - 0.5) * 0.022 * bobAmt;
+      h.rotation.y += Math.sin(this.bobT) * 0.012 * bobAmt;
       // crouching / standing: the gun dips and comes back with the body; aiming in: a small settle at the end
       J.vy -= (c.crouchT - MV.cr) * 1.3; MV.cr = c.crouchT;
       if (MV.ae < 0.9 && ae >= 0.9) { J.vy -= 0.05; J.vr += 0.22; }

@@ -185,6 +185,7 @@ export class Game {
     this.announcerSetting = s.announcer || 'random';
     this.musicMode = ['finale', 'off', 'always'].includes(s.matchMusic) ? s.matchMusic : 'finale';
     this.operatorVoice = VOICES.includes(s.voice) ? s.voice : null;
+    this.explicit = !!s.explicit;
     if (!this.announcerPack || (this.announcerSetting !== 'random' && this.announcerPack !== this.announcerSetting)) this.pickAnnouncer();
     this.renderer.timing = !!s.showFps;   // GPU timing only while the performance readout is shown
     const q = qualityFrom(s), qk = JSON.stringify(q);
@@ -1404,7 +1405,9 @@ export class Game {
     if (!urgent && t - (this.calloutT ?? -99) < 7) return 0;
     this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
-    const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, ui = me || radio;
+    // explicit language on: about half the time, the version with the swearing (where that line has one)
+    const base = `vo/chatter/${c.voice}/`, x = this.explicit && Math.random() < 0.5 && this.audio.samples.has(`${base}x_${kind}`);
+    const id = c.infected ? `vo/infected/${kind}` : base + (x ? 'x_' : '') + kind, ui = me || radio;
     const say = () => (c.alive ? this.audio.play('vo', ui ? null : c.pos, { id, ui, radio, vol: me ? 0.5 : radio ? 0.42 : 0.85 }) || 0 : 0);
     // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
     if (c.infected || !this.audio.manifest || this.audio.samples.has(id)) return say() || 2.5;

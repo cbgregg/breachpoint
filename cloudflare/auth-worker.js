@@ -79,6 +79,7 @@ export default {
         case '/me': return await withUser(ctx, async (u) => json({ user: await self(env, u) }, 200, cors));
         case '/name': return await withUser(ctx, (u) => setTag(ctx, u));
         case '/display': return await withUser(ctx, (u) => setDisplay(ctx, u));
+        case '/prefs': return await withUser(ctx, (u) => setPrefs(ctx, u));
         case '/ticket': return await withUser(ctx, (u) => ticket(ctx, u));
         case '/presence': return await withUser(ctx, (u) => presence(ctx, u));
         case '/friends': return await withUser(ctx, (u) => friends(ctx, u));
@@ -203,6 +204,7 @@ async function self(env, u) {
   return {
     id: u.id, tag: u.tag || null, disp: u.disp || '', code: fmtCode(u.code), email: maskEmail(u.email), terms: u.terms || '',
     hist: (u.hist || []).map(h => h.t), nextTagAt: u.tag && u.tagAt ? u.tagAt + TAG_EVERY : 0,
+    explicit: u.explicit === undefined ? null : !!u.explicit,   // null: never chosen
   };
 }
 
@@ -240,6 +242,13 @@ async function setDisplay({ env, body, cors }, user) {
   if (d && !/^[\p{L}\p{N} _\-.'’]{1,24}$/u.test(d)) return json({ error: 'Display names are up to 24 letters, numbers, spaces and - _ . \'' }, 400, cors);
   if (d && isOffensive(d)) return json({ error: 'Pick a different display name.' }, 400, cors);
   user.disp = d;
+  await saveUser(env, user);
+  return json({ user: await self(env, user) }, 200, cors);
+}
+
+// your own preferences, kept with the account so they follow you to any device
+async function setPrefs({ env, body, cors }, user) {
+  if (typeof body.explicit === 'boolean') user.explicit = body.explicit;
   await saveUser(env, user);
   return json({ user: await self(env, user) }, 200, cors);
 }
