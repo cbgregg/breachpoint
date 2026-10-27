@@ -15,8 +15,8 @@ const sm5 = (t) => { t = clamp(t, 0, 1); return t * t * t * (t * (t * 6 - 15) + 
 // is blended to as a whole (it used to be added on top of the normal sprint, which left every gun standing
 // straight up in the middle of the screen with the hand out of sight)
 const TAC_POSE = {
-  long: { p: [0.17, -0.2, -0.32], r: [0.8, 0.35, -0.4] },
-  pistol: { p: [0.13, -0.11, -0.3], r: [1.05, 0.15, -0.15] },
+  long: { p: [0.25, -0.25, -0.33], r: [1.2, 0.1, 0.06] },   // near upright, off to the right: the middle of the screen stays clear
+  pistol: { p: [0.17, -0.13, -0.3], r: [1.15, 0.08, 0.04] },
   launcher: { p: [0.26, -0.26, -0.12], r: [0.25, 0.35, -0.1] },   // tube on the shoulder, out of the way
 };
 const _tacP = new THREE.Vector3(), _tacQ = new THREE.Quaternion(), _tacE = new THREE.Euler();
