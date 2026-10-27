@@ -189,8 +189,17 @@ export class GameAudio {
     src.buffer = bufs[i];
     src.playbackRate.value = (opts.rate || 1) * (opts.vary === false ? 1 : 0.97 + Math.random() * 0.06);
     const g = ctx.createGain(); g.gain.value = opts.vol ?? 1;
-    src.connect(g).connect(this.out(sp.gain, sp.pan, sp.dist, opts.wet ?? 0.25, opts.muffle));
-    src.start(ctx.currentTime + (opts.delay || 0));
+    const dest = this.out(sp.gain, sp.pan, sp.dist, opts.wet ?? 0.25, opts.muffle), t = ctx.currentTime + (opts.delay || 0);
+    if (opts.radio) {
+      // over the squad radio: a thin band, a little grit, a squelch either side
+      const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), sh = ctx.createWaveShaper();
+      hp.type = 'highpass'; hp.frequency.value = 420; lp.type = 'lowpass'; lp.frequency.value = 3000;
+      sh.curve = this.radioCurve || (this.radioCurve = Float32Array.from({ length: 256 }, (_, i) => Math.tanh(2.2 * (i / 127.5 - 1)) / Math.tanh(2.2)));
+      src.connect(hp).connect(sh).connect(lp).connect(g).connect(dest);
+      this.noiseBurst(dest, t, { type: 'bandpass', freq: 2400, q: 1.5, decay: 0.05, gain: 0.05 });
+      this.noiseBurst(dest, t + src.buffer.duration, { type: 'bandpass', freq: 1800, q: 1.5, decay: 0.08, gain: 0.04 });
+    } else src.connect(g).connect(dest);
+    src.start(t);
     return src.buffer.duration;
   }
 

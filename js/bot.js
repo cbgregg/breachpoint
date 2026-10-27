@@ -112,7 +112,7 @@ export class BotBrain {
     }
     if (best) {
       if (best !== this.target || !this.visible) {
-        if (!this.visible && g.time - this.lastKnownT > 4) g.callout(this.bot, 'contact', 0.6);   // a fresh sighting: "contact!"
+        if (!this.visible && g.time - this.lastKnownT > 4) g.callout(this.bot, 'contact', 0.3);   // a fresh sighting: "contact!"
         this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible || g.time - this.lastKnownT < 1.5 ? 0.5 : 1);
         this.seenT = 0;
         this.newAimError(best);

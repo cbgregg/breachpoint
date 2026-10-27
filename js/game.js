@@ -14,7 +14,10 @@ const INF_LOADOUT = soloLoadout('blade');   // Infected: a combat knife in both 
 import { BotBrain } from './bot.js';
 // the five announcers and the twelve operator voices (recorded by tools/gen_voice.py: the same keys there)
 export const ANNOUNCERS = ['control', 'sable', 'ghost', 'warden', 'echo'];
-export const VOICES = ['sarah', 'harry', 'laura', 'liam', 'allison', 'charlie', 'piper', 'callum', 'hope', 'aiden', 'samantha', 'chris'];
+export const VOICES = ['sarah', 'harry', 'laura', 'liam', 'allison', 'charlie', 'piper', 'callum', 'hope', 'aiden', 'samantha', 'chris',
+  'brian', 'roger', 'eric', 'daniel', 'mark', 'harrison'];
+const ANNOUNCE_QUIET = new Set(['double_kill', 'killstreak', 'new_weapon']);
+const RADIO_KINDS = new Set(['contact', 'man_down', 'last_alive', 'planting', 'defusing', 'banter']);   // what your squad radios in from afar
 const nameHash = (n) => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 import { PROPS } from './props.js';
 import { PlayerController } from './player.js';
@@ -326,6 +329,7 @@ export class Game {
     // the countdown, the announcer naming the mode and the squad's banter all wait for everyone to be in (tryIntro)
     this.matchToken = (this.matchToken || 0) + 1;
     this.introHold = true; this.introHoldT = 0; this.introLocal = false;
+    this.calloutT = undefined; this.walkBySaid = undefined; this.leadSaidT = undefined;
     this.music.warm(this.inf ? 'infected' : 'action');   // (the match's music, fetched while it loads and counts down)
     this.hud.reset();
     this.hud.show(true);
@@ -1355,7 +1359,10 @@ export class Game {
   // announcer lines are named after the banner or medal they go with: 'DOUBLE KILL' -> vo/announcer/double_kill
   announce(what) {
     const id = String(what).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    if (!id) return;
+    // the small stuff (a double, a three-kill streak, every gun in Gun Game) is a medal on screen, no voice: the
+    // announcer is kept for moments that matter, and the lead changing hands is said at most once a minute
+    if (!id || ANNOUNCE_QUIET.has(id)) return;
+    if (id === 'lead_taken' || id === 'lead_lost') { if (this.time - (this.leadSaidT ?? -99) < 60) return; this.leadSaidT = this.time; }
     const pack = `vo/announcer/${this.matchAnnouncer || this.announcerPack}/`, play = () => this.audio.play('vo', null, { id: pack + id, ui: true, announcer: true });
     // (an announcer still loading, a match started straight after the last: wait a moment for it rather than skip the line)
     if (!this.audio.manifest || this.audio.samples.has(pack + id)) play();
@@ -1378,19 +1385,27 @@ export class Game {
       this.audio.want(`vo/chatter/${c.voice}/`);
     }
   }
-  // a character's callout (reloading, frag out, contact...), heard from where they are: not too often from
-  // anyone, and not on top of each other
+  // a character's callout (reloading, frag out, contact...), kept the way Black Ops does it: rare, short and worth
+  // hearing. Your squad comes over the radio (in person when they're beside you), the other side only when they're
+  // close enough to give themselves away, you yourself only throwing something, and one line at a time: after one,
+  // nobody else chimes in for a while unless it's urgent (a grenade at someone's feet, a plant, the last one alive).
   // Returns about how long the line runs (0 if nothing was said), so banter can wait for it.
   callout(c, kind, chance = 1, remote = false, urgent = false) {
     if (!c || !c.alive || Math.random() > chance) return 0;
-    const t = this.time;
-    // (urgent ones, a grenade at someone's feet or the last one alive, only wait for that character)
-    if (!remote && (t - (c.calloutT ?? -9) < (urgent ? 1.2 : 3.5) || (!urgent && t - (this.calloutT ?? -9) < 1.2))) return 0;
-    c.calloutT = t; this.calloutT = t;
+    const t = this.time, me = c === this.player, p = this.player;
+    if (me && !kind.endsWith('_out') && kind !== 'reloading') return 0;
+    if (!remote && t - (c.calloutT ?? -99) < (urgent ? 1.2 : 8)) return 0;
+    if (!remote) c.calloutT = t;
+    if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);   // (everyone online decides for themselves what reaches them)
+    // what reaches you, and how
+    const mate = !me && p && !this.ffa && !c.infected && c.team === p.team, dist = p ? c.pos.distanceTo(p.pos) : 0;
+    const radio = mate && dist > 6;
+    if (!me && !c.infected && dist > 15 && !(radio && RADIO_KINDS.has(kind))) return 0;   // (a throw or a reload across the map is no use to you)
+    if (!urgent && t - (this.calloutT ?? -99) < 7) return 0;
+    this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
-    const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, me = c === this.player;
-    const say = () => (c.alive ? this.audio.play('vo', me ? null : c.pos, { id, ui: me, vol: me ? 0.55 : 1 }) || 0 : 0);
-    if (!remote && this.mode === 'host') this.emit(['co', c.id, kind]);
+    const id = c.infected ? `vo/infected/${kind}` : `vo/chatter/${c.voice}/${kind}`, ui = me || radio;
+    const say = () => (c.alive ? this.audio.play('vo', ui ? null : c.pos, { id, ui, radio, vol: me ? 0.5 : radio ? 0.42 : 0.85 }) || 0 : 0);
     // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
     if (c.infected || !this.audio.manifest || this.audio.samples.has(id)) return say() || 2.5;
     const t0 = performance.now(); this.audio.want(`vo/chatter/${c.voice}/`).then(() => { if (performance.now() - t0 < 1500) say(); });
@@ -1424,11 +1439,11 @@ export class Game {
     const p = this.player;
     if (this.walkByT > 0 || !p || !p.alive || this.frozen || this.ffa || this.mode === 'guest') return;
     this.walkByT = 0.5;
-    if (this.time - (this.walkBySaid ?? -99) < 25 || this.time - p.lastFireT < 6) return;
+    if (this.walkBySaid !== undefined || this.time - p.lastFireT < 6) return;   // (once a match at most: a surprise, not a habit)
     for (const c of this.characters) {
       if (!c.isBot || !c.alive || c.team !== p.team || c.pos.distanceTo(p.pos) > 4.5 || this.time - c.lastFireT < 6 || this.time - (c.walkByT ?? -99) < 60) continue;
       c.walkByT = this.time;   // (each teammate gets one roll a minute, so standing next to one isn't a jukebox)
-      if (Math.random() < 0.2 && this.callout(c, 'banter')) this.walkBySaid = this.time;
+      if (Math.random() < 0.15 && this.callout(c, 'banter')) this.walkBySaid = this.time;
       return;
     }
   }
@@ -1494,12 +1509,12 @@ export class Game {
     }
     if (this.inf) this.infectedKill(killer, victim);
     // chatter: the killer calls it, a teammate of the fallen nearby calls that
-    if (enemyKill && killer && killer.isBot) this.callout(killer, 'enemy_down', 0.35);
+    if (enemyKill && killer && killer.isBot) this.callout(killer, 'enemy_down', 0.15);
     if (!this.ffa) {
       // round modes: the last one left on a team says so; otherwise a teammate nearby calls the loss
       const left = this.gm ? this.characters.filter(c => c.alive && c !== victim && c.team === victim.team) : [];
       if (left.length === 1 && left[0].isBot) this.callout(left[0], 'last_alive', 0.9, false, true);
-      else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.5); }
+      else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.4); }
     }
     // Team Deathmatch: the lead changing hands
     if (!this.gm && !this.ffa && !this.inf && enemyKill && this.player) {

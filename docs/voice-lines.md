@@ -2,7 +2,7 @@
 
 Everything the game can play from a recording. Nothing here is required: until a file exists the game stays silent for a voice line and uses its own synthesized sound for an effect. Each recording you add is picked up on the next page load.
 
-**Every voice line is already generated**: 1,170 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[urgent, shaken]`, `[deadpan]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
+**Every voice line is already generated**: 1,452 of them, made by `tools/gen_voice.py`, which holds the exact wording and acting direction of every take. The announcers and operators are ElevenLabs voices: each line has an acting tag in front (`[shouting]`, `[urgent, shaken]`, `[deadpan]`...) that sets the delivery and isn't spoken. The Link announcements are Azure HD voices, calm and unhurried like Sound Transit's. Long pauses inside a line are cut to about 0.2 s. Each clip is transcribed back with speech-to-text and re-made until the transcript matches the script, and every voice is brought to the same loudness. To regenerate: `ELEVENLABS_API_KEY=<key> AZURE_SPEECH_KEY=<key> python3 tools/gen_voice.py --force` (or `--only vo/announcer/sable` for one part). The keys are read from the environment only; never commit them. ElevenLabs needs a paid plan (library voices, enough credits, commercial use). A real recording saved over a generated file replaces it.
 
 ---
 
@@ -61,7 +61,17 @@ In the style of Sound Transit's recorded announcements: a warm, neutral, unhurri
 
 ## 3. Operators (`vo/chatter/<voice>/...`)
 
-Twelve operator voices, six women and six men: `sarah`, `laura`, `allison`, `piper`, `hope`, `samantha`, `harry`, `liam`, `charlie`, `callum`, `aiden`, `chris`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (sixty in all). Callouts are short and military; each is acted for its moment (grenades shouted, a teammate down urgent, a hit strained). Banter is the one place for humour: dry and deadpan, delivered completely straight, Airplane! rather than a sitcom ("[deadpan] I'm not saying we're outnumbered. I'm saying there's more of them.").
+Eighteen operator voices, six women and twelve men: `sarah`, `laura`, `allison`, `piper`, `hope`, `samantha`, `harry`, `liam`, `charlie`, `callum`, `aiden`, `chris`, `brian`, `roger`, `eric`, `daniel`, `mark`, `harrison`. Every character keeps one voice for the whole match, and no two share one while there are voices to go round (handed out by name, so everyone online hears the same bot with the same voice). Your own operator's voice is under Options > Audio. Each voice has three takes of every callout, drawn from a pool of twelve per callout so different operators say different things, and five banter lines of its own (ninety in all). Callouts are short and military; each is acted for its moment (grenades shouted, a teammate down urgent, a hit strained). Banter is the one place for humour: dry and deadpan, delivered completely straight, Airplane! rather than a sitcom ("[deadpan] I'm not saying we're outnumbered. I'm saying there's more of them.").
+
+How often they talk follows Black Ops: rarely, and only when it tells you something.
+
+- **One line at a time.** After a line reaches you, nothing else is said for 7 s unless it's urgent (a grenade at someone's feet, planting or defusing, the last one alive). Each character waits 8 s between lines.
+- **Your squad comes over the radio** for what helps from afar (contact, man down, last alive, planting, defusing, the pre-match banter): thin, a little gritty, with a squelch either side, and quieter than the fight. Their throws and reloads you only hear in person, within 15 m; a teammate within 6 m is always heard in person.
+- **The other side only when close**: enemy callouts reach you within 15 m, as a clue that someone is near.
+- **You** only call your throws, and now and then a reload.
+- **Rates**: contact 30%, reloading 15%, enemy down 15%, man down 40%, hit 10%; throws 90%.
+- **Banter**: up to three squad lines over the countdown, and at most one walk-by line a match.
+- **The announcer** stays quiet for a double kill, a three-kill streak and each new Gun Game weapon (the medal still shows), and calls the lead changing hands at most once a minute.
 
 | id | When |
 |---|---|

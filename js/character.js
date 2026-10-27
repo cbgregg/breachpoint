@@ -443,7 +443,7 @@ export class Character {
     if (this.meleeT > 0) return;
     if (this.weapon.startReload()) {
       this.game.audio.play('reload', this.spos, { duration: this.weapon.reloadTotal, weapon: this.weapon.id });
-      if (this.weapon.mag <= this.weapon.def.mag * 0.3 && this.weapon.def.mag >= 5) this.game.callout(this, 'reloading', this.isBot ? 0.5 : 0.8);
+      if (this.weapon.mag <= this.weapon.def.mag * 0.3 && this.weapon.def.mag >= 5) this.game.callout(this, 'reloading', this.isBot ? 0.15 : 0.2);
     }
   }
 
@@ -540,7 +540,7 @@ export class Character {
     if (this.health <= 0) {
       this.health = 0;
       this.game.onKill(attacker, this, weaponId, headshot);
-    } else if (this.isBot && amount >= 20 && this.health < 55) this.game.callout(this, 'hit', 0.35);   // "I'm hit!"
+    } else if (this.isBot && amount >= 20 && this.health < 55) this.game.callout(this, 'hit', 0.1);   // "I'm hit!"
   }
 
   updateCommon(dt) {
