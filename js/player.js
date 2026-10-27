@@ -322,7 +322,7 @@ export class PlayerController {
     // landing: the harder you come down, the deeper the dip and the bigger the jolt through the gun
     if (!c.onGround) this.fallV = Math.min(this.fallV || 0, c.vel.y);
     if (!this.wasGround && c.onGround) {
-      const k = clamp(-(this.fallV || 0) / 7, 0.45, 1.5);
+      const k = clamp(-(this.fallV || 0) / 7, 0.45, 1.2);
       this.landDip = k; this.fallV = 0;
       if (this.jolt) { this.jolt.vy -= 0.35 * k; this.jolt.vr += 1.2 * k; }
     }
@@ -513,24 +513,24 @@ export class PlayerController {
     const c = this.c, cam = this.camera, s = this.game.settings;
     const hs = Math.hypot(c.vel.x, c.vel.z);
     if (c.onGround && c.slideT <= 0) this.bobT += hs * dt * 1.55;
-    const cm = s.cameraMotion === 'reduced' ? 0.4 : 1;   // Options > Controls: less of it for anyone it makes queasy
-    const bobAmt = Math.min(1.35, hs / 6) * (1 - 0.85 * c.adsT) * cm;
+    // the camera itself stays calm (a moving view is what makes people motion sick): the weight and the
+    // exaggeration are in the gun and hands. Reduced (Options > Controls) takes most of what's left out too
+    const cm = s.cameraMotion === 'reduced' ? 0.3 : 1;
+    const bobAmt = Math.min(1, hs / 6) * (1 - 0.85 * c.adsT) * cm;
     this.landDip = Math.max(0, this.landDip - dt * 3.2);
     c.eyePos(cam.position);
     if (c.stepOff) cam.position.y += c.stepOff; // stairs: ease the eye over each step
     if (this.correction) { cam.position.add(this.correction); this.correction.multiplyScalar(Math.max(0, 1 - dt * 12)); }
     const dip = Math.sin(Math.min(1, this.landDip) * Math.PI) * Math.max(1, this.landDip);
-    cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.045 * bobAmt - dip * 0.1 * cm;
-    _a.set(Math.cos(c.yaw), 0, -Math.sin(c.yaw)); cam.position.addScaledVector(_a, Math.sin(this.bobT) * 0.018 * bobAmt);   // weight moving foot to foot
+    cam.position.y += Math.abs(Math.cos(this.bobT)) * 0.025 * bobAmt - dip * 0.06 * cm;
     this.shake = Math.max(0, this.shake - dt * 4);
     const sh = this.shake * this.shake * 0.018 * (1 - 0.8 * c.adsT);   // aimed: the view barely jitters, so the reticle stays on the target
     const slideRoll = c.slideT > 0 ? 0.06 : 0;
     // the head leans a touch into a strafe (smoothed; much less aimed in), and sways side to side with the steps
     const strafe = (c.vel.x * Math.cos(c.yaw) - c.vel.z * Math.sin(c.yaw)) / PLAYER.sprint;
-    this.camLean = lerp(this.camLean || 0, -strafe * 0.024 * cm * (1 - 0.7 * c.adsT), Math.min(1, dt * 6));
+    this.camLean = lerp(this.camLean || 0, -strafe * 0.008 * cm * (1 - 0.7 * c.adsT), Math.min(1, dt * 6));
     cam.rotation.order = 'YXZ';
-    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.014 * bobAmt + slideRoll * cm + this.camLean);
-    cam.rotation.x += (Math.abs(Math.cos(this.bobT)) - 0.5) * 0.008 * bobAmt - dip * 0.025 * cm;   // the head nods with each step and with a landing
+    cam.rotation.set(c.pitch + (Math.random() - 0.5) * sh, c.yaw + (Math.random() - 0.5) * sh, Math.sin(this.bobT * 0.5) * 0.004 * bobAmt + slideRoll * cm + this.camLean);
     this.tacK = lerp(this.tacK || 0, c.tacSprinting ? 1 : 0, Math.min(1, dt * 8));
     // sprint widens the view a little, eased in and out over about half a second (never a snap)
     const sprintGoal = c.sprinting ? 1 : 0;

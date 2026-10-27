@@ -928,7 +928,7 @@ const OPT_DESC = {
   'opt-sens': 'How fast the view turns with the mouse.',
   'opt-invert': 'Moving the mouse or stick up looks down.',
   'opt-adssens': 'How fast the view turns while aiming down sights, compared with the hip (mouse and stick). Lower it for steadier long-range aim.',
-  'opt-cammotion': 'Full: the view bobs with your stride, sways foot to foot, leans into strafes and dips on landings. Reduced: much less of all of it, for anyone it makes queasy.',
+  'opt-cammotion': 'How much the view itself bobs, leans and dips as you move and land (the gun moves the same either way). Reduced keeps the view almost still, for anyone it makes queasy.',
   'opt-explicit': 'Operators swear in the heat of the fight, about half the time. Off: clean callouts only. Signed in, the choice is kept with your account on every device.',
   'opt-autosprint': 'Sprint automatically whenever you push fully forward. Aiming, firing or crouching stops it; tactical sprint still works.',
   'opt-padsens': 'How fast the view turns with the right stick.',
