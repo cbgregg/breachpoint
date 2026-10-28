@@ -169,7 +169,7 @@ export class Game {
     });
     window.addEventListener('resize', () => this.renderer.setSize());
     this.last = performance.now();
-    this.renderer.renderer.setAnimationLoop(() => this.frame());
+    this.renderer.renderer.setAnimationLoop((t) => this.frame(false, t));
     // browsers stop animation frames in background tabs; a host must keep simulating for everyone
     setInterval(() => {
       if (this.mode === 'host' && this.live && performance.now() - this.last > 120) this.frame(true);
@@ -542,7 +542,8 @@ export class Game {
   }
 
   // ---------- frame ----------
-  frame(background = false) {
+  // stamp: the display's own time for this frame (requestAnimationFrame's), steadier than reading the clock
+  frame(background = false, stamp) {
     const now = performance.now();
     // frame-rate cap: skip display refreshes until the next frame is due (keeps the average at the cap)
     // the menu's live background doesn't need more than 30 fps on the Mobile path (battery, heat), and behind
@@ -568,8 +569,26 @@ export class Game {
       while (left > 0.0001 && this.live) { const st = Math.min(0.05, left); this.update(st); this.input.endFrame(); left -= st; }
       return;
     }
-    const gap = now - this.last, dt = Math.min(0.05, gap / 1000);
+    const gap = now - this.last;
     this.last = now;
+    // Smooth motion: step the game by the display's frame interval, not by when this callback happened to run.
+    // Frames land on the refresh, but the time we read wobbles by a millisecond or two either way, and that
+    // wobble was in every moving thing (the view, the gun, every player): a faint, constant shimmer. The
+    // display's timestamp, snapped to its steady interval when it's close to it, takes that out.
+    const ts = stamp > 0 ? stamp : now, raw = ts - (this.lastStamp ?? ts - 16.7);
+    this.lastStamp = ts;
+    const iv = this.frameIv || raw, near = Math.abs(raw - iv) < iv * 0.12;
+    // the usual interval: eased toward steady frames; a one-off late frame doesn't move it, but several in a row
+    // at a new rate (a cap changed, the window moved to another display) switch to that rate
+    if (near) { this.frameIv = iv + (raw - iv) * 0.04; this.frameMiss = 0; }
+    else if (raw > 2 && raw < 50 && ++this.frameMiss >= 6) { this.frameIv = raw; this.frameMiss = 0; }
+    else if (!this.frameIv) this.frameIv = raw;
+    let use = near ? iv : raw;
+    // whatever the snapping held back (or got ahead), fed back in slowly: game time never drifts from real time
+    this.frameDebt = (this.frameDebt || 0) + raw - use;
+    const fix = Math.max(-0.4, Math.min(0.4, this.frameDebt * 0.1));
+    use += fix; this.frameDebt -= fix;
+    const dt = Math.min(0.05, Math.max(0, use) / 1000);
     this.frameCount = (this.frameCount || 0) + 1;
     // performance readout (Options > Show FPS): the longest frame in each half second, and the main thread's own time
     const pf = this.perf || (this.perf = { worst: 0, cpu: 0, n: 0 });

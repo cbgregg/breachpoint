@@ -53,6 +53,22 @@ export function rayBox(ox, oy, oz, dx, dy, dz, minx, miny, minz, maxx, maxy, max
 const CELL = 4, BIG = 64;
 const ckey = (i, k) => (i + 4096) * 8192 + (k + 4096);
 let _stamp = 1;
+// The queries below run many times a frame for every character, so they make no garbage: no closures or
+// result arrays per call (the browser's garbage collector pausing to clear them is felt as a hitch).
+const boxHit = (b, x, y, z, r, h) => x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz;
+const _near = [];
+let _rO = null, _rD = null, _rBest = 0, _rBox = null, _rAxis = -1, _rSign = 0, _bHit = false;
+function rayVisit(b) {
+  if (b.pass) return _rBest;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
+  const t = rayBox(_rO.x, _rO.y, _rO.z, _rD.x, _rD.y, _rD.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, _rBest);
+  if (t < _rBest) { _rBest = t; _rBox = b; _rAxis = _axis; _rSign = _sign; }
+  return _rBest;
+}
+function blockVisit(b) {
+  if (_bHit) return 0;
+  if (!b.pass && rayBox(_rO.x, _rO.y, _rO.z, _rD.x, _rD.y, _rD.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, _rBest) < _rBest) { _bHit = true; return 0; }
+  return _rBest;
+}
 
 export class Physics {
   constructor() {
@@ -104,13 +120,9 @@ export class Physics {
 
   // Returns {t, point, normal, box} or null
   raycast(o, d, maxDist) {
-    let best = maxDist, bestBox = null, axis = -1, sign = 0;
-    this.walk(o, d, maxDist, (b) => {
-      if (b.pass) return best;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
-      const t = rayBox(o.x, o.y, o.z, d.x, d.y, d.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, best);
-      if (t < best) { best = t; bestBox = b; axis = _axis; sign = _sign; }
-      return best;
-    });
+    _rO = o; _rD = d; _rBest = maxDist; _rBox = null; _rAxis = -1; _rSign = 0;
+    this.walk(o, d, maxDist, rayVisit);
+    const best = _rBest, bestBox = _rBox, axis = _rAxis, sign = _rSign;
     if (!bestBox) return null;
     const normal = new THREE.Vector3();
     if (axis >= 0) normal.setComponent(axis, sign); else normal.copy(d).negate();
@@ -124,26 +136,33 @@ export class Physics {
     if (len < 1e-6) return false;
     const max = len - 0.05;
     _d.set(dx / len, dy / len, dz / len);
-    let hit = false;
-    this.walk(a, _d, max, (bx) => {
-      if (hit) return 0;
-      if (!bx.pass && rayBox(a.x, a.y, a.z, _d.x, _d.y, _d.z, bx.minx, bx.miny, bx.minz, bx.maxx, bx.maxy, bx.maxz, max) < max) { hit = true; return 0; }
-      return max;
-    });
-    return hit;
+    _rO = a; _rD = _d; _rBest = max; _bHit = false;
+    this.walk(a, _d, max, blockVisit);
+    return _bHit;
   }
 
   // Cylinder approximated by an AABB with feet at y
   overlap(x, y, z, r, h) {
     const G = this.index();
-    const test = (b) => x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz;
-    for (const b of G.always) if (test(b)) return b;
+    for (const b of G.always) if (boxHit(b, x, y, z, r, h)) return b;
     const i0 = Math.floor((x - r) / CELL), i1 = Math.floor((x + r) / CELL), k0 = Math.floor((z - r) / CELL), k1 = Math.floor((z + r) / CELL);
     for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) {
       const c = G.cells.get(ckey(i, k));
-      if (c) for (const b of c) if (test(b)) return b;
+      if (c) for (const b of c) if (boxHit(b, x, y, z, r, h)) return b;
     }
     return null;
+  }
+
+  // every box overlapping an x/z rectangle (once each), in a shared list: read it before the next query
+  boxesIn(x0, z0, x1, z1) {
+    const G = this.index(), st = ++_stamp;
+    _near.length = 0;
+    for (const b of G.always) _near.push(b);
+    for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let k = Math.floor(z0 / CELL); k <= Math.floor(z1 / CELL); k++) {
+      const c = G.cells.get(ckey(i, k));
+      if (c) for (const b of c) { if (b._q === st) continue; b._q = st; _near.push(b); }
+    }
+    return _near;
   }
 
   // every box overlapping an x/z rectangle (once each)

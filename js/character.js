@@ -568,7 +568,9 @@ export class Character {
     const dx = wish.x / wl, dz = wish.z / wl;
     const fx = p.x + dx * (r + 0.32), fz = p.z + dz * (r + 0.32), cw = 0.14;
     let top = -Infinity, wall = false;
-    for (const b of phys.boxes) {
+    const near = phys.boxesIn(fx - cw, fz - cw, fx + cw, fz + cw);   // (just the boxes there, not the whole map's)
+    for (let i = 0; i < near.length; i++) {
+      const b = near[i];
       if (fx - cw >= b.maxx || fx + cw <= b.minx || fz - cw >= b.maxz || fz + cw <= b.minz) continue;
       if (b.maxy <= p.y + PLAYER.stepHeight + 0.02 || b.miny > p.y + maxH) continue;
       if (b.maxy > p.y + maxH) { wall = true; break; }
@@ -668,9 +670,13 @@ export class Character {
     }
 
     if (jump && this.proneT > 0) { this.wantProne = false; jump = false; } // jump from prone gets you up to a crouch
-    if (jump && this.onGround && (this.crouchT < 0.5 || sliding)) {
+    // a moment's grace after running off an edge: the jump still goes (the press was "on time" to the player)
+    this.coyote = this.onGround ? 0.1 : Math.max(0, (this.coyote || 0) - dt);
+    if (jump && (this.onGround || (this.coyote > 0 && this.vel.y <= 0)) && (this.crouchT < 0.5 || sliding)) {
       this.vel.y = PLAYER.jump;
       this.onGround = false;
+      this.coyote = 0;
+      this.jumpedT = this.game.time;
       this.wantCrouch = false;
       this.game.audio.play('jump', this.spos);
     }

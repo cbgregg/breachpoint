@@ -135,8 +135,10 @@ export class Input {
       const m = Math.abs(e.movementX) + Math.abs(e.movementY);
       if (m > 2 && (this.lastDevice !== 'pad' || (m > 12 && performance.now() - (this.padActiveAt || 0) > 600))) this.setDevice('kbm');
       if (!this.enabled || (!this.locked && !this.fallback)) return;
-      this.mouseDX += Math.max(-300, Math.min(300, e.movementX || 0));
-      this.mouseDY += Math.max(-300, Math.min(300, e.movementY || 0));
+      // (a cap against the odd bogus jump some browsers report; high enough that a real flick on a fast mouse,
+      // which arrives as one event per frame, is never cut short)
+      this.mouseDX += Math.max(-1200, Math.min(1200, e.movementX || 0));
+      this.mouseDY += Math.max(-1200, Math.min(1200, e.movementY || 0));
     });
     window.addEventListener('wheel', (e) => {
       if (e.ctrlKey) e.preventDefault();          // Ctrl + wheel (crouched weapon swap) must not zoom the page
@@ -205,10 +207,19 @@ export class Input {
     };
     try {
       if (!this.canvas.requestPointerLock) { fail(); return; }
-      const r = this.canvas.requestPointerLock();
+      const r = this.rawLock();
       if (r && r.catch) r.catch(fail);
     } catch (_) { fail(); }
     this.goFullscreen();
+  }
+  // Raw mouse input where the browser offers it: the mouse's own movement, without the system's pointer
+  // acceleration (Windows' "enhance pointer precision"), so the same flick always turns you the same amount.
+  // Where it isn't offered (the promise is refused as unsupported), the ordinary lock.
+  rawLock() {
+    let r;
+    try { r = this.canvas.requestPointerLock({ unadjustedMovement: true }); } catch (_) { return this.canvas.requestPointerLock(); }
+    if (r && r.catch) return r.catch((e) => { if (e && e.name === 'NotSupportedError') return this.canvas.requestPointerLock(); throw e; });
+    return r;
   }
 
   // Matches run fullscreen with the keyboard locked: browsers only let a page receive shortcuts like Ctrl+W
@@ -227,7 +238,7 @@ export class Input {
       if (p && p.then) p.then(() => {
         this.fsT = performance.now();
         keys();
-        if (!document.pointerLockElement && this.enabled) { try { const r = this.canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* ignore */ } }
+        if (!document.pointerLockElement && this.enabled) { try { const r = this.rawLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* ignore */ } }
       }).catch(() => {});
     } catch (_) { /* not allowed right now */ }
   }

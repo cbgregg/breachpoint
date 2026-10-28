@@ -312,10 +312,15 @@ export class PlayerController {
     if (sprint && !c.sprinting) { this.crouchToggle = false; if (this.proneOn && f > 0.4) this.proneOn = false; }   // sprint gets you up
     c.wantCrouch = this.crouchToggle || inp.down('ControlLeft');
     c.wantProne = this.proneOn && c.alive;
-    let jump = canAct && (inp.down('Space') || inp.action('jump'));
+    // a jump pressed just before landing isn't lost: it's held for a moment and goes as soon as you touch down
+    const jumpPress = inp.action('jump') || (inp.down('Space') && !this.prevSpace);
+    this.prevSpace = inp.down('Space');
+    this.jumpBuf = jumpPress ? 0.13 : Math.max(0, (this.jumpBuf || 0) - dt);
+    let jump = canAct && (inp.down('Space') || inp.action('jump') || this.jumpBuf > 0);
     if (jump && this.proneOn) { this.proneOn = false; this.crouchToggle = true; c.wantProne = false; c.wantCrouch = true; jump = false; }
     if (jump) this.crouchToggle = false;
     c.updateMovement(dt, _wish, sprint, jump, slideReq && canAct, tac);
+    if (c.jumpedT === g.time || c.mantle) this.jumpBuf = 0;   // (used up)
     // the exact command that produced this frame's movement (sent to the host when playing online)
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
     this.cmd = { dt, mx: canAct ? clamp1(r) : 0, my: canAct ? clamp1(f) : 0, y: c.yaw, p: c.pitch, sp: sprint ? 1 : 0, tac: tac ? 1 : 0, cr: c.wantCrouch ? 1 : 0, pr: c.wantProne ? 1 : 0, j: jump ? 1 : 0, sl: slideReq && canAct ? 1 : 0, f: 0, ads: 0, a: null };

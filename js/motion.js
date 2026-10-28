@@ -13,6 +13,7 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4();
 const UP = new THREE.Vector3(0, 1, 0);
+const _e = new THREE.Euler(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(), _rq = new THREE.Quaternion();   // (per-frame scratch: no garbage)
 
 // ---------- springs ----------
 // critically-ish damped spring towards a target (semi-implicit Euler, stable at large dt)
@@ -264,7 +265,7 @@ export function stepRagdoll(rag, dt) {
   if (!g.rest) {
     g.v.y -= 9.8 * dt;
     g.p.addScaledVector(g.v, dt);
-    _q.setFromEuler(new THREE.Euler(g.spin.x * dt, g.spin.y * dt, g.spin.z * dt));
+    _q.setFromEuler(_e.set(g.spin.x * dt, g.spin.y * dt, g.spin.z * dt));
     g.q.multiply(_q);
     if (g.p.y < rag.floor + 0.04) {
       g.p.y = rag.floor + 0.04;
@@ -281,36 +282,37 @@ export function stepRagdoll(rag, dt) {
   return true;
 }
 
-// write the simulated joints back onto the skeleton
+// write the simulated joints back onto the skeleton (every frame while someone falls: allocation-free)
+function setWorld(bone, pos, quat) {
+  bone.parent.updateMatrixWorld(true);
+  _m.copy(bone.parent.matrixWorld).invert();
+  if (pos) bone.position.copy(_c.copy(pos).applyMatrix4(_m));
+  if (quat) {
+    bone.parent.getWorldQuaternion(_q2).invert();
+    bone.quaternion.copy(_q2.multiply(quat));
+  }
+  bone.updateMatrixWorld(true);
+}
+function frameQ(up, rightRaw, inv, q0) {
+  basis(_m2, up, rightRaw);
+  return _rq.setFromRotationMatrix(_m2).multiply(inv).multiply(q0);
+}
+function aimBone(swingBone, bone, child, target) {
+  bone.getWorldPosition(_v);
+  swingBone(bone, child, _w.copy(target).sub(_v).normalize());
+}
 export function poseRagdoll(rag, model, swingBone) {
   const B = model.bones, P = rag.p;
-  const setWorld = (bone, pos, quat) => {
-    bone.parent.updateMatrixWorld(true);
-    _m.copy(bone.parent.matrixWorld).invert();
-    if (pos) bone.position.copy(_c.copy(pos).applyMatrix4(_m));
-    if (quat) {
-      bone.parent.getWorldQuaternion(_q2).invert();
-      bone.quaternion.copy(_q2.multiply(quat));
-    }
-    bone.updateMatrixWorld(true);
-  };
-  const frame = (up, rightRaw, inv, q0) => {
-    basis(_m2, up, rightRaw);
-    return _q.setFromRotationMatrix(_m2).multiply(inv).multiply(q0);
-  };
-  const up = new THREE.Vector3().subVectors(P[IX.Spine2], P[IX.Hips]);
-  setWorld(B.Hips, P[IX.Hips], frame(up, new THREE.Vector3().subVectors(P[IX.RightUpLeg], P[IX.LeftUpLeg]), rag.hipInv, rag.hipQ0).clone());
-  setWorld(B.Spine2, null, frame(up, new THREE.Vector3().subVectors(P[IX.RightArm], P[IX.LeftArm]), rag.chestInv, rag.chestQ0).clone());
-  const aim = (bone, child, target) => {
-    const from = bone.getWorldPosition(new THREE.Vector3());
-    swingBone(bone, child, target.clone().sub(from).normalize());
-  };
-  aim(B.Neck, B.Head, P[IX.Head]);
-  for (const side of ['Left', 'Right']) {
-    aim(B[side + 'Arm'], B[side + 'ForeArm'], P[IX[side + 'ForeArm']]);
-    aim(B[side + 'ForeArm'], B[side + 'Hand'], P[IX[side + 'Hand']]);
-    aim(B[side + 'UpLeg'], B[side + 'Leg'], P[IX[side + 'Leg']]);
-    aim(B[side + 'Leg'], B[side + 'Foot'], P[IX[side + 'Foot']]);
+  _up.subVectors(P[IX.Spine2], P[IX.Hips]);
+  setWorld(B.Hips, P[IX.Hips], frameQ(_up, _v.subVectors(P[IX.RightUpLeg], P[IX.LeftUpLeg]), rag.hipInv, rag.hipQ0));
+  _up.subVectors(P[IX.Spine2], P[IX.Hips]);
+  setWorld(B.Spine2, null, frameQ(_up, _v.subVectors(P[IX.RightArm], P[IX.LeftArm]), rag.chestInv, rag.chestQ0));
+  aimBone(swingBone, B.Neck, B.Head, P[IX.Head]);
+  for (const side of SIDES) {
+    aimBone(swingBone, B[side[0]], B[side[1]], P[IX[side[1]]]);
+    aimBone(swingBone, B[side[1]], B[side[2]], P[IX[side[2]]]);
+    aimBone(swingBone, B[side[3]], B[side[4]], P[IX[side[4]]]);
+    aimBone(swingBone, B[side[4]], B[side[5]], P[IX[side[5]]]);
   }
   // gun
   const gh = model.gunHolder, g = rag.gun;
@@ -319,6 +321,7 @@ export function poseRagdoll(rag, model, swingBone) {
   gh.quaternion.copy(_q2.multiply(g.q));
   gh.updateMatrixWorld(true);
 }
+const SIDES = ['Left', 'Right'].map(s => [s + 'Arm', s + 'ForeArm', s + 'Hand', s + 'UpLeg', s + 'Leg', s + 'Foot']);
 
 // how hard a hit shoves the body (per pellet, so shotguns add up without going silly)
 export function hitPower(def) {
