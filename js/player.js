@@ -90,6 +90,9 @@ function solveElbow(S, H, a, b, pole, out) {
 export const VM_TUNE = { yaw: 0.16, yawBy: { shotgun: 0.07 }, hip: { rifle: [0.115, -0.15, -0.25], smg: [0.11, -0.135, -0.28], sniper: [0.12, -0.162, -0.25], launcher: [0.13, -0.15, -0.2], shotgun: [0.105, -0.155, -0.12] } }; // hip: muzzle turned in so you see the gun's left side and the support hand
 const FIT_CACHE = new Map(); // grip fits per gun build (same hands for every player)
 
+// a number per gun (0..6) that sets which way its recoil drifts and when
+const recoilSeed = (id) => { let h = 7; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 7919; return (h % 600) / 100; };
+
 export class PlayerController {
   constructor(game, char) {
     this.game = game;
@@ -101,7 +104,7 @@ export class PlayerController {
     this.triggerLatch = false;
     this.bobT = 0; this.kick = 0; this.kickRot = 0; this.swayX = 0; this.swayY = 0; this.sprintT = 0;
     this.flashT = 0; this.shake = 0; this.landDip = 0; this.wasGround = true;
-    this.recoilDebt = 0; this.lastShotT = -9;
+    this.recoilDebt = 0; this.lastShotT = -9; this.recP = 0; this.recY = 0;
     this.breathT = 0; this.prevSwayYaw = 0; this.prevSwayPitch = 0;
     this.crouchToggle = false; this.padSprint = false; this.proneOn = false; this.crouchHeldT = 0;
     this.assist = { target: null, yaw: 0, pitch: 0, snapT: 0, wasAds: false };
@@ -410,6 +413,13 @@ export class PlayerController {
     // semi-auto weapons on auto-fire: send the trigger as a pulse so the host's trigger latch resets
     if (auto) this.cmd.f = def.auto || fired ? 1 : 0;
 
+    // the kick (and a flinch from being hit) comes in fast but smoothly: most of it within 50 ms
+    if (this.recP || this.recY) {
+      const k = 1 - Math.exp(-dt * 40), dp = this.recP * k, dy = this.recY * k;
+      c.pitch = clamp(c.pitch + dp, -1.5, 1.5); c.yaw += dy;
+      this.recP -= dp; this.recY -= dy;
+      if (Math.abs(this.recP) + Math.abs(this.recY) < 1e-5) this.recP = this.recY = 0;
+    }
     // recoil recovery (pulls most of the climb back down after you stop firing)
     if (g.time - this.lastShotT > 0.09 && this.recoilDebt > 0) {
       const rec = Math.min(this.recoilDebt, this.recoilDebt * dt * 7 + dt * 0.02);
@@ -501,18 +511,32 @@ export class PlayerController {
     this.kick = 1;
     this.kickRot = 1;
     this.flashT = 0.045;
+    // which shot of the burst this is (a pause of a third of a second starts a new burst)
+    this.burstN = this.game.time - this.lastShotT > 0.3 ? 0 : (this.burstN || 0) + 1;
     this.lastShotT = this.game.time;
     const rm = (1 - 0.35 * c.adsT) * (c.proneT > 0.6 ? 0.6 : c.crouchT > 0.5 ? 0.75 : 1);
-    const climb = def.recoilPitch * rm * (0.85 + Math.random() * 0.3);
-    c.pitch += climb;
+    const climb = def.recoilPitch * rm * (0.92 + Math.random() * 0.16);
+    // Recoil you can learn, like Call of Duty: every gun kicks in its own pattern (straight up for the first
+    // few rounds, then drifting side to side the same way every burst), with only a little chance on top.
+    // It used to be pure chance, so no burst was like the last and there was nothing to master.
+    const n = this.burstN, seed = recoilSeed(c.weapon.id);
+    const drift = n < 3 ? 0.15 * Math.sign(seed - 3) : Math.sin(n * 0.55 + seed) * 0.7 + 0.2 * Math.sign(seed - 3);
+    const side = (drift + (Math.random() - 0.5) * 0.5) * def.recoilYaw * rm;
+    // the kick reaches the view over a few hundredths of a second instead of jumping in a single frame
+    this.recP += climb; this.recY -= side;
     this.recoilDebt = Math.min(0.25, this.recoilDebt + climb * 0.65);
-    c.yaw += (Math.random() - 0.45) * 2 * def.recoilYaw * rm;
     this.shake = Math.min(1, this.shake + def.recoilPitch * 5);
     if (def.mode === 'BOLT' || def.mode === 'PUMP') this.cycleT = 60 / def.rpm * 0.9;
     this.game.input.rumble(def.mode === 'BOLT' || def.mode === 'PUMP' || def.rocket ? 0.7 : 0.25, 0.5, def.auto ? 60 : 120);
   }
 
   addShake(v) { this.shake = Math.min(1.5, this.shake + v); }
+  // being hit knocks your aim up and a little aside (less aimed in), and it settles back like recoil does
+  flinch() {
+    const c = this.c, k = 1 - 0.45 * c.adsT;
+    this.recP += 0.016 * k; this.recY += (Math.random() - 0.5) * 0.014 * k;
+    this.recoilDebt = Math.min(0.25, this.recoilDebt + 0.012 * k);
+  }
 
   updateCamera(dt) {
     const c = this.c, cam = this.camera, s = this.game.settings;

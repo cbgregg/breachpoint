@@ -471,7 +471,11 @@ export class Character {
       return false;
     }
     w.mag--;
-    w.cooldown = 60 / w.def.rpm;
+    // keep the bit of the last frame that ran past when this shot was due: the gun fires at its real rate and
+    // an even rhythm at any frame rate (resetting to a whole interval each shot lost up to a frame a shot:
+    // a 900 RPM gun fired at 720 at 60 fps, unevenly, and faster or slower on other screens)
+    const iv = 60 / w.def.rpm;
+    w.cooldown = (w.cooldown < 0 && w.cooldown > -iv ? w.cooldown : 0) + iv;
     this.lastFireT = this.game.time;
     this.spawnProtect = 0;
     this.sprinting = false; this.tacSprinting = false;
