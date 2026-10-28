@@ -391,7 +391,11 @@ export class PlayerController {
     if (cooking) inp.clearAds();
     const adsWant = canAct && inp.ads && !cooking && !c.sprinting && c.switchT <= 0 && !c.weapon.reloading && c.meleeT <= 0 ? 1 : 0;
     this.cmd.ads = adsWant;
-    this.cmd.f = canAct && inp.fire && !cooking ? 1 : 0;
+    // sprint-out: coming out of a sprint, the gun has to come back up before it fires (about 80 ms for a
+    // pistol or SMG, 115 ms for a rifle, 130 ms for the heavy ones). Before, it fired while still pointing at
+    // the floor. The sprint pose eases out at 6 a second, so these are how far down it may still be.
+    const st = def.model.type, gunUp = (this.sprintT || 0) < (st === 'pistol' || st === 'smg' ? 0.68 : st === 'rifle' ? 0.5 : 0.35);
+    this.cmd.f = canAct && inp.fire && !cooking && gunUp ? 1 : 0;
     this.cmd.u = g.gm && inp.useHeld && !g.frozen ? 1 : 0;
     const acts = inp.used.filter(a => a === 'reload' || a === 'melee' || a === 'swap' || a === 'slot1' || a === 'slot2');
     if (thrownCook !== null) { acts.push('grenade'); this.cmd.gk = thrownCook; }
@@ -402,7 +406,7 @@ export class PlayerController {
     // touch auto-fire: shoot while the crosshair is on an enemy in range (Call of Duty Mobile "simple mode")
     const auto = autoOn && !c.sprinting;
     let fired = false;
-    if (canAct && !cooking && (inp.fire || auto) && this.cycleT <= 0) {
+    if (canAct && !cooking && (inp.fire || auto) && this.cycleT <= 0 && gunUp) {
       if (def.auto || !this.triggerLatch || auto) {
         if (c.tryFire(c.eyePos(_a), c.forward(_b))) { this.onFired(c.weapon.def); fired = true; }
       }

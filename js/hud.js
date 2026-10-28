@@ -184,6 +184,7 @@ export class HUD {
     }
     this.hitT -= dt;
     this.sty('hitmarker', 'opacity', this.hitT > 0 ? Math.min(1, this.hitT * 6).toFixed(2) : '0');
+    if (this.hitT > 0) this.sty('hitmarker', 'transform', `scale(${(1 + this.hitPop * Math.max(0, 1 - (this.hitT0 - this.hitT) / 0.08)).toFixed(2)})`);
 
     this.popT -= dt;
     if (this.popT <= 0 && this.popTotal) {
@@ -362,7 +363,8 @@ export class HUD {
   }
 
   hitmarker(kill, headshot) {
-    this.hitT = kill ? 0.4 : 0.18;
+    this.hitT = this.hitT0 = kill ? 0.45 : 0.18;
+    this.hitPop = kill ? 0.7 : headshot ? 0.45 : 0.28;   // it lands a little big and snaps to size: a hit you feel
     this.hm.className = kill ? 'kill' : headshot ? 'head' : '';
   }
 
