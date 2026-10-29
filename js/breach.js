@@ -40,6 +40,7 @@ export class Breakables {
     b.box = new Box(b.x - (b.axis === 'x' ? hw : th), b.y, b.z - (b.axis === 'x' ? th : hw), b.x + (b.axis === 'x' ? hw : th), b.y + b.h, b.z + (b.axis === 'x' ? th : hw));
     b.box.surface = b.kind === 'glass' ? 'glass' : 'wood';
     b.box.breakable = b.idx;
+    b.box.src = `breakable:${b.kind}`;   // (the audit: its mesh is in this group, not the map's)
     b.box.navIgnore = true;   // bots path as if it were open; one in the way gets kicked through (see bot.js)
     b.boxY = [b.box.miny, b.box.maxy];
     this.game.physics.addBox(b.box);

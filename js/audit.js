@@ -267,7 +267,7 @@ export async function auditMap(game, opts = {}) {
     let faces = 0;
     for (const b of boxes) {
       if (b.pass && b.maxy - b.miny < 1.3) continue;   // low see-through barriers (railings, gates): drawn thin on purpose
-      if (b.hidden || (b.src && b.src.startsWith('boundary'))) continue;   // invisible on purpose (the map's edge, a tunnel's end)
+      if (b.hidden || (b.src && (b.src.startsWith('boundary') || b.src.startsWith('breakable')))) continue;   // invisible on purpose (the map's edge, a tunnel's end), or drawn elsewhere (a pane, boards)
       const h = b.maxy - b.miny;
       if (h < 0.25) continue;
       const sides = [
