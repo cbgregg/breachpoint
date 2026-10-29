@@ -58,7 +58,7 @@ export class BotBrain {
     this.nadeT = 0; this.nadeSeen = null; this.nadeReactT = 0; this.fleeing = false;
     this.slideCd = 0; this.edgeBurst = 0; this.lane = null; this.holdT = 0; this.tradeT = 0;
     this.state = 'idle';
-    this.curExp = 0; this.lostSelf = false; this.coverSlowT = 0; this.coverHid = false; this.lookAt = null; this.preAimHold = 0; this.postKill = false; this.targetStillT = 0; this.nade = null; this.pushT = 0; this.lostShooting = false; this.quietT = 0;
+    this.curExp = 0; this.lostSelf = false; this.coverSlowT = 0; this.coverHid = false; this.coverBadT = 0; this.coverWasHeld = false; this.badCover = null; this.badCoverT = -99; this.lookAt = null; this.preAimHold = 0; this.postKill = false; this.targetStillT = 0; this.nade = null; this.pushT = 0; this.lostShooting = false; this.quietT = 0;
     if (!this.curAim) this.curAim = new THREE.Vector3();
     if (!this.dmgDir) { this.dmgDir = new THREE.Vector3(); this.aimSmooth = new THREE.Vector3(); this.flinchV = new THREE.Vector3(); this.huntGoal = new THREE.Vector3(); this.fightPos = new THREE.Vector3(); }
     if (this.spot) this.spot.clear();
@@ -268,6 +268,7 @@ export class BotBrain {
       const rr = r * (ring === 0 ? 0.4 : ring === 1 ? 0.7 : 1), an = (k + ring / 3) / 16 * Math.PI * 2;
       const x = b.pos.x + Math.cos(an) * rr, z = b.pos.z + Math.sin(an) * rr;
       if (!nav.isOpenAt(x, z)) continue;
+      if (this.badCover && g.time - this.badCoverT < 6 && Math.hypot(x - this.badCover.x, z - this.badCover.z) < 1.2) continue;   // (tried it: it didn't hide us)
       // the spot has to hide at least a crouched body (the cheap test first: most candidates fail it)
       const chestHid = ph.blocked(eye, _bv2.set(x, y + 1.2, z));
       const crouchHid = chestHid || ph.blocked(eye, _bv2.set(x, y + 0.9, z));
@@ -640,10 +641,13 @@ export class BotBrain {
       const from = this.visible && this.target ? this.target.pos : this.lastKnownT > g.time - 8 && this.target ? this.lastKnown : null;
       const hid = from ? g.physics.blocked(_bv1.set(from.x, from.y + 1.55, from.z), _bv2.set(b.pos.x, b.pos.y + (this.coverGoal.crouch ? 0.9 : 1.2), b.pos.z)) : true;
       this.coverHid = hid;   // (the hold branch reloads on it)
-      arrived = dg < 0.45 || (dg < 2.2 && hid) || (arrived && !this.coverGoal.crouch);
-      // (held up a step short of it by a prop the grid doesn't know: tuck in here rather than stand there pushing)
-      this.coverSlowT = Math.hypot(b.vel.x, b.vel.z) < 1 && g.time - this.retreatT > 0.4 ? this.coverSlowT + dt : 0;
+      arrived = dg < 0.3 || (dg < 2.2 && hid);
+      // (held up a step short of it by a prop the grid doesn't know: tuck in here rather than stand there pushing;
+      // only while trying to get there: a bot that stopped because it was already holding isn't held up)
+      this.coverSlowT = Math.hypot(b.vel.x, b.vel.z) < 1 && g.time - this.retreatT > 0.4 && !this.coverWasHeld ? this.coverSlowT + dt : 0;
       if (this.coverSlowT > 0.3 && dg < 2.5) arrived = true;
+      this.coverWasHeld = arrived;
+      if (arrived && b.slideT > 0.1) b.slideT = 0.1;   // (a slide into cover stops at the cover, not past it)
     } else this.coverSlowT = 0;
     if (!this.fleeing && (idle || watching || arrived)) {
       if (this.goalKind === 'plant' || this.goalKind === 'defuse') { b.useHeld = true; this.crouch = this.goalKind === 'defuse'; }
@@ -652,7 +656,12 @@ export class BotBrain {
         // tucked in: low if the spot needs it or we're hurt, a reload while nothing is in sight, the sights on where
         // they are (aim()); the hold runs down here, and chooseGoal lets us back out when it's done
         this.atCover = true; this.coverHold -= dt;
-        this.crouch = this.coverGoal.crouch || b.health < 50;
+        this.crouch = this.coverGoal.crouch || b.health < 50 || !this.coverHid;
+        this.coverBadT = this.coverHid ? 0 : this.coverBadT + dt;
+        if (this.coverBadT > 0.8) {
+          (this.badCover = this.badCover || new THREE.Vector3()).copy(this.coverGoal.p); this.badCoverT = g.time;
+          this.coverGoal = null; this.atCover = false; this.coverBadT = 0; this.goal = null; this.goalKind = this.visible ? 'engage' : 'hunt';
+        }
         // top up behind the cover (our body out of their sight, even with their head in view over it): the primary
         // first, back from the pistol if need be
         const pr = b.weapons[0], hid = !this.visible || this.coverHid || this.expo < 0.7;
@@ -763,6 +772,10 @@ export class BotBrain {
         }
         // clearing a route after a callout: walk it carefully now and then
         if (this.goalKind === 'intel' && !sprint && this.walkSlow) this.crouch = true;
+        if (this.goalKind === 'cover' && this.coverGoal && this.coverGoal.crouch && dg < 1.6) this.crouch = true;   // (a crouch-high spot: duck into it)
+      } else if (this.goalKind === 'cover' && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 1.5) {
+        wish.set(this.goal.x - b.pos.x, 0, this.goal.z - b.pos.z).normalize();   // (the path follower counts 0.7 m as there: cover is to the cm)
+        if (this.coverGoal && this.coverGoal.crouch) this.crouch = true;
       } else if (this.goalKind === 'roam' || this.goalKind === 'intel') {
         this.goalT = 0;
       } else if ((this.noPathT += dt) > 1.2) {
@@ -828,7 +841,9 @@ export class BotBrain {
     let slideReq = false; this.slideCd = Math.max(0, this.slideCd - dt);
     if (run && b.sprinting && b.onGround && this.goal && this.slideCd <= 0 && Math.hypot(b.vel.x, b.vel.z) > PLAYER.walk && (this.goalKind === 'cover' || this.goalKind === 'rotate' || this.goalKind === 'guard' || this.goalKind === 'push')) {
       const dg = Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z);
-      if (dg < 3.2 && dg > 1.6 && (Math.random() < d.slide || (this.goalKind === 'cover' && b.health < 50))) {   // (hurt, everybody slides in)
+      // (a slide keeps its direction: only when the spot is dead ahead along a clear line, or it slides off sideways)
+      const sp = Math.hypot(b.vel.x, b.vel.z), ahead = ((this.goal.x - b.pos.x) * b.vel.x + (this.goal.z - b.pos.z) * b.vel.z) / Math.max(1e-3, sp * dg);
+      if (dg < 3.2 && dg > 1.6 && ahead > 0.95 && nav.gridAt(b.pos).lineClear(b.pos.x, b.pos.z, this.goal.x, this.goal.z) && (Math.random() < d.slide || (this.goalKind === 'cover' && b.health < 50))) {   // (hurt, everybody slides in)
         let ring = 0; if (this.goalKind !== 'cover') { const gr = nav.gridAt(b.pos); for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2; if (!gr.isOpenAt(this.goal.x + Math.cos(an) * 1.3, this.goal.z + Math.sin(an) * 1.3)) ring++; } }
         if (this.goalKind === 'cover' || ring >= 3) { slideReq = true; this.slideCd = 3; }
       }
@@ -949,6 +964,7 @@ export class BotBrain {
   adsWant(dist) {
     const b = this.bot, w = b.weapon, d = this.diff, g = this.game, def = w.def, t = def.model.type;
     if (def.melee || def.sling || b.infected || def.pellets > 1) return 0;
+    if (this.goalKind === 'cover' && this.coverGoal && !this.atCover) return 0;   // (on the way to cover: hip, at full speed)
     const scoped = !!def.scope || def.model.sight === 'acog';
     const near = ({ pistol: 7, smg: 7, rifle: 5, launcher: 8 })[t] ?? 5;
     if (this.visible && this.target) { if (scoped) return 1; if (b.adsT > 0.8 && dist >= 3) return 1; return dist >= near * d.adsNear ? 1 : 0; }
@@ -1045,9 +1061,11 @@ export class BotBrain {
     // move() carries it there); nobody reloads a mag with rounds in it standing in the open
     const low = w.mag === 0 || (w.mag <= Math.max(2, w.def.mag * 0.25) && this.fightT > 0.5 && this.pauseT > 0);
     if (low) {
-      // cover first (the pistol comes out on the way there, and the rifle is reloaded behind it)
+      // cover first (the pistol comes out on the way there, and the rifle is reloaded behind it: once tucked in with
+      // our body out of their sight, the dry rifle is reloaded there rather than swapped for the pistol again)
+      const tucked = this.atCover && this.coverHid;
       if (!this.coverGoal && g.time - this.retreatT > 4 && !b.infected) { const c = this.coverPoint(this.target.pos, 6); if (c && Math.random() < d.coverUse + 0.2) this.takeCover(c, Math.min(4, w.def.reload + 1.2)); }
-      if (w.mag === 0 && b.cur === 0 && pistol.mag > 0 && dist < pistol.def.botRange[1]) { b.switchTo(1); return; }
+      if (!tucked && w.mag === 0 && b.cur === 0 && pistol.mag > 0 && dist < pistol.def.botRange[1] && !(w.reloading && w.reloadT < 0.8)) { b.switchTo(1); return; }
       // on the way to cover the reload waits for it (a walk-and-reload in the open is the slow way to die); if the
       // cover hasn't been reached in a couple of seconds, reload anyway
       if (w.mag === 0 && !w.reloading) { if (this.goalKind !== 'cover' || this.atCover || g.time - this.retreatT > 2.5) b.reload(); return; }

@@ -464,9 +464,9 @@ async function lab(defaults) {
     const fire = shooter(t, b);
     let hideAt = null, hid = 0, n = 0, died = false;
     const t0 = g.time, tr = [];
-    step(4, (i) => { t.health = 1e6; fire(i); if (!b.alive) died = true; n++; if (hidden(t, b)) { hid++; if (hideAt === null) hideAt = g.time - t0; } if (i % 9 === 0 && b.alive && i < 120) tr.push(`${(g.time - t0).toFixed(2)}:${br.goalKind}${br.coverGoal ? '>' + Math.hypot(br.goal.x - b.pos.x, br.goal.z - b.pos.z).toFixed(1) : ''} v${hs(b).toFixed(1)}${br.fleeing ? 'F' : ''} hp${Math.round(b.health)} dec${br.decideT.toFixed(2)}`); });
+    step(4, (i) => { t.health = 1e6; fire(i); if (!b.alive) died = true; n++; if (hidden(t, b)) { hid++; if (hideAt === null) hideAt = g.time - t0; } if (i % 9 === 0 && b.alive && i < 150) tr.push(`${(g.time - t0).toFixed(2)}:${br.goalKind}${br.coverGoal && br.goal ? '>' + Math.hypot(br.goal.x - b.pos.x, br.goal.z - b.pos.z).toFixed(1) + (br.atCover ? '@' : '') + (br.coverGoal.crouch ? 'c' : '') : ''} v${hs(b).toFixed(1)}${br.fleeing ? 'F' : ''}${b.sprinting ? 'S' : ''} cr${b.crouchT.toFixed(1)} hid${hidden(t, b) ? 1 : 0}/${br.coverHid ? 1 : 0} hp${Math.round(b.health)}`); });
     if (!check(hideAt !== null && hideAt <= 1.6, `at 35 hp under fire: out of sight within 1.6 s (${hideAt === null ? 'never' : hideAt.toFixed(2) + ' s'})`)) note(tr.join(' | '));
-    check(!died && b.alive, `and alive at the end (hp ${Math.round(b.health)})`);
+    if (!check(!died && b.alive, `and alive at the end (hp ${Math.round(b.health)})`)) note(tr.join(' | '));
     check(br.goalKind === 'cover' && br.atCover, `tucked into cover (goal ${br.goalKind}, there ${br.atCover})`);
     check(hid / n >= 0.6, `hidden ${(100 * hid / n).toFixed(0)}% of the four seconds`);
     check(!br.coverGoal || !br.coverGoal.crouch || b.crouchT > 0.5, `crouched if the spot is crouch-high (crouch ${!!(br.coverGoal && br.coverGoal.crouch)}, crouchT ${b.crouchT.toFixed(2)})`);
@@ -474,10 +474,11 @@ async function lab(defaults) {
     place(b, A, yawTo(A, B)); place(t, B, yawTo(B, A)); t.health = 1e6; b.grenades = 0; b.tacticals = 0;
     until(() => br.visible, 2, () => { t.health = 1e6; b.weapon.mag = 30; });
     b.weapon.mag = 2;
-    let reloadAt = null, exposed = null, pistolAt = null, coverAt = null; const t1 = g.time;
-    step(5, () => { t.health = 1e6; if (coverAt === null && br.goalKind === 'cover') coverAt = g.time - t1; if (pistolAt === null && b.cur === 1) pistolAt = g.time - t1; if (reloadAt === null && b.weapons[0].reloading) { reloadAt = g.time - t1; exposed = !hidden(t, b); } });
-    check(coverAt !== null && coverAt < 1.5, `two rounds left in their face: heads for cover (${coverAt === null ? 'never' : coverAt.toFixed(2) + ' s'})`);
-    check(reloadAt !== null && reloadAt < 4.5, `and reloads the rifle (${reloadAt === null ? 'never' : reloadAt.toFixed(2) + ' s'}${pistolAt !== null ? ', pistol out at ' + pistolAt.toFixed(2) : ''})`);
+    let reloadAt = null, exposed = null, pistolAt = null, coverAt = null; const t1 = g.time, tr2 = [];
+    step(5, (i) => { t.health = 1e6; if (i % 12 === 0) tr2.push(`${(g.time - t1).toFixed(1)}:${br.goalKind}${br.coverGoal ? '>' + Math.hypot(br.goal.x - b.pos.x, br.goal.z - b.pos.z).toFixed(1) + (br.atCover ? '@' : '') : ''} c${b.cur} ${b.weapon.mag}${b.weapon.reloading ? 'R' : ''} sw${b.switchT.toFixed(1)} v${br.visible ? 1 : 0} low${br.fightT.toFixed(1)}/${br.pauseT.toFixed(2)} cache${br.coverCache ? (br.coverCache.p ? 'y' : 'n') : '-'}`); if (coverAt === null && br.goalKind === 'cover') coverAt = g.time - t1; if (pistolAt === null && b.cur === 1) pistolAt = g.time - t1; if (reloadAt === null && b.weapons[0].reloading) { reloadAt = g.time - t1; exposed = !hidden(t, b); } });
+    // (or they're out of sight already and the reload goes in there and then)
+    if (!check((coverAt !== null && coverAt < 1.5) || (reloadAt !== null && reloadAt < 1.5 && !exposed), `two rounds left in their face: heads for cover or reloads out of their sight (cover ${coverAt === null ? 'never' : coverAt.toFixed(2) + ' s'}, reload ${reloadAt === null ? 'never' : reloadAt.toFixed(2) + ' s'})`)) note(tr2.slice(0, 14).join(' | '));
+    if (!check(reloadAt !== null && reloadAt < 4.5, `and reloads the rifle (${reloadAt === null ? 'never' : reloadAt.toFixed(2) + ' s'}${pistolAt !== null ? ', pistol out at ' + pistolAt.toFixed(2) : ''})`)) note(`goal ${br.goalKind} at cover ${br.atCover} hid ${br.coverHid} cur ${b.cur} rifle ${b.weapons[0].mag}/${b.weapons[0].reserve} visible ${br.visible} expo ${(br.expo || 0).toFixed(2)} switches ${b.__sw || 0} | ${tr2.join(' | ')}`);
     check(reloadAt === null || !exposed, `the reload starts out of their sight (exposed ${exposed})`);
     // in the open with the mag half full: no reload while they're in view (that's for behind cover or after)
     boot(); b = bot('rifle'); br = brain(b); const t2 = dummy(); alone(b, t2); b.grenades = 0; b.tacticals = 0;
@@ -551,15 +552,16 @@ async function lab(defaults) {
     const toLk = yawTo(b.pos, lk);
     check(Math.abs(angDiff(b.yaw, toLk)) < 0.4 && b.adsT > 0.8, `sighted on where they went (${Math.abs(angDiff(b.yaw, toLk)).toFixed(2)} rad off, adsT ${b.adsT.toFixed(2)})`);
     // then the approach: off the line, walked, aimed in
-    let sprinted = false, adsLow = 0, n = 0, offLine = 0, reached = null, goalOff = null; const t1 = g.time, seq = [];
+    let sprinted = false, adsLow = 0, n = 0, offLine = 0, reached = null, goalOff = null, repeek = false; const t1 = g.time, seq = [];
     const offOf = (p) => { const lx = lk.x - A.x, lz = lk.z - A.z, ll = Math.hypot(lx, lz) || 1; return Math.abs(((p.x - A.x) * -lz + (p.z - A.z) * lx) / ll); };
-    step(6, () => { t.health = 1e6; b.weapon.mag = 30; t.updateMovement(1 / 60, still, false, false); n++; const k = br.goalKind + (b.sprinting ? '/S' : '') + (br.visible ? '/v' : ''); if (seq[seq.length - 1] !== k) seq.push(k); if (goalOff === null && br.goalKind === 'hunt' && br.goal && !br.lostSelf && !br.chaseUntil) goalOff = offOf(br.goal); if (b.sprinting) sprinted = true; if (b.adsT < 0.5 && hs(b) > 1) adsLow++; const d = Math.hypot(b.pos.x - lk.x, b.pos.z - lk.z); if (reached === null && d < 3) reached = g.time - t1; const dx = b.pos.x - A.x, dz = b.pos.z - A.z, along = (dx * (B.x - A.x) + dz * (B.z - A.z)) / pl; const off = Math.abs(dx * perp.x + dz * perp.z); if (along > 3 && along < pl - 3) offLine = Math.max(offLine, off); });
+    step(6, () => { t.health = 1e6; b.weapon.mag = 30; t.updateMovement(1 / 60, still, false, false); n++; const k = br.goalKind + (b.sprinting ? '/S' : '') + (br.visible ? '/v' : ''); if (seq[seq.length - 1] !== k) seq.push(k); if (br.goalKind === 'hunt' && br.lostSelf) repeek = true; if (goalOff === null && br.goalKind === 'hunt' && br.goal && !br.lostSelf && !br.chaseUntil) goalOff = offOf(br.goal); if (b.sprinting) sprinted = true; if (b.adsT < 0.5 && hs(b) > 1) adsLow++; const d = Math.hypot(b.pos.x - lk.x, b.pos.z - lk.z); if (reached === null && d < 3) reached = g.time - t1; const dx = b.pos.x - A.x, dz = b.pos.z - A.z, along = (dx * (B.x - A.x) + dz * (B.z - A.z)) / pl; const off = Math.abs(dx * perp.x + dz * perp.z); if (along > 3 && along < pl - 3) offLine = Math.max(offLine, off); });
     // (the approach, or the target seen again on the way: a re-peek that finds them ends in a fight, then another hold)
     if (!check(reached !== null || seq.some(k => k.startsWith('hunt') || k.includes('/v')), `the hold ends and the approach starts (${seq.slice(0, 4).join(' > ')}, within 3 m ${reached === null ? 'never' : 'at ' + reached.toFixed(1) + ' s'})`)) note(`${seq.join(' > ')} | los ${los(b, t)} visible ${br.visible} spot ${(br.spot.get(t) || 0).toFixed(2)} lostT ${(g.time - br.lostT).toFixed(2)} ago, lastKnown ${(g.time - br.lastKnownT).toFixed(2)} ago, watchFor ${br.watchFor.toFixed(2)}, dist ${b.pos.distanceTo(t.pos).toFixed(1)}`);
     if (!check(!sprinted, 'never a sprint on the way in')) note(seq.join(' > '));
     check(adsLow / Math.max(1, n) < 0.2, `aimed in on the way (sights down while moving ${(100 * adsLow / Math.max(1, n)).toFixed(0)}% of the time)`);
     // (the walk itself is often cut short by seeing them again: the point it heads for is what's checked)
-    if (!check(goalOff === null ? !seq.some(k => k.startsWith('hunt')) : goalOff > 1.5 || offLine > 1.5, `comes in off the straight line (heads for a point ${goalOff === null ? '-' : goalOff.toFixed(1)} m off it, walked ${offLine.toFixed(1)} m off)`)) note(seq.join(' > '));
+    // (a bot that strafed behind the cover itself steps back out to where the fight was: a re-peek, not an approach)
+    if (!check(goalOff === null ? repeek || !seq.some(k => k.startsWith('hunt')) : goalOff > 1.5 || offLine > 1.5, `comes in off the straight line (heads for a point ${goalOff === null ? '-' : goalOff.toFixed(1)} m off it, walked ${offLine.toFixed(1)} m off${repeek ? ', re-peeked' : ''})`)) note(seq.join(' > '));
     // a wounded one: chased at a run to where it was
     boot(); const b2 = bot('rifle'), br2 = brain(b2), t2 = dummy(); alone(b2, t2); b2.grenades = 0; b2.tacticals = 0; br2.diff.chase = 1;
     const [C, D] = pair(12, { clear: 3 });
