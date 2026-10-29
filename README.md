@@ -73,6 +73,23 @@ Weapon and prop models from Sketchfab under [CC BY 4.0](https://creativecommons.
 - [Road Signs](https://sketchfab.com/3d-models/road-signs-c39bf97110494b5db3de84165211f592) by FrodoUndead (Pioneer Square street signs)
 - [Subway station](https://sketchfab.com/3d-models/subway-station-fa31f1ebe8cb437f9c753b22b3fdfc55) by Pasha
 
+Vehicles, also from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), scaled and with textures resized for the game:
+
+- [Free Mazda 6 Sedan 2011](https://sketchfab.com/3d-models/free-mazda-6-sedan-2011-arvr-lowpoly-3d-model-5742c2b07f224d53916307cc1e0f9cc5) by 3D Piece (3D_Mill)
+- [Jeep Renegade 2016](https://sketchfab.com/3d-models/jeep-renegade-2016-192f7e81dce84c6780434f692a0f96c5) by Jose Bronze
+- [Box-truck](https://sketchfab.com/3d-models/box-truck-b0e8788b6b774fe3a18eda1895a2b8fe) by Cristian Rus
+- [Food Truck](https://sketchfab.com/3d-models/food-truck-9a179f9803734a3e95630727b9db3477) by sandrafaki
+- [SFMTA Muni New Flyer XD40](https://sketchfab.com/3d-models/sfmta-muni-new-flyer-xd40-bb7c7e5b03874961b03d4b36f6c95b1b) by kieranfarr, base model by _TimTheTerrible
+- [1910 Cologne streetcar](https://sketchfab.com/3d-models/1910-cologne-streetcar-5c6c2a7babd34845a66572dc604dca8a) by felixoesinghaus
+- [Mercedes Benz Sprinter 2006](https://sketchfab.com/3d-models/mercedes-benz-sprinter-2006-f69de1315bb049c8946d57f6006acd73) by Max (Max-7215)
+- [Semi Truck](https://sketchfab.com/3d-models/semi-truck-65d325c2fc9443d88c61dc01976b8291) by ne0ns (Ervinas)
+- [Forklift Truck](https://sketchfab.com/3d-models/forklift-truck-060f3f8bc7de4e6ca2f348d414702e9d) by louis-muir
+- [Low Poly Car - Chrysler Saratoga 1960](https://sketchfab.com/3d-models/low-poly-car-chrysler-saratoga-1960-3fa89e6bf78b49aab111af4195efb6fe) and [Low Poly Car - Cadillac 75 Sedan 1953](https://sketchfab.com/3d-models/low-poly-car-cadillac-75-sedan-1953-2935f8faa5f64ce4a3bd65af0f925c21) by ROH3D (tedpermana)
+- [1951 Chevy StepSide Truck](https://sketchfab.com/3d-models/1951-chevy-stepside-truck-4f53676a14ec4d3295d969441655b09c) by Nick Rosenthal
+- [700 Follower Special Van](https://sketchfab.com/3d-models/700-follower-special-van-downloadable-6a6c3f1410d34491994c3308959f2f38) by Libau Media
+- [Rustic Chevrolet P30 Step-Van Replica](https://sketchfab.com/3d-models/rustic-chevrolet-p30-step-van-replica-45c4e2166c8a4cbc88f04ae404fa9a02) by the.snajp
+- [Adelaide Alstom Citadis 302](https://sketchfab.com/3d-models/adelaide-alstom-citadis-302-original-6ee414e9f05347ca9b3f1e0e062b99c0) by MiguelRamos
+
 From the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets), textures resized:
 
 - Commercial Refrigerator (snack bar fridges): CC BY 4.0, Eric Chadwick / Darmstadt Graphics Group, based on [Commercial Fridge](https://sketchfab.com/3d-models/commercial-fridge-2174e1e4f1f24f1a95aa110ee060f473) by Sean Thomas

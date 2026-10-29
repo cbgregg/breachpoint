@@ -17,6 +17,12 @@ export function setProp(name, scene) {
     geo.applyMatrix4(o.matrixWorld);
     geo.computeBoundingBox();
     box.union(geo.boundingBox);
+    // vehicles shipped unlit (KHR_materials_unlit loads as MeshBasicMaterial): lit like everything else, or they
+    // glow in the dark and ignore the sun
+    if (name.startsWith('veh_') && o.material.isMeshBasicMaterial) {
+      const b = o.material;
+      o.material = new THREE.MeshStandardMaterial({ map: b.map, color: b.color, side: b.side, transparent: b.transparent, opacity: b.opacity, alphaTest: b.alphaTest, roughness: 0.55, metalness: 0 });
+    }
     if (o.material.map) o.material.map.anisotropy = 8;
     // the maps batch with only the first uv set: drop any map that reads another one
     for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'specularIntensityMap', 'specularColorMap']) {
