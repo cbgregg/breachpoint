@@ -172,6 +172,26 @@ export class Doors {
     else if (a && target) a.play('doorslide', new THREE.Vector3(d.x, d.y + 1, d.z));
   }
 
+  // kicked in: it flies open away from the kicker, and anyone within reach on the far side is shoved and stunned
+  kick(d, c) {
+    const g = this.game, [, n] = this.rel(d, c.pos), away = -Math.sign(n) || 1;
+    d.target = away; d.t = away * 0.55;   // (already well open: the kick, not the hinge, moved it)
+    this.pose(d);
+    const at = new THREE.Vector3(d.x, d.y + 1, d.z);
+    g.audio.play('doorkick', at);
+    g.emit(['dk', d.idx]);
+    for (const o of g.characters) {
+      if (!o.alive || o === c) continue;
+      const [a, on, y] = this.rel(d, o.pos);
+      if (Math.abs(y) > 1.5 || Math.abs(a) > d.w / 2 + 0.5 || on * away < 0 || Math.abs(on) > 1.6) continue;
+      o.vel.x += d.n[0] * away * 5.5; o.vel.z += d.n[1] * away * 5.5;
+      o.stun(1.1);
+      o.hitReact(o.chestPos(new THREE.Vector3()), new THREE.Vector3(d.n[0] * away, 0, d.n[1] * away), 1.6, false, 1);
+      if (o.isBot) g.callout(o, 'hit', 0.6);
+    }
+    if (c === g.player) g.hud.toast('DOOR KICKED IN');
+  }
+
   update(dt, authority) {
     const g = this.game;
     for (const d of this.list) {

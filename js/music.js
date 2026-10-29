@@ -140,9 +140,9 @@ export class Music {
     const t0 = ctx.currentTime + 0.05, end = t0 + secs;
     // recorded: started so its impact lands on the end of the countdown (a short countdown joins it part-way)
     const rec = this.files && this.files.intro;
-    if (rec && this.buffers[rec.file]) { this.hypeBus = this.cue('intro', end - rec.hit, 0, 0.95); if (this.hypeBus) return; }
+    if (rec && this.buffers[rec.file]) { this.hypeBus = this.cue('intro', end - rec.hit, 0, 0.7); if (this.hypeBus) return; }
     const bus = ctx.createGain();
-    bus.gain.value = 0.95;
+    bus.gain.value = 0.7;
     bus.connect(this.out);
     const send = ctx.createGain(); send.gain.value = 0.45; bus.connect(send).connect(this.hall);
     this.hypeBus = bus;
@@ -444,8 +444,8 @@ class MoodTrack extends Track {
       if (hall) { const h = ctx.createGain(); h.gain.value = hall; g.connect(h).connect(this.hall); }
       return g;
     };
-    this.arpBus = part(0.8, 1, 0.7); this.pianoBus = part(1, 0.35, 0.9); this.bellBus = part(0.8, 0.6, 1);
-    this.padBus = part(1, 0, 0.9); this.clapBus = part(1, 0, 0.6); this.counterBus = part(0.9, 1, 1);
+    this.arpBus = part(0.55, 0.9, 0.8); this.pianoBus = part(0.9, 0.35, 1); this.bellBus = part(0.45, 0.5, 1);
+    this.padBus = part(1, 0, 1); this.clapBus = part(0.6, 0, 0.7); this.counterBus = part(0.6, 0.9, 1);
   }
   // a soft kick: just the thump (the stock kick's click on every beat was too much here)
   kick(t, v) {
@@ -459,8 +459,8 @@ class MoodTrack extends Track {
     const bar = Math.floor(step / 16), s = step % 16, b16 = bar % 16, pass = Math.floor(bar / 16) % 4;
     const ch = CHORDS[MOOD_CHORDS[b16]];
     // drums: a soft kick on the beat, a clap on 2 and 4 (into the hall), quiet offbeat hats
-    if (s % 4 === 0) this.kick(t, 0.5);
-    if (s === 4 || s === 12) { noise(ctx, nb, this.clapBus, t, { type: 'bandpass', freq: 1400, q: 0.8, attack: 0.004, decay: 0.12, gain: 0.1 }); noise(ctx, nb, this.clapBus, t + 0.014, { type: 'bandpass', freq: 1600, q: 0.8, attack: 0.004, decay: 0.16, gain: 0.07 }); }
+    if (s % 4 === 0) this.kick(t, 0.36);
+    if (s === 4 || s === 12) { noise(ctx, nb, this.clapBus, t, { type: 'bandpass', freq: 1400, q: 0.8, attack: 0.004, decay: 0.12, gain: 0.07 }); noise(ctx, nb, this.clapBus, t + 0.014, { type: 'bandpass', freq: 1600, q: 0.8, attack: 0.004, decay: 0.16, gain: 0.07 }); }
     if (s % 4 === 2) noise(ctx, nb, this.kit, t, { type: 'bandpass', freq: 5500, q: 1.2, attack: 0.012, decay: 0.05, gain: 0.014 });   // (a soft shaker)
     // sub bass on the offbeats (the pump), the root held under the downbeat
     const root = ch[0] - 12;
@@ -493,14 +493,14 @@ class MoodTrack extends Track {
 // menu's hook on the bell, as a reminder. Quiet: it sits under the fight.
 const FINALE_CHORDS = ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'A', 'A'];
 class FinaleTrack extends MoodTrack {
-  constructor(m) { super(m, 112); this.level = 0.7; }
+  constructor(m) { super(m, 112); this.level = 0.5; }   // (the closing moments: felt under the fight, not over it)
   start() { super.start(); this.bus.gain.cancelScheduledValues(this.ctx.currentTime); this.bus.gain.setTargetAtTime(this.level, this.ctx.currentTime, 1.2); }
   play(step, t) {
     const ctx = this.ctx, dt = this.dt, nb = this.m.audio.noise;
     const bar = Math.floor(step / 16), s = step % 16, b8 = bar % 8;
     const ch = CHORDS[FINALE_CHORDS[b8]], root = ch[0] - 12;
-    if (s % 4 === 0) this.kick(t, 0.45);
-    if (s % 4 === 2) noise(ctx, nb, this.kit, t, { type: 'bandpass', freq: 5500, q: 1.2, attack: 0.012, decay: 0.05, gain: 0.012 });
+    if (s % 4 === 0) this.kick(t, 0.34);
+    if (s % 4 === 2) noise(ctx, nb, this.kit, t, { type: 'bandpass', freq: 5500, q: 1.2, attack: 0.012, decay: 0.05, gain: 0.009 });
     if (bar % 2 && (s === 4 || s === 12)) noise(ctx, nb, this.clapBus, t, { type: 'bandpass', freq: 1400, q: 0.8, attack: 0.004, decay: 0.12, gain: 0.07 });
     if (s % 2 === 0) voice(ctx, this.bus, t, { freq: mtof(root), type: 'sine', attack: 0.012, hold: dt * 0.9, release: 0.08, gain: s % 4 === 0 ? 0.12 : 0.08, cutoff: 260 });
     const arp = [ch[0] + 12, ch[1] + 12, ch[2] + 12, ch[1] + 12][step % 4];

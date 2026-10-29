@@ -4,7 +4,7 @@ import { ROUTE_SEEDS } from './nav.js';
 import { DIFFICULTY, PLAYER } from './config.js';
 const MELEE_REACH = 2.1;   // Infected bots strike from here (the knife reaches 2.3 m to the chest)
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _bv1 = new THREE.Vector3(), _bv2 = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -446,6 +446,12 @@ export class BotBrain {
     const run = sprint && !this.visible;
     if (!run) this.tac = false;
     else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
+    // something breakable across the way (boards over a doorway, a pane): kick it in and carry on
+    if (g.breakables && wish.lengthSq() > 0.04 && b.meleeCd <= 0 && (this.breachT = (this.breachT || 0) + dt) > 0.25) {
+      this.breachT = 0;
+      const eye = b.eyePos(_bv1), dir = _bv2.copy(wish).normalize(), hit = g.physics.raycast(eye, dir, 1.4);
+      if (hit && hit.box.breakable !== undefined) { b.yaw = Math.atan2(-dir.x, -dir.z); b.melee(); }
+    }
     b.updateMovement(dt, wish, run, jump, false, run && this.tac);
   }
 

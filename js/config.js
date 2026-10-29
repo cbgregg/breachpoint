@@ -75,7 +75,7 @@ export const WEAPONS = {
     model: { type: 'rifle', sight: 'holo' },
   },
   smg: {
-    id: 'smg', name: 'VX-9 SMG', short: 'VX-9', mode: 'AUTO', auto: true, rpm: 880, damage: 19, headMult: 1.4,
+    id: 'smg', name: 'VX-9 SMG', short: 'VX-9', mode: 'AUTO', auto: true, rpm: 880, damage: 20, headMult: 1.4,
     mag: 32, reserve: 160, reload: 1.9, spread: 0.04, adsSpread: 0.012, moveSpread: 0.015,
     recoilPitch: 0.009, recoilYaw: 0.008, range: 100, falloffStart: 14, falloffEnd: 40, falloffMin: 0.55,
     pellets: 1, adsFov: 55, adsTime: 0.16, botRange: [4, 22],
@@ -111,14 +111,14 @@ export const WEAPONS = {
     model: { type: 'rifle', sight: 'iron', look: { wood: true, metal: 0x3a3a38, curved: true, gastube: true } },
   },
   br308: {
-    id: 'br308', name: 'BR-308 Battle Rifle', short: 'BR-308', mode: 'AUTO', auto: true, rpm: 520, damage: 36, headMult: 1.6,
+    id: 'br308', name: 'BR-308 Battle Rifle', short: 'BR-308', mode: 'AUTO', auto: true, rpm: 480, damage: 34, headMult: 1.6,
     mag: 20, reserve: 120, reload: 2.5, spread: 0.038, adsSpread: 0.004, moveSpread: 0.04,
-    recoilPitch: 0.019, recoilYaw: 0.008, range: 180, falloffStart: 45, falloffEnd: 100, falloffMin: 0.75,
+    recoilPitch: 0.022, recoilYaw: 0.009, range: 180, falloffStart: 45, falloffEnd: 100, falloffMin: 0.75,
     pellets: 1, adsFov: 48, adsTime: 0.26, botRange: [10, 50],
     model: { type: 'rifle', sight: 'holo', look: { tan: true, long: 0.1, riser: true } },
   },
   hx60: {
-    id: 'hx60', name: 'HX-60 LMG', short: 'HX-60', mode: 'AUTO', auto: true, rpm: 650, damage: 27, headMult: 1.4,
+    id: 'hx60', name: 'HX-60 LMG', short: 'HX-60', mode: 'AUTO', auto: true, rpm: 650, damage: 24, headMult: 1.4,
     mag: 100, reserve: 200, reload: 5.4, spread: 0.048, adsSpread: 0.008, moveSpread: 0.055,
     recoilPitch: 0.010, recoilYaw: 0.009, range: 160, falloffStart: 35, falloffEnd: 90, falloffMin: 0.7,
     pellets: 1, adsFov: 50, adsTime: 0.38, botRange: [8, 45],
@@ -146,7 +146,7 @@ export const WEAPONS = {
     model: { type: 'rifle', sight: 'iron', look: { furniture: 0x2b2d2a, drum: true } }, // drum-fed: rifle-style mag change
   },
   d50: {
-    id: 'd50', name: 'D-50 Hand Cannon', short: 'D-50', mode: 'SEMI', auto: false, rpm: 220, damage: 55, headMult: 1.8,
+    id: 'd50', name: 'D-50 Hand Cannon', short: 'D-50', mode: 'SEMI', auto: false, rpm: 180, damage: 55, headMult: 1.8,
     mag: 7, reserve: 35, reload: 1.9, spread: 0.03, adsSpread: 0.003, moveSpread: 0.02,
     recoilPitch: 0.05, recoilYaw: 0.012, range: 110, falloffStart: 20, falloffEnd: 50, falloffMin: 0.6,
     pellets: 1, adsFov: 56, adsTime: 0.17, botRange: [3, 28],
@@ -304,7 +304,7 @@ export const DEFAULT_SETTINGS = {
   fpsCap: 0,           // 0 = unlimited (the display's refresh rate)
   fullscreen: true,    // desktop matches go fullscreen with the keyboard locked (so Ctrl+W crouches instead of closing the tab)
   fillBots: true, chat: true,
-  musicVolume: 0.5,
+  musicVolume: 0.35,   // (the score sits back: you hear the fight)
   matchMusic: 'finale',   // in a match: 'finale' (the closing moments only, like Black Ops 2), 'off' or 'always'
   adsZoom: 1,          // multiplies each optic's magnification (0.5–1.5)
   sightSize: 'large',  // how much of the screen the sight fills when aiming: normal | large | huge

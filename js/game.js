@@ -6,6 +6,7 @@ const _rayHit = { t: 0, head: false };
 const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lq = new THREE.Quaternion();
 import { Physics, rayBox } from './physics.js';
 import { Doors } from './doors.js';
+import { Breakables } from './breach.js';
 import { buildWorld, renderMinimap, MAPS, MAP_IDS, setWorldDetail, worldDetailLow } from './world.js';
 import { Character, setCharacterDetail, prewarmGun } from './character.js';
 import { hitPower } from './motion.js';
@@ -971,7 +972,16 @@ export class Game {
     for (let p = 0; p < def.pellets; p++) {
       applySpread(dir, spread, _d);
       let best = def.range, hitC = null, head = false;
-      const w = this.physics.raycast(origin, _d, def.range);
+      let w = this.physics.raycast(origin, _d, def.range);
+      // a pane of glass: this round shatters it and carries on (a little past it); boards take the round
+      for (let guard = 0; w && w.box.breakable !== undefined && this.breakables && guard < 4; guard++) {
+        const bk = this.breakables.list[w.box.breakable];
+        const broke = !cosmetic && this.breakables.hit(w.box.breakable, def.damage * (def.pellets > 1 ? 0.5 : 1), w.point, w.normal, shooter);
+        if (!broke && !(cosmetic && bk && bk.kind === 'glass')) break;
+        const past = w.t + 0.08;
+        w = this.physics.raycast(_b.copy(origin).addScaledVector(_d, past), _d, def.range - past);
+        if (w) w.t += past;
+      }
       if (w) best = w.t;
       for (const c of this.characters) {
         if (!c.alive || c === shooter || c.hidden || (!this.foes(c, shooter) && !ff)) continue;
@@ -1037,7 +1047,17 @@ export class Game {
       if (this.physics.blocked(eye, c.chestPos(_b))) continue;
       best = c; bd = d;
     }
-    if (!best) return;
+    if (!best) {
+      // nothing to hit: a breach instead. Boards or glass right in front: a kick breaks them. A shut door: kicked
+      // in hard, and anyone just behind it is thrown back and stunned for a moment
+      const bk = this.breakables && this.breakables.near(attacker);
+      if (bk) { this.breakables.hit(bk.b.idx, 60, bk.point, bk.normal, attacker); return; }
+      if (this.doors) {
+        const d = this.doors.near(attacker);
+        if (d && d.kind === 'swing' && Math.abs(d.t) < 0.12) this.doors.kick(d, attacker);
+      }
+      return;
+    }
     const lunge = _a.subVectors(best.pos, attacker.pos).setY(0).normalize();
     attacker.vel.x += lunge.x * 4; attacker.vel.z += lunge.z * 4;
     best.hitReact(best.chestPos(_b), lunge, 2.2, false);
@@ -1346,6 +1366,7 @@ export class Game {
     const src = _a.copy(pos); src.y += 0.25;
     if (g.rocket) src.addScaledVector(_d.copy(g.vel).normalize(), -0.3);   // just in front of the wall it hit
     const R = g.rocket ? g.rocket.radius : (g.spec ? g.spec.radius : GRENADE.radius), DMG = g.rocket ? g.rocket.damage : (g.spec ? g.spec.damage : GRENADE.damage), wid = g.rocket ? 'monte' : g.type === 'semtex' ? 'semtex' : 'grenade';
+    if (this.breakables) this.breakables.blast(pos, R * 0.8, g.owner);
     for (const c of this.characters) {
       if (!c.alive) continue;
       const cp = c.chestPos(new THREE.Vector3());
@@ -1428,7 +1449,7 @@ export class Game {
     this.calloutT = t;
     if (!c.voice) { c.voice = VOICES[nameHash(c.name) % VOICES.length]; this.audio.want(`vo/chatter/${c.voice}/`); }   // joined mid-match
     // explicit language on: about half the time, the version with the swearing (where that line has one)
-    const base = `vo/chatter/${c.voice}/`, x = this.explicit && Math.random() < 0.5 && this.audio.samples.has(`${base}x_${kind}`);
+    const base = `vo/chatter/${c.voice}/`, x = this.explicit && Math.random() < 0.65 && this.audio.samples.has(`${base}x_${kind}`);
     const id = c.infected ? `vo/infected/${kind}` : base + (x ? 'x_' : '') + kind, ui = me || radio;
     const say = () => (c.alive ? this.audio.play('vo', ui ? null : c.pos, { id, ui, radio, vol: me ? 0.5 : radio ? 0.42 : 0.85 }) || 0 : 0);
     // (their voice still loading, the first seconds of a match: say it as soon as it's in, if that's soon)
@@ -1830,11 +1851,13 @@ export class Game {
       for (const set of Object.values(this.world.textures)) for (const t of Object.values(set)) if (t && t.isTexture && !t.userData.keep) t.dispose();
     }
     if (this.doors) { this.doors.dispose(); this.doors = null; }
+    if (this.breakables) { this.breakables.dispose(); this.breakables = null; }
     this.physics.boxes.length = 0;
     this.world = buildWorld(this.scene, this.physics, id);
     this.world.game = this;   // (maps with moving parts carry the characters on them)
     // doors come after the nav grid, so bots path through doorways (and open them on the way)
     if (this.world.doors) this.doors = new Doors(this, this.world.doors);
+    this.breakables = this.world.breakables && this.world.breakables.length ? new Breakables(this, this.world.breakables) : null;
     setCharacterDetail(this.world.textures.fabric);
     this.renderer.scanLights();   // the new map's lamps feed the light pool (render.js)
     this.renderer.applyAniso();

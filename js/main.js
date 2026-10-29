@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, WEAPONS, PRIMARIES, SECONDARIES, FRIENDLY_CSS, ENEMY_
 import { setupPadCal } from './padcal.js';
 import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
-import { Game, prewarmBotGuns } from './game.js';
+import { Game, prewarmBotGuns, VOICES } from './game.js';
 import { glyph } from './hud.js';
 import { loadAssets } from './assets.js';
 import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } from './online.js';
@@ -271,6 +271,7 @@ for (const [id, key, type] of bindings) {
   el.addEventListener(ev, () => {
     readField(id, key, type);
     if (key === 'gyro' && settings.gyro !== 'off') { game.input.setGyro(settings.gyro); game.input.askGyro(); }   // (iPhone asks for permission on a tap: this one)
+    if (key === 'explicit' && settings.explicit) { const v = VOICES[(Math.random() * VOICES.length) | 0]; voicePreview(`vo/chatter/${v}/`, ['x_contact', 'x_hit', 'x_enemy_down', 'x_grenade']); }   // (so you hear it's on)
     if (OPT_KEYS.includes(key)) {
       // an option: show it in the form, apply it later
       if (key === 'quality' && settings.quality !== 'custom') { Object.assign(settings, presetGfx(settings.quality)); writeGfx(); }
@@ -2213,12 +2214,16 @@ function sideTab(t) {
 document.querySelectorAll('#side .sd-tab').forEach(b => b.addEventListener('click', () => sideTab(b.dataset.sdt)));
 
 // account state shown around the menus
+let explicitSyncedFor = null;
 function syncAccount() {
   const u = account.signedIn ? account.user : null;
   // one name everywhere: once you have a Name Tag, offline matches use it too
   if (u && u.tag && settings.name !== u.tag) { settings.name = u.tag; saveSettings(settings); }
-  // the account's explicit-language choice wins over this device's (it follows you everywhere)
-  if (u && typeof u.explicit === 'boolean' && settings.explicit !== u.explicit) {
+  // the account's explicit-language choice comes in once, when the account first shows up (it follows you to a
+  // new device); after that, what you set here wins and is pushed to the account (it used to come back on every
+  // refresh, which turned the option off again behind your back)
+  if (u && typeof u.explicit === 'boolean' && settings.explicit !== u.explicit && explicitSyncedFor !== u.id) {
+    explicitSyncedFor = u.id;
     settings.explicit = u.explicit; saveSettings(settings); game.applySettings(settings);
     $('opt-explicit').checked = u.explicit;
     const b = JSON.parse(optBase); b.explicit = u.explicit; optBase = JSON.stringify(b);   // (not an unapplied change)

@@ -897,6 +897,7 @@ export class HostSession {
     const msg = { t: 's', tm: r3(g.time), ack: r.ack, sc: [...g.scores], tl: r2(g.timeLeft), cd: r2(Math.max(0, g.countdownT)), me, ch, pk };
     if (g.gm) msg.gm = g.gm.netState();
     if (g.doors && g.doors.list.length) msg.dr = g.doors.netState();
+    if (g.breakables && g.breakables.list.length) msg.bk = g.breakables.netState();
     if (r.ev.length) { msg.ev = r.ev; r.ev = []; }
     if (r.pv.length) { msg.pv = r.pv; r.pv = []; }
     if (sb) msg.sb = sb;
@@ -1031,6 +1032,7 @@ export class GuestSession {
     if (fin(m.cd)) g.countdownT = m.cd;
     if (m.gm && g.gm) g.gm.applyNet(m.gm);
     if (m.dr && g.doors) g.doors.applyNet(m.dr);
+    if (m.bk && g.breakables) g.breakables.applyNet(m.bk);
     this.curTm = m.tm;
     if (Array.isArray(m.ev)) for (const ev of m.ev) if (Array.isArray(ev)) this.event(ev);
     if (Array.isArray(m.pv)) for (const ev of m.pv) if (Array.isArray(ev)) this.personal(ev);
@@ -1238,6 +1240,8 @@ export class GuestSession {
         g.audio.play('melee', c.pos);
         break;
       }
+      case 'brk': { if (g.breakables) g.breakables.event(ev[1] | 0, ev[2], ev[3], ev[4]); break; }
+      case 'dk': { const d = g.doors && g.doors.list[ev[1] | 0]; if (d) g.audio.play('doorkick', new THREE.Vector3(d.x, d.y + 1, d.z)); break; }
       case 'drop': {
         const [, pid, x, y, z] = ev;
         if ([pid, x, y, z].every(fin)) g.dropAmmo(new THREE.Vector3(x, y, z), pid);

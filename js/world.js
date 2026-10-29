@@ -570,6 +570,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   const group = new THREE.Group();
   scene.add(group);
   const rnd = seeded(1337);
+  const breakables = [];   // what can be broken through (js/breach.js): glazed and boarded-up openings, from the houses
 
   // XF: a rotated local frame { x, z, a } (origin and yaw). While set, everything put / solid places is authored in
   // that frame: pieces are turned and moved into place, and collision follows the turned footprint in thin strips.
@@ -1033,6 +1034,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const wallMat = spec.stone ? M.stone : brick ? M.brick : M.plaster;
     const tint = spec.stone ? 0xa79d8c : brick ? 0xf2e6dc : plasterTints[Math.floor(rnd() * plasterTints.length)];
     const inner = 0xece6da;
+    const doorCount = ['n', 's', 'e', 'w'].reduce((n, k) => n + (spec[k] || []).filter(o => o[0] === 'd').length, 0);
     const sides = [
       { k: 'n', ax: 1, az: 0, nx: 0, nz: 1, len: w, ox: cx, oz: cz + d / 2 - T / 2 },
       { k: 's', ax: 1, az: 0, nx: 0, nz: -1, len: w, ox: cx, oz: cz - d / 2 + T / 2 },
@@ -1063,6 +1065,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         seg(cur, o.a, 0, h);
         const ow = o.b - o.a, mid = (o.a + o.b) / 2;
         const fx = S.ox + S.ax * mid, fz = S.oz + S.az * mid;
+        // breaching: a window is glazed (shoot it out) or boarded up (kick it in) now and then, and a doorway is
+        // boarded over once in a while when the house has another way in (a shortcut you make, never a dead end)
+        const roll = rnd(), axis = S.ax ? 'x' : 'z';
+        if (o.k === 'd' && roll < 0.15 && doorCount > 1) breakables.push({ kind: 'boards', x: fx, y: y0 + 0.08, z: fz, axis, w: ow - 0.1, h: 2.1 });
+        else if (o.k === 'w' && roll < 0.38) breakables.push({ kind: 'glass', x: fx, y: y0 + 1.02, z: fz, axis, w: ow - 0.12, h: 1.05 });
+        else if (o.k === 'w' && roll < 0.55) breakables.push({ kind: 'boards', x: fx, y: y0 + 1.04, z: fz, axis, w: ow - 0.12, h: 1.02 });
         if (o.k === 'd') {
           seg(o.a, o.b, 2.3, h);
           // door frame + a battered door swung open against the inside wall
@@ -2570,7 +2578,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (LAYOUT.mountain !== false) group.add(buildMountain());
 
   for (const [k, m] of Object.entries(M)) if (m && m.isMaterial && !m.name) m.name = k;   // named, for the map audit's reports
-  const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex };
+  const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex, breakables };
   if (LAYOUT.spawns2) {
     // asymmetric maps list each team's spawns
     LAYOUT.spawns2.forEach((list, t) => { for (const [x, z] of list) world.spawns[t].push(new THREE.Vector3(x, 0, z)); });
