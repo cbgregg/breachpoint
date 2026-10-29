@@ -81,6 +81,8 @@ export class Input {
     this.actions = new Set();
     this.used = []; // actions consumed this frame (sent to the host in online play)
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
+    this.touchDX = 0; this.touchDY = 0; this.gyroYaw = 0; this.gyroPitch = 0;   // touch look and gyro (applied by the player)
+    this.touchAccel = 0.6; this.gyroMode = 'off'; this.haptics = true; this.touchSprintLock = false;
     this.mouseFire = false; this.mouseAds = false;
     this.locked = false;
     this.fallback = false; // free-look without pointer lock (sandboxed iframes)
@@ -256,6 +258,7 @@ export class Input {
   }
 
   rumble(strong, weak, ms) {
+    if (this.lastDevice === 'touch') { if (strong >= 0.3) this.buzz(Math.min(40, ms * 0.25)); return; }
     if (!this.vibration || !this.pad || this.lastDevice !== 'pad') return;
     const a = this.pad.vibrationActuator;
     if (a && a.playEffect) a.playEffect('dual-rumble', { startDelay: 0, duration: ms, strongMagnitude: Math.min(1, strong), weakMagnitude: Math.min(1, weak) }).catch(() => {});
@@ -356,7 +359,47 @@ export class Input {
     this.actions.clear();
     this.used.length = 0;
     this.mouseDX = 0; this.mouseDY = 0; this.wheel = 0;
+    this.touchDX = 0; this.touchDY = 0; this.gyroYaw = 0; this.gyroPitch = 0;
   }
+
+  // ---------- gyro aiming (Options: off / while aiming / always) ----------
+  // The phone's turn rate, read in the screen's frame: turning the phone left or right turns you, tilting its
+  // top edge back or forward looks up or down, the way you'd point a camera. iPhones ask once for permission
+  // (it has to come from a tap: the first touch in a match, or switching it on in Options).
+  setGyro(mode) {
+    this.gyroMode = mode;
+    if (mode === 'off' || this.gyroOn) return;
+    const DM = window.DeviceMotionEvent;
+    if (!DM) return;
+    if (typeof DM.requestPermission === 'function' && !this.gyroGranted) { this.gyroNeedsAsk = true; return; }
+    this.gyroOn = true;
+    let lastT = 0;
+    window.addEventListener('devicemotion', (e) => {
+      const r = e.rotationRate;
+      if (!r || this.gyroMode === 'off' || !this.enabled) { lastT = 0; return; }
+      const now = e.timeStamp || performance.now();
+      const dt = lastT ? Math.min(0.05, (now - lastT) / 1000) : Math.min(0.05, e.interval > 1 ? e.interval / 1000 : e.interval || 0.016);
+      lastT = now;
+      const ang = (((screen.orientation && screen.orientation.angle) ?? window.orientation ?? 90) + 360) % 360;
+      const b = r.beta || 0, gm = r.gamma || 0, D = Math.PI / 180;
+      // landscape: the screen's up is the phone's +x (turned left, 90) or -x (turned right, 270); its right is -y or +y
+      let yaw, pitch;
+      if (ang === 90) { yaw = b; pitch = -gm; } else if (ang === 270) { yaw = -b; pitch = gm; } else { yaw = gm; pitch = b; }
+      // (a hand is never perfectly still: ignore the faintest drift)
+      if (Math.abs(yaw) < 0.6) yaw = 0;
+      if (Math.abs(pitch) < 0.6) pitch = 0;
+      this.gyroYaw += yaw * D * dt; this.gyroPitch += pitch * D * dt;
+    });
+  }
+  askGyro() {
+    const DM = window.DeviceMotionEvent;
+    if (!this.gyroNeedsAsk || !DM || typeof DM.requestPermission !== 'function') return;
+    this.gyroNeedsAsk = false;
+    DM.requestPermission().then((st) => { if (st === 'granted') { this.gyroGranted = true; this.setGyro(this.gyroMode); } }).catch(() => {});
+  }
+
+  // a short buzz on phones that can (Android; iPhone browsers don't allow it)
+  buzz(ms) { if (this.haptics && this.lastDevice === 'touch' && navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) { /* ignore */ } } }
 
   reset() {
     this.keys.clear(); this.actions.clear();
@@ -380,31 +423,51 @@ export class Input {
     const stick = document.getElementById('stick');
     const knob = document.getElementById('stick-knob');
     let stickId = null, sx = 0, sy = 0;
-    let lookId = null, lx = 0, ly = 0;
+    let lookId = null, lx = 0, ly = 0, lt = 0;
     const R = 55;
-    const lookStart = (t) => { lookId = t.identifier; lx = t.clientX; ly = t.clientY; };
-    const lookMove = (t) => { this.mouseDX += (t.clientX - lx) * 1.6; this.mouseDY += (t.clientY - ly) * 1.6; lx = t.clientX; ly = t.clientY; };
+    const lookStart = (t) => { lookId = t.identifier; lx = t.clientX; ly = t.clientY; lt = performance.now(); };
+    // Aim acceleration (as in CoD Mobile): a slow drag moves the view exactly with your finger, for fine aim;
+    // a fast swipe goes further, so you can turn round without running out of screen.
+    const lookMove = (t) => {
+      const dx = t.clientX - lx, dy = t.clientY - ly, now = performance.now();
+      const speed = Math.hypot(dx, dy) / Math.max(4, now - lt);   // px per ms
+      const k = 1 + this.touchAccel * Math.min(1, Math.max(0, (speed - 0.4) / 1.6));
+      this.touchDX += dx * k; this.touchDY += dy * k;
+      lx = t.clientX; ly = t.clientY; lt = now;
+    };
+    const placeStick = () => {
+      const z = this.touchZoom(), r = ui.getBoundingClientRect();   // (the layer is inset from the screen's edges on an iPhone)
+      stick.style.left = `${sx - r.left - 60 * z}px`; stick.style.top = `${sy - r.top - 60 * z}px`;
+    };
+    // a locked sprint ends when you touch the stick again, fire or aim
+    const unlockSprint = () => {
+      if (!this.touchSprintLock) return;
+      this.touchSprintLock = false; this.touchSprint = false; this.touchMoveX = this.touchMoveY = 0;
+      stick.classList.remove('locked', 'sprint', 'show'); knob.style.transform = '';
+    };
+    this.unlockSprint = unlockSprint;
 
     ui.addEventListener('touchstart', (e) => {
       this.setDevice('touch');
       if (!this.enabled) return;
+      this.askGyro();   // (iPhone: the first tap in a match asks for the gyro, if it's switched on)
       for (const t of e.changedTouches) {
         const btn = t.target.closest('[data-btn]');
         if (btn) {
           const k = btn.dataset.btn;
           btn.classList.add('down');
-          if (k === 'fire') { this.touchFire = true; if (lookId === null) lookStart(t); }
-          else if (k === 'ads') { this.touchAdsHeld = true; this.adsPress(); if (lookId === null) lookStart(t); }
+          this.buzz(8);
+          if (k === 'fire') { this.touchFire = true; unlockSprint(); if (lookId === null) lookStart(t); }
+          else if (k === 'ads') { this.touchAdsHeld = true; unlockSprint(); this.adsPress(); if (lookId === null) lookStart(t); }
           else if (k === 'score') this.touchScore = true;
           else if (k === 'grenade') this.touchGren = true;
           else { if (k === 'reload') this.touchUse = true; if (k === 'crouch') this.touchCrouch = true; this.actions.add(k); }
           continue;
         }
         if (t.clientX < window.innerWidth * 0.4 && stickId === null) {
+          unlockSprint();
           stickId = t.identifier; sx = t.clientX; sy = t.clientY;
-          const z = this.touchZoom();   // (the controls' size from Options; the stick is 120 px across at full size)
-          const r = ui.getBoundingClientRect();   // (the layer is inset from the screen's edges on an iPhone)
-          stick.style.left = `${sx - r.left - 60 * z}px`; stick.style.top = `${sy - r.top - 60 * z}px`;
+          placeStick();
           stick.classList.add('show');
         } else if (lookId === null) {
           lookStart(t);
@@ -416,15 +479,26 @@ export class Input {
     ui.addEventListener('touchmove', (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === stickId) {
+          const z = this.touchZoom(), Rz = R;   // (thumb travel in screen pixels; the drawing scales with the button size)
           let dx = t.clientX - sx, dy = t.clientY - sy;
-          const len = Math.hypot(dx, dy);
-          // push the stick all the way forward (to the ring and a little past) to sprint, like CoD Mobile
-          const sprint = len > R * 1.02 && -dy > Math.abs(dx) * 1.2;
-          if (sprint !== this.touchSprint) { this.touchSprint = sprint; stick.classList.toggle('sprint', sprint); }
-          if (len > R) { dx *= R / len; dy *= R / len; }
-          const z = this.touchZoom();
+          let len = Math.hypot(dx, dy);
+          const fwd = -dy > Math.abs(dx) * 1.2;
+          // the stick follows a thumb that runs on past the ring (except straight ahead, where the sprint lock
+          // is), so pulling back answers at once instead of after travelling back to where you first touched
+          const far = Rz * 1.45;
+          if (len > far && !fwd) {
+            const k = (len - far) / len; sx += dx * k; sy += dy * k;
+            dx = t.clientX - sx; dy = t.clientY - sy; len = far; placeStick();
+          }
+          // push the stick to the ring and a little past to sprint, like CoD Mobile; push on up into the lock
+          // above it and the sprint stays on after you let go
+          const sprint = len > Rz * 1.02 && fwd;
+          const lock = fwd && -dy > Rz * 2.1;
+          if (sprint !== this.touchSprint) { this.touchSprint = sprint; stick.classList.toggle('sprint', sprint); if (sprint) this.buzz(6); }
+          if (lock !== stick.classList.contains('locking')) { stick.classList.toggle('locking', lock); if (lock) this.buzz(15); }
+          if (len > Rz) { dx *= Rz / len; dy *= Rz / len; }
           knob.style.transform = `translate(${dx * z}px, ${dy * z}px)`;
-          this.touchMoveX = dx / R; this.touchMoveY = -dy / R;
+          this.touchMoveX = dx / Rz; this.touchMoveY = -dy / Rz;
         } else if (t.identifier === lookId) {
           lookMove(t);
         }
@@ -435,9 +509,17 @@ export class Input {
     const end = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === stickId) {
-          stickId = null; this.touchMoveX = this.touchMoveY = 0;
-          this.touchSprint = false; stick.classList.remove('sprint');
-          knob.style.transform = ''; stick.classList.remove('show');
+          stickId = null;
+          if (stick.classList.contains('locking')) {
+            // let go in the lock: keep running forward
+            stick.classList.remove('locking'); stick.classList.add('locked');
+            knob.style.transform = `translate(0px, ${-R * this.touchZoom()}px)`;
+            this.touchSprintLock = true; this.touchSprint = true; this.touchMoveX = 0; this.touchMoveY = 1;
+          } else {
+            this.touchMoveX = this.touchMoveY = 0;
+            this.touchSprint = false; stick.classList.remove('sprint');
+            knob.style.transform = ''; stick.classList.remove('show');
+          }
         }
         if (t.identifier === lookId) lookId = null;
         const btn = t.target.closest && t.target.closest('[data-btn]');

@@ -246,7 +246,20 @@ export class PlayerController {
     const inv = s.invertY ? -1 : 1;
     c.yaw -= inp.mouseDX * sens;
     c.pitch -= inp.mouseDY * sens * inv;
-    if (inp.lookX || inp.lookY) {
+    if (inp.lastDevice === 'touch') {
+      // touch: its own look and aim sensitivities (Options), and aim assist slows the finger a little over a target
+      const tAds = lerp(1, clamp(Number(s.touchAdsSens) || 1, 0.2, 2), c.adsT);
+      const ts = 0.0035 * (Number(s.touchSens) || 1) * zoom * stunK * tAds * this.aimAssist(dt, s);
+      c.yaw -= inp.touchDX * ts;
+      c.pitch -= inp.touchDY * ts * inv;
+      // gyro: turning and tilting the phone aims, always or only while aimed in (Options)
+      const gm = inp.gyroMode, gk = gm === 'always' ? 1 : gm === 'ads' ? clamp((c.adsT - 0.2) / 0.6, 0, 1) : 0;
+      if (gk > 0) {
+        const gs = (Number(s.gyroSens) || 1) * Math.pow(zoom, 0.6) * stunK * gk;
+        c.yaw += inp.gyroYaw * gs;
+        c.pitch += inp.gyroPitch * gs * inv;
+      }
+    } else if (inp.lookX || inp.lookY) {
       let rate = 3.6 * s.padSensitivity * Math.pow(zoom, 0.8) * stunK * adsK;
       const aa = this.aimAssist(dt, s);
       rate *= aa;
@@ -295,7 +308,7 @@ export class PlayerController {
     if ((shiftEdge && now - (this.lastShiftUpT ?? -9) < 0.3) || (inp.lastDevice === 'pad' && sprintPress && c.sprinting && !shiftEdge) || (touchEdge && now - (this.lastTouchSprintT ?? -9) < 0.45)) {
       if (c.tacFuel > 0.3) this.tacOn = true;
     }
-    if (inp.touchSprint === false && this.prevTouchUp !== false) this.lastTouchSprintT = now;
+    if (inp.touchSprint === false && this.prevTouchUp === true) this.lastTouchSprintT = now;
     this.prevTouchUp = inp.touchSprint;
     if (!sprint || c.tacFuel <= 0.05) this.tacOn = false;
     const tac = sprint && !!this.tacOn;
@@ -433,13 +446,14 @@ export class PlayerController {
 
     this.updateBreathing(dt);
     this.updateCamera(dt);
-    this.updateViewmodel(dt, inp.mouseDX + inp.lookX * 18, inp.mouseDY + inp.lookY * 18);
+    this.updateViewmodel(dt, inp.mouseDX + inp.touchDX + inp.lookX * 18, inp.mouseDY + inp.touchDY + inp.lookY * 18);
   }
 
   // returns look-rate multiplier; also tracks the target for rotational assist
   aimAssist(dt, s) {
     const A = this.assist;
-    if (!s.aimAssist || this.game.input.lastDevice !== 'pad') { A.target = null; A.mul = 1; return 1; }
+    const dev = this.game.input.lastDevice, touch = dev === 'touch';
+    if (!s.aimAssist || (dev !== 'pad' && !touch)) { A.target = null; A.mul = 1; return 1; }
     const c = this.c, g = this.game;
     const eye = c.eyePos(_a);
     const fwd = c.forward(_b);
@@ -458,7 +472,8 @@ export class PlayerController {
     if (!best) { A.target = null; return ease(1); }
     best.chestPos(_c).sub(eye);
     const ty = Math.atan2(-_c.x, -_c.z), tp = Math.atan2(_c.y, Math.hypot(_c.x, _c.z));
-    const inp = g.input, steering = Math.abs(inp.lookX || 0) + Math.abs(inp.lookY || 0) > 0.05 || Math.abs(inp.moveX || 0) + Math.abs(inp.moveY || 0) > 0.1;
+    const inp = g.input, steering = Math.abs(inp.lookX || 0) + Math.abs(inp.lookY || 0) > 0.05 || Math.abs(inp.moveX || 0) + Math.abs(inp.moveY || 0) > 0.1
+      || Math.abs(inp.touchDX || 0) + Math.abs(inp.touchDY || 0) > 0.5;
     if (A.target === best && steering) {
       // rotational assist: follow part of the target's angular motion, only while you're aiming or moving
       // (never on its own), capped so it can't swing the view
@@ -472,13 +487,13 @@ export class PlayerController {
     A.target = best; A.yaw = ty; A.pitch = tp;
     const dist = best.pos.distanceTo(c.pos);
     const onTarget = bestAng < Math.atan2(0.5, dist) + 0.01;
-    return ease(onTarget ? 0.7 : 0.85);
+    return ease(touch ? (onTarget ? 0.8 : 0.9) : onTarget ? 0.7 : 0.85);   // (touch: lighter, the finger is already precise)
   }
 
   applyAdsSnap(dt) {
     const A = this.assist, c = this.c;
     const adsNow = c.adsT > 0.5;
-    if (adsNow && !A.wasAds && A.target && this.game.settings.aimAssist && this.game.input.lastDevice === 'pad') A.snapT = 0.16;
+    if (adsNow && !A.wasAds && A.target && this.game.settings.aimAssist && (this.game.input.lastDevice === 'pad' || this.game.input.lastDevice === 'touch')) A.snapT = 0.16;
     A.wasAds = adsNow;
     if (A.snapT > 0 && A.target && A.target.alive) {
       A.snapT -= dt;

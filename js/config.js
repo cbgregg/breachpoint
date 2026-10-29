@@ -312,6 +312,13 @@ export const DEFAULT_SETTINGS = {
   touchSize: 'small',   // touch screens: size of the on-screen buttons (small leaves more room to look around)
   touchAds: 'toggle',   // touch screens: tap ADS once to aim, again to stop
   touchAutoFire: true,  // touch screens: fire automatically while the crosshair is on an enemy
+  touchSens: 1,         // touch screens: look sensitivity (dragging to look)
+  touchAdsSens: 1,      // touch screens: look sensitivity while aimed in, relative to the hip
+  touchAccel: 'medium', // touch screens: aim acceleration (fast swipes turn further): off / low / medium / high
+  gyro: 'off',          // touch screens: gyro aiming: off / ads (only while aimed in) / always
+  gyroSens: 1,
+  touchHaptics: true,   // touch screens: buzz on buttons, hits and kills (phones that allow it: Android)
+  touchLayout: null,    // touch screens: your own button layout ({ id: { x, y, s } }, fractions of the screen)
   name: 'Operator',
   mode: 'tdm',       // tdm | gunfight | snd
   teamSize: 6,

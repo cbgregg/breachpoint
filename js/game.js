@@ -206,6 +206,9 @@ export class Game {
     const adsMode = this.input.isTouch ? (s.touchAds || 'toggle') : (s.adsMode || 'hold');
     if (this.input.adsMode !== adsMode) { this.input.adsMode = adsMode; this.input.clearAds(); }
     this.input.vibration = s.vibration;
+    this.input.touchAccel = { off: 0, low: 0.3, medium: 0.6, high: 1 }[s.touchAccel] ?? 0.6;
+    this.input.haptics = s.touchHaptics !== false;
+    this.input.setGyro(['ads', 'always'].includes(s.gyro) ? s.gyro : 'off');
     this.input.fullscreen = s.fullscreen !== false;
     if (!!s.showCollision !== !!this.collisionView) this.setCollisionView(!!s.showCollision);
   }
@@ -868,9 +871,9 @@ export class Game {
   localNotify(type, ...a) {
     const hud = this.hud, inp = this.input, ctl = this.playerCtl;
     switch (type) {
-      case 'hit': hud.hitmarker(a[0], a[1]); if (a[1]) this.audio.play('headshot', null, { ui: true }); else if (!a[0]) this.audio.play('hit', null, { ui: true }); if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
+      case 'hit': hud.hitmarker(a[0], a[1]); if (!a[0]) inp.buzz(a[1] ? 14 : 8); if (a[1]) this.audio.play('headshot', null, { ui: true }); else if (!a[0]) this.audio.play('hit', null, { ui: true }); if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
       case 'dmg': if (a[0] !== null) hud.damageFrom({ x: a[0], z: a[1] }); this.audio.play('hurt', null, { ui: true }); if (ctl) { ctl.addShake(0.12); ctl.flinch(); } inp.rumble(0.55, 0.3, 160); break;
-      case 'kill': this.audio.play('kill', null, { ui: true }); inp.rumble(0.3, 0.6, 120); break;
+      case 'kill': this.audio.play('kill', null, { ui: true }); inp.rumble(0.3, 0.6, 120); inp.buzz(30); break;
       case 'score': hud.scoreEvent(a[0], a[1]); break;
       case 'medal': hud.medal(a[0], a[1]); break;
       case 'kpick': if (this.mode === 'guest' && this.player) this.player.grenades++; hud.toast('+1 THROWING KNIFE'); this.audio.play('pickup', null, { ui: true }); break;

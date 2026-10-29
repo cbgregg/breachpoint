@@ -14,6 +14,7 @@ import { applyReticles, cleanReticles, reticlePreview, shapesFor, RET_COLORS, RE
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
 import { levelOf, emblemSVG } from './career.js';
+import { applyTouchLayout, editTouchLayout } from './touchlayout.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'breachpoint.settings.v2';
@@ -131,12 +132,12 @@ const bindings = [
   ['opt-dynres', 'dynamicRes', 'bool'], ['opt-fullscreen', 'fullscreen', 'bool'], ['opt-collision', 'showCollision', 'bool'], ['opt-fov', 'fov', 'int'], ['opt-vmfov', 'vmFov', 'int'], ['opt-fps', 'showFps', 'bool'],
   ['opt-sens', 'sensitivity', 'float'], ['opt-adsmode', 'adsMode', 'str'], ['opt-adssens', 'adsSens', 'float'], ['opt-autosprint', 'autoSprint', 'bool'], ['opt-cammotion', 'cameraMotion', 'str'], ['opt-adszoom', 'adsZoom', 'float'], ['opt-sightsize', 'sightSize', 'str'], ['opt-invert', 'invertY', 'bool'], ['opt-padsens', 'padSensitivity', 'float'],
   ['opt-deadzone', 'padDeadzone', 'float'], ['opt-aa', 'aimAssist', 'bool'], ['opt-vib', 'vibration', 'bool'],
-  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-matchmusic', 'matchMusic', 'str'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-explicit', 'explicit', 'bool'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'],
+  ['opt-vol', 'volume', 'float'], ['opt-music', 'musicVolume', 'float'], ['opt-matchmusic', 'matchMusic', 'str'], ['opt-announcer', 'announcer', 'str'], ['opt-voice', 'voice', 'str'], ['opt-explicit', 'explicit', 'bool'], ['opt-relay', 'privateRelay', 'bool'], ['opt-fillbots', 'fillBots', 'bool'], ['opt-chat', 'chat', 'bool'], ['opt-touchsize', 'touchSize', 'str'], ['opt-touchads', 'touchAds', 'str'], ['opt-autofire', 'touchAutoFire', 'bool'], ['opt-touchsens', 'touchSens', 'float'], ['opt-touchadssens', 'touchAdsSens', 'float'], ['opt-touchaccel', 'touchAccel', 'str'], ['opt-gyro', 'gyro', 'str'], ['opt-gyrosens', 'gyroSens', 'float'], ['opt-touchhaptics', 'touchHaptics', 'bool'],
 ];
 const outputs = {
   'opt-gfxres': ['out-gfxres', v => `${v}%`], 'opt-fsrsharp': ['out-fsrsharp', v => `${v}%`],
   'opt-fov': ['out-fov', v => `${v}°`], 'opt-vmfov': ['out-vmfov', v => `${v}°`], 'opt-adszoom': ['out-adszoom', v => `${Math.round(v * 100)}%`], 'opt-sens': ['out-sens', v => Number(v).toFixed(2)], 'opt-adssens': ['out-adssens', v => `${Math.round(v * 100)}%`], 'opt-padsens': ['out-padsens', v => Number(v).toFixed(2)],
-  'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
+  'opt-deadzone': ['out-deadzone', v => Number(v).toFixed(2)], 'opt-touchsens': ['out-touchsens', v => Number(v).toFixed(2)], 'opt-touchadssens': ['out-touchadssens', v => `${Math.round(v * 100)}%`], 'opt-gyrosens': ['out-gyrosens', v => Number(v).toFixed(2)], 'opt-vol': ['out-vol', v => `${Math.round(v * 100)}%`], 'opt-music': ['out-music', v => `${Math.round(v * 100)}%`],
 };
 // the map dropdown is built from the map list, so every map shows up in the menu
 const MAP_TAGS = { shuran: '3 lanes', mart: 'indoor', pioneer: 'Underground site', drivein: 'night' };
@@ -193,7 +194,7 @@ let optBase = optState();
 const optDirty = () => optState() !== optBase;
 function syncApplyBar() { $('opt-apply').hidden = !optDirty(); }
 // options that take effect mid-match (the match keeps its own copy of the settings)
-const LIVE_KEYS = ['vmFov', 'sensitivity', 'padSensitivity', 'fov', 'invertY', 'aimAssist', 'showFps', 'adsZoom', 'sightSize', 'adsSens', 'autoSprint', 'adsMode', 'padDeadzone', 'vibration', 'cameraMotion'];
+const LIVE_KEYS = ['vmFov', 'sensitivity', 'padSensitivity', 'fov', 'invertY', 'aimAssist', 'showFps', 'adsZoom', 'sightSize', 'adsSens', 'autoSprint', 'adsMode', 'padDeadzone', 'vibration', 'cameraMotion', 'touchSens', 'touchAdsSens', 'touchAccel', 'gyro', 'gyroSens', 'touchHaptics', 'touchAutoFire', 'touchAds'];
 function syncLive() { if (game.settings) for (const k of LIVE_KEYS) if (settings[k] !== undefined) game.settings[k] = settings[k]; }
 // Reset tab to defaults: puts this tab's options back to their defaults, staged like any change (Apply / X)
 $('opt-reset').addEventListener('click', () => {
@@ -242,6 +243,21 @@ $('ad-apply').addEventListener('click', () => { const f = closeApplyDlg(); apply
 $('ad-discard').addEventListener('click', () => { const f = closeApplyDlg(); discardOptions(); if (f) f(); });
 $('ad-cancel').addEventListener('click', () => { closeApplyDlg(); if (game.input.lastDevice === 'pad') setTimeout(() => focusEl($('opt-apply-btn').offsetParent ? $('opt-apply-btn') : null) || focusFirst(), 0); });
 $('opt-apply-btn').addEventListener('click', applyOptions);
+// touch layout editor: over the game or the menus, saved straight away (it isn't a staged option)
+$('opt-touchlayout').addEventListener('click', async () => {
+  const back = screen;
+  showScreen(null);   // (the editor needs the touch layer, which only shows in a match)
+  const layout = await editTouchLayout(settings.touchLayout, null);
+  settings.touchLayout = layout;
+  saveSettings(settings);
+  showScreen(back);
+  applyTouchLayout(layout);
+  game.hud.toast(layout ? 'TOUCH LAYOUT SAVED' : 'DEFAULT TOUCH LAYOUT');
+});
+// the saved layout goes on as the controls appear and whenever the screen changes shape
+const syncTouchLayout = () => { if (settings.touchLayout) applyTouchLayout(settings.touchLayout); };
+window.addEventListener('resize', () => setTimeout(syncTouchLayout, 50));
+window.addEventListener('orientationchange', () => setTimeout(syncTouchLayout, 300));
 $('opt-discard-btn').addEventListener('click', () => { discardOptions(); game.audio.play('ui', null, { ui: true }); });
 // picking an announcer or a voice plays one of their lines
 const voicePreview = (prefix, lines) => { game.audio.init(); game.audio.want(prefix).then(() => game.audio.play('vo', null, { id: prefix + lines[(Math.random() * lines.length) | 0], ui: true })); };
@@ -254,6 +270,7 @@ for (const [id, key, type] of bindings) {
   const ev = el.type === 'range' || el.tagName === 'INPUT' && type === 'text' ? 'input' : 'change';
   el.addEventListener(ev, () => {
     readField(id, key, type);
+    if (key === 'gyro' && settings.gyro !== 'off') { game.input.setGyro(settings.gyro); game.input.askGyro(); }   // (iPhone asks for permission on a tap: this one)
     if (OPT_KEYS.includes(key)) {
       // an option: show it in the form, apply it later
       if (key === 'quality' && settings.quality !== 'custom') { Object.assign(settings, presetGfx(settings.quality)); writeGfx(); }
@@ -943,6 +960,12 @@ const OPT_DESC = {
   'opt-touchsize': 'Size of the on-screen buttons on phones and tablets.',
   'opt-touchads': 'Tap: tap ADS to aim and tap again to stop. Hold: aim while your finger is on the button.',
   'opt-autofire': 'Fires automatically while your crosshair is on an enemy (touch only).',
+  'opt-touchsens': 'How far a drag turns you. Aiming has its own setting below.',
+  'opt-touchadssens': 'Look sensitivity while aimed in, as a share of the hip sensitivity. Lower for steadier aim.',
+  'opt-touchaccel': 'A slow drag moves the view exactly with your finger; a fast swipe turns further, so you can turn round without running out of screen. Off: every drag turns the same.',
+  'opt-gyro': 'Aim by turning and tilting the phone, like a camera. While aiming: only through the sights, for fine corrections. Always: every moment. iPhones ask once for permission.',
+  'opt-gyrosens': 'How far a turn of the phone turns your view.',
+  'opt-touchhaptics': 'A short buzz on button presses, hits and kills. Android phones; iPhones don\'t allow it in the browser.',
 };
 let optSub = 'general';
 const subsAvail = () => OPT_SUBS.filter(x => x !== 'account' || document.body.classList.contains('has-account'));
@@ -987,6 +1010,7 @@ function showScreen(id) {
   if (window.__chatReady) { if (chatOpen) closeChat(); syncChat(); }
   if (sideOpen && !sideAllowed()) closeSide();
   document.body.classList.toggle('ingame', id === null);
+  if (id === null && settings.touchLayout) setTimeout(() => applyTouchLayout(settings.touchLayout), 0);
   syncMenuBg();
   if (id && game.input.lastDevice === 'pad') setTimeout(() => focusFirst(), 0);
 }

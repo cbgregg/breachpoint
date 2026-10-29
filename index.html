@@ -128,6 +128,15 @@
     <button data-btn="melee" class="tb" id="tb-melee">MELEE</button>
     <button data-btn="sprint" class="tb" id="tb-sprint">SPRINT</button>
   </div>
+  <!-- the touch layout editor's toolbar (Options > Controls > Touch: button layout) -->
+  <div id="tl-edit" hidden>
+    <div class="tl-bar">
+      <span class="tl-hint">Drag a button to move it · pinch to resize</span>
+      <span id="tl-size" class="tl-size" hidden><button id="tl-smaller" class="menu-btn small">−</button><button id="tl-bigger" class="menu-btn small">+</button></span>
+      <button id="tl-reset" class="menu-btn small">RESET</button>
+      <button id="tl-done" class="menu-btn small cta-ish">DONE</button>
+    </div>
+  </div>
 
   <!-- ============ Title ============ -->
   <div id="title" class="screen">
@@ -476,6 +485,15 @@
             <div class="row touch-only"><label for="opt-touchads">Touch: aim down sights</label><select id="opt-touchads" data-nav>
               <option value="toggle">Tap</option><option value="hold">Hold</option></select></div>
             <div class="row touch-only"><label for="opt-autofire">Touch: auto-fire on target</label><input type="checkbox" id="opt-autofire" data-nav></div>
+            <div class="row touch-only"><label for="opt-touchsens">Touch: look sensitivity <output id="out-touchsens"></output></label><input type="range" id="opt-touchsens" min="0.3" max="3" step="0.05" data-nav></div>
+            <div class="row touch-only"><label for="opt-touchadssens">Touch: aiming sensitivity <output id="out-touchadssens"></output></label><input type="range" id="opt-touchadssens" min="0.2" max="2" step="0.05" data-nav></div>
+            <div class="row touch-only"><label for="opt-touchaccel">Touch: aim acceleration<small>Fast swipes turn further; slow drags stay precise</small></label><select id="opt-touchaccel" data-nav>
+              <option value="off">Off</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+            <div class="row touch-only"><label for="opt-gyro">Touch: gyro aiming<small>Turn and tilt the phone to aim</small></label><select id="opt-gyro" data-nav>
+              <option value="off">Off</option><option value="ads">While aiming</option><option value="always">Always</option></select></div>
+            <div class="row touch-only"><label for="opt-gyrosens">Touch: gyro sensitivity <output id="out-gyrosens"></output></label><input type="range" id="opt-gyrosens" min="0.3" max="3" step="0.05" data-nav></div>
+            <div class="row touch-only"><label for="opt-touchhaptics">Touch: vibration<small>Buttons, hits and kills (where the phone allows it)</small></label><input type="checkbox" id="opt-touchhaptics" data-nav></div>
+            <div class="row touch-only"><label>Touch: button layout<small>Drag buttons where your thumbs want them, and resize them</small></label><button id="opt-touchlayout" class="menu-btn small" data-nav>CUSTOMIZE</button></div>
             <div class="group">MOUSE &amp; KEYBOARD</div>
             <div class="row"><label for="opt-sens">Mouse sensitivity <output id="out-sens"></output></label><input type="range" id="opt-sens" min="0.2" max="3" step="0.05" data-nav></div>
             <div class="row"><label for="opt-invert">Invert look</label><input type="checkbox" id="opt-invert" data-nav></div>
