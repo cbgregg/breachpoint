@@ -199,12 +199,32 @@ export const PRIMARIES = ['rifle', 'kv47', 'br308', 'hx60', 'smg', 'krv45', 'sho
 export const SECONDARIES = ['pistol', 'd50', 'r357', 'mp18', 'monte'];
 export const typeOf = (id) => (WEAPONS[id] && WEAPONS[id].model.type) || 'rifle';
 
-// fov = half-angle (radians) of the bot's vision cone
+// Bot difficulty. The first line of each row is the gunplay (fov = half-angle, radians, of the vision cone); the
+// second is how the bot behaves, easy -> hard. adsNear scales the range inside which it hip-fires; settle is
+// how long its aim takes to settle on a target; flinch scales how far a hit throws the aim; latency is how long
+// it takes to decide to go for cover. coverUse, peek, strafe, preAim, slide, dropShot, cook, chase and
+// rotateKill are the odds of using cover, peeking out of it, strafing in a fight, pre-aiming a corner, sliding
+// into cover, drop-shotting, cooking a grenade, chasing a wounded enemy and relocating after a kill: none above
+// 0.95, because nobody does the right thing every time. lkp is how long (s) a last-known position is worth
+// going to; postKill the pause (s, a range) before the next target after a kill; nadeDodge the delay (s)
+// before running from a live grenade; sprintOut scales the delay before the gun is up after a sprint; holdMax
+// the longest (s) a bot holds one spot.
 export const DIFFICULTY = {
-  easy: { spot: 1.3, reaction: 0.85, aimError: 0.12, aimFloor: 0.6, lag: 0.32, turnRate: 3.0, headChance: 0.05, burst: [0.12, 0.3], pause: [0.45, 0.9], semiDelay: 0.45, sight: 50, fov: 0.9 },
-  normal: { spot: 2.6, reaction: 0.42, aimError: 0.065, aimFloor: 0.42, lag: 0.17, turnRate: 6.0, headChance: 0.15, burst: [0.18, 0.45], pause: [0.25, 0.55], semiDelay: 0.25, sight: 70, fov: 1.1 },
-  hard: { spot: 3.0, reaction: 0.3, aimError: 0.045, aimFloor: 0.3, lag: 0.1, turnRate: 8, headChance: 0.3, burst: [0.25, 0.7], pause: [0.12, 0.3], semiDelay: 0.1, sight: 90, fov: 1.3 },
+  easy: {
+    spot: 1.3, reaction: 0.85, aimError: 0.12, aimFloor: 0.6, lag: 0.32, turnRate: 3.0, headChance: 0.05, burst: [0.12, 0.3], pause: [0.45, 0.9], semiDelay: 0.45, sight: 50, fov: 0.9,
+    adsNear: 1.3, settle: 0.35, flinch: 1.3, latency: 0.5, coverUse: 0.2, peek: 0.2, strafe: 0.4, preAim: 0.2, slide: 0, dropShot: 0, cook: 0, lkp: 3, postKill: [0.7, 0.9], chase: 0, rotateKill: 0.3, nadeDodge: 0.6, sprintOut: 1.4, holdMax: 15,
+  },
+  normal: {
+    spot: 2.6, reaction: 0.42, aimError: 0.065, aimFloor: 0.5, lag: 0.17, turnRate: 6.0, headChance: 0.15, burst: [0.18, 0.45], pause: [0.25, 0.55], semiDelay: 0.25, sight: 70, fov: 1.1,
+    adsNear: 1, settle: 0.25, flinch: 1, latency: 0.35, coverUse: 0.5, peek: 0.5, strafe: 0.7, preAim: 0.5, slide: 0.2, dropShot: 0.05, cook: 0.4, lkp: 5, postKill: [0.5, 0.7], chase: 0.2, rotateKill: 0.5, nadeDodge: 0.4, sprintOut: 1, holdMax: 20,
+  },
+  hard: {
+    spot: 3.0, reaction: 0.3, aimError: 0.045, aimFloor: 0.36, lag: 0.1, turnRate: 8, headChance: 0.3, burst: [0.25, 0.7], pause: [0.12, 0.3], semiDelay: 0.1, sight: 90, fov: 1.3,
+    adsNear: 0.7, settle: 0.18, flinch: 0.7, latency: 0.25, coverUse: 0.8, peek: 0.85, strafe: 0.95, preAim: 0.9, slide: 0.6, dropShot: 0.2, cook: 0.9, lkp: 7, postKill: [0.3, 0.45], chase: 0.6, rotateKill: 0.75, nadeDodge: 0.25, sprintOut: 0.8, holdMax: 28,
+  },
 };
+// the behaviour knobs a brain starts from (Normal's), so a row that leaves one out still has it
+export const BOT_DEFAULTS = { adsNear: 1, settle: 0.25, flinch: 1, latency: 0.35, coverUse: 0.5, peek: 0.5, strafe: 0.7, preAim: 0.5, slide: 0.2, dropShot: 0.05, cook: 0.4, lkp: 5, postKill: [0.5, 0.7], chase: 0.2, rotateKill: 0.5, nadeDodge: 0.4, sprintOut: 1, holdMax: 20 };
 
 export const QUALITY = {
   low: { label: 'Low', pixelRatio: 0.75, shadows: 1024, softShadows: false, shadowEvery: 2, ao: false, bloom: true, aa: true, msaa: 0, lights: false, motes: 0, aniso: 4 },

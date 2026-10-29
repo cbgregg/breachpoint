@@ -1,10 +1,10 @@
 // Bot AI: perception, goal selection, pathing, aiming, shooting, grenades
 import * as THREE from 'three';
 import { ROUTE_SEEDS } from './nav.js';
-import { DIFFICULTY, PLAYER } from './config.js';
+import { DIFFICULTY, PLAYER, BOT_DEFAULTS, EQUIPMENT } from './config.js';
 const MELEE_REACH = 2.1;   // Infected bots strike from here (the knife reaches 2.3 m to the chest)
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _bv1 = new THREE.Vector3(), _bv2 = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _bv1 = new THREE.Vector3(), _bv2 = new THREE.Vector3(), _bv3 = new THREE.Vector3(), _bv4 = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -13,7 +13,9 @@ export class BotBrain {
   constructor(bot, game) {
     this.bot = bot;
     this.game = game;
-    this.diff = DIFFICULTY[game.settings.difficulty] || DIFFICULTY.normal;
+    // its own copy of the difficulty row (over the defaults), so one bot's knobs can be pinned (the bot lab does)
+    // without touching the table or the other bots
+    this.diff = { ...BOT_DEFAULTS, ...(DIFFICULTY[game.settings.difficulty] || DIFFICULTY.normal) };
     this.wish = new THREE.Vector3();
     this.lastKnown = new THREE.Vector3();
     this.aimErr = new THREE.Vector3();
@@ -39,6 +41,23 @@ export class BotBrain {
     this.holding = false; this.holdStance = 0; this.lookYaw = null; this.lookT = 0; this.lookPitch = 0;
     this.idleT = 0; this.noPathT = 0; this.proneEngage = false; this.proneT = 0;
     this.walkSlow = false;
+    // the CoD-style behaviours (each owned by the part of the brain that reads it): how dangerous the ground ahead
+    // is and the posture it asks for; the sprint-out delay; the strafe legs; the drop-shot; what hit it and when;
+    // cover and the retreat; a lost target; hits dealt and kills made from here; the aim filter and flinch; the
+    // peek cycle; a live grenade; the slide; the lane being held; the trade; and the state tag the audit reads
+    this.threat = 0; this.cornering = false; this.cornerWp = null; this.cornerAim = false;
+    this.sprintOutT = 0; this.wasSprinting = false; this.fightT = 0;
+    this.strafeStop = 0; this.strafeOn = true; this.stillT = 0; this.dropT = 0; this.dropRolled = null; this.lowCover = false;
+    this.hurtT = -99; this.dmgT = -99; this.dmgRecent = 0; this.decideT = 0; this.retreatT = -99;
+    this.coverHold = 0; this.coverGoal = null; this.atCover = false; this.coverCache = null; this.enemiesVisible = 0;
+    this.lostT = -99; this.lostDist = 0; this.watchFor = 0; this.huntFor = -1; this.chaseUntil = 0;
+    this.hitsOn = null; this.hitsDealt = 0; this.hitsT = -99; this.killT = -99; this.killsHere = 0; this.switchT = -99;
+    this.aimInit = false; this.flinchT = 0; this.lastStun = 0;
+    this.peekPhase = undefined; this.peekT = 0;
+    this.nadeT = 0; this.nadeSeen = null; this.nadeReactT = 0; this.fleeing = false;
+    this.slideCd = 0; this.edgeBurst = 0; this.lane = null; this.holdT = 0; this.tradeT = 0;
+    this.state = 'idle';
+    if (!this.dmgDir) { this.dmgDir = new THREE.Vector3(); this.aimSmooth = new THREE.Vector3(); this.flinchV = new THREE.Vector3(); this.huntGoal = new THREE.Vector3(); }
     if (this.spot) this.spot.clear();
   }
 
@@ -47,7 +66,8 @@ export class BotBrain {
     if (!b.alive) return;
     this.perceiveT -= dt;
     if (this.perceiveT <= 0) { this.perceiveT = 0.12; this.perceive(); }
-    if (this.visible) { this.seenT += dt; this.reactT -= dt; }
+    if (this.visible) this.seenT += dt;
+    if (this.reactT > 0) this.reactT -= dt;   // (runs with nobody in sight too: the pause after a kill counts down)
     this.chooseGoal(dt);
     this.move(dt);
     this.aim(dt);
