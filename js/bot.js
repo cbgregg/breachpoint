@@ -4,7 +4,7 @@ import { ROUTE_SEEDS } from './nav.js';
 import { DIFFICULTY, PLAYER, BOT_DEFAULTS, EQUIPMENT } from './config.js';
 const MELEE_REACH = 2.1;   // Infected bots strike from here (the knife reaches 2.3 m to the chest)
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _bv1 = new THREE.Vector3(), _bv2 = new THREE.Vector3(), _bv3 = new THREE.Vector3(), _bv4 = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _bv1 = new THREE.Vector3(), _bv2 = new THREE.Vector3(), _bv3 = new THREE.Vector3(), _bv4 = new THREE.Vector3(), _from = new THREE.Vector3(), _aim = new THREE.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -237,7 +237,7 @@ export class BotBrain {
   // close enough that closing wins means stand and trade. Planters and defusers never leave the bomb.
   assess() {
     const b = this.bot, d = this.diff, g = this.game, t = this.target, seen = this.visible && t;
-    if (this.goalKind === 'cover' || this.goalKind === 'plant' || this.goalKind === 'defuse' || b.useHeld || b.infected) return;
+    if (this.goalKind === 'cover' || /^(plant|defuse|bomb|flag)$/.test(this.goalKind) || b.useHeld || b.infected || (g.gm && g.gm.bomb && g.gm.bomb.carrier === b)) return;
     const dist = t ? t.pos.distanceTo(b.pos) : 99;
     // hit hard and fast counts as losing only when we aren't giving as good back (a trade we're winning is stood)
     const trading = seen && this.hitsOn === t && g.time - this.hitsT < 1.5 && this.hitsDealt >= this.dmgRecent;
@@ -247,7 +247,7 @@ export class BotBrain {
     if (seen && !losing && (b.health > 60 || dist <= 12)) retreat = false;
     if (retreat && !losing && Math.random() > d.coverUse) retreat = false;   // (losing, everybody breaks the line; merely outgunned is the dice)
     if (!retreat) return;
-    const from = seen ? t.pos : _bv4.copy(b.pos).addScaledVector(this.dmgDir, 12);
+    const from = seen ? t.pos : _from.copy(b.pos).addScaledVector(this.dmgDir, 12);
     const c = this.coverPoint(from, 6, losing) || (losing ? this.coverPoint(from, 3, true) : null);   // (nearly dead: anything close will do)
     if (c) { this.takeCover(c, PLAYER.regenDelay + 1.5); g.callout(b, 'hit', 0.3); }
     else if (losing && this.unstickT <= 0) { this.fleeFrom(from); this.unstickT = 1.2; this.fleeing = true; this.holding = false; }   // (nothing to get behind: run for it)
@@ -411,6 +411,8 @@ export class BotBrain {
     if (this.idleT > 0) this.idleT -= dt;
     // in cover: stay until done (a visible target doesn't pull the bot back out; combat() still shoots from here)
     if (this.goalKind === 'cover' && this.coverGoal) {
+      const og0 = g.gm && g.gm.botGoal(this, b);
+      if (og0 && /^(plant|defuse|bomb|flag)$/.test(og0.kind)) { this.coverGoal = null; this.atCover = false; this.goal = null; this.setGoal(og0.pos, og0.kind); return; }
       if (!this.coverDone()) return;
       this.coverGoal = null; this.atCover = false; this.peekPhase = undefined; this.goalKind = 'hunt'; this.goal = null;
       if (this.target && this.target.alive) this.lastKnownT = Math.max(this.lastKnownT, g.time - 1);
@@ -419,7 +421,7 @@ export class BotBrain {
     if (this.goalKind === 'engage') { this.goalKind = 'hunt'; this.goal = null; }
     // just made a kill, nobody else in sight: top up, then either rotate to a new angle (always after two kills from
     // one spot) or hold a beat on where they fell
-    if (this.postKill && this.enemiesVisible === 0 && g.time - this.killT < 3 && !/^(plant|defuse|flag|bomb|cover)$/.test(this.goalKind) && !b.infected) {
+    if (this.postKill && this.enemiesVisible === 0 && g.time - this.killT < 3 && !/^(plant|defuse|flag|bomb|cover)$/.test(this.goalKind) && !b.infected && !(g.gm && g.gm.bomb && g.gm.bomb.carrier === b)) {
       this.postKill = false;
       if (w.mag < w.def.mag * 0.6 && w.reserve > 0 && !w.reloading) b.reload();
       if ((this.killsHere >= 2 || Math.random() < d.rotateKill) && this.startRotate()) return;
@@ -1032,7 +1034,7 @@ export class BotBrain {
       const safe = g.time - this.hurtT > 1.5 && !w.reloading && this.goalKind !== 'cover' && (!engaging || this.expo < 0.5 || this.pauseT > 0.25);
       if (b.grenades > 0 && b.grenadeCd <= 0 && fresh && safe && spec && !spec.knife && Math.random() < (ducked ? 0.55 : 0.2)) {
         const from = engaging ? t.pos : this.lastKnown, d0 = from.distanceTo(b.pos), T = clamp(d0 / 14, 0.5, 1.4);
-        const aim = _bv4.copy(from); if (engaging) aim.addScaledVector(t.vel, T * 0.8);
+        const aim = _aim.copy(from); if (engaging) aim.addScaledVector(t.vel, T * 0.8);
         const ld = aim.distanceTo(b.pos);
         if (ld > 7 && ld < 28 && this.arcClear(aim, T)) {
           const cook = spec.cook && Math.random() < d.cook ? clamp(spec.fuse - T - 0.45, 0, 1.6) : 0;

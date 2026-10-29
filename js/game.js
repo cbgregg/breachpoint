@@ -1568,7 +1568,7 @@ export class Game {
       if (left.length === 1 && left[0].isBot) this.callout(left[0], 'last_alive', 0.9, false, true);
       else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.4); }
       // the trade: the nearest bot teammate who isn't already fighting goes for the killer (most of the time)
-      if (enemyKill && killer && killer.alive) {
+      if (enemyKill && killer && killer.alive && !this.inf) {   // (Infected: survivors keep hiding)
         let best = null, bd = 20;
         for (const [c, br] of this.brains) { if (!c.alive || c === victim || c.team !== victim.team || br.visible || br.goalKind === 'cover') continue; const dd = c.pos.distanceTo(victim.pos); if (dd < bd) { bd = dd; best = br; } }
         if (best && Math.random() < 0.7) best.onMateDown(victim, killer);
