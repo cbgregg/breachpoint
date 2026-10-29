@@ -34,20 +34,21 @@ export class BotBrain {
     this.strafeDir = Math.random() < 0.5 ? -1 : 1; this.strafeT = 0;
     this.aimErrT = 0; this.aimHead = false; this.aimOff = 1;
     this.burstT = rand(...this.diff.burst); this.pauseT = 0; this.semiT = 0;
-    this.stuckT = 1; this.lastPos.copy(this.bot.pos);
+    this.stuckT = 1; this.lastPos.copy(this.bot.pos); this.movedAcc = 0;
     this.unstickT = 0; this.stuckN = 0; if (!this.unstickDir) this.unstickDir = new THREE.Vector3();
     this.grenadeT = rand(4, 10);
     this.crouch = false; this.prone = false;
     this.holding = false; this.holdStance = 0; this.lookYaw = null; this.lookT = 0; this.lookPitch = 0;
-    this.idleT = 0; this.noPathT = 0; this.proneEngage = false; this.proneT = 0;
+    this.idleT = 0; this.noPathT = 0;
     this.walkSlow = false;
     // the CoD-style behaviours (each owned by the part of the brain that reads it): how dangerous the ground ahead
     // is and the posture it asks for; the sprint-out delay; the strafe legs; the drop-shot; what hit it and when;
     // cover and the retreat; a lost target; hits dealt and kills made from here; the aim filter and flinch; the
     // peek cycle; a live grenade; the slide; the lane being held; the trade; and the state tag the audit reads
     this.threat = 0; this.cornering = false; this.cornerWp = null; this.cornerAim = false;
-    this.sprintOutT = 0; this.wasSprinting = false; this.fightT = 0;
+    this.sprintOutT = 0; this.wasSprinting = false; this.wasTac = false; this.fightT = 0;
     this.strafeStop = 0; this.strafeOn = true; this.stillT = 0; this.dropT = 0; this.dropRolled = null; this.lowCover = false;
+    this.strafeHitT = -99; this.strafeRoll = null;   // (the hit the strafe last reversed on; the target the strafe dice were rolled for)
     this.hurtT = -99; this.dmgT = -99; this.dmgRecent = 0; this.decideT = 0; this.retreatT = -99;
     this.coverHold = 0; this.coverGoal = null; this.atCover = false; this.coverCache = null; this.enemiesVisible = 0;
     this.lostT = -99; this.lostDist = 0; this.watchFor = 0; this.huntFor = -1; this.chaseUntil = 0;
@@ -57,7 +58,7 @@ export class BotBrain {
     this.nadeT = 0; this.nadeSeen = null; this.nadeReactT = 0; this.fleeing = false;
     this.slideCd = 0; this.edgeBurst = 0; this.lane = null; this.holdT = 0; this.tradeT = 0;
     this.state = 'idle';
-    if (!this.dmgDir) { this.dmgDir = new THREE.Vector3(); this.aimSmooth = new THREE.Vector3(); this.flinchV = new THREE.Vector3(); this.huntGoal = new THREE.Vector3(); }
+    if (!this.dmgDir) { this.dmgDir = new THREE.Vector3(); this.aimSmooth = new THREE.Vector3(); this.flinchV = new THREE.Vector3(); this.huntGoal = new THREE.Vector3(); this.fightPos = new THREE.Vector3(); }
     if (this.spot) this.spot.clear();
   }
 
@@ -102,7 +103,7 @@ export class BotBrain {
     const b = this.bot, g = this.game, d = this.diff, step = 0.12;
     const eye = b.eyePos(_a);
     const fwd = _b.set(-Math.sin(b.yaw), 0, -Math.cos(b.yaw));
-    let best = null, bestScore = Infinity, bestExp = 0;
+    let best = null, bestScore = Infinity, bestExp = 0, n = 0;
     for (const e of g.characters) {
       if (!e.alive || !g.foes(e, b)) { this.spot.delete(e); continue; }
       let m = this.spot.get(e) || 0;
@@ -128,13 +129,16 @@ export class BotBrain {
       m = Math.min(1.6, m + rate * step);
       this.spot.set(e, m);
       if (m < 1) continue;
+      n++;
       const score = dist - (e === this.target ? 8 : 0);
       if (score < bestScore) { bestScore = score; best = e; bestExp = exp; this.bestAim = this.bestAim || new THREE.Vector3(); this.bestAim.copy(this.aimPt); }
     }
+    this.enemiesVisible = n;
     if (best) {
       if (best !== this.target || !this.visible) {
         if (!this.visible && g.time - this.lastKnownT > 4) g.callout(this.bot, 'contact', 0.3);   // a fresh sighting: "contact!"
-        this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible || g.time - this.lastKnownT < 1.5 ? 0.5 : 1);
+        // (a sprinter reacts 100 ms later: the gun is down)
+        this.reactT = d.reaction * rand(0.7, 1.3) * (this.visible || g.time - this.lastKnownT < 1.5 ? 0.5 : 1) + (b.sprinting ? 0.1 : 0);
         this.seenT = 0;
         this.newAimError(best);
       }
@@ -152,6 +156,7 @@ export class BotBrain {
   }
 
   onDamaged(attacker) {
+    this.hurtT = this.game.time;   // (the strafe reverses on it; a drop-shot is a reply to being shot first)
     if (!attacker || !this.game.foes(attacker, this.bot)) return;
     // being shot by someone who isn't the target: they are now (they're the danger), and they're found at once
     if (this.target !== attacker) { this.spot.set(attacker, Math.max(this.spot.get(attacker) || 0, 1)); this.target = attacker; this.visible = false; this.perceiveT = Math.min(this.perceiveT, 0.05); }
@@ -335,7 +340,7 @@ export class BotBrain {
   }
 
   move(dt) {
-    const b = this.bot, g = this.game, nav = g.world.nav;
+    const b = this.bot, g = this.game, nav = g.world.nav, d = this.diff, w = b.weapon;
     const wish = this.wish.set(0, 0, 0);
     let sprint = false, jump = false;
     this.crouch = false; this.prone = false;
@@ -346,6 +351,7 @@ export class BotBrain {
       if (tv.wish.lengthSq() > 0.04) this.steer(tv.wish);
       b.wantCrouch = !!tv.crouch; b.wantProne = false;
       b.updateMovement(dt, tv.wish, !!tv.sprint && !this.visible, !!tv.jump, false, false);
+      this.stuckIdle();
       return;
     }
     // objective spots: stop there (and hold the button to plant / defuse); guard / push spots: settle into
@@ -372,6 +378,7 @@ export class BotBrain {
       }
       b.wantCrouch = this.crouch; b.wantProne = this.prone;
       b.updateMovement(dt, wish, false, false, false, false);
+      this.stuckIdle();
       return;
     }
     if (this.holding) { this.holding = false; this.lookYaw = null; }
@@ -386,34 +393,54 @@ export class BotBrain {
       b.updateMovement(dt, wish, dist > 2.5, Math.random() < 0.01, false, false);
       return;
     }
+    if (this.goalKind !== 'engage') this.dropT = 0;   // (a drop-shot ends with the fight)
     if (this.goalKind === 'engage' && this.target) {
+      // The gunfight, the way a player moves in one: an A/D strafe in jittered legs with the odd plant, reversed
+      // the moment a hit lands, mirroring a runner crossing in front half the time; never a statue in the open
+      // past half a second; crouched only to shrink behind something chest high; prone only for a drop-shot;
+      // no hopping about (the stuck-jump below is the only jump left)
       const t = this.target;
       const dist = b.pos.distanceTo(t.pos);
-      const [mn, mx] = b.weapon.def.botRange;
+      const [mn, mx] = w.def.botRange;
       _c.subVectors(t.pos, b.pos); _c.y = 0; _c.normalize();
       const perp = _e.set(_c.z, 0, -_c.x);
-      this.strafeT -= dt;
-      if (this.strafeT <= 0) {
-        this.strafeDir = Math.random() < 0.7 ? -this.strafeDir : this.strafeDir;
-        this.strafeT = rand(0.35, 1.3);
-        if (Math.random() < (this.game.settings.difficulty === 'hard' ? 0.15 : 0.06)) jump = true;
-        this.crouchEngage = Math.random() < 0.2 && dist > 14;
-        // long guns at range: sometimes drop prone and settle in (gets up again after a bit, or if they close in)
-        if (!this.proneEngage && dist > 24 && mx >= 40 && Math.random() < 0.18) { this.proneEngage = true; this.proneT = rand(2.5, 6); }
+      this.fightT += dt; this.strafeT -= dt; if (this.strafeStop > 0) this.strafeStop -= dt;
+      const hitNow = g.time - this.hurtT < 0.1 && this.hurtT !== this.strafeHitT;
+      if (this.strafeRoll !== t) { this.strafeRoll = t; this.strafeOn = Math.random() < d.strafe; this.fightT = 0; this.stillT = 0; this.dropRolled = null; this.fightPos.copy(b.pos); }
+      if (this.strafeT <= 0 || hitNow) {
+        this.strafeHitT = this.hurtT;
+        const lat = t.vel.x * perp.x + t.vel.z * perp.z;
+        if (hitNow || Math.abs(lat) < 2 || Math.random() < 0.5) this.strafeDir = -this.strafeDir; else this.strafeDir = Math.sign(lat);
+        // drifted 2 m along the line from where the fight started: this leg comes back (a player strafes around
+        // a spot, not off down the street into the next wall)
+        const off = (b.pos.x - this.fightPos.x) * perp.x + (b.pos.z - this.fightPos.z) * perp.z;
+        if (!hitNow && Math.abs(off) > 2) this.strafeDir = -Math.sign(off);
+        // a leg is 0.15-0.75 s, never a metronome; a quarter of reversals start with a 100 ms plant (the plant is on
+        // top of the leg, so a leg is never a twitch); whether this leg moves at all is the difficulty's strafe dice
+        // (a hit always gets the feet going), and a stood-still leg is short
+        this.strafeOn = hitNow || Math.random() < d.strafe;
+        this.strafeStop = this.strafeOn && !hitNow && Math.random() < 0.25 ? 0.1 : 0;
+        this.strafeT = this.strafeOn ? rand(0.3, 0.6) + rand(-0.15, 0.15) + this.strafeStop : rand(0.2, 0.4);
       }
-      if (this.proneEngage) { this.proneT -= dt; if (this.proneT <= 0 || dist < 14) this.proneEngage = false; }
-      this.crouch = !!this.crouchEngage;
-      this.prone = this.proneEngage;
-      if (!this.prone) wish.addScaledVector(perp, this.strafeDir * (this.crouch ? 0.4 : 1));
-      if (this.prone) { /* settled in */ }
-      else if (dist > mx) {
-        const dir = this.followPath(t.pos, dt);
-        if (dir) wish.addScaledVector(dir, 1.2);
-      } else if (dist < mn) {
-        wish.addScaledVector(_c, -1);
+      // crouch only to shrink behind something chest high between us and them (a 0.7-1.3 m box, nothing above it)
+      const cx = b.pos.x + _c.x * 0.9, cz = b.pos.z + _c.z * 0.9, ph = g.physics;
+      this.lowCover = dist > 8 && !!ph.overlap(cx, b.pos.y + 0.75, cz, 0.3, 0.5) && !ph.overlap(cx, b.pos.y + 1.35, cz, 0.3, 0.4);
+      this.crouch = this.lowCover;
+      // drop-shot: shot first at <= 10 m by the one enemy in view, one roll per fight (hard mostly)
+      if (this.dropT <= 0 && dist <= 10 && this.enemiesVisible < 2 && g.time - this.hurtT < 0.15 && b.lastFireT < this.hurtT - 0.5 && this.dropRolled !== t) { this.dropRolled = t; if (Math.random() < d.dropShot) this.dropT = 1.2; }
+      if (this.dropT > 0) this.dropT = Math.max(0, this.dropT - dt);
+      this.prone = this.dropT > 0;
+      this.stillT = Math.hypot(b.vel.x, b.vel.z) < 0.5 ? this.stillT + dt : 0;
+      if (!this.strafeOn && !this.lowCover && this.stillT > 0.4) { this.strafeOn = true; this.strafeStop = 0; }   // nobody stands still in the open past half a second
+      const strafeK = this.strafeOn && this.strafeStop <= 0 && !this.lowCover && !this.prone ? 1 : 0;
+      wish.addScaledVector(perp, this.strafeDir * strafeK);
+      if (!this.prone) {
+        if (dist > mx) { const dir = this.followPath(t.pos, dt); if (dir) wish.addScaledVector(dir, 1.2); }
+        else if (dist < mn) wish.addScaledVector(_c, -0.7);   // give ground on the diagonal, never a straight backpedal
       }
-      if (!nav.gridAt(b.pos).isOpenAt(b.pos.x + wish.x * 1.2, b.pos.z + wish.z * 1.2)) {   // no strafing off a platform edge
-        this.strafeDir *= -1;
+      // no strafing off a platform edge or into a wall: the leg turns round
+      if (!nav.gridAt(b.pos).isOpenAt(b.pos.x + wish.x * 1.2, b.pos.z + wish.z * 1.2) || (wish.lengthSq() > 0.04 && this.blockedDir(wish.x, wish.z, 0.6))) {
+        this.strafeDir *= -1; this.strafeT = rand(0.3, 0.6);
         wish.addScaledVector(perp, this.strafeDir * 2);
       }
     } else if (this.goal) {
@@ -449,11 +476,15 @@ export class BotBrain {
       sprint = false;
     } else if (wish.lengthSq() > 0.04) this.steer(wish);
 
-    // stuck detection: barely moved for a second while trying to
-    this.stuckT -= dt;
+    // stuck detection: barely moved for most of a second while trying to. The clock only runs while the bot wants
+    // to move (standing still on purpose, or having only just set off, isn't stuck), and the ground covered counts
+    // as well as the net displacement (a strafe that turns round ends up where it started without being stuck)
+    if (wish.lengthSq() <= 0.2) this.stuckIdle();
+    this.stuckT -= dt; this.movedAcc += Math.hypot(b.vel.x, b.vel.z) * dt;
     if (this.stuckT <= 0) {
-      const moved = Math.hypot(b.pos.x - this.lastPos.x, b.pos.z - this.lastPos.z);
-      if (wish.lengthSq() > 0.2 && moved < 0.35) {
+      const moved = Math.max(this.movedAcc, Math.hypot(b.pos.x - this.lastPos.x, b.pos.z - this.lastPos.z));
+      this.movedAcc = 0;
+      if (moved < 0.35) {
         this.stuckN = (this.stuckN || 0) + 1;
         jump = this.stuckN % 2 === 1;
         this.repathT = 0;
@@ -465,8 +496,10 @@ export class BotBrain {
       this.stuckT = 0.8;
     }
     b.wantCrouch = this.crouch; b.wantProne = this.prone;
-    // long runs with nobody in sight: tactical sprint while the charge is high
-    const run = sprint && !this.visible;
+    // no sprinting through a reload (the player can't either): a near-full top-up is dropped for the run, any
+    // other reload is finished at a walk. Long runs with nobody in sight: tactical sprint while the charge is high
+    if (sprint && w.reloading && w.mag >= w.def.mag * 0.6) w.cancelReload();
+    const run = sprint && (!this.visible || this.goalKind === 'cover' || this.fleeing || this.chaseUntil > g.time) && !w.reloading;
     if (!run) this.tac = false;
     else if (!this.tac && b.tacFuel >= PLAYER.tacTime * 0.9 && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) > 18) this.tac = true;
     // something breakable across the way (boards over a doorway, a pane): kick it in and carry on
@@ -477,6 +510,9 @@ export class BotBrain {
     }
     b.updateMovement(dt, wish, run, jump, false, run && this.tac);
   }
+
+  // not trying to move: the stuck clock waits, and the next sample measures from here
+  stuckIdle() { this.stuckT = Math.max(this.stuckT, 0.8); this.lastPos.copy(this.bot.pos); this.movedAcc = 0; }
 
   // is the body blocked a little way along this direction? (ignores low steps)
   blockedDir(x, z, dist = 0.55) {
@@ -569,13 +605,37 @@ export class BotBrain {
     b.pitch += clamp(pd, -rate, rate);
   }
 
+  // Sights up (1) or down (0), by weapon and range. dist = 0 when nothing is visible. Shotguns never; a scope or
+  // an ACOG always; a rifle beyond 5 m, an SMG or pistol beyond 7 m (scaled by the difficulty's adsNear); once up
+  // they stay up; sighted on where a lost enemy went, into a danger zone, at cover, and (hard) on a held angle.
+  adsWant(dist) {
+    const b = this.bot, w = b.weapon, d = this.diff, g = this.game, def = w.def, t = def.model.type;
+    if (def.melee || def.sling || b.infected || def.pellets > 1) return 0;
+    const scoped = !!def.scope || def.model.sight === 'acog';
+    const near = ({ pistol: 7, smg: 7, rifle: 5, launcher: 8 })[t] ?? 5;
+    if (this.visible && this.target) { if (scoped) return 1; if (b.adsT > 0.8 && dist >= 3) return 1; return dist >= near * d.adsNear ? 1 : 0; }
+    if (this.target && this.target.alive && g.time - this.lastKnownT < (scoped ? 4 : 2) && this.lastKnown.distanceTo(b.pos) < 25) return 1;
+    if (this.threat >= 0.5 || this.cornering || this.goalKind === 'watch') return 1;
+    if (this.atCover && this.coverGoal) return 1;
+    if (this.holding && d.preAim >= 0.8) return 1;
+    return 0;
+  }
+
   combat(dt) {
     const b = this.bot, g = this.game, d = this.diff;
     const w = b.weapon;
     const engaging = this.visible && this.target;
     const dist = engaging ? this.target.pos.distanceTo(b.pos) : 0;
-    const adsTarget = engaging && dist > 12 ? 1 : 0;
-    b.adsT += clamp(adsTarget - b.adsT, -dt / w.def.adsTime, dt / w.def.adsTime);
+    // the sights, ramped at the gun's ADS time and gated the way the player's are: not while sprinting, switching,
+    // reloading, swinging, throwing, sliding or climbing
+    const want = this.adsWant(engaging ? dist : 0);
+    const can = !b.sprinting && b.switchT <= 0 && !w.reloading && b.meleeT <= 0 && b.grenadeCd <= 0.6 && b.slideT <= 0 && !b.mantle && !b.infected;
+    b.adsT = clamp(b.adsT + Math.sign((can ? want : 0) - b.adsT) * dt / w.def.adsTime, 0, 1);
+    // the sprint-out: the gun takes 80-130 ms to come up after a sprint ends (a little more after a tactical
+    // sprint), like the player's; b.sprinting is this frame's (move() ran first)
+    if (this.sprintOutT > 0) this.sprintOutT -= dt;
+    if (this.wasSprinting && !b.sprinting) { const st = w.def.model.type; this.sprintOutT = ((st === 'pistol' || st === 'smg') ? 0.08 : st === 'rifle' ? 0.115 : 0.13) * d.sprintOut + (this.wasTac ? 0.05 : 0); }
+    this.wasSprinting = b.sprinting; this.wasTac = b.tacSprinting;
 
     if (!engaging) {
       if (b.cur === 1 && b.weapons[0].mag + b.weapons[0].reserve > 0) b.switchTo(0);
@@ -609,9 +669,18 @@ export class BotBrain {
       else if (dist > 6 && dist < 18 && b.grenades > 0 && b.grenadeCd <= 0 && Math.random() < 0.02) b.throwGrenade(this.target.pos.clone(), 0);
       return;
     }
+    // the gun has to come up first; no shots through the throw swing or a slide
+    if (this.sprintOutT > 0 || b.sprinting || b.grenadeCd > 0.45 || b.slideT > 0.3) return;
+    const primary = b.weapons[0], pistol = b.weapons[1];
+    // contact up close in the middle of a reload: with a few rounds left, drop the reload and use them; otherwise
+    // the loaded pistol, or the knife if they're on top of us (a reload about to finish is finished)
+    if (w.reloading && dist < 10 && w.reloadT > 0.3) {
+      if (w.mag >= 3) w.cancelReload();
+      else if (b.cur === 0 && pistol.mag > 0) { b.switchTo(1); return; }   // (the switch drops the reload)
+      else if (dist < 2.2 && b.meleeCd <= 0) { b.melee(); return; }
+    }
     if (dist < 1.7 && b.meleeCd <= 0 && Math.random() < 0.5) { b.melee(); return; }
     // pick the right tool for the range
-    const primary = b.weapons[0], pistol = b.weapons[1];
     const pr = primary.def.botRange;
     if (b.cur === 0 && pistol.mag + pistol.reserve > 0 && ((primary.def.model.type === 'shotgun' && dist > 16) || (primary.def.model.type === 'sniper' && dist < 6))) { b.switchTo(1); return; }
     if (b.cur === 1 && primary.mag > 0 && dist >= pr[0] && dist <= pr[1] + 2) { b.switchTo(0); return; }

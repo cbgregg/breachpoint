@@ -93,20 +93,24 @@ async function lab(defaults) {
   }
   // out of the way for good
   function park(c) { brain(c).update = () => {}; c.pos.set(500, 0, 500); c.alive = false; c.respawnT = Infinity; }
+  // every bot but these parked: a scenario about one bot and its target, with nobody wandering into it
+  function alone(...keep) { for (const c of g.characters) if (c.isBot && !keep.includes(c)) park(c); }
   function eye(p) { return v3.set(p.x, g.world.nav.levelY(p) + 1.62, p.z); }
   // two open cells |ab| within 0.5 m of dist, a clear walk between them and eye-to-eye line of sight; cover: true
   // also needs brain.coverPoint (the bot's own cover search) to find something from a (so the cover tests run on
-  // the map's real walls)
-  function pair(dist, { cover = false, br = null } = {}) {
+  // the map's real walls); clear: m of open ground all round each end (room to strafe without meeting a wall)
+  function pair(dist, { cover = false, br = null, clear = 0 } = {}) {
     const nav = g.world.nav, cells = nav.openCells.slice().sort(() => Math.random() - 0.5).slice(0, 1500);
     const xs = cells.map(k => nav.cx(k % nav.cols)), zs = cells.map(k => nav.cz((k / nav.cols) | 0));
     const a = new THREE.Vector3(), b = new THREE.Vector3();
+    const open = (x, z) => { for (let dx = -clear; dx <= clear; dx += 0.5) for (let dz = -clear; dz <= clear; dz += 0.5) if (dx * dx + dz * dz <= clear * clear && !nav.isOpenAt(x + dx, z + dz)) return false; return true; };
     for (let i = 0; i < cells.length; i++) {
       a.set(xs[i], 0, zs[i]);
+      if (clear && !open(a.x, a.z)) continue;
       for (let j = 0; j < cells.length; j++) {
         if (Math.abs(Math.hypot(xs[j] - xs[i], zs[j] - zs[i]) - dist) > 0.5) continue;
         b.set(xs[j], 0, zs[j]);
-        if (!nav.lineClear(a.x, a.z, b.x, b.z) || g.physics.blocked(eye(a).clone(), eye(b))) continue;
+        if (!nav.lineClear(a.x, a.z, b.x, b.z) || g.physics.blocked(eye(a).clone(), eye(b)) || (clear && !open(b.x, b.z))) continue;
         if (cover) { const save = br.bot.pos.clone(); br.bot.pos.copy(a); br.coverCache = null; const c = br.coverPoint(b, 6); br.bot.pos.copy(save); br.coverCache = null; if (!c) continue; }
         return [a.clone(), b.clone()];
       }
@@ -127,11 +131,19 @@ async function lab(defaults) {
   function step(sec, each = null, dt = 1 / 60) {
     for (let i = 0, n = Math.round(sec / dt); i < n; i++) { g.update(dt); g.input.endFrame(); if (each) each(i); }
   }
-  // record every attempt to fire: c.__fires = [{ t, ok, adsT, sprinting, reloading, prone }]
+  // step until cond() holds (at most maxSec s); returns the seconds it took, or null
+  function until(cond, maxSec = 3, each = null, dt = 1 / 60) {
+    const t0 = g.time;
+    for (let i = 0, n = Math.round(maxSec / dt); i < n; i++) { g.update(dt); g.input.endFrame(); if (each) each(i); if (cond()) return g.time - t0; }
+    return null;
+  }
+  // record every attempt to fire: c.__fires = [{ t, ok, adsT, sprinting, reloading, prone }] (a second call starts a
+  // fresh list; the hook is only ever put on once)
   function spyFire(c) {
     c.__fires = [];
-    const of = c.tryFire.bind(c);
-    c.tryFire = (o, d) => { const ok = of(o, d); c.__fires.push({ t: g.time, ok, adsT: c.adsT, sprinting: c.sprinting, reloading: c.weapon.reloading, prone: c.proneT }); return ok; };
+    if (c.__tryFire0) return;
+    const of = c.__tryFire0 = c.tryFire.bind(c);
+    c.tryFire = (o, d) => { const ok = of(o, d); c.__fires.push({ t: g.time, ok, adsT: c.adsT, sprinting: c.sprinting, reloading: c.weapon.reloading, prone: c.proneT, cur: c.cur }); return ok; };
   }
   // a solid wall (collision and nav), x0..x1 by z0..z1, h tall; unwall() takes it away again
   function wall(x0, z0, x1, z1, h = 2.2) {
@@ -158,7 +170,7 @@ async function lab(defaults) {
   const note = (m) => { results.push({ note: m }); };
   const yieldNow = () => new Promise(r => setTimeout(r, 0));
 
-  const L = window.__lab = { g, THREE, Box, DEFAULT_SETTINGS, v1, v2, v3, clamp, angDiff, yawTo, hs, los, mulberry, errors, boot, brain, pin, unpin, bot, dummy, place, park, eye, pair, pointAlong, hiddenNear, step, spyFire, wall, unwall, check, assert, note, yieldNow, defaults, scenarios: {} };
+  const L = window.__lab = { g, THREE, Box, DEFAULT_SETTINGS, v1, v2, v3, clamp, angDiff, yawTo, hs, los, mulberry, errors, boot, brain, pin, unpin, bot, dummy, place, park, alone, eye, pair, pointAlong, hiddenNear, step, until, spyFire, wall, unwall, check, assert, note, yieldNow, defaults, scenarios: {} };
   // run one scenario: its checks, the error that stopped it (if one did) and how long it took
   L.run = async (name) => {
     results = []; const t0 = performance.now(); let error = null;
@@ -250,6 +262,184 @@ async function lab(defaults) {
     check(g.physics.boxes.length === boxes0 && g.world.nav.openCells.length === cells0 && walls.length === 0, 'boot: clears a scenario\'s leftover walls');
     const b2 = bot('rifle'); park(b2); step(0.5);
     check(!b2.alive && b2.pos.x === 500 && b2.respawnT === Infinity, 'park: out of the match for good');
+  };
+
+  // ADS discipline (step 2): sights by weapon and range, gated like the player's; the sprint-out delay before
+  // the first shot; no sprinting through a reload; a reload dropped or swapped out of on contact up close
+  L.scenarios.ads = async () => {
+    boot();
+    let b = bot('rifle'), br = brain(b);
+    const t = dummy();
+    alone(b, t);
+    // the gunplay knobs pinned to Normal's whatever --diff says: the hip-fire ranges below are Normal's (the knob
+    // itself is checked at the end), and easy's slow, sloppy first shot would land after the bot has given ground
+    // out of hip range (that's the aim model's business, not the sights')
+    br.diff.adsNear = 1; br.diff.reaction = 0.42; br.diff.aimError = 0.065;
+    const [A, B] = pair(16, { clear: 3 });
+    // a fresh fight: the bot (with this gun) at A facing a dummy `dist` m down the line, stepped `sec` s;
+    // returns the shots that went off
+    const fight = (weapon, dist, sec, setup = null) => {
+      b = bot(weapon); br = brain(b); b.grenades = 0; b.tacticals = 0;
+      place(b, A, yawTo(A, B)); place(t, pointAlong(A, B, dist), yawTo(B, A)); t.health = 1e6;
+      if (setup) setup();
+      spyFire(b); step(sec);
+      return b.__fires.filter(f => f.ok);
+    };
+    const first = (fires) => fires[0];
+    let f = fight('rifle', 10, 2);
+    check(f.length > 0 && first(f).adsT >= 0.95, `rifle at 10 m: the first round goes down the sights (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'}, ${f.length} shots)`);
+    check(f.every(x => !x.sprinting), 'rifle at 10 m: never a shot while sprinting');
+    f = fight('rifle', 3, 1.5);
+    check(f.length > 0 && first(f).adsT < 0.2, `rifle at 3 m: hip-fire, and it still fires (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'} at the first shot, ${f.length} shots)`);
+    f = fight('shotgun', 10, 2);
+    check(b.adsT === 0 && f.length > 0 && f.every(x => x.adsT === 0), `shotgun at 10 m: never aims down the sights (adsT ${b.adsT.toFixed(2)}, ${f.length} shots)`);
+    f = fight('sniper', 8, 2.5);   // (a bolt gun on easy takes its time over the first shot)
+    check(b.adsT >= 0.95 && f.length > 0 && first(f).adsT >= 0.95, `sniper at 8 m: scoped in even up close (adsT ${b.adsT.toFixed(2)}, first shot at ${f.length ? first(f).adsT.toFixed(2) : '-'})`);
+    f = fight('smg', 5, 1.5);
+    check(f.length > 0 && first(f).adsT < 0.2, `smg at 5 m: hip-fire (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'})`);
+    f = fight('smg', 12, 2);
+    check(f.length > 0 && first(f).adsT >= 0.95, `smg at 12 m: sights up (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'})`);
+    // the gates: a reload drops the sights at once (at 15 m the reload is kept; up close it would be dropped instead)
+    f = fight('rifle', 15, 1.2);
+    check(b.adsT >= 0.95, `rifle at 15 m: aimed in before the reload test (adsT ${b.adsT.toFixed(2)})`);
+    b.weapon.mag = 10; b.reload(); step(0.4);
+    check(b.weapon.reloading && b.adsT < 0.1, `a reload drops the sights within 0.4 s (adsT ${b.adsT.toFixed(2)}, reloading ${b.weapon.reloading})`);
+    // the sprint-out: sprinting down a lane, a dummy appears 9 m ahead; the first shot waits for the gun to come up
+    b = bot('rifle'); br = brain(b); b.grenades = 0; b.tacticals = 0;
+    br.diff.reaction = 0.001;
+    const [C, D] = pair(30);
+    place(b, C, yawTo(C, D)); park(t);
+    br.setGoal(D, 'roam'); br.goalT = 30; br.route = null;
+    step(1.5);
+    check(b.sprinting && hs(b) > 6, `sprints down the lane with nobody in sight (${hs(b).toFixed(1)} m/s)`);
+    place(t, pointAlong(b.pos, D, 9), yawTo(D, C)); t.health = 1e6;
+    spyFire(b);
+    let stopT = null, sawT = null;
+    step(2, () => { if (sawT === null && br.visible) sawT = g.time; if (stopT === null && !b.sprinting) stopT = g.time; });
+    f = b.__fires.filter(x => x.ok);
+    const gap = f.length && stopT !== null ? f[0].t - stopT : null;
+    check(sawT !== null && stopT !== null && sawT <= stopT + 1e-6, `the sprint ends the frame the dummy is seen (seen ${sawT === null ? '-' : sawT.toFixed(2)}, stopped ${stopT === null ? '-' : stopT.toFixed(2)})`);
+    check(gap !== null && gap >= 0.08 && gap < 0.45, `sprint-out: the first shot ${gap === null ? 'never came' : gap.toFixed(3) + ' s after the sprint ended'} (0.08-0.45 s: the player's own sprint-out is 80-130 ms)`);
+    // (the first round or two go off while the sights are still coming up: the ADS ramp is longer than the sprint-out)
+    check(f.length > 1 && f.every(x => !x.sprinting) && f[f.length - 1].adsT >= 0.95, `every shot at 9 m out of the sprint, and the sights up by the last (${f.length} shots, adsT ${f.map(x => x.adsT.toFixed(2)).join(' ')})`);
+    // no sprint-reloads: a reload on the run stops the run until it's done; a near-full top-up is dropped for the run instead
+    const lane = () => { place(b, C, yawTo(C, D)); park(t); b.weapons.forEach(w => w.refill()); br.setGoal(D, 'roam'); br.goalT = 30; br.route = null; step(1.5); return b.sprinting; };
+    check(lane(), 'sprinting again for the reload test');
+    b.weapon.mag = 5; b.reload(); step(0.2);
+    check(b.weapon.reloading && !b.sprinting, `a reload stops the sprint (reloading ${b.weapon.reloading}, sprinting ${b.sprinting})`);
+    let walked = true; step(1.9, () => { if (b.weapon.reloading && b.sprinting) walked = false; });
+    check(walked && !b.weapon.reloading && b.weapon.mag === 30 && b.sprinting, `the reload finishes at a walk, then the sprint resumes (mag ${b.weapon.mag}, sprinting ${b.sprinting}, walked ${walked})`);
+    check(lane(), 'sprinting again for the top-up test');
+    b.weapon.mag = 25; b.reload(); step(0.2);
+    check(!b.weapon.reloading && b.sprinting && b.weapon.mag === 25, `a near-full top-up is dropped for the run (reloading ${b.weapon.reloading}, sprinting ${b.sprinting})`);
+    // contact at 6 m in the middle of a reload: two rounds left -> the loaded pistol; ten left -> drop the reload and fire
+    br.diff.reaction = 0.05;
+    f = fight('rifle', 6, 1, () => { b.weapons[1].mag = 12; b.weapon.mag = 2; b.reload(); });
+    check(b.cur === 1 && !b.weapons[0].reloading, `mid-reload contact at 6 m with 2 rounds: swaps to the pistol (cur ${b.cur}, primary reloading ${b.weapons[0].reloading})`);
+    // (a hard bot may empty the ten and swap to the pistol inside the second: the primary is never reloaded in their face)
+    f = fight('rifle', 6, 1, () => { b.weapon.mag = 10; b.reload(); });
+    check(!b.weapons[0].reloading && f.length > 0 && f[0].cur === 0 && f.every(x => !x.reloading), `mid-reload contact at 6 m with 10 rounds: drops the reload and fires within 1 s (${f.length} shots, cur ${b.cur})`);
+    // a reload with 0.3 s left is finished, not dropped
+    f = fight('rifle', 6, 1, () => { b.weapon.mag = 10; b.reload(); b.weapon.reloadT = 0.25; });
+    check(f.length > 0 && f[0].cur === 0 && b.weapons[0].mag + f.filter(x => x.cur === 0).length === 30, `a reload about to finish is finished, then the fight goes on (mag ${b.weapons[0].mag} + ${f.length} shots)`);
+    // the adsNear knob: easy (1.3) hip-fires an SMG at 8 m where normal (1) has the sights up
+    br.diff.reaction = 0.3; br.diff.adsNear = 1.3;
+    f = fight('smg', 8, 1.5);
+    check(f.length > 0 && first(f).adsT < 0.2, `adsNear 1.3 (easy): smg at 8 m hip-fires (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'})`);
+    br.diff.adsNear = 1;
+    f = fight('smg', 8, 1.5);
+    check(f.length > 0 && first(f).adsT >= 0.95, `adsNear 1 (normal): smg at 8 m sights up (adsT ${f.length ? first(f).adsT.toFixed(2) : '-'})`);
+  };
+
+  // the strafe (step 3): jittered A/D legs, a reversal on a hit, never still past half a second in the open,
+  // no hops or prone in the open, crouch only behind chest-high cover, the drop-shot on hard
+  L.scenarios.strafe = async () => {
+    boot();
+    let b = bot('rifle'), br = brain(b);
+    const t = dummy();
+    alone(b, t);
+    b.grenades = 0; b.tacticals = 0;
+    br.diff.strafe = 1;
+    const [A, B] = pair(15, { clear: 4 });
+    const pl = Math.hypot(B.z - A.z, B.x - A.x), perp = { x: -(B.z - A.z) / pl, z: (B.x - A.x) / pl };
+    // a 15 m fight for `sec` s, sampled every frame once the bot has seen the dummy; hitAt: a 10-damage hit at that time
+    const run = (sec, hitAt = null) => {
+      place(b, A, yawTo(A, B)); place(t, B, yawTo(B, A));
+      const s = { frames: 0, still: 0, longestStill: 0, airborne: 0, maxProne: 0, maxCrouch: 0, speed: 0, flips: [], hitT: null, flipT: null, seen: null, far: 0 };
+      let sign = 0, dir0 = null;
+      const t0 = g.time;
+      step(sec, (i) => {
+        t.health = 1e6;
+        const now = g.time;
+        if (hitAt !== null && s.hitT === null && now - t0 >= hitAt) { s.hitT = now; dir0 = br.strafeDir; b.takeDamage(10, t, 'rifle', false, t.pos); return; }
+        if (s.hitT !== null && s.flipT === null && br.strafeDir !== dir0) s.flipT = now;
+        if (!br.visible && s.seen === null) return;
+        if (s.seen === null) s.seen = now;
+        s.frames++;
+        const v = hs(b);
+        s.speed += v;
+        if (v < 0.5) { s.still++; s.longestStill = Math.max(s.longestStill, s.still); } else s.still = 0;
+        if (!b.onGround && b.vel.y > 1) s.airborne++;
+        s.maxProne = Math.max(s.maxProne, b.proneT); s.maxCrouch = Math.max(s.maxCrouch, b.crouchT);
+        s.far = Math.max(s.far, b.pos.distanceTo(A));
+        const lat = b.vel.x * perp.x + b.vel.z * perp.z;
+        if (Math.abs(lat) > 0.3) { const sg = Math.sign(lat); if (sign !== 0 && sg !== sign) s.flips.push(now); sign = sg; }
+      });
+      s.speed /= Math.max(1, s.frames);
+      return s;
+    };
+    let s = run(6, 3);
+    check(s.seen !== null && s.frames > 300, `sees the dummy at 15 m and fights for ${(s.frames / 60).toFixed(1)} s`);
+    check(s.longestStill / 60 <= 0.5, `never still past half a second in the open (longest ${(s.longestStill / 60).toFixed(2)} s)`);
+    check(s.airborne === 0, `no hopping in a gunfight (${s.airborne} airborne frames)`);
+    check(s.maxProne === 0, `no going prone in the open (proneT ${s.maxProne.toFixed(2)})`);
+    check(s.maxCrouch < 0.3, `no crouching with nothing to crouch behind (crouchT ${s.maxCrouch.toFixed(2)})`);
+    const iv = s.flips.slice(1).map((x, i) => x - s.flips[i]);
+    const mean = iv.reduce((a, x) => a + x, 0) / Math.max(1, iv.length), sd = Math.sqrt(iv.reduce((a, x) => a + (x - mean) * (x - mean), 0) / Math.max(1, iv.length));
+    check(iv.length >= 5 && iv.every(x => x >= 0.12 && x <= 1.0), `strafe legs of 0.12-1.0 s (${iv.length} reversals: ${iv.map(x => x.toFixed(2)).join(' ')})`);
+    check(sd > 0.05, `jittered, not a metronome (sd ${sd.toFixed(3)} s)`);
+    check(s.hitT !== null && s.flipT !== null && s.flipT - s.hitT <= 0.15, `a hit reverses the strafe within 0.15 s (${s.flipT === null ? 'never' : (s.flipT - s.hitT).toFixed(3) + ' s'})`);
+    check(s.speed >= 1.8 && s.speed <= 3.2, `mean speed ${s.speed.toFixed(2)} m/s (1.8-3.2: an aimed-in strafe)`);
+    check(s.far < 6, `fights from where it stands (${s.far.toFixed(1)} m from A at most)`);
+    // the strafe dice at 0: stood-still legs, but never past half a second
+    br.diff.strafe = 0;
+    s = run(6);
+    check(s.seen !== null && s.longestStill / 60 <= 0.5, `strafe = 0: still never past half a second (longest ${(s.longestStill / 60).toFixed(2)} s, mean speed ${s.speed.toFixed(2)})`);
+    check(s.airborne === 0 && s.maxProne === 0 && s.maxCrouch < 0.3, 'strafe = 0: still no hops, prone or crouch');
+    br.diff.strafe = 1;
+    // chest-high cover (a 0.7 m square, 1 m tall) 0.9 m in front at 12 m: crouch behind it and stop strafing
+    const C = pointAlong(A, B, 0.9);
+    const box = g.physics.addBox(new Box(C.x - 0.35, 0, C.z - 0.35, C.x + 0.35, 1.0, C.z + 0.35));
+    place(b, A, yawTo(A, B)); place(t, pointAlong(A, B, 12), yawTo(B, A)); t.health = 1e6;
+    let crouchAt = null, lateral = 0, seenAt = null;
+    step(2, () => { t.health = 1e6; if (seenAt === null && br.visible) seenAt = g.time; if (crouchAt === null && b.crouchT > 0.5) crouchAt = g.time; if (g.time > seenAt + 1) lateral = Math.max(lateral, Math.abs(b.vel.x * perp.x + b.vel.z * perp.z)); });
+    check(seenAt !== null && crouchAt !== null && crouchAt - seenAt <= 1, `chest-high cover in front: crouches behind it within a second (${crouchAt === null ? 'never' : (crouchAt - seenAt).toFixed(2) + ' s'}, lowCover ${br.lowCover})`);
+    check(lateral < 0.5 && b.pos.distanceTo(A) < 0.5, `and holds there instead of strafing out of it (lateral ${lateral.toFixed(2)} m/s)`);
+    g.physics.boxes.splice(g.physics.boxes.indexOf(box), 1);   // (the index rebuilds on the count)
+    place(b, A, yawTo(A, B)); place(t, pointAlong(A, B, 12), yawTo(B, A)); step(1, () => { t.health = 1e6; });
+    check(!br.lowCover && b.crouchT < 0.3, 'the box gone, the crouch goes with it');
+    // the drop-shot (hard, dice pinned): shot first at 8 m, it drops prone, fires from there and is up again by 2.3 s
+    boot({ difficulty: 'hard' });
+    b = bot('rifle'); br = brain(b); const t2 = dummy(); alone(b, t2);
+    b.grenades = 0; b.tacticals = 0; br.diff.dropShot = 1;
+    const [E, F] = pair(8, { clear: 3 });
+    place(b, E, yawTo(E, F)); place(t2, F, yawTo(F, E)); t2.health = 1e6; spyFire(b);
+    let seen2 = until(() => br.visible, 2, () => { t2.health = 1e6; });
+    check(seen2 !== null && b.__fires.length === 0, `drop-shot: the dummy is seen (${seen2 === null ? '-' : seen2.toFixed(2)} s) and the bot has not fired yet`);
+    const hitT = g.time; b.takeDamage(25, t2, 'rifle', false, t2.pos);
+    let proneAt = null, maxP = 0;
+    step(0.6, () => { t2.health = 1e6; if (proneAt === null && b.proneT > 0.5) proneAt = g.time; });
+    check(proneAt !== null && proneAt - hitT <= 0.6, `shot first at 8 m: drops within 0.6 s (${proneAt === null ? 'never' : (proneAt - hitT).toFixed(2) + ' s'})`);
+    step(1.7, () => { t2.health = 1e6; maxP = Math.max(maxP, b.proneT); });
+    check(b.__fires.some(x => x.ok && x.prone > 0.5), `fires from the ground (${b.__fires.filter(x => x.ok && x.prone > 0.5).length} prone shots)`);
+    check(b.proneT < 0.1, `up again by 2.3 s (proneT ${b.proneT.toFixed(2)})`);
+    // the dice at 0 (normal's default is 5%): no drop
+    br.diff.dropShot = 0;
+    place(b, E, yawTo(E, F)); place(t2, F, yawTo(F, E)); t2.health = 1e6;
+    seen2 = until(() => br.visible, 2, () => { t2.health = 1e6; });
+    b.takeDamage(25, t2, 'rifle', false, t2.pos); maxP = 0;
+    step(1, () => { t2.health = 1e6; maxP = Math.max(maxP, b.proneT); });
+    check(maxP === 0, `dropShot = 0: stays on its feet (proneT ${maxP.toFixed(2)})`);
   };
 
   // two minutes of a 6v6 on Tarsa with the renderer off: no page errors, and the match stays a match
