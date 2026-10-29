@@ -5,7 +5,7 @@ import { loadPadMaps } from './input.js';
 import { MAPS } from './world.js';
 import { Game, prewarmBotGuns, VOICES } from './game.js';
 import { glyph } from './hud.js';
-import { loadAssets } from './assets.js';
+import { loadAssets, loadMapVehicles } from './assets.js';
 import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
@@ -1089,8 +1089,8 @@ function launchMatch(cfg, online) {
   return (async () => {
     await nextFrame();
     fill.style.transition = '';
-    step(15, 'Loading textures');
-    await wait(160); await nextFrame();
+    step(15, 'Loading vehicles');
+    await Promise.all([Promise.race([loadMapVehicles(mapId), wait(20000)]), wait(160)]); await nextFrame();   // (a slow host can't hold the match up for long)
     step(35, 'Building the map');
     await wait(220); await nextFrame();   // let the bar paint before the (blocking) build
     try { game.startMatch(cfg, online); } catch (e) {

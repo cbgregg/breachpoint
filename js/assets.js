@@ -72,6 +72,27 @@ const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/model
   fridge: 'assets/models/fridge.glb', lantern: 'assets/models/lantern.glb', cone: 'assets/models/cone.glb',
   dumpster: 'assets/models/dumpster.glb', locker: 'assets/models/locker.glb', office: 'assets/models/office.glb', kitchen: 'assets/models/kitchen.glb',
   signs: 'assets/models/signs.glb', roadsigns: 'assets/models/roadsigns.glb' };
+// Vehicles: real models (CC0 / CC-BY, credited in the README), loaded per map on the match loading screen so a
+// map only downloads its own (setProp names them veh_<slot>). A map built before they arrive, or a model that
+// fails to load, uses the procedural vehicle instead.
+const VEHICLES_BY_MAP = {
+  tarsa: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
+  shuran: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
+  pioneer: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'bus', 'streetcar'],
+  mart: ['sedan', 'hatch', 'van', 'semi', 'forklift'],
+  drivein: ['car50', 'car50b', 'pickup50', 'van50', 'stepvan'],
+  link: ['lightrail'],
+};
+const vehicleLoads = new Map();
+export function loadMapVehicles(mapId) {
+  return Promise.all((VEHICLES_BY_MAP[mapId] || []).map(slot => {
+    const name = 'veh_' + slot;
+    if (!vehicleLoads.has(name)) vehicleLoads.set(name, new GLTFLoader().loadAsync(`assets/models/${name}.glb`)
+      .then(g => setProp(name, g.scene))
+      .catch(e => console.warn('Vehicle model unavailable, using procedural:', name, e)));
+    return vehicleLoads.get(name);
+  }));
+}
 async function loadProps() {
   await Promise.all(Object.entries(PROP_FILES).map(async ([name, file]) => {
     try { setProp(name, (await new GLTFLoader().loadAsync(file)).scene); }
