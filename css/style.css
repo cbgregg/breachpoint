@@ -291,6 +291,7 @@ body.ingame #touch.on { display: block; }
 @keyframes stick-locked { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 .tb { transition: transform .08s, background .08s; }
 .tb.down { transform: scale(0.92); }
+#tb-reload.obj { background: rgba(var(--bo-rgb), 0.45); border-color: rgba(var(--bo-rgb), 0.9); animation: stick-locked 0.9s ease-in-out infinite; }
 /* while aiming: a bigger fire button, plus a second one on the left so the right thumb can hold ADS and aim */
 #tb-fire, #tb-fire2 { transition: width .12s, height .12s; }
 #tb-fire2 { left: calc(24px * var(--tb-zoom, 0.7)); bottom: calc(92px * var(--tb-zoom, 0.7)); width: calc(92px * var(--tb-zoom, 0.7)); height: calc(92px * var(--tb-zoom, 0.7)); display: none; }

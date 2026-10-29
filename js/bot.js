@@ -104,6 +104,7 @@ export class BotBrain {
       const near = clamp(1.35 - dist / 40, 0.3, 1.25);
       const moving = Math.hypot(e.vel.x, e.vel.z) > 3 ? 1.25 : e.crouchT > 0.5 ? 0.7 : 1;
       const rate = d.spot * Math.pow(exp, 1.5) * center * near * moving * (loud ? 1.6 : 1) * (hurt ? 2 : 1) * (dist < 4 ? 3 : 1);
+      if (dist < 6 && exp >= 0.3 && ang < d.fov) m = Math.max(m, 1);   // (someone right there in front of you: no slow dawning)
       m = Math.min(1.6, m + rate * step);
       this.spot.set(e, m);
       if (m < 1) continue;
@@ -132,6 +133,8 @@ export class BotBrain {
 
   onDamaged(attacker) {
     if (!attacker || !this.game.foes(attacker, this.bot)) return;
+    // being shot by someone who isn't the target: they are now (they're the danger), and they're found at once
+    if (this.target !== attacker) { this.spot.set(attacker, Math.max(this.spot.get(attacker) || 0, 1)); this.target = attacker; this.visible = false; this.perceiveT = Math.min(this.perceiveT, 0.05); }
     if (!this.visible) {
       this.lastKnown.copy(attacker.pos);
       this.lastKnownT = this.game.time;

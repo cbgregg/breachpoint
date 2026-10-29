@@ -233,6 +233,8 @@ export class PlayerController {
     }
     this.specTarget = null;
     if (this.wasDead) { this.wasDead = false; this.lastFov = 0; }
+    // a fresh spawn (after a death, or a new round) stands you up: the crouch / prone toggles don't carry over
+    if (c.spawnT !== this.lastSpawnT) { this.lastSpawnT = c.spawnT; this.crouchToggle = false; this.proneOn = false; this.crouchHeldT = 0; this.tacOn = false; this.padSprint = false; }
     this.vmRoot.visible = true;
     const canAct = !g.frozen && !c.busy; // planting / defusing roots you in place
     const def = c.weapon.def;

@@ -202,7 +202,7 @@ export const typeOf = (id) => (WEAPONS[id] && WEAPONS[id].model.type) || 'rifle'
 // fov = half-angle (radians) of the bot's vision cone
 export const DIFFICULTY = {
   easy: { spot: 1.3, reaction: 0.85, aimError: 0.12, aimFloor: 0.6, lag: 0.32, turnRate: 3.0, headChance: 0.05, burst: [0.12, 0.3], pause: [0.45, 0.9], semiDelay: 0.45, sight: 50, fov: 0.9 },
-  normal: { spot: 2.0, reaction: 0.55, aimError: 0.08, aimFloor: 0.45, lag: 0.2, turnRate: 5.0, headChance: 0.15, burst: [0.18, 0.45], pause: [0.25, 0.55], semiDelay: 0.25, sight: 70, fov: 1.1 },
+  normal: { spot: 2.6, reaction: 0.42, aimError: 0.065, aimFloor: 0.42, lag: 0.17, turnRate: 6.0, headChance: 0.15, burst: [0.18, 0.45], pause: [0.25, 0.55], semiDelay: 0.25, sight: 70, fov: 1.1 },
   hard: { spot: 3.0, reaction: 0.3, aimError: 0.045, aimFloor: 0.3, lag: 0.1, turnRate: 8, headChance: 0.3, burst: [0.25, 0.7], pause: [0.12, 0.3], semiDelay: 0.1, sight: 90, fov: 1.3 },
 };
 

@@ -672,7 +672,8 @@ class RoundMode {
     // use prompt
     const zone = this.authority ? this.useZone(me) : this.guestZone(me);
     const dev = g.hud.device;
-    g.hud.objPrompt = zone && !me.busy ? `HOLD ${glyph('reload', dev)}${dev === 'kbm' ? ' / <kbd>F</kbd>' : ''} TO ${zone === 'plant' ? 'PLANT' : 'DEFUSE'}` : '';
+    g.hud.objPrompt = zone && !me.busy ? `HOLD ${dev === 'kbm' ? '<kbd>F</kbd>' : glyph('reload', dev)} TO ${zone === 'plant' ? 'PLANT' : 'DEFUSE'}` : '';
+    g.hud.objKind = zone || '';
     // world markers
     const want = [];
     if (snd) {

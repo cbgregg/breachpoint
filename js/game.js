@@ -608,7 +608,8 @@ export class Game {
     if (this.world.sounds && this.world.sounds.length) {
       // (a world can say how well a sound carries to where you are: a train under the street, in another station)
       const ear = this.camera.position, aud = this.world.audible;
-      if (this.state === 'playing') for (const [name, pos, opts] of this.world.sounds) {
+      // (not while the loading screen is still up: the station's PA under it sounded like a second announcer)
+      if (this.state === 'playing' && !this.introHold) for (const [name, pos, opts] of this.world.sounds) {
         const k = aud && pos ? aud(pos, ear, name, opts) : 1;
         if (k > 0.02) this.audio.play(name, pos, k < 1 ? { ...opts, occl: Math.sqrt(k), muffle: 1 - k } : opts);
       }
@@ -1473,11 +1474,15 @@ export class Game {
     const squad = shuffle(this.characters.filter(c => c.isBot && c.alive && (this.ffa || c.team === this.player.team))), token = this.matchToken;
     let i = 0;
     const next = (gap) => setTimeout(() => {
-      if (this.matchToken !== token || !this.live || this.countdownT < 2.2 || i >= Math.min(3, squad.length)) return;
+      if (this.matchToken !== token || !this.live || i >= Math.min(3, squad.length)) return;
+      // not over the announcer (the mode line can run 4 s), and not into FIGHT: a line needs 4.5 s of countdown left
+      const a = this.audio, left = a.ctx ? a.voUntil - a.ctx.currentTime : 0;
+      if (left > 0.05) { next(left + 0.5); return; }
+      if (this.countdownT < 4.5) return;
       const c = squad[i++]; c.calloutT = -9; this.calloutT = -9;
       next(this.callout(c, 'banter') + 0.7 + Math.random() * 0.6);
     }, gap * 1000);
-    next(2.6);   // (after the announcer has named the mode)
+    next(1.2);   // (the announcer names the mode first; the first line waits for it to finish)
   }
   // walking past a teammate who isn't fighting: now and then, by chance, they've got something to say
   walkByBanter(dt) {

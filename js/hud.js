@@ -158,6 +158,9 @@ export class HUD {
     // prompt
     let key = '', html = '', warn = false;
     if (p.alive && this.objPrompt) { key = 'obj' + this.objPrompt; html = this.objPrompt; }
+    // (touch: the RELOAD button is the plant / defuse button at a site, and says so)
+    const tbr = $('tb-reload'), lbl = p.alive && this.objKind ? (this.objKind === 'plant' ? 'PLANT' : 'DEFUSE') : 'RELOAD';
+    if (tbr && this.cache['tb-reload.label'] !== lbl) { this.cache['tb-reload.label'] = lbl; tbr.textContent = lbl; tbr.classList.toggle('obj', lbl !== 'RELOAD'); }
     else if (p.alive && this.doorPrompt) { key = 'door' + this.doorPrompt; html = this.doorPrompt; }
     else if (p.alive && !w.reloading) {
       if (w.mag === 0 && w.reserve === 0) { key = 'noammo'; html = 'NO AMMO'; warn = true; }
