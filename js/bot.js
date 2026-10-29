@@ -257,7 +257,8 @@ export class BotBrain {
   // each, cached a second per threat cell; asked on transitions only, never every frame.
   coverPoint(threat, r = 6, urgent = false) {
     const b = this.bot, g = this.game, ph = g.physics, nav = g.world.nav.gridAt(b.pos);
-    const key = (((threat.x / 3) | 0) * 4096 + ((threat.z / 3) | 0)) * 16 + Math.round(r) * 2 + (urgent ? 1 : 0);
+    // (cached a second per threat cell, bot cell, radius and urgency: a bot that has moved a couple of metres asks afresh)
+    const key = `${Math.floor(threat.x / 3)},${Math.floor(threat.z / 3)},${Math.floor(b.pos.x / 2)},${Math.floor(b.pos.z / 2)},${Math.round(b.pos.y)},${r},${urgent ? 1 : 0}`;
     if (this.coverCache && this.coverCache.key === key && g.time - this.coverCache.t < (urgent ? 0.5 : 1)) return this.coverCache.p;
     const eye = _bv1.set(threat.x, threat.y + 1.55, threat.z), y = b.pos.y;
     const tx = threat.x - b.pos.x, tz = threat.z - b.pos.z, tl = Math.hypot(tx, tz) || 1;
@@ -1045,7 +1046,7 @@ export class BotBrain {
     const low = w.mag === 0 || (w.mag <= Math.max(2, w.def.mag * 0.25) && this.fightT > 0.5 && this.pauseT > 0);
     if (low) {
       // cover first (the pistol comes out on the way there, and the rifle is reloaded behind it)
-      if (!this.coverGoal && g.time - this.retreatT > 4 && !b.infected) { const c = this.coverPoint(this.target.pos, 5); if (c && Math.random() < d.coverUse + 0.2) this.takeCover(c, Math.min(4, w.def.reload + 1.2)); }
+      if (!this.coverGoal && g.time - this.retreatT > 4 && !b.infected) { const c = this.coverPoint(this.target.pos, 6); if (c && Math.random() < d.coverUse + 0.2) this.takeCover(c, Math.min(4, w.def.reload + 1.2)); }
       if (w.mag === 0 && b.cur === 0 && pistol.mag > 0 && dist < pistol.def.botRange[1]) { b.switchTo(1); return; }
       // on the way to cover the reload waits for it (a walk-and-reload in the open is the slow way to die); if the
       // cover hasn't been reached in a couple of seconds, reload anyway
