@@ -1500,13 +1500,14 @@ export class Game {
   }
 
   onDamaged(victim, attacker, amount, headshot, fromPos) {
-    if (victim.isBot) this.brains.get(victim)?.onDamaged(attacker);
+    if (victim.isBot) this.brains.get(victim)?.onDamaged(attacker, amount, fromPos, headshot);
     else this.notify(victim, 'dmg', attacker !== victim && fromPos ? +fromPos.x.toFixed(1) : null, fromPos ? +fromPos.z.toFixed(1) : 0);
+    if (attacker && attacker !== victim && attacker.isBot) this.brains.get(attacker)?.onHit(victim, amount);   // (the shooter keeps count: a wounded one gets chased)
   }
 
   onKill(killer, victim, weaponId, headshot) {
     victim.alive = false;
-    (this.recentDeaths || (this.recentDeaths = [])).push({ x: victim.pos.x, z: victim.pos.z, t: this.time }); // spawns avoid fresh fights
+    (this.recentDeaths || (this.recentDeaths = [])).push({ x: victim.pos.x, z: victim.pos.z, t: this.time, team: victim.team }); // spawns avoid fresh fights; bots walk in aimed
     victim.deaths++;
     victim.streak = 0;
     victim.respawnT = PLAYER.respawnDelay;
@@ -1560,12 +1561,18 @@ export class Game {
     }
     if (this.inf) this.infectedKill(killer, victim);
     // chatter: the killer calls it, a teammate of the fallen nearby calls that
-    if (enemyKill && killer && killer.isBot) this.callout(killer, 'enemy_down', 0.15);
+    if (enemyKill && killer && killer.isBot) { this.callout(killer, 'enemy_down', 0.15); this.brains.get(killer)?.onKill(victim); }
     if (!this.ffa) {
       // round modes: the last one left on a team says so; otherwise a teammate nearby calls the loss
       const left = this.gm ? this.characters.filter(c => c.alive && c !== victim && c.team === victim.team) : [];
       if (left.length === 1 && left[0].isBot) this.callout(left[0], 'last_alive', 0.9, false, true);
       else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.4); }
+      // the trade: the nearest bot teammate who isn't already fighting goes for the killer (most of the time)
+      if (enemyKill && killer && killer.alive) {
+        let best = null, bd = 20;
+        for (const [c, br] of this.brains) { if (!c.alive || c === victim || c.team !== victim.team || br.visible || br.goalKind === 'cover') continue; const dd = c.pos.distanceTo(victim.pos); if (dd < bd) { bd = dd; best = br; } }
+        if (best && Math.random() < 0.7) best.onMateDown(victim, killer);
+      }
     }
     // Team Deathmatch: the lead changing hands
     if (!this.gm && !this.ffa && !this.inf && enemyKill && this.player) {

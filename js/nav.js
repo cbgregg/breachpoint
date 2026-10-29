@@ -98,7 +98,9 @@ export class NavGrid {
   cz(j) { return this.minZ + (j + 0.5) * this.cell; }
 
   isOpen(i, j) { return i >= 0 && j >= 0 && i < this.cols && j < this.rows && !this.blocked[j * this.cols + i]; }
-  isOpenAt(x, z) { return this.isOpen(this.ci(x), this.cj(z)); }
+  // (a point off the grid is not open: ci/cj clamp to the edge cell, which made everything past the boundary wall
+  // read as whatever the last column was, and sent bots into it)
+  isOpenAt(x, z) { return this.isOpen(Math.floor((x - this.minX) / this.cell), Math.floor((z - this.minZ) / this.cell)); }
 
   nearestOpen(i, j) {
     if (this.isOpen(i, j)) return [i, j];
