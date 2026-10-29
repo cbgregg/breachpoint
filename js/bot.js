@@ -166,7 +166,7 @@ export class BotBrain {
         const t = this.target;
         this.lostT = g.time; this.lostDist = this.lastKnown.distanceTo(b.pos); this.lostShooting = g.time - t.lastFireT < 1; this.quietT = 0;
         // (they stood still and we walked behind something: we broke the line, not them)
-        this.lostSelf = Math.hypot(t.vel.x, t.vel.z) < 1 && Math.hypot(b.vel.x, b.vel.z) > 1 && this.strafeRoll === t && this.fightPos.distanceTo(b.pos) < 6;
+        this.lostSelf = Math.hypot(t.vel.x, t.vel.z) < 1 && this.strafeRoll === t && this.fightPos.distanceTo(b.pos) < 6;   // (they didn't move: we did)
       }
       this.visible = false; this.aimInit = false;
       if (this.target && !this.target.alive) this.target = null;
@@ -270,9 +270,18 @@ export class BotBrain {
       if (!nav.isOpenAt(x, z)) continue;
       if (this.badCover && g.time - this.badCoverT < 6 && Math.hypot(x - this.badCover.x, z - this.badCover.z) < 1.2) continue;   // (tried it: it didn't hide us)
       // the spot has to hide at least a crouched body (the cheap test first: most candidates fail it)
-      const chestHid = ph.blocked(eye, _bv2.set(x, y + 1.2, z));
-      const crouchHid = chestHid || ph.blocked(eye, _bv2.set(x, y + 0.9, z));
+      let chestHid = ph.blocked(eye, _bv2.set(x, y + 1.2, z));
+      let crouchHid = chestHid || ph.blocked(eye, _bv2.set(x, y + 0.9, z));
       if (!crouchHid) continue;
+      // (a body is 0.8 m wide: the spot has to hide it a shoulder's width either side too, or a ray that just
+      // grazes a corner calls a spot cover that the body standing on it isn't behind)
+      {
+        const qx = -(threat.z - z), qz = threat.x - x, ql = Math.hypot(qx, qz) || 1, ox = qx / ql * 0.3, oz = qz / ql * 0.3, hy = chestHid ? 1.2 : 0.9;
+        if (!ph.blocked(eye, _bv2.set(x + ox, y + hy, z + oz)) || !ph.blocked(eye, _bv2.set(x - ox, y + hy, z - oz))) {
+          if (!chestHid || !ph.blocked(eye, _bv2.set(x + ox, y + 0.9, z + oz)) || !ph.blocked(eye, _bv2.set(x - ox, y + 0.9, z - oz))) continue;
+          chestHid = false; crouchHid = true;   // (hides a crouched body all the way across)
+        }
+      }
       // the way there: a straight walk the body can make (the grid misses thin walls and planters, and a spot on the
       // far side of one is the wall the bot would die pushing against); failing that, a short way round (the A*
       // path, at most a couple of them per search, no longer than 2.5 x the straight line and 10 m)
@@ -301,7 +310,18 @@ export class BotBrain {
     this.coverCache = { key, t: g.time, p: best };
     return best;
   }
-  takeCover(c, hold) { this.coverGoal = c; this.coverHold = hold; this.goalKind = 'cover'; this.goal = c.p.clone(); this.repathT = 0; this.route = null; this.retreatT = this.game.time; this.atCover = false; this.peekPhase = undefined; this.holding = false; }
+  // a cover spot that turned out not to hide us (held up short of it, or seen on it): skip it for a few seconds and
+  // take the next best one now if there is one, otherwise back to the fight
+  abandonCover() {
+    const g = this.game, c = this.coverGoal, hold = this.coverHold;
+    (this.badCover = this.badCover || new THREE.Vector3()).copy(c.p); this.badCoverT = g.time;
+    this.coverGoal = null; this.atCover = false; this.coverBadT = 0; this.coverSlowT = 0; this.coverWasHeld = false; this.coverCache = null; this.goal = null;
+    this.goalKind = this.visible ? 'engage' : 'hunt';
+    const from = this.target && this.target.alive ? (this.visible ? this.target.pos : this.lastKnown) : null;
+    const n = from && this.coverPoint(from, 6, this.bot.health < 40);
+    if (n) { const t0 = this.retreatT; this.takeCover(n, Math.max(1, hold)); this.retreatT = Math.max(t0, g.time - 1.5); }   // (the 3 s trip budget isn't reset in full)
+  }
+  takeCover(c, hold) { this.coverBest = 99; this.coverBestT = this.game.time; this.coverGoal = c; this.coverHold = hold; this.goalKind = 'cover'; this.goal = c.p.clone(); this.repathT = 0; this.route = null; this.retreatT = this.game.time; this.atCover = false; this.peekPhase = undefined; this.holding = false; }
   coverDone() {
     const b = this.bot, g = this.game;
     if (g.time - this.retreatT > 10) return true;   // (never stuck in cover: the way there may have failed)
@@ -644,8 +664,9 @@ export class BotBrain {
       arrived = dg < 0.3 || (dg < 2.2 && hid);
       // (held up a step short of it by a prop the grid doesn't know: tuck in here rather than stand there pushing;
       // only while trying to get there: a bot that stopped because it was already holding isn't held up)
-      this.coverSlowT = Math.hypot(b.vel.x, b.vel.z) < 1 && g.time - this.retreatT > 0.4 && !this.coverWasHeld ? this.coverSlowT + dt : 0;
-      if (this.coverSlowT > 0.3 && dg < 2.5) arrived = true;
+      // (held up = no ground gained on the spot for 0.6 s; a bot jittering against a prop is moving but not getting there)
+      if (this.coverWasHeld || dg < this.coverBest - 0.25) { this.coverBest = dg; this.coverBestT = g.time; }
+      if (!this.coverWasHeld && g.time - this.coverBestT > 0.6 && dg < 2.5) { if (hid) arrived = true; else this.abandonCover(); }   // (not hidden there: no good, the next spot now)
       this.coverWasHeld = arrived;
       if (arrived && b.slideT > 0.1) b.slideT = 0.1;   // (a slide into cover stops at the cover, not past it)
     } else this.coverSlowT = 0;
@@ -658,10 +679,7 @@ export class BotBrain {
         this.atCover = true; this.coverHold -= dt;
         this.crouch = this.coverGoal.crouch || b.health < 50 || !this.coverHid;
         this.coverBadT = this.coverHid ? 0 : this.coverBadT + dt;
-        if (this.coverBadT > 0.8) {
-          (this.badCover = this.badCover || new THREE.Vector3()).copy(this.coverGoal.p); this.badCoverT = g.time;
-          this.coverGoal = null; this.atCover = false; this.coverBadT = 0; this.goal = null; this.goalKind = this.visible ? 'engage' : 'hunt';
-        }
+        if (this.coverBadT > 0.8) this.abandonCover();
         // top up behind the cover (our body out of their sight, even with their head in view over it): the primary
         // first, back from the pistol if need be
         const pr = b.weapons[0], hid = !this.visible || this.coverHid || this.expo < 0.7;

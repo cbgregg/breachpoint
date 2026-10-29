@@ -470,8 +470,9 @@ async function lab(defaults) {
     check(br.goalKind === 'cover' && br.atCover, `tucked into cover (goal ${br.goalKind}, there ${br.atCover})`);
     check(hid / n >= 0.6, `hidden ${(100 * hid / n).toFixed(0)}% of the four seconds`);
     check(!br.coverGoal || !br.coverGoal.crouch || b.crouchT > 0.5, `crouched if the spot is crouch-high (crouch ${!!(br.coverGoal && br.coverGoal.crouch)}, crouchT ${b.crouchT.toFixed(2)})`);
-    // the reload: seen first, then two rounds left
+    // the reload: seen first, then two rounds left (no reload left running from the first half)
     place(b, A, yawTo(A, B)); place(t, B, yawTo(B, A)); t.health = 1e6; b.grenades = 0; b.tacticals = 0;
+    b.weapons.forEach(w => { if (w.reloading) w.cancelReload(); w.refill(); }); if (b.cur !== 0) b.switchTo(0); b.switchT = 0;
     until(() => br.visible, 2, () => { t.health = 1e6; b.weapon.mag = 30; });
     b.weapon.mag = 2;
     let reloadAt = null, exposed = null, pistolAt = null, coverAt = null; const t1 = g.time, tr2 = [];
