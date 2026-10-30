@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { cloneSoldier } from './assets.js';
 import { armIK } from './character.js';
-import { propFit } from './props.js';
+import { PROPS, propFit } from './props.js';
 
 // store shell: x -22..22 (front at -x), z -24..24, 6 m to the roof
 const X0 = -22, X1 = 22, Z0 = -24, Z1 = 24, H = 6, T = 0.4;
@@ -234,6 +234,97 @@ function accentTex() {
     g.strokeStyle = 'rgba(90,80,70,0.6)'; g.lineWidth = 1.5;
     for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, W); g.stroke(); g.beginPath(); g.moveTo(0, i * s); g.lineTo(W, i * s); g.stroke(); }
   });
+}
+
+// ---------- vehicle models ----------
+// Real vehicle models (CC-BY, credited in the README), loaded for this map by assets.js loadMapVehicles() as
+// PROPS.veh_<slot>. Each is turned so its front faces +x, the way the procedural vehicles here are built, and scaled
+// to the procedural one's length; its collision keeps the procedural footprint, with heights and widths matched to the
+// model. A model that didn't load leaves its procedural vehicle, built exactly as before.
+const VEH_FRONT = { sedan: Math.PI, hatch: Math.PI / 2, van: Math.PI / 2, semi: Math.PI / 2, forklift: -Math.PI / 2 };   // the turn that brings each model's front to +x
+const vehicle = (slot, len) => propFit('veh_' + slot, null, 'x', len, VEH_FRONT[slot]);
+// a copy of a model's material that takes the batcher's per-vertex tint (put's `tint`): one per material, shared by
+// every car drawn with it and kept across map loads like the model's own material
+const tintable = new WeakMap();
+function tintMat(mat) {
+  if (!tintable.has(mat)) { const m = mat.clone(); m.vertexColors = true; tintable.set(mat, m); }
+  return tintable.get(mat);
+}
+// a copy of a model's (opaque) material never glossier than `r` and a touch darker (`k`): the van's white paint is a
+// near-mirror (roughness 0.05) and its big flat sides glared in the sun like a lamp. One per material, kept across
+// map loads.
+const matted = new Map();
+function matteMat(mat, r, k = 1) {
+  if (mat.transparent) return mat;
+  const key = mat.uuid + ':' + r + ':' + k;
+  if (!matted.has(key)) {
+    const m = mat.clone();
+    m.color.multiplyScalar(k);
+    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n  roughnessFactor = max(roughnessFactor, ${r.toFixed(2)});`); };
+    m.customProgramCacheKey = () => 'mart-matte-' + r.toFixed(2);
+    matted.set(key, m);
+  }
+  return matted.get(key);
+}
+const rigs = new WeakMap();   // the reshaped semi and forklift, per loaded model
+// The semi is one merged mesh (a sleeper cab hauling a short box trailer) and undersized: scaled 1.3 it has a real
+// rig's width and height. Its trailer is then lengthened to the procedural one's by stretching the bare runs of box
+// between the rear frame, the tandem and the tractor (no vertices there, so only the side panels get longer): the
+// tandem lands on the procedural wheel blocks and the bumper on the procedural grille. Returns { parts } with the
+// trailer's rear at x = 0, the front at x = 16.36, centred on z, wheels on y = 0.
+function semiRig() {
+  const P = PROPS.veh_semi;
+  if (!P) return null;
+  if (rigs.has(P)) return rigs.get(P);
+  // [model z (front +z), metres from the trailer's rear]: the rear frame, the tandem (axles at z -4.0 and -3.3, centred
+  // between the procedural wheel blocks at 3.6 and 4.85 m), then the whole tractor (from z 0) at 1.3
+  const S = 1.3, K = [[-5.016, 0], [-4.77, 0.32], [-4.51, 3.107], [-2.63, 5.551], [0, 9.839], [5.016, 16.36]];
+  const at = (z) => {
+    let k = 1;
+    while (k < K.length - 1 && z > K[k][0]) k++;
+    const [z0, x0] = K[k - 1], [z1, x1] = K[k];
+    return x0 + (z - z0) * (x1 - x0) / (z1 - z0);
+  };
+  const parts = P.parts.map(({ geo, mat }) => {
+    const g = geo.clone(), pos = g.attributes.position, nrm = g.attributes.normal;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      pos.setXYZ(i, at(z), (y - P.box.min.y) * S, -x * S);
+      if (nrm) { const nx = nrm.getX(i), nz = nrm.getZ(i); nrm.setXYZ(i, nz, nrm.getY(i), -nx); }   // (stretched runs: only faces along the length)
+    }
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    return { geo: g, mat };
+  });
+  const rig = { parts };
+  rigs.set(P, rig);
+  return rig;
+}
+// The forklift fitted fork tips to counterweight (len metres), its forks and their carriage (the pieces wholly in the
+// front third, ahead of the mast) slid up the mast to carry a pallet: the forks' top at forkY.
+function forkliftRig(len, forkY) {
+  const pc = vehicle('forklift', len);
+  if (!pc) return null;
+  if (rigs.has(pc)) return rigs.get(pc);
+  const L = pc.size.x, front = L / 2;
+  let top = 0;   // the forks' top: the highest point in the front quarter (only the blades reach that far)
+  for (const { geo } of pc.parts) { const p = geo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getX(i) > front - L / 4) top = Math.max(top, p.getY(i)); }
+  const parts = pc.parts.map(({ geo, mat }) => {
+    const g = geo.clone(), p = g.attributes.position, n = p.count, idx = g.index ? g.index.array : null;
+    // pieces: vertices joined by triangles, welded by position (so a piece split at its texture seams stays one)
+    const weld = new Map(), root = new Int32Array(n), par = Int32Array.from({ length: n }, (_, i) => i);
+    for (let i = 0; i < n; i++) { const k = `${p.getX(i).toFixed(5)},${p.getY(i).toFixed(5)},${p.getZ(i).toFixed(5)}`; if (!weld.has(k)) weld.set(k, i); root[i] = weld.get(k); }
+    const find = (i) => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; };
+    const v = (t) => root[idx ? idx[t] : t];
+    for (let t = 0; t < (idx ? idx.length : n); t += 3) { const a = find(v(t)); par[find(v(t + 1))] = a; par[find(v(t + 2))] = a; }
+    const back = new Map();   // piece -> its rearmost x
+    for (let i = 0; i < n; i++) { const r = find(root[i]); back.set(r, Math.min(back.get(r) ?? Infinity, p.getX(i))); }
+    for (let i = 0; i < n; i++) if (back.get(find(root[i])) > front - L / 3) p.setY(i, p.getY(i) + forkY - top);
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    return { geo: g, mat };
+  });
+  const rig = { parts, size: pc.size };
+  rigs.set(pc, rig);
+  return rig;
 }
 
 // ---------- the build ----------
@@ -1057,11 +1148,22 @@ function build(ctx) {
   // ---------- outside: parking lot ----------
   const parked = [[-30.2, -22.8], [-30.2, -17.2], [-30.2, -8.8], [-30.2, 2.4], [-30.2, 10.8], [-30.2, 19.2], [-34.8, -20], [-34.8, -6], [-34.8, 5.2], [-34.8, 16.4], [-34.8, 24.8], [-30.2, 25]];
   // car collision: the body, then the narrower, shorter cabin (no invisible corners)
-  const carSolid = (x, z) => { solid(x, z, 3.9, 1.75, 0.85, 0, 'metal'); solid(x, z, 2.9, 1.5, 0.6, 0.85, 'metal').pass = true; };   // the cabin is mostly glass
-  for (const [x, z] of parked) {
-    buildCar(x, z, x > -32 ? Math.PI : 0, 0);
-    carSolid(x, z);
-  }
+  const carSolid = (x, z, w = 1.75, h = 0.85, cw = 1.5, ch = 0.6) => { solid(x, z, 3.9, w, h, 0, 'metal'); solid(x, z, 2.9, cw, ch, h, 'metal').pass = true; };   // the cabin is mostly glass
+  // the cars: real models where they loaded, a sedan and a small SUV taking turns at the procedural car's length, each
+  // turned a degree or two and in one of four shades (both are white, the paint baked into the texture: a light tint
+  // over the whole car reads as silver, pale blue or cream). Collision per model: [body width, body height, cabin
+  // width, cabin height]
+  const CAR_LEN = 4.5, CAR_PAINT = [0xffffff, 0xa4a9b0, 0x8a9fb9, 0xdccaa4];
+  const CAR_FIT = { sedan: [1.75, 0.85, 1.5, 0.6], hatch: [1.9, 1.25, 1.55, 0.65] };
+  let carN = 0;
+  const car = (x, z, ry) => {
+    const k = carN++, slot = k % 2 ? 'hatch' : 'sedan', pc = vehicle(slot, CAR_LEN);
+    if (!pc) { buildCar(x, z, ry, 0); carSolid(x, z); return; }
+    const paint = CAR_PAINT[Math.floor(ctx.rnd() * 4)];   // (the draw buildCar makes for its paint: what's built after stays the same)
+    for (const { geo, mat } of pc.parts) P(geo.clone(), tintMat(mat), x, 0, z, ry + ((k * 5) % 7 - 3) * 0.012, { cast: true, tint: paint });
+    carSolid(x, z, ...CAR_FIT[slot]);
+  };
+  for (const [x, z] of parked) car(x, z, x > -32 ? Math.PI : 0);
   // light poles (real lights on High / Ultra)
   for (const z of [-14, 0, 14]) {
     const x = -32.5;
@@ -1121,6 +1223,27 @@ function build(ctx) {
   // semi: a long box trailer backed up to door 2, the tractor almost at the back fence
   const semi = (zc) => {
     const tx0 = 22.7, tL = 11.4, tx = tx0 + tL / 2;
+    const rig = semiRig();
+    if (rig) {
+      // the semi model (see semiRig), with the procedural one's collision, heights matched to the model
+      model(rig, tx0, 0, zc);
+      solid(tx, zc, tL, 2.5, 2.39, 1.04, 'metal');                                                       // trailer box
+      for (const dx of [3.6, 4.85]) for (const s of [-1, 1]) solid(tx0 + dx, zc + s * 1.0, 1.0, 0.4, 0.92, 0, 'metal');   // tandem
+      for (const s of [-1, 1]) {
+        solid(tx0 + tL - 2.2, zc + s * 0.9, 0.14, 0.14, 1.04, 0, 'metal');                              // landing gear legs
+        P(new THREE.BoxGeometry(0.12, 1.04, 0.12), M.dark, tx0 + tL - 2.2, 0.52, zc + s * 0.9);
+        // the trailer's livery
+        const sm = signMesh(signTex(['FRESHWAY', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.25, zc + s * 1.275, s > 0 ? 0 : Math.PI, 0.05);
+        sm.material.roughness = 0.5;
+      }
+      const cx0 = tx0 + tL - 1.4;
+      solid(cx0 + 3.73, zc, 5.26, 2.05, 0.5, 0.6, 'metal');                                               // frame and tanks
+      solid(cx0 + 2.35, zc, 1.3, 2.2, 2.25, 1.1, 'metal');                                                // sleeper (and the trailer's nose)
+      solid(cx0 + 3.95, zc, 1.9, 1.95, 1.8, 1.1, 'metal');                                                // cab
+      solid(cx0 + 5.55, zc, 1.4, 1.6, 0.7, 0.95, 'metal');                                                // hood (its wings are the frame box's)
+      for (const dx of [0.42, 1.2, 2.5, 5.4]) for (const s of [-1, 1]) solid(cx0 + dx, zc + s * 1.0, dx < 1 ? 0.9 : 1.0, dx > 5 ? 0.24 : 0.4, 0.92, 0, 'metal');   // wheels (and the model's rear drive axle)
+      return;
+    }
     SB(M.paint, tL, 2.75, 2.5, tx, 1.2, zc, { tint: 0xeae8e2, grime: 0.12 }, 'metal');
     for (const dx of [3.6, 4.85]) for (const s of [-1, 1]) solid(tx0 + dx, zc + s * 1.0, 1.0, 0.4, 1.0, 0, 'metal');   // wheels; open under the trailer (crawl under it)
     for (const s of [-1, 1]) solid(tx0 + tL - 2.2, zc + s * 0.9, 0.14, 0.14, 1.0, 0, 'metal');   // landing gear legs
@@ -1151,6 +1274,20 @@ function build(ctx) {
   semi(-8.4);
   // forklift with a pallet on the forks, parked outside the open door
   const forklift = (x, z) => {
+    const rig = forkliftRig(2.9, 0.4);
+    if (rig) {
+      // the forklift model over the procedural one's 2.9 m (fork tips at x - 1.6 to the counterweight), forks to -x and
+      // raised to carry the pallet; the collision as before, the body and seat as high as the model's
+      model(rig, x - 0.15, 0, z, Math.PI);
+      solid(x + 0.4, z, 1.6, 1.15, 0.8, 0.15, 'metal');
+      solid(x + 0.4, z, 1.6, 1.15, 0.15, 0, 'metal');
+      solid(x + 0.45, z, 0.45, 0.5, 0.2, 0.95, 'cloth');                                              // seat
+      // the pallet and its load, from the carriage forward (the forks are shorter than the procedural ones)
+      B(M.wood, 0.92, 0.15, 1.0, x - 1.26, 0.4, z, 0, { tint: 0xb89a6a }); solid(x - 1.1, z, 1.2, 1.0, 0.15, 0.4, 'wood');
+      B(M.cardboard, 0.88, 0.9, 0.95, x - 1.25, 0.55, z, 0, { grime: 0.05 }); solid(x - 1.1, z, 1.1, 0.95, 0.9, 0.55, 'wood');
+      solid(x - 1.05, z, 1.2, 1.0, 0.4, 0, 'wood');
+      return;
+    }
     SB(M.paint, 1.6, 1.15, 1.15, x + 0.4, 0.15, z, { tint: 0xe8b020, grime: 0.25 }, 'metal');
     solid(x + 0.4, z, 1.6, 1.15, 0.15, 0, 'metal');
     B(M.dark, 0.5, 0.45, 1.1, x + 1.05, 1.3, z, 0, { grime: 0.1 });                                 // counterweight
@@ -1244,7 +1381,7 @@ function build(ctx) {
   B(M.concrete, 46, 0.14, 0.25, -1, 0, 28.45, 0, { grime: 0.2, cast: false });     // kerb
   plane(M.asphalt, 66.6, 5.6, 8.3, 31.2, 0.008);                                   // the street
   for (let x = -22; x < 40; x += 3) P(new THREE.PlaneGeometry(1.6, 0.12), M.line, x, 0.022, 31.4, 0, { rx: -Math.PI / 2, cast: false, tint: 0xe8e4d8 });
-  for (const [x, ry] of [[-19.5, 0], [-9.5, Math.PI], [0.5, 0], [17.5, Math.PI]]) { buildCar(x, 29.6, ry, 0); carSolid(x, 29.6); }
+  for (const [x, ry] of [[-19.5, 0], [-9.5, Math.PI], [0.5, 0], [17.5, Math.PI]]) car(x, 29.6, ry);
   addKind(10, 29.7, 6.2, 2.3, 2.9, 0, 'truck', { back: 1 });                       // a box van at the kerb
   addKind(-4, 32.7, 7, 2.4, 3.3, 0, 'truck', {});                                   // delivery truck in the drive lane
   addKind(26, 31.8, 6.5, 2.4, 3.1, 0, 'truck', { food: 2 });                        // a food truck at the yard end
@@ -1343,7 +1480,7 @@ function build(ctx) {
   corral(-26.8, -20); corral(-26.8, 21.2);
   palletStack(-39.6, -15.5, 1.3); palletStack(-39.6, 15.8, 1.0); palletStack(-27, -9.4, 1.4); palletStack(-27, 9, 1.1);
   for (const sz of [-1, 1]) {
-    for (const x of [-37.5, -28.5]) { buildCar(x, sz * 31.6, sz > 0 ? 0 : Math.PI, 0); carSolid(x, sz * 31.6); }
+    for (const x of [-37.5, -28.5]) car(x, sz * 31.6, sz > 0 ? 0 : Math.PI);
     palletStack(-33, sz * 31.8, 1.4); palletStack(-33, sz * 30.5, 0.9);
   }
   // long planters down the outer edge of the lot and along the right-side wall, so nobody gets a clean lane end to end
@@ -1358,7 +1495,13 @@ function build(ctx) {
   palletStack(-29, -25, 1.6); palletStack(-24.6, -27.5, 1.3); palletStack(-35.6, -25, 1.0); palletStack(-26.4, 26.4, 1.5); addKind(-32.5, 26.6, 1.3, 1.3, 1.3, 0, 'crate');
   palletStack(-28, 0, 1.5); palletStack(-36, -8, 1.2); palletStack(-36, 8, 1.4);
   // tall stuff in the parking rows (cars alone are below eye height): a delivery van and head-high pallet runs
-  addKind(-30.2, 6.6, 4.6, 2.2, 2.6, 0, 'truck', {});
+  const van = vehicle('van', 4.6);
+  if (van) {
+    // the van model at the procedural van's length (front to +x): the body to the windscreen, then the lower nose
+    for (const { geo, mat } of van.parts) P(geo.clone(), matteMat(mat, 0.4, 0.88), -30.2, 0, 6.6, 0, { cast: !mat.transparent });   // (the glass casts no shadow)
+    solid(-30.75, 6.6, 3.5, 1.5, 1.96, 0, 'metal').src = 'van@-30.2,6.6';
+    solid(-28.45, 6.6, 1.1, 1.5, 1.15, 0, 'metal').src = 'van@-30.2,6.6';
+  } else addKind(-30.2, 6.6, 4.6, 2.2, 2.6, 0, 'truck', {});
   for (const sz of [-1, 1]) { palletStack(-37, sz * 13, 1.8); palletStack(-35, sz * 13, 1.6); palletStack(-33.4, sz * 12.9, 1.7); }
   palletStack(-25, -2, 1.8); palletStack(40.6, -9, 1.8); palletStack(-24.6, 24.9, 1.8); palletStack(26.4, 24.9, 1.8); palletStack(7.25, 25.1, 1.8); planter(-5.6, 25.0, 1.2, 0.9);
   // the storefront: neon over the windows like the sign inside, brick cladding on the corners

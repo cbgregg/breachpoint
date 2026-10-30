@@ -523,6 +523,42 @@ function worldBox(w, h, d, scale, radius) {
 
 const flatBox = (w, h, d, scale = 0) => worldBox(w, h, d, scale, 0);
 
+// Vehicle models in other paints: one copy per source material and paint, shared by every vehicle wearing it
+// and kept across map loads (like the models' own materials). paint: { tint } recolours white bodywork (only the
+// bright, grey texels: not the glass, trim, tyres or lights), { red } repaints a red livery in that colour
+// (keeping its shading and dirt), { burnt } chars the lot, { rough } sets the finish.
+const vehMats = new Map();
+function vehMat(mat, paint) {
+  if (!paint) return mat;
+  const key = mat.uuid + JSON.stringify(paint);
+  let m = vehMats.get(key);
+  if (m) return m;
+  m = mat.clone();
+  if (paint.rough !== undefined) m.roughness = paint.rough;
+  if (paint.burnt) {
+    // rust brown, sooted toward the ground (vertex colours: the batcher's grime)
+    m.color.set(0x6b4b38); m.vertexColors = true; m.roughness = 1; m.metalness = 0; m.roughnessMap = null; m.metalnessMap = null;
+  } else if (paint.tint !== undefined || paint.red !== undefined) {
+    const tint = new THREE.Color(paint.tint ?? 0xffffff), red = new THREE.Color(paint.red ?? 0), on = paint.red !== undefined ? 1 : 0;
+    // (the sky's reflection, untinted, would wash a darker paint out to white along the sills)
+    if (paint.tint !== undefined) m.envMapIntensity = 0.4;
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.vehTint = { value: tint }; sh.uniforms.vehRed = { value: red }; sh.uniforms.vehRedOn = { value: on };
+      sh.fragmentShader = 'uniform vec3 vehTint;\nuniform vec3 vehRed;\nuniform float vehRedOn;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        {
+          vec3 c = diffuseColor.rgb, s = sqrt(c);   // s: about the texel as painted, for the masks
+          float hi = max(s.r, max(s.g, s.b)), lo = min(s.r, min(s.g, s.b));
+          c = mix(c, c * vehTint, smoothstep(0.45, 0.8, hi) * (1.0 - smoothstep(0.1, 0.25, hi - lo)));
+          float redness = (s.r - max(s.g, s.b)) / max(s.r, 1e-3);
+          diffuseColor.rgb = mix(c, vehRed * (max(c.r, max(c.g, c.b)) / 0.5), vehRedOn * smoothstep(0.5, 0.7, redness));
+        }`);
+    };
+    m.customProgramCacheKey = () => 'veh-paint';
+  }
+  vehMats.set(key, m);
+  return m;
+}
+
 export function buildWorld(scene, physics, mapId = 'tarsa') {
   const LAYOUT = MAPS[mapId] || MAPS.tarsa;
   const { hx: HX, hz: HZ } = LAYOUT.bounds || DEFAULT_BOUNDS;
@@ -690,6 +726,64 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   };
   const SURFACE = { dumpster: 'metal', infokiosk: 'wood', bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
   const NO_SOLID = new Set(['station', 'house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
+
+  // ---------- vehicle models (CC-BY, credited in the README; js/assets.js loads a map's own before it's built) ----------
+  // Every vehicle the layouts place has a procedural build and, when its model loaded, the real thing instead:
+  // scaled to the same length, centred on the same spot, nose the same way, collision as wide and high as it
+  // (vehSolid, and the car case in add). Per model: `nose`, the yaw its front faces in the file (0 = +z,
+  // PI / 2 = +x), and measured off it at `len` metres long: the body's width (mirrors left out), `belt` (a car's
+  // bonnet and waist) and `top` (the roof: aerials and the trolley pole left out); a box truck's cab is its front
+  // `cab` metres, `cabWid` wide and `cabTop` high; a streetcar's arched roof rises from `eaves` to `top`, `roofWid` wide.
+  const VEH = {
+    sedan: { nose: -Math.PI / 2, len: 4.5, wid: 1.72, belt: 0.92, top: 1.37 },
+    hatch: { nose: 0, len: 4.5, wid: 1.92, belt: 1.22, top: 1.9 },
+    boxtruck: { nose: 0, len: 7, wid: 2.24, top: 3.15, cab: 1.95, cabWid: 2.4, cabTop: 2.52 },
+    foodtruck: { nose: 0, len: 7, wid: 2.08, top: 3.0 },
+    bus: { nose: Math.PI / 2, len: 12, wid: 2.64, top: 3.3 },
+    streetcar: { nose: Math.PI / 2, len: 10, wid: 2.1, eaves: 3.5, top: 4.2, roofWid: 1.5 },
+  };
+  const vehSlot = (kind, extra) => kind === 'bus' ? 'bus' : kind === 'tram' ? 'streetcar' : kind === 'truck' ? (extra && extra.food !== undefined ? 'foodtruck' : 'boxtruck') : null;
+  // the model `len` long, nose to +x, centred on x/z, base at y = 0, with its facts at that size (or null: not loaded)
+  const vehModel = (slot, len) => {
+    const v = VEH[slot], pc = v && PROPS['veh_' + slot] && propFit('veh_' + slot, null, 'x', len, Math.PI / 2 - v.nose);
+    if (!pc) return null;
+    const f = { pc, slot };
+    for (const k in v) if (k !== 'nose' && k !== 'len') f[k] = v[k] * len / v.len;
+    return f;
+  };
+  // draw one nose to `yaw`, in `paint` (vehMat); glass casts no shadow
+  const vehPut = (vm, x, y, z, yaw, paint, o = {}) => {
+    for (const { geo, mat } of vm.pc.parts) put(geo.clone(), vehMat(mat, paint), x, y, z, yaw - Math.PI / 2, { grime: 0, cast: !mat.transparent, ...o });
+  };
+  const jit = (x, z) => { const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return s - Math.floor(s); };   // 0..1, fixed per spot
+  // collision as wide and high as what's drawn: an edge more than ~12 cm off moves to the model's (never the
+  // length or the position)
+  const fitTo = (was, drawn) => Math.abs(drawn - was) > 0.12 ? drawn : was;
+  // parked cars: the sedan and the hatchback in turn, a point-mirrored pair alike (both teams get the same cover).
+  // The same answer for a spot every time it's asked (add sizes the collision, then buildCar draws it).
+  const carPicks = new Map();
+  let carTurn = mapId === 'shuran' ? 1 : 0;   // Shuran's one pair: the hatchback (Tarsa's first is the sedan)
+  const carModel = (cx, cz) => {
+    const slots = ['sedan', 'hatch'].filter(s => PROPS['veh_' + s]);
+    if (!slots.length) return null;
+    const flip = cx < 0 || (cx === 0 && cz < 0), key = `${(flip ? -cx : cx).toFixed(2)},${(flip ? -cz : cz).toFixed(2)}`;
+    if (!carPicks.has(key)) carPicks.set(key, carTurn++);
+    return vehModel(slots[carPicks.get(key) % slots.length], 4.5);
+  };
+  // a bus, truck or streetcar drawn from its model: the layout box, sized to it; a box truck's lower cab and a
+  // streetcar's arched roof get boxes of their own. False when there's no model (the layout box as it was).
+  const vehSolid = (cx, cz, w, d, h, y0, kind, extra) => {
+    const along = d >= w, L = along ? d : w, W = along ? w : d, fr = extra && extra.back ? -1 : 1;
+    const vm = vehModel(vehSlot(kind, extra), L);
+    if (!vm) return false;
+    const surface = SURFACE[kind] || 'concrete';
+    const box = (a0, a1, wid, hh, yb = 0) => { const a = (a0 + a1) / 2 * fr; solid(cx + (along ? 0 : a), cz + (along ? a : 0), along ? wid : a1 - a0, along ? a1 - a0 : wid, hh, y0 + yb, surface); };
+    const wid = fitTo(W, vm.wid);
+    if (vm.cab) { box(-L / 2, L / 2 - vm.cab, wid, fitTo(h, vm.top)); box(L / 2 - vm.cab, L / 2, fitTo(W, vm.cabWid), fitTo(h, vm.cabTop)); }
+    else if (vm.eaves) { box(-L / 2, L / 2, wid, vm.eaves); box(-L / 2, L / 2, vm.roofWid, vm.top - vm.eaves, vm.eaves); }
+    else box(-L / 2, L / 2, wid, fitTo(h, vm.top));
+    return true;
+  };
 
   // ---------- shared decals / glows ----------
   const radial = (stops) => {
@@ -1866,6 +1960,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // city traffic: a Metro bus at its stop (extra = livery) or a box truck / food truck ('truck', extra 'food')
         // long axis along whichever side of the box is longer; the cab / front at the +end unless extra.back
         const along = d >= w, L = along ? d : w, W = along ? w : d, fr = extra && extra.back ? -1 : 1;
+        const vm = vehModel(vehSlot(kind, extra), L);
+        if (vm) {
+          // the model: nose at the cab end, a truck a degree or so off the kerb line; a food truck in its colours, the
+          // bus repainted in the livery's (its red band and trim)
+          const yaw = (along ? 0 : Math.PI / 2) + (fr < 0 ? Math.PI : 0) + (kind === 'truck' ? (jit(cx, cz) - 0.5) * 0.04 : 0);
+          const paint = vm.slot === 'foodtruck' ? { rough: 0.6, red: [undefined, 0xd89a18, 0x1f7a7a][(extra.food | 0) % 3] }
+            : vm.slot === 'bus' ? { red: [0x2f6a3a, 0x1f4e8a, 0xd8a028][(extra && extra.livery) || 0] } : null;
+          vehPut(vm, cx, y0, cz, yaw, paint);
+          break;
+        }
         const P = (a, b) => [cx + (along ? b : a), cz + (along ? a : b)];            // a along the length, b across
         const box = (mat, a0, a1, b0, b1, y, hh, o) => { const [x, z] = P((a0 + a1) / 2 * fr, (b0 + b1) / 2); const la = Math.abs(a1 - a0), lb = Math.abs(b1 - b0); B(mat, along ? lb : la, hh, along ? la : lb, x, y0 + y, z, 0, o); };
         const wheel = (a, s2) => { const [x, z] = P(a * fr, s2 * (W / 2 - 0.12)); put(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16), M.rubber, x, y0 + 0.5, z, 0, { rz: along ? Math.PI / 2 : 0, rx: along ? 0 : Math.PI / 2, grime: 0.2 }); };
@@ -1912,6 +2016,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       case 'tram': {
         // a 1910s streetcar parked on its tracks: varnished body, clerestory roof, trolley pole
         const along = d >= w, L = along ? d : w, W = along ? w : d, ry = along ? 0 : Math.PI / 2;
+        // the model (1910 Cologne car), running the way this one does (its trolley pole trailing): nose to +x, or to -z
+        // when it lies along z
+        const vm = vehModel('streetcar', L);
+        if (vm) { vehPut(vm, cx, y0, cz, along ? Math.PI : Math.PI / 2); break; }
         const P = (a, b) => [cx + (along ? a : b), cz + (along ? b : a)];
         B(M.paint, along ? W : L, 1.1, along ? L : W, cx, 0.35, cz, 0, { tint: 0x5a2a20, grime: 0.4 });
         B(M.paint, along ? W - 0.1 : L - 0.4, 1.3, along ? L - 0.4 : W - 0.1, cx, 1.45, cz, 0, { tint: 0x7a3a2a, grime: 0.2 });
@@ -2189,7 +2297,20 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     }
   };
 
+  // a parked car, nose to local +x turned by ry (variant 1: burnt out). With a car model loaded it's that, and the
+  // return is its facts (vehModel: width, belt and roof height at 4.5 m long) for sizing collision to it.
   function buildCar(cx, cz, ry, variant) {
+    const cm = carModel(cx, cz);
+    if (cm) {
+      // a factory white or a respray, parked a degree or two off straight; burnt out: charred, sat down on its rims
+      // (rnd is drawn as often as for the procedural car, so everything placed after it lands the same)
+      const burnt = variant === 1, r = rnd();
+      if (burnt) for (let i = 0; i < 3; i++) rnd();
+      const PAINT = [undefined, 0xb2b6bb, 0x3f444b, 0x2a3a56, 0x6c2225, 0xc9bda0];
+      const n = r * PAINT.length, i = Math.floor(n);
+      vehPut(cm, cx, burnt ? -0.03 : 0, cz, ry + Math.PI / 2 + (n - i - 0.5) * 0.07, burnt ? { burnt: 1 } : PAINT[i] !== undefined ? { tint: PAINT[i] } : null, burnt ? { rz: 0.015, grime: 0.75 } : {});
+      return cm;
+    }
     const c = Math.cos(ry), sn = Math.sin(ry);
     const P = (lx, ly, lz) => [cx + lx * c + lz * sn, ly, cz - lx * sn + lz * c];
     const burnt = variant === 1;
@@ -2311,10 +2432,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     if (kind === 'ammo') solid(cx, cz, 1.85, 1.02, 1.12, 0, 'metal');
     else if (kind === 'palm') solid(cx, cz, 0.32, 0.32, h, y0, 'wood');
     else if (kind === 'sand') solid(cx, cz, w > d ? w - 0.55 : Math.min(w, 0.62), w > d ? Math.min(d, 0.62) : d - 0.55, h - 0.1, y0, 'concrete');
-    else if (kind === 'car') {   // body, then the narrower, shorter cabin
-      const al = w > d;
-      solid(cx, cz, al ? w - 0.5 : w - 0.25, al ? d - 0.25 : d - 0.5, 0.85, y0, 'metal');
-      solid(cx, cz, al ? w - 1.5 : w - 0.5, al ? d - 0.5 : d - 1.5, h - 0.85, y0 + 0.85, 'metal').pass = true;   // cabin: mostly glass, bullets go through
+    else if (kind === 'car') {   // body, then the narrower, shorter cabin (as wide and high as a car model drawn instead)
+      const al = w > d, cm = carModel(cx, cz), bw = (al ? d : w) - 0.25;
+      const wid = cm ? fitTo(bw, cm.wid) : bw, belt = cm ? fitTo(0.85, cm.belt) : 0.85, top = cm ? fitTo(h, cm.top) : h;
+      solid(cx, cz, al ? w - 0.5 : wid, al ? wid : d - 0.5, belt, y0, 'metal');
+      solid(cx, cz, al ? w - 1.5 : w - 0.5, al ? d - 0.5 : d - 1.5, top - belt, y0 + belt, 'metal').pass = true;   // cabin: mostly glass, bullets go through
+    } else if ((kind === 'truck' || kind === 'bus' || kind === 'tram') && vehSolid(cx, cz, w, d, h, y0, kind, extra)) { /* sized to its model */
     } else if (kind === 'jersey') {   // wide foot, narrow top
       const al = w > d;
       solid(cx, cz, al ? w : 0.6, al ? 0.6 : d, 0.3, y0, 'concrete');
