@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { setGunModel } from './weapons.js';
-import { setProp } from './props.js';
+import { setProp, VEHICLES_BY_MAP } from './props.js';
 
 export const ASSETS = { soldier: null, photo: {}, hands: null };
 
@@ -75,14 +75,6 @@ const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/model
 // Vehicles: real models (CC0 / CC-BY, credited in the README), loaded per map on the match loading screen so a
 // map only downloads its own (setProp names them veh_<slot>). A map built before they arrive, or a model that
 // fails to load, uses the procedural vehicle instead.
-const VEHICLES_BY_MAP = {
-  tarsa: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
-  shuran: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
-  pioneer: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'bus', 'streetcar'],
-  mart: ['sedan', 'hatch', 'van', 'semi', 'forklift'],
-  drivein: ['car50', 'car50b', 'pickup50', 'van50', 'stepvan'],
-  link: ['lightrail'],
-};
 const vehicleLoads = new Map();
 export function loadMapVehicles(mapId) {
   return Promise.all((VEHICLES_BY_MAP[mapId] || []).map(slot => {

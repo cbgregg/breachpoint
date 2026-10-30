@@ -5,6 +5,17 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const PROPS = {};
 
+// Which vehicle models each map uses (assets.js loads them on the match loading screen; a map only ever draws
+// its own, so what it looks like and its collision never depend on which maps were played before)
+export const VEHICLES_BY_MAP = {
+  tarsa: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
+  shuran: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
+  pioneer: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'bus', 'streetcar'],
+  mart: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'van', 'semi', 'forklift'],
+  drivein: ['car50', 'car50b', 'pickup50', 'van50', 'stepvan'],
+  link: ['lightrail'],
+};
+
 // Bake a loaded scene into a list of { geo, mat } parts in its own world space (node transforms applied),
 // and record its bounds.
 export function setProp(name, scene) {

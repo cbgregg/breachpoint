@@ -9,7 +9,8 @@
 // The layout (where every car, van, fence and building goes) comes from tools/drivein_gen.py, a parametric
 // generator searched against targets measured on Black Ops 2 maps; see that file and js/drivein_layout.js.
 import * as THREE from 'three';
-import { PROPS } from './props.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { PROPS, propFit } from './props.js';
 import { DRIVEIN_HALF, DRIVEIN_CENTER, DRIVEIN_SPAWNS, DRIVEIN_META } from './drivein_layout.js';
 
 const { HX, HZ, xs: XS, Ws: WS } = DRIVEIN_META;
@@ -157,6 +158,28 @@ function neonTex(text, color, { w = 1024, h = 220, font = RETRO(130) } = {}) {
     }
   });
 }
+// an ice-cream truck's serving window at dusk, lit from inside: the sign over it, the menu boards, the counter
+function iceWindowTex() {
+  return canvasTex(512, 224, (g, W, H) => {
+    const bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#ffe6b8'); bg.addColorStop(1, '#b07a44');
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const items = [['VANILLA', '5¢'], ['CHOCOLATE', '5¢'], ['STRAWBERRY', '5¢'], ['SUNDAE', '15¢'], ['BANANA SPLIT', '25¢'], ['MILKSHAKE', '20¢']];
+    for (const [i, x] of [[0, 20], [1, 270]]) {
+      g.fillStyle = '#f8f2e4'; g.fillRect(x, 70, 222, 104);
+      g.font = 'bold 19px Arial';
+      items.slice(i * 3, i * 3 + 3).forEach(([a, b], k) => {
+        g.textAlign = 'left'; g.fillStyle = '#3a2a22'; g.fillText(a, x + 10, 90 + k * 31);
+        g.textAlign = 'right'; g.fillStyle = '#c0304a'; g.fillText(b, x + 212, 90 + k * 31);
+      });
+    }
+    g.fillStyle = '#d8405e'; g.fillRect(0, 0, W, 56);
+    g.textAlign = 'center'; g.fillStyle = '#fff6e8'; g.font = RETRO(44); g.fillText('ICE CREAM', W / 2, 30);
+    g.fillStyle = '#5a3c26'; g.fillRect(0, H - 34, W, 34);
+    g.fillStyle = '#8a6040'; g.fillRect(0, H - 34, W, 5);
+  });
+}
 function grassTex() {
   return canvasTex(256, 256, (g, W) => {
     const r = rng(5);
@@ -177,6 +200,118 @@ function checkerTex() {
 // 50s paint: turquoise, coral, mint, pink, cream, red, black, yellow, powder blue
 const PAINT = [0x4fa8a0, 0xd8604a, 0x8ec8a8, 0xe0909e, 0xe8dcb8, 0xa8241e, 0x1e1e20, 0xe0bc4a, 0x7aa0c8];
 const ROOFS = [0xf0ead8, 0xf0ead8, 0x2a2a2a, 0xf0ead8, 0x8a2a24, 0xf0ead8, 0xe8dcb8, 0x1e1e20, 0xf0ead8];
+
+// ---------- vehicle models (CC-BY, credited in the README; js/assets.js loads them before the map is built) ----------
+// Each kind is drawn from its model when that loaded, the procedural build otherwise. A model is scaled to the
+// procedural vehicle's length (bumper to bumper, `len`), nose to the same end, centred on the same spot. Measured
+// off it at that length: the body's width (mirrors left out), `belt` (bonnet and waist), `top` (the roof), a car's
+// `cabWid` (its glasshouse; the pickup's cab, its mean over its height: 1.76 at the door tops, 1.52 at the roof), a
+// truck's `hoodTop` / `hoodWid` (the bonnet ahead of the cab), the van's `shoulder` and `roofWid` (its sides lean in
+// above the waist: 1.9 wide below, 1.3-1.6 above) and `side` (a step van's flat flank, half its width).
+// `paint`: per material, how its paint is found for a respray: `hue` (texels near that hue: the teal Chrysler, the
+// green step van), `dark` (dark, unsaturated texels up to that value: the black Cadillac, the primer on the pickup)
+// or `color` (a plain material colour, times that factor: the panel van); `ref` is the paint's mean linear
+// luminance in the texture, so a respray keeps its shading and dirt. `drop`: parts nobody sees (the engine under
+// the van's bonnet). `fix`: transmissive lenses made plain (the transmission pass would cost a whole extra scene
+// render).
+const VEH50 = {
+  car50: { len: 4.9, wid: 1.8, belt: 0.86, top: 1.2, cabWid: 1.42, paint: { Body: { hue: 0.5, dh: 0.07, ref: 0.318 } } },
+  car50b: { len: 4.9, wid: 1.58, belt: 0.95, top: 1.39, cabWid: 1.18, paint: { Body: { dark: 0.22, ref: 0.0152, k: 0.5 } } },
+  pickup50: { len: 5.44, wid: 2.16, cabWid: 1.66, top: 1.88, hoodTop: 1.3, hoodWid: 1.5, paint: { Tex_Body: { dark: 0.4, ref: 0.038, k: 0.6 } } },
+  van50: { len: 5.16, wid: 1.92, top: 2.05, hoodTop: 1.34, shoulder: 1.3, roofWid: 1.5, drop: ['paint2', 'Metal_painted', 'lorrymetal'], fix: ['tail_light', 'headlight_glass'],
+    paint: { paint_whitee: { color: 1 }, busbod: { color: 0.86 } } },
+  stepvan: { len: 5.78, wid: 1.86, side: 0.931, top: 2.36, hoodTop: 1.41,
+    paint: { material: { hue: 0.347, dh: 0.08, ref: 0.157 }, Doors: { hue: 0.347, dh: 0.08, ref: 0.158 }, 'Doors.back': { hue: 0.347, dh: 0.08, ref: 0.156 } } },
+};
+// (kept across map loads with the models' own materials: built once, their shaders compiled once)
+const KITS = new WeakMap(), VEH_MATS = new Map();
+// a respray of `mat`: its instance colour is the new paint (white: the paint it came in)
+function paintMat(mat, p) {
+  let m = VEH_MATS.get(mat.uuid);
+  if (m) return m;
+  m = mat.clone();
+  if (p.color) m.color.setRGB(1, 1, 1);   // a plain colour: the instance colour times the factor (InstancedMesh's own tint)
+  else {
+    const f = (x) => x.toFixed(4);
+    const mask = p.hue !== undefined
+      ? `smoothstep(0.18, 0.32, sat) * smoothstep(0.05, 0.12, hi) * (1.0 - smoothstep(${f(p.dh)}, ${f(p.dh + 0.06)}, min(abs(h - ${f(p.hue)}), 1.0 - abs(h - ${f(p.hue)}))))`
+      : `(1.0 - smoothstep(0.12, 0.3, sat)) * (1.0 - smoothstep(${f(p.dark)}, ${f(p.dark + 0.12)}, hi))`;
+    // the paint's shading (its luminance against the mean) carried onto the new colour; a dark paint's shading is
+    // squeezed (k < 1), or the grain in a near-black texture would come out as blotches in a light one
+    const code = `#ifdef USE_COLOR
+      {
+        vec3 c = diffuseColor.rgb, s = pow(max(c, vec3(0.0)), vec3(0.4545));
+        float hi = max(s.r, max(s.g, s.b)), lo = min(s.r, min(s.g, s.b)), sat = (hi - lo) / max(hi, 1e-3);
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(s.bg, K.wz), vec4(s.gb, K.xy), step(s.b, s.g));
+        vec4 q = mix(vec4(p.xyw, s.r), vec4(s.r, p.yzx), step(p.x, s.r));
+        float h = abs(q.z + (q.w - q.y) / (6.0 * (q.x - min(q.w, q.y)) + 1e-6));
+        float m = ${mask} * step(vColor.r + vColor.g + vColor.b, 2.99);
+        float l = pow(clamp(dot(c, vec3(0.2126, 0.7152, 0.0722)) / ${f(p.ref)}, 0.15, 3.0), ${f(p.k || 1)});
+        diffuseColor.rgb = mix(c, vColor * clamp(l, 0.35, 1.7), m);
+      }
+      #endif`;
+    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', code); };
+    m.customProgramCacheKey = () => 'drivein-paint|' + mask + (p.k || 1) + p.ref;
+  }
+  VEH_MATS.set(mat.uuid, m);
+  return m;
+}
+// a lens that drew through the transmission pass, made a plain opaque one
+function plainMat(mat) {
+  let m = VEH_MATS.get(mat.uuid);
+  if (m) return m;
+  m = mat.clone();
+  m.transmission = 0; m.transparent = false; m.opacity = 1; m.depthWrite = true;
+  VEH_MATS.set(mat.uuid, m);
+  return m;
+}
+const plainAttr = (a) => {
+  if (!a.isInterleavedBufferAttribute) return a;
+  const out = new Float32Array(a.count * a.itemSize);
+  for (let i = 0; i < a.count; i++) for (let j = 0; j < a.itemSize; j++) out[i * a.itemSize + j] = a.getComponent ? a.getComponent(i, j) : [a.getX, a.getY, a.getZ, a.getW][j].call(a, i);
+  return new THREE.BufferAttribute(out, a.itemSize, a.normalized);
+};
+// The model at its length, nose to +x, centred on x/z, base at y = 0: one geometry per material (position, normal
+// and uv only), each { geo, mat, paint }. Null when the model didn't load.
+function vehKit(slot) {
+  const P = PROPS['veh_' + slot], F = VEH50[slot];
+  if (!P || !F) return null;
+  if (KITS.has(P)) return KITS.get(P);
+  const pc = propFit('veh_' + slot, null, 'x', F.len, Math.PI / 2);   // every model's nose is +z in its file
+  if (!pc) return null;
+  const byMat = new Map();
+  for (const { geo, mat } of pc.parts) {
+    if (F.drop && F.drop.includes(mat.name)) continue;
+    if (!byMat.has(mat)) byMat.set(mat, []);
+    byMat.get(mat).push(geo);
+  }
+  const parts = [];
+  for (const [mat0, geos] of byMat) {
+    const list = geos.map(g0 => {
+      const g = new THREE.BufferGeometry();
+      for (const k of ['position', 'normal', 'uv']) if (g0.attributes[k]) g.setAttribute(k, plainAttr(g0.attributes[k]));
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      if (g0.index) g.setIndex(g0.index);
+      return g;
+    });
+    // (merging needs all indexed or none)
+    if (list.some(g => g.index)) for (const g of list) if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
+    const geo = list.length === 1 ? list[0] : mergeGeometries(list);
+    geo.computeBoundingSphere();
+    const p = F.paint && F.paint[mat0.name];
+    const mat = p ? paintMat(mat0, p) : F.fix && F.fix.includes(mat0.name) ? plainMat(mat0) : mat0;
+    parts.push({ geo, mat, paint: p || null, base: p && p.color ? mat0.color.clone() : null });
+  }
+  const kit = { slot, F, parts };
+  KITS.set(P, kit);
+  return kit;
+}
+const jit = (x, z) => { const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return s - Math.floor(s); };   // 0..1, fixed per spot
+// collision as wide and high as what's drawn: a size more than ~15 cm off moves to the model's (never the length
+// or the position)
+const fitTo = (was, drawn) => Math.abs(drawn - was) > 0.15 ? drawn : was;
 
 function build(ctx) {
   const { M, B, put, solid, plane, decal, glows, group, physics, flatBox, worldBox, glowTex, poolMat } = ctx;
@@ -262,9 +397,68 @@ function build(ctx) {
     F.solid(lx, lz, r * 1.7, 0.26, 0.34, 0, 'rubber');   // the tyre under the body's collision
   };
 
+  // ---------- vehicle models: every one of a kind drawn as one InstancedMesh per material ----------
+  // (68 vehicles of 15-27k triangles each: merged copies would be some 190 MB of vertices)
+  const fleet = new Map();   // slot -> [{ x, z, ry, paint }]
+  // returns the frame it's drawn in, for anything built onto it (a camper, an ice-cream truck's hatch): turned with
+  // it, or a long piece's end sinks into the body and the other stands off it
+  const putVeh = (kit, cx, cz, ry, paint) => {
+    // a degree or so off straight, the same for a spot and its mirror (both teams get the same cover)
+    const flip = cx < 0 || (cx === 0 && cz < 0);
+    const yaw = ry + (jit(flip ? -cx : cx, flip ? -cz : cz) - 0.5) * 0.04;
+    if (!fleet.has(kit.slot)) fleet.set(kit.slot, []);
+    fleet.get(kit.slot).push({ x: cx, z: cz, ry: yaw, paint });
+    return frame(cx, cz, yaw);
+  };
+  const flushFleet = () => {
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    for (const [slot, list] of fleet) for (const { geo, mat, paint, base } of vehKit(slot).parts) {
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      list.forEach((v, i) => {
+        im.setMatrixAt(i, m4.compose(p.set(v.x, 0, v.z), q.setFromAxisAngle(up, v.ry), one));
+        if (!paint) return;
+        if (paint.color) { if (v.paint === null) col.copy(base); else col.setHex(v.paint); col.multiplyScalar(paint.color); }
+        else if (v.paint === null) col.setRGB(1, 1, 1);   // white: as modelled
+        else col.setHex(v.paint);
+        im.setColorAt(i, col);
+      });
+      im.instanceMatrix.needsUpdate = true;
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.computeBoundingSphere();
+      im.castShadow = !mat.transparent; im.receiveShadow = true;   // (the glass lets the light in)
+      group.add(im);
+    }
+  };
+  // the 50s cars: the Chrysler and the Cadillac in turn, a spot and its mirror alike
+  const carPicks = new Map();
+  const carKit = (cx, cz) => {
+    const kits = ['car50', 'car50b'].map(vehKit).filter(Boolean);
+    if (!kits.length) return null;
+    const flip = cx < 0 || (cx === 0 && cz < 0), key = `${(flip ? -cx : cx).toFixed(2)},${(flip ? -cz : cz).toFixed(2)}`;
+    if (!carPicks.has(key)) carPicks.set(key, carPicks.size);
+    return kits[carPicks.get(key) % kits.length];
+  };
+  // the tyres' collision under a model, its outside no wider than the body drawn
+  const tyreSolid = (F, lx, lz, r, half) => {
+    const s = Math.sign(lz), a = Math.abs(lz) - 0.13, b = Math.min(Math.abs(lz) + 0.13, half);
+    if (b - a > 0.02) F.solid(lx, s * (a + b) / 2, r * 1.7, b - a, 0.34, 0, 'rubber');
+  };
+
   // ---------- vehicles ----------
   // 1950s sedan: long hood, wraparound windscreen, two-tone roof, tail fins, chrome everywhere
   function car50(cx, cz, ry, v) {
+    const kit = carKit(cx, cz);
+    if (kit) {
+      // the model, in the 50s palette (the Chrysler's own teal is the first) or, the Cadillac, the darker paints of
+      // its day; the collision as before, as wide and high as the car drawn
+      const VF = kit.F, F = frame(cx, cz, ry), W = fitTo(1.9, VF.wid);
+      const CADDY = [null, 0x5a1a1e, 0x1e2a44, 0x2a3e30, 0x4a4e54, 0xb8ac8c];
+      putVeh(kit, cx, cz, ry, kit.slot === 'car50' ? (v % PAINT.length ? PAINT[v % PAINT.length] : null) : CADDY[v % CADDY.length]);
+      F.solid(0, 0, 4.72, W, fitTo(0.62, VF.belt - 0.3), 0.3, 'metal');
+      F.solid(-0.2, 0, 1.8, fitTo(1.5, VF.cabWid), fitTo(0.55, VF.top - 0.92), 0.92, 'metal').pass = true;
+      for (const lx of [-1.35, 1.42]) for (const s of [-1, 1]) tyreSolid(F, lx, s * 0.82, 0.36, W / 2);
+      return;
+    }
     const F = frame(cx, cz, ry), W = 1.9, paint = PAINT[v % PAINT.length], roof = ROOFS[v % ROOFS.length];
     const sh = new THREE.Shape();
     sh.moveTo(-2.3, 0.3); sh.lineTo(-2.32, 0.82); sh.lineTo(-1.25, 0.9); sh.lineTo(-0.98, 1.36);
@@ -305,6 +499,33 @@ function build(ctx) {
   }
   // a pickup with a camper shell on the bed
   function pickup(cx, cz, ry, v) {
+    const kit = vehKit('pickup50');
+    if (kit) {
+      // the '51 Chevy, resprayed or in its primer, with a slide-in camper on the bed: on the rails, out over the
+      // fenders and over the cab roof, filling the camper's collision as before
+      const VF = kit.F, F = frame(cx, cz, ry), W = fitTo(2.0, VF.wid);
+      const PK = [null, 0x8a2a22, 0x3a5a40, 0x4a6a8a, 0xc0b088, 0x2a3a4a, 0x6a7a62];
+      const flip = cx < 0 || (cx === 0 && cz < 0), paint = PK[(v + Math.floor(jit(flip ? -cz : cz, flip ? -cx : cx) * PK.length)) % PK.length];
+      const D = putVeh(kit, cx, cz, ry, paint);   // (the camper turned with the truck; the collision stays square)
+      const shell = 0xd8d4c8, CW = 2.04;
+      D.bx(M.enamel, 2.33, 1.45, CW, -1.495, 1.04, 0, { tint: shell, grime: 0.2 });             // the box, on the bed rails
+      D.bx(M.enamel, 0.65, 0.5, CW, -0.005, 1.99, 0, { tint: shell, grime: 0.1 });               // the bunk over the cab
+      D.bx(M.enamel, 3.01, 0.2, CW + 0.02, -1.17, 2.06, 0, { tint: paint ?? 0x8a2a22, grime: 0 }); // band round the top
+      D.bx(M.enamel, 2.96, 0.06, CW - 0.08, -1.17, 2.49, 0, { tint: 0xc8c4b8 });                 // roof
+      for (const s of [-1, 1]) D.bx(M.glass, 0.9, 0.36, 0.04, -1.3, 1.58, s * (CW / 2 + 0.01), { grime: 0 });
+      D.bx(M.glass, 0.03, 0.16, 1.2, 0.335, 2.28, 0, { grime: 0 });                              // the bunk's front window
+      D.bx(M.enamel, 0.03, 0.92, 0.62, -2.675, 1.1, 0.4, { tint: 0xb8b4a8, grime: 0.2 });         // door at the back
+      D.bx(M.glass, 0.03, 0.26, 0.4, -2.685, 1.62, 0.4, { grime: 0 });
+      D.bx(M.chrome, 0.05, 0.03, 0.12, -2.7, 1.5, 0.18, { grime: 0 });                           // its handle
+      F.solid(0, 0, 5.3, W, 0.74, 0.3, 'metal');
+      F.solid(-1.18, 0, 3.0, 2.1, 1.48, 1.04, 'metal');
+      // the cab, and the bonnet ahead of it to the grille (one box over the cab and the back of the bonnet before; it
+      // would stand in the air over the bonnet, and the bonnet's top stood clear of the body's box)
+      F.solid(0.475, 0, 0.85, fitTo(1.9, VF.cabWid), fitTo(0.75, VF.top - 1.04), 1.04, 'metal');
+      F.solid(1.7, 0, 1.6, fitTo(1.9, VF.hoodWid), fitTo(0.75, VF.hoodTop - 1.04), 1.04, 'metal');
+      for (const lx of [-1.7, 1.75]) for (const s of [-1, 1]) tyreSolid(F, lx, s * 0.9, 0.4, W / 2);
+      return;
+    }
     const F = frame(cx, cz, ry), W = 2.0, paint = PAINT[(v * 3 + 1) % PAINT.length];
     F.bx(M.gloss, 5.2, 0.62, W, 0, 0.42, 0, { tint: paint });                      // body sides to the waist
     F.bx(M.gloss, 1.2, 0.18, W - 0.2, 1.95, 1.04, 0, { tint: paint });             // hood
@@ -328,6 +549,20 @@ function build(ctx) {
   }
   // panel van: rounded nose, split windscreen, two-tone
   function van(cx, cz, ry, v) {
+    const kit = vehKit('van50');
+    if (kit) {
+      // the Ford panel van in its maroon or a respray; its collision split at the windscreen: the box behind it
+      // as high as the roof, the bonnet's as high as the bonnet (one box over both before). Above the waist the
+      // body behind the windscreen is narrower and stops short of the rounded tail: a box of its own there.
+      const VF = kit.F, F = frame(cx, cz, ry), W = fitTo(2.0, VF.wid);
+      const VP = [null, 0x2f5a3a, 0x24406a, 0xd8ccb0, 0x1e1e20, 0xb8862a, 0x4fa8a0];
+      putVeh(kit, cx, cz, ry, VP[(v * 5 + 2) % VP.length]);
+      F.solid(-0.725, 0, 3.45, W, VF.shoulder - 0.32, 0.32, 'metal');
+      F.solid(-0.575, 0, 3.05, fitTo(W, VF.roofWid), VF.top - VF.shoulder, VF.shoulder, 'metal');
+      F.solid(1.725, 0, 1.45, W, fitTo(2.1, VF.hoodTop - 0.32), 0.32, 'metal');
+      for (const lx of [-1.6, 1.6]) for (const s of [-1, 1]) tyreSolid(F, lx, s * 0.86, 0.38, W / 2);
+      return;
+    }
     const F = frame(cx, cz, ry), W = 2.0, paint = PAINT[(v * 5 + 2) % PAINT.length];
     const sh = new THREE.Shape();
     sh.moveTo(-2.45, 0.32); sh.lineTo(-2.45, 2.2); sh.quadraticCurveTo(-2.45, 2.42, -2.2, 2.42); sh.lineTo(1.8, 2.42);
@@ -347,10 +582,35 @@ function build(ctx) {
   }
   // step van: an ice-cream truck (v 0/2) or a dairy / bakery delivery truck (v 1/3)
   function stepvan(cx, cz, ry, v) {
-    const F = frame(cx, cz, ry), W = 2.2, L = 5.7;
     const ice = v % 2 === 0;
     const base = ice ? [0xf4ecf0, 0xe8f4ec][v >> 1 & 1] : [0xf0ead8, 0xd84a3a][v >> 1 & 1];
     const band = ice ? [0xe07090, 0x4fa8a0][v >> 1 & 1] : [0x2f5a9a, 0xf0ead8][v >> 1 & 1];
+    const kit = vehKit('stepvan');
+    if (kit) {
+      // the step van resprayed in the truck's colours, a stripe down each flank; the ice-cream trucks keep their
+      // serving hatches, awnings and the cone on the roof. Collision split behind the bonnet, like the van's.
+      const VF = kit.F, F = frame(cx, cz, ry), W = fitTo(2.2, VF.wid), sd = VF.side, top = VF.top;
+      // (drawn 0.2 m back: the model's bounds include its thin rear grab rails, which put the body forward of the boxes)
+      const [mx, mz] = F.P(-0.2, 0), D = putVeh(kit, mx, mz, ry, base);   // (what's built onto it turned with it; the collision stays square)
+      for (const s of [-1, 1]) D.bx(M.enamel, 3.8, 0.2, 0.012, -0.65, 0.85, s * (sd + 0.006), { tint: band, grime: 0 });
+      if (ice) {
+        // (the serving hatch lit from inside, its sign and menu readable from either side: a black hole in the
+        // flank otherwise, at dusk)
+        const lit = M._iceLit || (M._iceLit = (() => { const t = iceWindowTex(); return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.45, roughness: 0.7 }); })());
+        for (const s of [-1, 1]) {
+          D.g(flatBox(1.6, 0.7, 0.02), lit, -0.6, 1.65, s * (sd + 0.01), { grime: 0, dry: s < 0 ? Math.PI : 0 });   // serving hatch
+          D.bx(M.chrome, 1.7, 0.04, 0.2, -0.6, 1.26, s * (sd + 0.1), { grime: 0 });                       // its ledge
+          D.bx(M.enamel, 1.8, 0.05, 0.5, -0.6, 2.1, s * (sd + 0.26), { tint: band, grime: 0, rx: s * 0.25 }); // awning
+        }
+        D.g(new THREE.ConeGeometry(0.22, 0.5, 10), M.enamel, -1.2, top + 0.25, 0, { rx: Math.PI, tint: 0xd8a860 });
+        D.g(new THREE.SphereGeometry(0.24, 12, 8), M.enamel, -1.2, top + 0.48, 0, { tint: 0xf4d0dc });
+      }
+      F.solid(-0.35, 0, 5.0, W, fitTo(2.3, top - 0.42), 0.42, 'metal');
+      F.solid(2.35, 0, 0.4, W, fitTo(2.3, VF.hoodTop - 0.42), 0.42, 'metal');
+      for (const lx of [-1.9, 1.8]) for (const s of [-1, 1]) tyreSolid(F, lx, s * 0.95, 0.42, W / 2);
+      return;
+    }
+    const F = frame(cx, cz, ry), W = 2.2, L = 5.7;
     F.bx(M.enamel, L - 0.4, 2.3, W, -0.2, 0.42, 0, { tint: base, grime: 0.2 });
     F.bx(M.enamel, 0.6, 1.4, W - 0.1, L / 2 - 0.35, 0.42, 0, { tint: base, grime: 0.2 });   // rounded nose (low)
     F.bx(M.glass, 0.06, 0.8, W - 0.3, L / 2 - 0.42, 1.85, 0, { rz: -0.15, grime: 0 });
@@ -798,6 +1058,7 @@ function build(ctx) {
     const it = it0[6] === 'speaker' ? [it0[0], it0[1] - 0.5, ...it0.slice(2)] : it0;
     placeItem(...it); placeItem(-it[0], -it[1], ...it.slice(2));
   }
+  flushFleet();   // the vehicle models placed above
 
   // lamps: along the perimeter road and the lawns, arms out over the lot
   for (const s of [-1, 1]) {

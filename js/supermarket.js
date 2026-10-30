@@ -289,7 +289,10 @@ function semiRig() {
     const g = geo.clone(), pos = g.attributes.position, nrm = g.attributes.normal;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-      pos.setXYZ(i, at(z), (y - P.box.min.y) * S, -x * S);
+      // the trailer (its first 11 m) rides 17 cm higher than drawn: its floor at 1.21 m, so a crouched player still
+      // fits under it, as under the procedural one (the tandem's tyres, below 0.95 m, stay on the ground)
+      const ax = at(z), ny = (y - P.box.min.y) * S;
+      pos.setXYZ(i, ax, ax < 11 ? ny + 0.17 * Math.min(1, Math.max(0, (ny - 0.95) / 0.1)) : ny, -x * S);
       if (nrm) { const nx = nrm.getX(i), nz = nrm.getZ(i); nrm.setXYZ(i, nz, nrm.getY(i), -nx); }   // (stretched runs: only faces along the length)
     }
     g.computeBoundingBox(); g.computeBoundingSphere();
@@ -1157,7 +1160,9 @@ function build(ctx) {
   const CAR_FIT = { sedan: [1.75, 0.85, 1.5, 0.6], hatch: [1.9, 1.25, 1.55, 0.65] };
   let carN = 0;
   const car = (x, z, ry) => {
-    const k = carN++, slot = k % 2 ? 'hatch' : 'sedan', pc = vehicle(slot, CAR_LEN);
+    const k = carN++;
+    let slot = k % 2 ? 'hatch' : 'sedan', pc = vehicle(slot, CAR_LEN);
+    if (!pc) { slot = slot === 'hatch' ? 'sedan' : 'hatch'; pc = vehicle(slot, CAR_LEN); }   // (one model missing: the other in its spot)
     if (!pc) { buildCar(x, z, ry, 0); carSolid(x, z); return; }
     const paint = CAR_PAINT[Math.floor(ctx.rnd() * 4)];   // (the draw buildCar makes for its paint: what's built after stays the same)
     for (const { geo, mat } of pc.parts) P(geo.clone(), tintMat(mat), x, 0, z, ry + ((k * 5) % 7 - 3) * 0.012, { cast: true, tint: paint });
@@ -1227,13 +1232,13 @@ function build(ctx) {
     if (rig) {
       // the semi model (see semiRig), with the procedural one's collision, heights matched to the model
       model(rig, tx0, 0, zc);
-      solid(tx, zc, tL, 2.5, 2.39, 1.04, 'metal');                                                       // trailer box
+      solid(tx, zc, tL, 2.5, 2.39, 1.21, 'metal');                                                       // trailer box (crouch height clear under it)
       for (const dx of [3.6, 4.85]) for (const s of [-1, 1]) solid(tx0 + dx, zc + s * 1.0, 1.0, 0.4, 0.92, 0, 'metal');   // tandem
       for (const s of [-1, 1]) {
-        solid(tx0 + tL - 2.2, zc + s * 0.9, 0.14, 0.14, 1.04, 0, 'metal');                              // landing gear legs
-        P(new THREE.BoxGeometry(0.12, 1.04, 0.12), M.dark, tx0 + tL - 2.2, 0.52, zc + s * 0.9);
+        solid(tx0 + tL - 2.2, zc + s * 0.9, 0.14, 0.14, 1.21, 0, 'metal');                              // landing gear legs
+        P(new THREE.BoxGeometry(0.12, 1.21, 0.12), M.dark, tx0 + tL - 2.2, 0.605, zc + s * 0.9);
         // the trailer's livery
-        const sm = signMesh(signTex(['FRESHWAY', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.25, zc + s * 1.275, s > 0 ? 0 : Math.PI, 0.05);
+        const sm = signMesh(signTex(['FRESHWAY', 'fresh every day'], { bg: '#eae8e2', fg: '#2f8a4a', font: 'bold 64px Arial', w: 1024, h: 256 }), 7, 1.75, tx + 0.6, 2.42, zc + s * 1.275, s > 0 ? 0 : Math.PI, 0.05);
         sm.material.roughness = 0.5;
       }
       const cx0 = tx0 + tL - 1.4;

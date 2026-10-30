@@ -21,6 +21,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Box } from './physics.js';
 import { FONT, lineBullet, canvasTex } from './station.js';
+import { PROPS } from './props.js';
 
 // ---------- the stations and the loop ----------
 // ox: where the station stands (x); py: platform height; tx: the two tracks' centre lines (station-local x);
@@ -59,8 +60,10 @@ const CAR = 28.6, L2 = CAR / 2, TW = 2.65, H = TW / 2, WT = 0.12;
 const T_BOT = RAIL + 0.12, T_TOP = YP + 3.0, WIN0 = YP + 0.95, WIN1 = YP + 2.05;
 const DOORS = [-10.2, -3.4, 3.4, 10.2], DW = 0.65;    // door centres along the car and half the opening
 // collision, in car space (x across from the track centre, absolute y, z along from the car's middle):
-// [x0, y0, z0, x1, y1, z1, flags]; flags: pass (stops people, not bullets), door (side)
-function carBoxes() {
+// [x0, y0, z0, x1, y1, z1, flags]; flags: pass (stops people, not bullets), door (side). With `fit` (the model's
+// car, CIT_FIT) it's the same car fitted to what's drawn: see citBoxes
+function carBoxes(fit) {
+  if (fit) return citBoxes(fit);
   const out = [];
   out.push([-H, T_BOT, -L2, H, YP, L2]);                                  // floor (level with the platforms)
   out.push([-H, T_TOP - 0.05, -L2, H, T_TOP + 0.3, L2]);                  // roof
@@ -211,6 +214,365 @@ function makeCar(dirIdx) {
   // its own light inside (a marker: the map's light pool lights whoever is riding)
   const light = new THREE.PointLight(0xeef4ff, 7, 14, 1.4); light.position.set(0, T_TOP - 0.4, 0); light.userData.mapLight = true; group.add(light);
   return { group, doors };
+}
+
+// ---------- the car from its model: an Alstom Citadis 302 (CC-BY, credited in the README) ----------
+// js/assets.js loads it before the map is built; without it the car above is built as it was. The model is the
+// shell (body, cabs, roof gear, pantograph, gangways, and its own walls and ceiling inside); the game keeps its own
+// sliding doors, seats, poles and lights in it, and the glass is the game's (riders see out, and shoot out).
+// Its facts, in the file's units (metres): the length along +x (either end is a front: it's double-ended), the
+// body's middle at x 19.915, z -1.2915; its floor at y 0.113 is the body's underside (no skirts: they're ours).
+// Six doors a side, centred on x as below; each door's frame 1.95 m wide, its two leaves 1.55 (y 0.29..2.65).
+// Drawn to the game car's size: the cross-section as it is (2.58 m wide, 3.03 floor to ceiling: the S70's 2.65
+// and 3.0), and along the car remapped piece by piece, so that four of its doors (one by each cab, the inner two
+// of the middle four) open exactly on the game's four (their frames scaled 0.84 to its 1.3 m openings, the
+// panels between them 0.92..1.02) and the other two are taken out, their frames shrunk to nothing: four doors a
+// side, as on the S70. Nose to nose 28.9 m (the S70 28.6, past its couplers).
+const CIT = {
+  name: 'veh_lightrail', mx: 19.915, mz: -1.2915, floor: 0.113, ends: [2.49, 37.34], nose: 14.45,
+  doors: [6.835, 12.675, 16.125, 23.71, 27.165, 33.005], frame: 0.975, leaf: 0.775, open: [0.1, 2.655],
+  keep: [0, 2, 3, 5],                                         // the doors that are the game's four
+  joints: [[10.94, 11.57], [17.22, 17.86], [21.97, 22.61], [28.26, 28.9]],   // the gangways between its sections
+  panto: 'Object_41', pantoBase: 3.2, pantoTop: 5.3,          // raised to 5.3 m: it's lowered to our contact wire
+  glass: new Set(['material_12', 'material_23']),
+  // left out: the boxes over its bogies (seats standing in for ours) and its wheels (inside them: we draw a skirt
+  // to the rails instead)
+  drop: new Set(['Object_63', 'Object_55', 'Object_59', 'Object_646', 'Object_650', 'Object_362', 'Object_671',
+    'Object_64', 'Object_56', 'Object_60', 'Object_647', 'Object_651', 'Object_363']),
+  // Adelaide Metro's badge on the noses, painted out in the black of the mask it's set in (left out, it left a
+  // badge-shaped hole); its white parts are in with the cab's white faces: `emblem`, by the model's x, y and
+  // distance across from the middle
+  badge: new Set(['Color_I16', 'Color_I16_0', 'Color_A01', 'Color_D01', 'Color_G11', 'material_37']),
+  emblem: { x: [2.72, 37.12], y: [0.77, 1.04], hw: 0.23 },
+  // the gangway bellows: two-sided folds, and one-sided copies of some of their faces in two greys (the backing
+  // that closes the gaps between the folds): all one grey, lit flat, so the faces lying on each other don't fight
+  bellows: new Set(['Color_005', 'Color_005_0', 'Color_004_0']),
+  // its destination sign's lettering: filled in black (the sign's back has the letters cut out of it: with them
+  // left out, the cab's lit ceiling showed through as "ENTERTAINMENT CENTRE"), ours over it
+  dest: new Set(['material_28', '10_0']),
+  // the bodywork: Adelaide's red and blue repainted Link white, with Sound Transit's blue along the bottom and a
+  // teal line over it (bands in metres over the floor)
+  repaint: new Set(['material_27', 'material_24', 'material', 'material_7']),
+  paint: new Set(['material_27', 'material_24', 'material', 'material_7', 'Color_000']),
+  bands: [0.3, 0.36, 0.42],
+};
+// its collision, fitted to what's drawn (carBoxes): the floor, ceiling and window line where the model has them;
+// the passengers' end of the car at the cabs' backs (`zp`, where the cab side windows end: the cabs taper over
+// their last 3 m, so a box out to the old ends would stand in thin air round the noses and let a rider's head
+// out through the windscreen); each cab stepped in to the nose's shape, [z0, z1, half width, top]
+const CIT_FIT = {
+  zp: 11.4, tt: 3.03, roof: 3.12, win0: 1.1, win1: 2.5,
+  nose: [[11.4, 12.4, 1.25, 3.12], [12.4, 13, 1.13, 3.06], [13, 13.35, 1.04, 2.9], [13.35, 13.7, 0.96, 2.62], [13.7, 14, 0.88, 2.05], [14, L2, 0.78, 1.45]],
+};
+function citBoxes({ zp, tt, roof, win0, win1, nose }) {
+  const out = [];
+  out.push([-H, T_BOT, -zp, H, YP, zp]);                                  // floor (level with the platforms)
+  out.push([-H, tt - 0.05, -zp, H, roof, zp]);                            // roof
+  for (const [a, b, hw, top] of nose) out.push([-hw, T_BOT, -b, hw, top, -a], [-hw, T_BOT, a, hw, top, b]);   // the cabs
+  for (const sx of [-1, 1]) {
+    const x0 = sx > 0 ? H - WT : -H, x1 = sx > 0 ? H : -H + WT;
+    const edges = [-zp, ...DOORS.flatMap(d => [d - DW, d + DW]), zp];
+    for (let i = 0; i < edges.length; i += 2) {
+      const a = edges[i], b = edges[i + 1];
+      out.push([x0, YP, a, x1, win0, b]);                                  // panel under the windows
+      out.push([x0, win0, a, x1, win1, b, { pass: true }]);                // the windows: bullets go through
+    }
+    out.push([x0, win1, -zp, x1, tt, zp]);                                 // over the windows and doors
+    for (const d of DOORS) out.push([x0, YP, d - DW, x1, win1, d + DW, { door: sx }]);
+    // bench seats along the walls between the doors, as in the S70 (none in the short bays by the cabs)
+    const si = sx > 0 ? H - WT - 0.48 : -H + WT;
+    for (let i = 0; i < edges.length; i += 2) {
+      const a = edges[i] + 0.4, b = edges[i + 1] - 0.4;
+      if (b - a > 1) out.push([si, YP, a, si + 0.48, YP + 0.46, b, { pass: true }]);
+    }
+  }
+  return out;
+}
+
+// keep the part of a polygon (vertices [x, y, z, nx, ny, nz]) on one side of the plane `axis` = v
+function clipPoly(poly, axis, v, above) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const ia = above ? a[axis] >= v : a[axis] <= v, ib = above ? b[axis] >= v : b[axis] <= v;
+    if (ia) out.push(a);
+    if (ia !== ib) { const t = (v - a[axis]) / (b[axis] - a[axis]); out.push(a.map((q, k) => q + (b[k] - q) * t)); }
+  }
+  return out;
+}
+// what's left of a polygon with the box x0..x1, y0..y1 cut out of it
+function cutOut(poly, x0, x1, y0, y1) {
+  let lo = Infinity, hi = -Infinity, bot = Infinity, top = -Infinity;
+  for (const v of poly) { lo = Math.min(lo, v[0]); hi = Math.max(hi, v[0]); bot = Math.min(bot, v[1]); top = Math.max(top, v[1]); }
+  if (hi <= x0 || lo >= x1 || top <= y0 || bot >= y1) return [poly];
+  const out = [], keep = (p) => { if (p.length > 2) out.push(p); };
+  keep(clipPoly(poly, 0, x0, false));
+  let mid = clipPoly(poly, 0, x0, true);
+  keep(clipPoly(mid, 0, x1, true));
+  mid = clipPoly(mid, 0, x1, false);
+  keep(clipPoly(mid, 1, y0, false));
+  keep(clipPoly(mid, 1, y1, true));
+  return out;
+}
+
+// along the car: the model's x to the car's z, piece by piece (the knots: its ends, and each door frame's edges)
+function citKnots() {
+  const k = CIT.frame, sd = DW / CIT.leaf, U = [CIT.ends[0]], Z = [-CIT.nose];
+  CIT.doors.forEach((x, i) => {
+    const j = CIT.keep.indexOf(i);
+    U.push(x - k, x + k); Z.push(j < 0 ? null : DOORS[j] - k * sd, j < 0 ? null : DOORS[j] + k * sd);
+  });
+  U.push(CIT.ends[1]); Z.push(CIT.nose);
+  // a door taken out: its frame shrinks to a point, and the panels either side of it stretch alike
+  for (let i = 0; i < Z.length; i++) if (Z[i] === null) {
+    const a = i - 1, b = i + 2, run = (U[i] - U[a]) + (U[b] - U[i + 1]);
+    Z[i] = Z[i + 1] = Z[a] + (U[i] - U[a]) * (Z[b] - Z[a]) / run;
+    i++;
+  }
+  const seg = (x) => { let i = 1; while (i < U.length - 1 && x > U[i]) i++; return i; };
+  return {
+    along: (x) => { const i = seg(x); return Z[i - 1] + (x - U[i - 1]) * (Z[i] - Z[i - 1]) / (U[i] - U[i - 1]); },
+    slope: (x) => { const i = seg(x); return (Z[i] - Z[i - 1]) / (U[i] - U[i - 1]) || 1; },
+  };
+}
+
+// The model baked into the shell the cars share (null when it didn't load): one mesh for its faces (no textures:
+// its colours ride on the vertices), the glass, the head and tail lights; and the game's own pieces fitted into
+// it. Built once, kept on the prop.
+function citShell() {
+  const P = PROPS[CIT.name];
+  if (!P) return null;
+  if (P.linkShell) return P.linkShell;
+  const { along, slope } = citKnots();
+  const F = CIT.floor, WIRE = TUN_H - PIT_D - 0.095;                  // the contact wire's underside over the floor
+  const pk = (WIRE - (CIT.pantoBase - F)) / (CIT.pantoTop - CIT.pantoBase);   // the pantograph's squash, to reach it
+  // the triangles of a part, as [x, y, z, nx, ny, nz] in the model's space
+  const tris = (pt, fn) => {
+    const g = pt.geo, pos = g.attributes.position, nor = g.attributes.normal, ix = g.index, n = ix ? ix.count : pos.count;
+    for (let i = 0; i + 2 < n; i += 3) {
+      const t = [];
+      for (let k = 0; k < 3; k++) { const j = ix ? ix.getX(i + k) : i + k; t.push([pos.getX(j), pos.getY(j), pos.getZ(j), nor ? nor.getX(j) : 0, nor ? nor.getY(j) : 1, nor ? nor.getZ(j) : 0]); }
+      fn(t);
+    }
+  };
+  // its windows have an opaque white back face on the same three corners as the pane: found by those
+  const key = (t) => t.map(v => `${Math.round(v[0] * 1000)},${Math.round(v[1] * 1000)},${Math.round(v[2] * 1000)}`).sort().join('|');
+  const paneKeys = new Set();
+  for (const pt of P.parts) if (CIT.glass.has(pt.mat.name)) tris(pt, t => paneKeys.add(key(t)));
+  // to the car's space: x across (the model's z, turned), y up from the floor, z along (remapped)
+  const xf = (v, panto) => {
+    let y = v[1] - F, ny = v[4];
+    const b = CIT.pantoBase - F;
+    if (panto && y > b) { y = b + (y - b) * pk; ny /= pk; }
+    const nx = -v[5], nz = v[3] / slope(v[0]), l = Math.hypot(nx, ny, nz) || 1;
+    return [-(v[2] - CIT.mz), y, along(v[0]), nx / l, ny / l, nz / l];
+  };
+  const bucket = () => ({ pos: [], nor: [], col: [] });
+  const B = { front: bucket(), double: bucket(), glass: bucket(), head: bucket(), tail: bucket() };
+  const dest = [-1, 1].map(() => ({ c: new THREE.Vector3(), n: new THREE.Vector3(), a: 0, v: [] }));
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3();
+  // (`flat`: lit as the face lies, its own normals aside: the bellows and the pieces painted out on the noses, so
+  // that faces lying on each other shade alike and don't show through each other.) Its two-sided faces (most of the body: one skin,
+  // its outside the car's, its back the riders' walls) are written out as two one-sided ones back to back: the
+  // ambient-occlusion pass draws everything one-sided, so it saw through a wall seen from behind and shaded it with
+  // whatever stood outside (a tree beside the platform, in grey smudges on the wall inside)
+  const emit = (poly, col, out, panto, flat) => {
+    const two = out === B.double;
+    if (two) out = B.front;
+    const q = poly.map(v => xf(v, panto));
+    for (let k = 1; k + 1 < q.length; k++) {
+      const t = [q[0], q[k], q[k + 1]];
+      _a.fromArray(t[0]); _b.fromArray(t[1]); _c.fromArray(t[2]);
+      if (_n.crossVectors(_b.sub(_a), _c.sub(_a)).lengthSq() < 1e-10) continue;   // (a taken-out door's, shrunk flat)
+      // a sixth of its faces (the gangway bellows, some roof gear) have their normals pointing the other way from
+      // the side they show: lit from behind, they drew black. Turned to the face's own side
+      const s = flat ? 1 : _n.x * (t[0][3] + t[1][3] + t[2][3]) + _n.y * (t[0][4] + t[1][4] + t[2][4]) + _n.z * (t[0][5] + t[1][5] + t[2][5]) < 0 ? -1 : 1;
+      if (flat) _n.normalize();
+      const put = (order, sg) => {
+        for (const i of order) {
+          const v = t[i];
+          out.pos.push(v[0], v[1], v[2]);
+          if (flat) out.nor.push(sg * _n.x, sg * _n.y, sg * _n.z); else out.nor.push(sg * s * v[3], sg * s * v[4], sg * s * v[5]);
+          if (col) out.col.push(col.r, col.g, col.b);
+        }
+      };
+      put([0, 1, 2], 1);
+      if (two) put([0, 2, 1], -1);
+    }
+  };
+  const white = new THREE.Color(0xeef0ec), blue = new THREE.Color(0x1d4f91), teal = new THREE.Color(0x00a3ad);
+  const bands = CIT.bands.map(y => y + F);
+  const ways = CIT.keep.map(i => CIT.doors[i]);
+  const colOf = (name, hex) => { const p = P.parts.find(q => q.mat.name === name); return p ? p.mat.color : new THREE.Color(hex); };
+  const mask = colOf('Color_008', 0x1e1e1e), signBack = colOf('Color_008_0', 0x1e1e1e), fold = colOf('Color_005', 0xb2b2b2), E = CIT.emblem;
+  const floorCol = colOf('Charcoal_0', 0x686868);   // (the end sections' floor is white in the model: charcoal like the rest)
+  for (const pt of P.parts) {
+    const mn = pt.mat.name;
+    if (CIT.drop.has(pt.name)) continue;
+    const glass = CIT.glass.has(mn), panto = pt.name === CIT.panto, white0 = mn === 'Color_000' || mn === 'Color_000_0';
+    const bellows = CIT.bellows.has(mn), base = CIT.repaint.has(mn) ? white : bellows ? fold : pt.mat.color, side = pt.mat.side === THREE.DoubleSide ? B.double : B.front;
+    tris(pt, (t) => {
+      const cx = (t[0][0] + t[1][0] + t[2][0]) / 3;
+      if (CIT.dest.has(mn)) {   // where the destination sign goes: the lettering's middle and the way it faces
+        const q = t.map(v => xf(v)), d = dest[cx > CIT.mx ? 1 : 0];
+        _a.fromArray(q[0]); _b.fromArray(q[1]); _c.fromArray(q[2]);
+        _n.crossVectors(_b.clone().sub(_a), _c.clone().sub(_a));
+        const ar = _n.length() / 2;
+        if (_n.z * (cx > CIT.mx ? 1 : -1) < 0) _n.negate();
+        d.c.addScaledVector(_a.add(_b).add(_c), ar / 3); d.n.add(_n); d.a += ar; d.v.push(...q);
+        emit(t, signBack, side);
+        return;
+      }
+      if (!glass && paneKeys.has(key(t))) return;                         // a window's white back
+      // the badge's white rim and lettering
+      if (CIT.badge.has(mn) || (white0 && (cx < E.x[0] || cx > E.x[1]) && t.every(v => v[1] > E.y[0] && v[1] < E.y[1] && Math.abs(v[2] - CIT.mz) < E.hw))) { emit(t, mask, side, false, true); return; }
+      if (mn === 'Color_000_0' && t.every(v => Math.abs(v[1] - CIT.floor) < 0.006 && Math.abs(v[2] - CIT.mz) < 1.15)) { emit(t, floorCol, side); return; }
+      let polys = [t];
+      // the game's four doorways, cut out of both sides (our leaves slide in them)
+      if (t.every(v => Math.abs(v[2] - CIT.mz) > 0.95)) for (const c of ways) polys = polys.flatMap(p => cutOut(p, c - CIT.leaf, c + CIT.leaf, CIT.open[0], CIT.open[1]));
+      for (const p of polys) {
+        if (glass) { emit(p, null, B.glass); continue; }
+        // the lamps on the noses: the headlights lit at the leading end (+z), the tail lights at the other
+        const front = cx > CIT.mx;
+        if (mn === 'Color_002' && front) { emit(p, null, B.head); continue; }
+        if (mn === 'material_31' && !front) { emit(p, null, B.tail); continue; }
+        if (!CIT.paint.has(mn)) { emit(p, base, side, panto, bellows); continue; }
+        // the livery: cut along the bands' edges, each piece painted by where it lies
+        let rest = p;
+        bands.forEach((y, i) => {
+          const below = clipPoly(rest, 1, y, false);
+          if (below.length > 2) emit(below, i === 0 ? blue : i === 2 ? teal : base, side);
+          rest = clipPoly(rest, 1, y, true);
+        });
+        if (rest.length > 2) emit(rest, base, side);
+      }
+    });
+  }
+  const geo = (b) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+    if (b.col.length) g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+    return g;
+  };
+  const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.5, envMapIntensity: 0.4, ...o });
+  const mats = {
+    front: std({ vertexColors: true, roughness: 0.42, metalness: 0.1 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x8aa4b4, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
+    head: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e0, emissiveIntensity: 6 }),
+    tail: new THREE.MeshStandardMaterial({ color: 0xff2010, emissive: 0xff2010, emissiveIntensity: 3 }),
+    seat: std({ color: 0x23508a, roughness: 0.85 }), grey: std({ color: 0x5a5e62, roughness: 0.6, metalness: 0.4 }),
+    pole: std({ color: 0xd8c020, roughness: 0.35, metalness: 0.5 }), wall: std({ color: 0xe4e6e2, roughness: 0.6 }),
+    lamp: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 2.2 }),
+    under: std({ color: 0x2a2d31, roughness: 0.85 }), alu: std({ color: 0x9aa0a6, roughness: 0.4, metalness: 0.6 }),
+    leaf: std({ color: 0x34373b, roughness: 0.5, metalness: 0.2 }),
+    // the doors' panes darker than the windows: shut, a doorway reads as shut
+    leafGlass: new THREE.MeshStandardMaterial({ color: 0x5a6e7a, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
+  };
+  // the destination signs (one per line: which way round the loop), on both noses
+  mats.dest = [0, 1].map(dirIdx => {
+    const t = canvasTex(512, 64, (g, w, h) => {
+      g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffb21e'; g.font = `bold 36px ${FONT}`; g.textBaseline = 'middle'; g.textAlign = 'center';
+      g.fillText(dirIdx ? '1 LINE  LOOP · EAST' : '1 LINE  LOOP · WEST', w / 2, h / 2);
+    });
+    return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 1.6 });
+  });
+  const logoTex = canvasTex(512, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#1d4f91'; g.font = `bold 84px ${FONT}`; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText('Link', 10, h / 2);
+    g.fillStyle = '#00a3ad'; g.font = `bold 30px ${FONT}`; g.fillText('SOUND TRANSIT', 210, h / 2 + 4);
+  });
+  mats.logo = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -2 });
+
+  // ours, fitted in: by material, merged
+  const { zp, tt } = CIT_FIT;
+  const parts = new Map();
+  const add = (mat, g) => { if (!parts.has(mat)) parts.set(mat, []); parts.get(mat).push(g); };
+  const box = (mat, x0, y0, z0, x1, y1, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); add(mat, g); };
+  const plane = (mat, w, h, x, y, z, ry = 0, rz = 0) => { const g = new THREE.PlaneGeometry(w, h); if (ry) g.rotateY(ry); if (rz) g.rotateZ(rz); g.translate(x, y, z); add(mat, g); };
+  for (const sx of [-1, 1]) {
+    const edges = [-zp, ...DOORS.flatMap(d => [d - DW, d + DW]), zp];
+    // seats: a blue bench along the wall between each pair of doors (as the collision has them)
+    for (let i = 0; i < edges.length; i += 2) {
+      const a = edges[i] + 0.4, b = edges[i + 1] - 0.4;
+      if (b - a < 1) continue;
+      const s0 = sx > 0 ? H - WT - 0.48 : -H + WT, s1 = s0 + 0.48;
+      box(mats.seat, s0, YP + 0.3, a, s1, YP + 0.46, b);
+      box(mats.seat, sx > 0 ? s1 - 0.08 : s0, YP + 0.46, a, sx > 0 ? s1 : s0 + 0.08, YP + 1.0, b);   // backrest
+      box(mats.grey, s0 + 0.05, YP, a + 0.1, s1 - 0.05, YP + 0.3, b - 0.1);
+    }
+    // a threshold plate in each doorway, out to the floor's edge (the body's underside curves in under it)
+    for (const d of DOORS) box(mats.alu, sx > 0 ? 1.06 : -1.315, YP - 0.035, d - DW, sx > 0 ? 1.315 : -1.06, YP + 0.004, d + DW);
+    // the Link logo low on each end section's side, leaning with the body
+    for (const lz of [-1, 1].map(e => (along(CIT.doors[e > 0 ? 5 : 0] - e * CIT.frame) + along(CIT.joints[e > 0 ? 3 : 0][e > 0 ? 1 : 0])) / 2)) {
+      plane(mats.logo, 2.0, 0.5, sx * 1.275, YP + 0.75, lz, sx * Math.PI / 2, -sx * 0.07);
+    }
+  }
+  // grab poles by every door
+  for (const d of DOORS) for (const sx of [-1, 1]) { const g = new THREE.CylinderGeometry(0.02, 0.02, tt, 6); g.translate(sx * 0.55, tt / 2, d + 0.95); add(mats.pole, g); }
+  for (const lz of [-9, -3, 3, 9]) box(mats.lamp, -0.25, tt - 0.1, lz - 2.2, 0.25, tt - 0.06, lz + 2.2);   // light panels
+  // the cabs' backs: a wall across with a window into the cab (riders look out through the windscreen)
+  for (const e of [-1, 1]) {
+    const z0 = e > 0 ? zp : -zp - 0.04, z1 = z0 + 0.04;
+    box(mats.wall, -1.17, YP, z0, 1.17, YP + 0.3, z1); box(mats.wall, -1.22, YP + 0.3, z0, 1.22, YP + 1.0, z1);   // (inside the hull where it curves in at the bottom)
+    box(mats.wall, -1.22, YP + 1.0, z0, -0.7, YP + 2.3, z1); box(mats.wall, 0.7, YP + 1.0, z0, 1.22, YP + 2.3, z1);
+    box(mats.wall, -1.2, YP + 2.3, z0, 1.2, YP + 2.65, z1); box(mats.wall, -1.0, YP + 2.65, z0, 1.0, tt + 0.01, z1);
+    const g = new THREE.PlaneGeometry(1.4, 1.3); g.translate(0, YP + 1.65, e * (zp + 0.02));
+    B.glass.extra = (B.glass.extra || []).concat([g]);
+  }
+  // under the body down to the rails, set in: the bogies and gear in the shadow under the floor
+  box(mats.under, -1.12, T_BOT, -12.4, 1.12, YP - 0.01, 12.4);
+  for (const e of [-1, 1]) { box(mats.under, -1.0, T_BOT, e > 0 ? 12.4 : -13.4, 1.0, YP - 0.01, e > 0 ? 13.4 : -12.4); box(mats.under, -0.8, T_BOT, e > 0 ? 13.4 : -14.1, 0.8, YP - 0.01, e > 0 ? 14.1 : -13.4); }
+  const inside = [...parts].map(([mat, list]) => [mergeGeometries(list), mat, mat !== mats.lamp && mat !== mats.logo]);
+  // the door leaves (dark frames round two panes, like its own), merged by the way they slide: each side's leaves
+  // toward the front move together, and those toward the back
+  const LX = 1.2, leaves = {};
+  for (const sx of [-1, 1]) for (const leaf of [-1, 1]) {
+    const fr = [], gl = [];
+    for (const d of DOORS) {
+      const c = d + leaf * DW / 2, o = c + leaf * DW / 2, m = c - leaf * DW / 2;   // its outer edge, its meeting edge
+      const lb = (z0, z1, y0, y1) => { const g = new THREE.BoxGeometry(0.04, y1 - y0, Math.abs(z1 - z0)); g.translate(sx * LX, (y0 + y1) / 2, (z0 + z1) / 2); fr.push(g); };
+      const zo = o - leaf * 0.11, zm = m + leaf * 0.075;
+      lb(o, zo, 0, 2.535); lb(m, zm, 0, 2.535);                                       // stiles
+      lb(zo, zm, 0, 0.25); lb(zo, zm, 1.25, 1.37); lb(zo, zm, 2.44, 2.535);          // rails
+      for (const [y0, y1] of [[0.25, 1.25], [1.37, 2.44]]) { const g = new THREE.PlaneGeometry(Math.abs(zm - zo), y1 - y0); g.rotateY(Math.PI / 2); g.translate(sx * LX, (y0 + y1) / 2, (zo + zm) / 2); gl.push(g); }
+    }
+    leaves[`${sx}${leaf}`] = { frame: mergeGeometries(fr), glass: mergeGeometries(gl) };
+  }
+  // the destination signs: where its lettering was, facing the way it did
+  // (just clear of its letters, which stand proud of the sign's face)
+  const destGeo = mergeGeometries(dest.map(({ c, n, a, v }) => {
+    const g = new THREE.PlaneGeometry(1.36, 0.19), o = new THREE.Object3D();
+    c.divideScalar(a); n.normalize();
+    const off = v.reduce((m, p) => Math.max(m, (p[0] - c.x) * n.x + (p[1] - c.y) * n.y + (p[2] - c.z) * n.z), 0);
+    o.position.copy(c).addScaledVector(n, off + 0.004); o.lookAt(c.clone().add(n)); o.updateMatrix();
+    return g.applyMatrix4(o.matrix);
+  }));
+  const glassGeo = mergeGeometries([geo(B.glass), ...(B.glass.extra || []).map(g => { g.deleteAttribute('uv'); return g.toNonIndexed(); })]);
+  P.linkShell = { front: geo(B.front), glass: glassGeo, head: geo(B.head), tail: geo(B.tail), dest: destGeo, inside, leaves, mats };
+  return P.linkShell;
+}
+
+function makeModelCar(dirIdx, C) {
+  const group = new THREE.Group(), M = C.mats, casters = [];
+  const mesh = (geo, mat, cast, parent = group) => { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; m.receiveShadow = true; m.userData.noMinimap = true; if (cast) casters.push(m); parent.add(m); return m; };
+  mesh(C.front, M.front, true);
+  mesh(C.glass, M.glass, false).renderOrder = 2;
+  mesh(C.head, M.head, false); mesh(C.tail, M.tail, false); mesh(C.dest, M.dest[dirIdx], false);
+  for (const [geo, mat, cast] of C.inside) mesh(geo, mat, cast);
+  // the doors: per side, the leaves sliding toward the front and those sliding back (update moves each group by
+  // the leaf's travel: placed at its rest, `d` takes that back off)
+  const doors = { [-1]: [], [1]: [] };
+  for (const sx of [-1, 1]) for (const leaf of [-1, 1]) {
+    const g = new THREE.Group(), L = C.leaves[`${sx}${leaf}`];
+    mesh(L.frame, M.leaf, true, g); mesh(L.glass, M.leafGlass, false, g).renderOrder = 2;
+    g.userData = { d: -leaf * DW / 2, leaf };
+    doors[sx].push(g); group.add(g);
+  }
+  const light = new THREE.PointLight(0xeef4ff, 7, 14, 1.4); light.position.set(0, CIT_FIT.tt - 0.4, 0); light.userData.mapLight = true; group.add(light);
+  // (its shadow-casting meshes: the sun only reaches Chinatown's platforms, so elsewhere they leave the shadow map)
+  return { group, doors, casters };
 }
 
 // ---------- street-level layouts (station-local) ----------
@@ -670,10 +1032,12 @@ function build(ctx) {
   STATIONS.forEach((st, si) => { trackwork(st); [pioneer, symphony, chinatown][si](st, si); });
 
   // ---------- the trains: three per line, one at each station, moving in lockstep ----------
-  const LOCAL = carBoxes();
+  // (the model's car when it loaded, its collision fitted to it; otherwise the S70 built in code)
+  const shell = citShell();
+  const LOCAL = carBoxes(shell && CIT_FIT);
   const trains = [];
   for (let d = 0; d < 2; d++) for (let k = 0; k < 3; k++) {
-    const car = makeCar(d);
+    const car = shell ? makeModelCar(d, shell) : makeCar(d);
     group.add(car.group);
     const boxes = LOCAL.map(([x0, y0, z0, x1, y1, z1, f]) => {
       const b = physics.addBox(new Box(9000, y0, 9000, 9001, y1, 9001));
@@ -712,6 +1076,12 @@ function build(ctx) {
       tr.x = X; tr.y = Y; tr.z = Z; tr.v = s.v; tr.at = s.v === 0 ? s.st : -1; tr.st = s;
       tr.car.group.position.set(X, Y, Z);
       tr.car.group.rotation.y = DIRZ[tr.d] > 0 ? 0 : Math.PI;
+      // the model's car (95k triangles) casts its shadow only where there's sun: Pioneer Square's and Symphony's
+      // platforms are under roofs, the tunnels dark
+      if (tr.car.casters) {
+        const sun = s.st === 2 && Z > st.mouth[0] - L2 && Z < st.mouth[1] + L2;
+        if (tr.sun !== sun) { tr.sun = sun; for (const m of tr.car.casters) m.castShadow = sun; }
+      }
       // doors: slide open over half a second, on the platform's side
       const want = s.open ? 1 : 0, ds = st.doors[tr.d];
       tr.open += Math.sign(want - tr.open) * Math.min(Math.abs(want - tr.open), dt * 2.2);
