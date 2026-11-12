@@ -3002,6 +3002,17 @@ syncAccount();
   account.refresh().then(() => heartbeat(true));
 }
 // models, textures and fonts stay on the device between visits (sw.js); not inside the desktop/offline build
+// Menus are laid out for a screen of roughly 1060 x 600 or more. On a phone (or a small window) they're scaled
+// down as a whole, so a landscape phone shows the same full menu instead of a few giant cards with the tabs
+// pushed off screen; portrait phones get a narrower column at a readable size.
+function fitUi() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const z = w > h ? Math.min(w / 1060, h / 600) : w / 560;
+  document.documentElement.style.setProperty('--ui-zoom', Math.max(0.5, Math.min(1, z)).toFixed(3));
+}
+fitUi();
+addEventListener('resize', fitUi);
+addEventListener('orientationchange', () => setTimeout(fitUi, 200));
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.BREACHPOINT_OFFLINE) {
   navigator.serviceWorker.register('sw.js').catch(() => { /* private mode or blocked: downloads as before */ });
 }

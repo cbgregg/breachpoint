@@ -390,15 +390,15 @@ export class GameAudio {
         break;
       }
       case 'headshot': {
-        // the "ching": a struck steel plate. Inharmonic bell partials ring out over a crisp tick, with a
-        // touch of room so it hangs in the air for a moment
-        const o = dry(0.22), f = 1780 * (0.97 + Math.random() * 0.06);
-        this.noiseBurst(o, t, { type: 'highpass', freq: 7000, decay: 0.025, gain: 0.32, attack: 0.0004 });
-        this.tone(o, t, { freq: 950, end: 720, type: 'triangle', decay: 0.05, gain: 0.07, attack: 0.0006 });
-        for (const [m, d, gn] of [[1, 0.75, 0.2], [2.76, 0.48, 0.11], [5.4, 0.28, 0.055], [8.93, 0.16, 0.03]]) {
-          this.tone(o, t, { freq: f * m, type: 'sine', decay: d, gain: gn, attack: 0.0008 });
-          this.tone(o, t, { freq: f * m * 1.004, type: 'sine', decay: d * 0.8, gain: gn * 0.45, attack: 0.0008 }); // slight beat = shimmer
+        // the "ching": a crisp tick ("ch") into a bright, clean ring ("ing"). The partials sit on consonant
+        // ratios (octave, fifth, twelfth) so it reads as a pleasant chime rather than a clanking bell
+        const o = dry(0.12), f = 2350 * (0.98 + Math.random() * 0.04);
+        this.noiseBurst(o, t, { type: 'highpass', freq: 6500, decay: 0.014, gain: 0.34, attack: 0.0003 });
+        this.noiseBurst(o, t, { type: 'bandpass', freq: 4800, q: 1.4, decay: 0.035, gain: 0.16, attack: 0.0005 });
+        for (const [m, d, gn] of [[1, 0.42, 0.2], [1.5, 0.3, 0.1], [2, 0.24, 0.08], [3, 0.13, 0.04]]) {
+          this.tone(o, t + 0.004, { freq: f * m, type: 'sine', decay: d, gain: gn, attack: 0.001 });
         }
+        this.tone(o, t + 0.004, { freq: f * 1.003, type: 'sine', decay: 0.36, gain: 0.06, attack: 0.001 });   // slight shimmer
         break;
       }
       case 'kill': {

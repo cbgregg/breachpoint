@@ -28,3 +28,6 @@ body.mode-online #play-tiles .tile[data-tile="training"] b { font-size: 20px; }
 #lobby :is(#lobby-hints, #cl-foot) { text-transform: uppercase; font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: 0.08em; color: var(--mw-dim); }
 #lobby :is(#lobby-hints, #cl-foot) kbd { font-size: 12px; padding: 1px 6px; }
 #lobby .cl #cl-title { font-size: clamp(24px, 2.4vw, 36px); }
+
+/* phone / small-window scaling: --ui-zoom is set from the viewport in main.js (1 on a normal screen) */
+.screen, #side, .side-btn, .support, .dd, .top-notes, #apply-dlg { zoom: var(--ui-zoom, 1); }
