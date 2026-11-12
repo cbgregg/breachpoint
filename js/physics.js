@@ -8,42 +8,59 @@ export class Box {
   constructor(minx, miny, minz, maxx, maxy, maxz) {
     this.minx = minx; this.miny = miny; this.minz = minz;
     this.maxx = maxx; this.maxy = maxy; this.maxz = maxz;
+    // the optional tags maps and props add later, declared up front so every box has one shape: the collision
+    // loops then read the bounds through fast, allocation-free loads instead of a generic lookup per box
+    this.surface = undefined; this.pass = undefined; this.dynamic = undefined; this.navBlock = undefined;
+    this.navIgnore = undefined; this.breakable = undefined; this._q = 0;
   }
 }
 
 const _d = new THREE.Vector3();
-let _axis = -1;
-let _sign = 0;
+// scratch numbers live in typed arrays: a module-level `let` holding a double is re-boxed on every write,
+// and these are written thousands of times a frame
 
-// Ray vs AABB (slab method). Returns entry distance or Infinity. Sets _axis/_sign for the hit normal.
+// Ray vs AABB (slab method). Returns entry distance or Infinity. Used for one-off tests (bullets vs heads).
 export function rayBox(ox, oy, oz, dx, dy, dz, minx, miny, minz, maxx, maxy, maxz, maxT) {
-  let tmin = 0, tmax = maxT, ax = -1, sg = 0;
-  if (Math.abs(dx) < 1e-9) { if (ox < minx || ox > maxx) return Infinity; }
+  _O[0] = ox; _O[1] = oy; _O[2] = oz; _O[3] = dx; _O[4] = dy; _O[5] = dz;
+  _T.minx = minx; _T.miny = miny; _T.minz = minz; _T.maxx = maxx; _T.maxy = maxy; _T.maxz = maxz;
+  _O[6] = maxT;
+  return slab(_T) ? _S[2] : Infinity;
+}
+
+// The hot version. The ray sits in _O (origin xyz, direction xyz, max distance); it writes the entry distance to _S[2] and the
+// hit normal's axis/sign to _S[0]/_S[1], and returns whether it hit within the max distance. Everything goes through typed
+// arrays and the box object, never number arguments or a number return: V8 puts a double that crosses a
+// call boundary in a fresh heap object, and this runs thousands of times a frame (that garbage was the hitching).
+const _O = new Float64Array(7), _S = new Float64Array(3), _T = new Box(0, 0, 0, 0, 0, 0);
+function slab(b) {
+  let tmin = 0, tmax = _O[6], ax = -1, sg = 0;
+  const ox = _O[0], oy = _O[1], oz = _O[2], dx = _O[3], dy = _O[4], dz = _O[5];
+  if (Math.abs(dx) < 1e-9) { if (ox < b.minx || ox > b.maxx) return false; }
   else {
-    const inv = 1 / dx; let t1 = (minx - ox) * inv, t2 = (maxx - ox) * inv, s = -1;
+    const inv = 1 / dx; let t1 = (b.minx - ox) * inv, t2 = (b.maxx - ox) * inv, s = -1;
     if (t1 > t2) { const t = t1; t1 = t2; t2 = t; s = 1; }
     if (t1 > tmin) { tmin = t1; ax = 0; sg = s; }
     if (t2 < tmax) tmax = t2;
-    if (tmin > tmax) return Infinity;
+    if (tmin > tmax) return false;
   }
-  if (Math.abs(dy) < 1e-9) { if (oy < miny || oy > maxy) return Infinity; }
+  if (Math.abs(dy) < 1e-9) { if (oy < b.miny || oy > b.maxy) return false; }
   else {
-    const inv = 1 / dy; let t1 = (miny - oy) * inv, t2 = (maxy - oy) * inv, s = -1;
+    const inv = 1 / dy; let t1 = (b.miny - oy) * inv, t2 = (b.maxy - oy) * inv, s = -1;
     if (t1 > t2) { const t = t1; t1 = t2; t2 = t; s = 1; }
     if (t1 > tmin) { tmin = t1; ax = 1; sg = s; }
     if (t2 < tmax) tmax = t2;
-    if (tmin > tmax) return Infinity;
+    if (tmin > tmax) return false;
   }
-  if (Math.abs(dz) < 1e-9) { if (oz < minz || oz > maxz) return Infinity; }
+  if (Math.abs(dz) < 1e-9) { if (oz < b.minz || oz > b.maxz) return false; }
   else {
-    const inv = 1 / dz; let t1 = (minz - oz) * inv, t2 = (maxz - oz) * inv, s = -1;
+    const inv = 1 / dz; let t1 = (b.minz - oz) * inv, t2 = (b.maxz - oz) * inv, s = -1;
     if (t1 > t2) { const t = t1; t1 = t2; t2 = t; s = 1; }
     if (t1 > tmin) { tmin = t1; ax = 2; sg = s; }
     if (t2 < tmax) tmax = t2;
-    if (tmin > tmax) return Infinity;
+    if (tmin > tmax) return false;
   }
-  _axis = ax; _sign = sg;
-  return tmin;
+  _S[0] = ax; _S[1] = sg; _S[2] = tmin;
+  return true;
 }
 
 // Broad phase: a grid over x/z (4 m cells) listing the boxes in each cell, so a query only tests the boxes
@@ -55,19 +72,19 @@ const ckey = (i, k) => (i + 4096) * 8192 + (k + 4096);
 let _stamp = 1;
 // The queries below run many times a frame for every character, so they make no garbage: no closures or
 // result arrays per call (the browser's garbage collector pausing to clear them is felt as a hitch).
-const boxHit = (b, x, y, z, r, h) => x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz;
 const _near = [];
-let _rO = null, _rD = null, _rBest = 0, _rBox = null, _rAxis = -1, _rSign = 0, _bHit = false;
+let _rBox = null, _bHit = false;
+const _R = new Float64Array(3); // 0 best distance, 1 hit axis, 2 hit sign
+// visitors for walk(): they shrink _R[0] (the distance to stop at) instead of returning it, for the same reason
 function rayVisit(b) {
-  if (b.pass) return _rBest;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
-  const t = rayBox(_rO.x, _rO.y, _rO.z, _rD.x, _rD.y, _rD.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, _rBest);
-  if (t < _rBest) { _rBest = t; _rBox = b; _rAxis = _axis; _rSign = _sign; }
-  return _rBest;
+  if (b.pass) return;   // see-through barriers (railings, benches, shop glass): they stop you, not bullets or sight
+  _O[6] = _R[0];
+  if (slab(b) && _S[2] < _R[0]) { _R[0] = _S[2]; _rBox = b; _R[1] = _S[0]; _R[2] = _S[1]; }
 }
 function blockVisit(b) {
-  if (_bHit) return 0;
-  if (!b.pass && rayBox(_rO.x, _rO.y, _rO.z, _rD.x, _rD.y, _rD.z, b.minx, b.miny, b.minz, b.maxx, b.maxy, b.maxz, _rBest) < _rBest) { _bHit = true; return 0; }
-  return _rBest;
+  if (_bHit || b.pass) return;
+  _O[6] = _R[0];
+  if (slab(b) && _S[2] < _R[0]) { _bHit = true; _R[0] = -1; }
 }
 
 export class Physics {
@@ -96,12 +113,12 @@ export class Physics {
     return this.grid;
   }
 
-  // every box a ray from o along unit d might hit within maxT, nearest cells first: calls visit(box) once per
-  // box; visit returns the distance to stop at (the best hit so far), so cells beyond it are skipped
-  walk(o, d, maxT, visit) {
-    const G = this.index(), st = ++_stamp;
-    let best = maxT;
-    for (const b of G.always) best = Math.min(best, visit(b));
+  // every box a ray from o along unit d might hit within _R[0] (set by the caller), nearest cells first: calls
+  // visit(box) once per box; visit lowers _R[0] to the best hit so far, so cells beyond it are skipped
+  walk(o, d, visit) {
+    const G = this.index(), st = ++_stamp, maxT = _R[0];
+    const A = G.always;
+    for (let j = 0; j < A.length; j++) visit(A[j]);
     // 2D DDA over the cells the ray crosses (t in the ray's own 3D units)
     let i = Math.floor(o.x / CELL), k = Math.floor(o.z / CELL);
     const si = d.x > 0 ? 1 : -1, sk = d.z > 0 ? 1 : -1;
@@ -109,20 +126,19 @@ export class Physics {
     let ti = Math.abs(d.x) > 1e-9 ? ((d.x > 0 ? (i + 1) * CELL - o.x : o.x - i * CELL) / Math.abs(d.x)) : Infinity;
     let tk = Math.abs(d.z) > 1e-9 ? ((d.z > 0 ? (k + 1) * CELL - o.z : o.z - k * CELL) / Math.abs(d.z)) : Infinity;
     let t0 = 0;
-    for (let n = 0; n < 4096 && t0 <= best; n++) {
+    for (let n = 0; n < 4096 && t0 <= _R[0]; n++) {
       const c = G.cells.get(ckey(i, k));
-      if (c) for (const b of c) { if (b._q === st) continue; b._q = st; best = Math.min(best, visit(b)); }
+      if (c) for (let j = 0; j < c.length; j++) { const b = c[j]; if (b._q === st) continue; b._q = st; visit(b); }
       if (ti < tk) { t0 = ti; ti += di; i += si; } else { t0 = tk; tk += dk; k += sk; }
       if (t0 > maxT) break;
     }
-    return best;
   }
 
   // Returns {t, point, normal, box} or null
   raycast(o, d, maxDist) {
-    _rO = o; _rD = d; _rBest = maxDist; _rBox = null; _rAxis = -1; _rSign = 0;
-    this.walk(o, d, maxDist, rayVisit);
-    const best = _rBest, bestBox = _rBox, axis = _rAxis, sign = _rSign;
+    _O[0] = o.x; _O[1] = o.y; _O[2] = o.z; _O[3] = d.x; _O[4] = d.y; _O[5] = d.z; _R[0] = maxDist; _rBox = null; _R[1] = -1; _R[2] = 0;
+    this.walk(o, d, rayVisit);
+    const best = _R[0], bestBox = _rBox, axis = _R[1], sign = _R[2];
     if (!bestBox) return null;
     const normal = new THREE.Vector3();
     if (axis >= 0) normal.setComponent(axis, sign); else normal.copy(d).negate();
@@ -132,23 +148,24 @@ export class Physics {
   // Cheap boolean "is anything between a and b"
   blocked(a, b) {
     const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-    const len = Math.hypot(dx, dy, dz);
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (len < 1e-6) return false;
     const max = len - 0.05;
     _d.set(dx / len, dy / len, dz / len);
-    _rO = a; _rD = _d; _rBest = max; _bHit = false;
-    this.walk(a, _d, max, blockVisit);
+    _O[0] = a.x; _O[1] = a.y; _O[2] = a.z; _O[3] = _d.x; _O[4] = _d.y; _O[5] = _d.z; _R[0] = max; _bHit = false;
+    this.walk(a, _d, blockVisit);
     return _bHit;
   }
 
   // Cylinder approximated by an AABB with feet at y
   overlap(x, y, z, r, h) {
     const G = this.index();
-    for (const b of G.always) if (boxHit(b, x, y, z, r, h)) return b;
+    const A = G.always;
+    for (let j = 0; j < A.length; j++) { const b = A[j]; if (x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz) return b; }
     const i0 = Math.floor((x - r) / CELL), i1 = Math.floor((x + r) / CELL), k0 = Math.floor((z - r) / CELL), k1 = Math.floor((z + r) / CELL);
     for (let i = i0; i <= i1; i++) for (let k = k0; k <= k1; k++) {
       const c = G.cells.get(ckey(i, k));
-      if (c) for (const b of c) if (boxHit(b, x, y, z, r, h)) return b;
+      if (c) for (let j = 0; j < c.length; j++) { const b = c[j]; if (x - r < b.maxx && x + r > b.minx && y < b.maxy && y + h > b.miny && z - r < b.maxz && z + r > b.minz) return b; }
     }
     return null;
   }
@@ -157,10 +174,10 @@ export class Physics {
   boxesIn(x0, z0, x1, z1) {
     const G = this.index(), st = ++_stamp;
     _near.length = 0;
-    for (const b of G.always) _near.push(b);
+    for (let j = 0; j < G.always.length; j++) _near.push(G.always[j]);
     for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let k = Math.floor(z0 / CELL); k <= Math.floor(z1 / CELL); k++) {
       const c = G.cells.get(ckey(i, k));
-      if (c) for (const b of c) { if (b._q === st) continue; b._q = st; _near.push(b); }
+      if (c) for (let j = 0; j < c.length; j++) { const b = c[j]; if (b._q === st) continue; b._q = st; _near.push(b); }
     }
     return _near;
   }
