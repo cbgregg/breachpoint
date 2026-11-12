@@ -873,7 +873,7 @@ export class Game {
   localNotify(type, ...a) {
     const hud = this.hud, inp = this.input, ctl = this.playerCtl;
     switch (type) {
-      case 'hit': hud.hitmarker(a[0], a[1]); if (!a[0]) inp.buzz(a[1] ? 14 : 8); if (a[1]) this.audio.play('headshot', null, { ui: true }); else if (!a[0]) this.audio.play('hit', null, { ui: true }); if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
+      case 'hit': hud.hitmarker(a[0], a[1]); if (!a[0]) inp.buzz(a[1] ? 14 : 8); if (a[0] && a[1]) this.audio.play('headshot', null, { ui: true }); else if (!a[0]) this.audio.play('hit', null, { ui: true });   // the cha-ching is for a headshot that kills if (a[2]) { inp.rumble(0.6, 0.4, 150); ctl && ctl.addShake(0.4); } break;
       case 'dmg': if (a[0] !== null) hud.damageFrom({ x: a[0], z: a[1] }); this.audio.play('hurt', null, { ui: true }); if (ctl) { ctl.addShake(0.12); ctl.flinch(); } inp.rumble(0.55, 0.3, 160); break;
       case 'kill': this.audio.play('kill', null, { ui: true }); inp.rumble(0.3, 0.6, 120); inp.buzz(30); break;
       case 'score': hud.scoreEvent(a[0], a[1]); break;
