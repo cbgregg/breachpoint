@@ -390,15 +390,17 @@ export class GameAudio {
         break;
       }
       case 'headshot': {
-        // the "ching": a crisp tick ("ch") into a bright, clean ring ("ing"). The partials sit on consonant
-        // ratios (octave, fifth, twelfth) so it reads as a pleasant chime rather than a clanking bell
-        const o = dry(0.12), f = 2350 * (0.98 + Math.random() * 0.04);
-        this.noiseBurst(o, t, { type: 'highpass', freq: 6500, decay: 0.014, gain: 0.34, attack: 0.0003 });
-        this.noiseBurst(o, t, { type: 'bandpass', freq: 4800, q: 1.4, decay: 0.035, gain: 0.16, attack: 0.0005 });
-        for (const [m, d, gn] of [[1, 0.42, 0.2], [1.5, 0.3, 0.1], [2, 0.24, 0.08], [3, 0.13, 0.04]]) {
-          this.tone(o, t + 0.004, { freq: f * m, type: 'sine', decay: d, gain: gn, attack: 0.001 });
+        // cash register "cha-ching": the key punch and drawer clack ("cha"), then the bell ("ching") a beat later.
+        // The bell's partials are slightly detuned against each other so it shimmers as it rings out
+        const o = dry(0.12), f = 2650 * (0.985 + Math.random() * 0.03), tb = t + 0.11;
+        this.noiseBurst(o, t, { type: 'bandpass', freq: 1700, q: 1.1, decay: 0.05, gain: 0.4, attack: 0.0005 });
+        this.tone(o, t, { freq: 320, end: 180, type: 'square', decay: 0.035, gain: 0.08, attack: 0.0005 });
+        this.noiseBurst(o, t + 0.045, { type: 'bandpass', freq: 2600, q: 1.6, decay: 0.04, gain: 0.28, attack: 0.0005 });
+        this.noiseBurst(o, tb, { type: 'highpass', freq: 6000, decay: 0.02, gain: 0.25, attack: 0.0003 });
+        for (const [m, d, gn] of [[1, 0.65, 0.22], [2.01, 0.45, 0.09], [2.92, 0.32, 0.07], [4.16, 0.2, 0.04]]) {
+          this.tone(o, tb, { freq: f * m, type: 'sine', decay: d, gain: gn, attack: 0.001 });
         }
-        this.tone(o, t + 0.004, { freq: f * 1.003, type: 'sine', decay: 0.36, gain: 0.06, attack: 0.001 });   // slight shimmer
+        this.tone(o, tb, { freq: f * 1.008, type: 'sine', decay: 0.6, gain: 0.1, attack: 0.001 });   // beats against the fundamental: the "iiing"
         break;
       }
       case 'kill': {
