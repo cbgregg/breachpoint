@@ -4,7 +4,7 @@
 //   request: an unchanged file costs a few hundred bytes), so a replaced file shows up on the next visit.
 // - everything else (the page, scripts, styles, motd.json): always from the network, so an update is never
 //   stale; the cached copy is only used when the network fails (offline play once loaded).
-const ASSETS = 'bp-assets-v1', APP = 'bp-app-v1';
+const ASSETS = 'bp-assets-v1', APP = 'bp-app-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
@@ -35,7 +35,7 @@ async function cacheFirst(e, req) {
 async function networkFirst(req) {
   const cache = await caches.open(APP);
   try {
-    const r = await fetch(req);
+    const r = await fetch(req, { cache: 'no-cache' });   // past the browser's own cache too, or a deploy shows up minutes late
     if (r.ok && r.status === 200) cache.put(req, r.clone());
     return r;
   } catch (err) {
