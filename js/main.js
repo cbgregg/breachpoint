@@ -9,7 +9,7 @@ import { loadAssets, loadMapVehicles } from './assets.js';
 import { Lobby, MAX_HUMANS, cleanName, PROTO, QUICK_MODES, QUICK_COUNTDOWN } from './online.js';
 import { turnAvailable, turnServers, turnStatus } from './net.js';
 import { loadoutFromSettings, parseLoadout, GUNSMITH, SLOTS, SLOT_NAMES, ATTACHMENTS, cleanAtt, weaponDef, attSummary } from './attachments.js';
-import { GunPreview, gunThumb, thumbReady } from './gunsmith.js';
+import { GunPreview } from './gunsmith.js';
 import { applyReticles, cleanReticles, reticlePreview, shapesFor, RET_COLORS, RET_OPTICS } from './reticles.js';
 import { Account, takeLoginToken } from './account.js';
 import { MODES } from './modes.js';
@@ -489,7 +489,10 @@ function loadoutChanged() {
   saveSettings(settings);
   if (inMatch() && game.player) game.requestLoadout(loadoutFromSettings(settings));
 }
-// ---- Create a Class UI (BO2 Pick-10 overview + MW2019 cards/gunsmith) ----
+// ---- Create a Class UI (MW2019 loadouts + gunsmith) ----
+// Loadouts: the class list, the class's showcase (its primary turning in the preview) and four cards.
+// Editor: a list of everything in the class on the left (each gun, its attachment slots, the equipment); the
+// gunsmith on the right (the live preview, stat bars and the numbers, with what a choice changes before it's made).
 const escHtml = (t) => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const WCAT = { rifle: 'ASSAULT RIFLES', kv47: 'ASSAULT RIFLES', br308: 'ASSAULT RIFLES', hx60: 'LIGHT MACHINE GUNS', smg: 'SUBMACHINE GUNS', krv45: 'SUBMACHINE GUNS',
   shotgun: 'SHOTGUNS', sa12: 'SHOTGUNS', mr14: 'MARKSMAN RIFLES', sniper: 'SNIPER RIFLES', pistol: 'PISTOLS', d50: 'PISTOLS', r357: 'PISTOLS', mp18: 'MACHINE PISTOLS', monte: 'LAUNCHERS' };
@@ -514,85 +517,86 @@ const ICO = {
   'laser.none': '<rect x="10" y="22" width="22" height="16" rx="2" stroke-dasharray="3 3"/>',
   'laser.laser': '<rect x="6" y="22" width="22" height="16" rx="2"/><circle cx="24" cy="30" r="3"/><path d="M28 30h32" stroke-width="2.5"/>',
 };
-const icon = (sl, k) => `<svg viewBox="0 0 64 56" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">${ICO[sl + '.' + k] || ''}</svg>`;
-const FRAG_ICO = '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="30" cy="34" rx="14" ry="16"/><path d="M22 18h16v-6H22zM38 14c8 0 12 4 12 10M18 28h24M18 40h24M30 18v32"/></svg>';
-const KNIFE_ICO = '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 30h18v6H4zM22 26h4v14h-4M26 30h22l12-6-6 12H26z"/></svg>';
-const isCustom = (k) => !!k && k[0] === 'c';
-const modCount = (id, att) => SLOTS.filter(s => GUNSMITH[id][s] && att[s] !== GUNSMITH[id][s][0]).length;
-const slotCount = (id) => SLOTS.filter(s => GUNSMITH[id][s]).length;
-const pips = (id, att) => `<span class="pips">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<i class="${att[s] !== GUNSMITH[id][s][0] ? 'on' : ''}"></i>`).join('')}</span>`;
-// Weapon card thumbnails: each one is a render read back to an image, so they're made one per frame, in the
-// background (all at once froze the page for seconds on a slow GPU); until then the card shows the gun's name.
-const thumbQueue = new Map();   // slot number -> [id, att]
-let thumbSlot = 0, thumbBusy = false;
-const thumb = (id, att) => {
-  const u = thumbReady(id, att);
-  if (u !== undefined) return u ? `<img class="gthumb" src="${u}" alt="">` : `<span class="gthumb none">${WEAPONS[id].short}</span>`;
-  const n = ++thumbSlot;
-  thumbQueue.set(n, [id, att]);
-  if (!thumbBusy) { thumbBusy = true; requestAnimationFrame(makeThumbs); }
-  return `<span class="gthumb none" data-gt="${n}">${WEAPONS[id].short}</span>`;
+const svg = (body) => `<svg viewBox="0 0 64 56" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">${body}</svg>`;
+const icon = (sl, k) => svg(ICO[sl + '.' + k] || '');
+const EQ_ICO = {
+  frag: svg('<ellipse cx="30" cy="34" rx="14" ry="16"/><path d="M22 18h16v-6H22zM38 14c8 0 12 4 12 10M18 28h24M18 40h24M30 18v32"/>'),
+  semtex: svg('<rect x="14" y="20" width="36" height="22" rx="3"/><path d="M14 28h36M22 20v-6h20v6"/><circle cx="40" cy="14" r="2" fill="currentColor"/>'),
+  knife: svg('<path d="M8 40l30-26 14-6-6 14-26 30z"/><path d="M14 46l-6 6M20 40l6 6"/>'),
+  shock: svg('<rect x="22" y="10" width="14" height="36" rx="5"/><path d="M44 14l-6 10h8l-8 12M14 18l6 6M12 34l8-2"/>'),
+  stun: svg('<rect x="22" y="14" width="18" height="34" rx="3"/><path d="M22 22h18M26 8h10v6H26zM46 12l6-4M48 22h8M46 32l6 4"/>'),
 };
-async function makeThumbs() {
-  const next = thumbQueue.entries().next();
-  if (next.done) { thumbBusy = false; return; }
-  const [n, [id, att]] = next.value;
-  if (document.querySelector(`[data-gt="${n}"]`)) await gunThumb(id, att);   // (only if it's still on the page)
-  else thumbQueue.delete(n);
-  // fill every card whose picture is ready (the same gun can be on the page more than once)
-  for (const [m, [id2, att2]] of [...thumbQueue]) {
-    const u = thumbReady(id2, att2);
-    if (u === undefined) continue;
-    thumbQueue.delete(m);
-    const el = document.querySelector(`[data-gt="${m}"]`);
-    if (!el) continue;
-    if (!u) { el.removeAttribute('data-gt'); continue; }
-    const img = new Image(); img.className = 'gthumb'; img.alt = ''; img.src = u; el.replaceWith(img);
-  }
-  requestAnimationFrame(makeThumbs);
-}
+const KNIFE_ICO = svg('<path d="M4 30h18v6H4zM22 26h4v14h-4M26 30h22l12-6-6 12H26z"/>');
+const isCustom = (k) => !!k && k[0] === 'c';
+// attachments fitted: anything but an empty slot (no muzzle device, no grip, no laser), the factory magazine
+// or iron sights
+const EMPTY = new Set(['none', 'std', 'iron']);
+const slotsOf = (id) => SLOTS.filter(s => GUNSMITH[id][s]);
+const fitted = (id, att) => slotsOf(id).filter(s => !EMPTY.has(att[s])).length;
+const pips = (id, att) => `<span class="pips" title="${fitted(id, att)} of ${slotsOf(id).length} attachments">${slotsOf(id).map(s => `<i class="${EMPTY.has(att[s]) ? '' : 'on'}"></i>`).join('')}</span>`;
+// weapon pictures: rendered once, offline, side-on, stock build (assets/ui/guns, made by tools/gun_pictures.mjs)
+const thumb = (id) => `<img class="gthumb" src="assets/ui/guns/${id}.webp" alt="" draggable="false" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'gthumb none',textContent:'${WEAPONS[id].short}'}))">`;
 
-// segmented stat bars (BO2): `now` vs `base` shows the change in green / red
+// segmented stat bars: `now` against `base` shows the change in green / red
 function statBars(now, base) {
   const a = statsOf(now), b = statsOf(base || now);
   return a.map(([k, v], i) => {
     const w = b[i][1], lo = Math.min(v, w), diff = v - w;
-    return `<span class="stat">${k}<i><b style="width:${(lo * 100).toFixed(1)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${(lo * 100).toFixed(1)}%;width:${(Math.abs(diff) * 100).toFixed(1)}%"></em>` : ''}</i></span>`;
+    return `<div class="stat"><span>${k}</span><i><b style="width:${(lo * 100).toFixed(1)}%"></b>${Math.abs(diff) > 0.005 ? `<em class="${diff > 0 ? 'up' : 'down'}" style="left:${(lo * 100).toFixed(1)}%;width:${(Math.abs(diff) * 100).toFixed(1)}%"></em>` : ''}</i></div>`;
   }).join('');
 }
-const facts = (d) => `<span class="gs-facts">${WCAT[d.id] || ''} · ${d.mag} RDS · ${d.reload.toFixed(1)}s RELOAD · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
-function equippedRow(id, att, hiSlot) {
-  return `<div class="eq-k">EQUIPPED <b>${modCount(id, att)}/${slotCount(id)}</b></div><div class="eq-icons">${SLOTS.filter(s => GUNSMITH[id][s]).map(s =>
-    `<span class="${s === hiSlot ? 'hi' : ''}${att[s] !== GUNSMITH[id][s][0] ? ' mod' : ''}" title="${ATTACHMENTS[s][att[s]].name}">${icon(s, att[s])}</span>`).join('')}</div>`;
+// the numbers, with what changes against `base` (lower is better for aim time and reload)
+function statNums(d, base) {
+  const rows = [
+    ['DAMAGE', d.damage * d.pellets, (v) => d.pellets > 1 ? `${d.damage}×${d.pellets}` : Math.round(v), 1],
+    ['FIRE RATE', d.rpm, (v) => `${Math.round(v)}<small> RPM</small>`, 1],
+    ['RANGE', d.falloffEnd, (v) => `${Math.round(v)}<small> M</small>`, 1],
+    ['AIM TIME', d.adsTime * 1000, (v) => `${Math.round(v)}<small> MS</small>`, -1],
+    ['RELOAD', d.reload, (v) => `${v.toFixed(1)}<small> S</small>`, -1],
+    ['MAGAZINE', d.mag, (v) => `${Math.round(v)}`, 1],
+  ];
+  const bv = base && [base.damage * base.pellets, base.rpm, base.falloffEnd, base.adsTime * 1000, base.reload, base.mag];
+  return `<div class="gs-nums">${rows.map(([k, v, f, good], i) => {
+    const dv = bv ? v - bv[i] : 0, sig = Math.abs(dv) > (i === 4 ? 0.05 : 0.5);
+    const cls = sig ? (dv * good > 0 ? 'up' : 'down') : '';
+    const txt = sig ? `${dv > 0 ? '+' : '−'}${i === 4 ? Math.abs(dv).toFixed(1) : Math.round(Math.abs(dv))}` : '';
+    return `<div class="gn"><span>${k}</span><b>${f(v)}</b>${txt ? `<em class="${cls}">${txt}</em>` : ''}</div>`;
+  }).join('')}</div>`;
 }
-// right-hand detail panel: live 3D preview + name, description, stats, equipped attachments
+// what a choice does, in words: every bar it moves, better or worse
+function prosCons(now, base) {
+  if (!base) return '';
+  const a = statsOf(now), b = statsOf(base), pro = [], con = [];
+  a.forEach(([k, v], i) => { const d = v - b[i][1]; if (d > 0.01) pro.push(k); else if (d < -0.01) con.push(k); });
+  if (now.quiet && !base.quiet) pro.push('OFF THE RADAR');
+  if (now.mag !== base.mag) (now.mag > base.mag ? pro : con).push(now.mag > base.mag ? 'MORE ROUNDS' : 'FEWER ROUNDS');
+  if (!pro.length && !con.length) return '';
+  return `<div class="gs-pc">${pro.map(t => `<span class="pro">+ ${t}</span>`).join('')}${con.map(t => `<span class="con">− ${t}</span>`).join('')}</div>`;
+}
+// the gunsmith panel: the preview, the name, what it is, the bars, the numbers; `base` = what it's compared to
 function showDetail(id, att, { base = null, title = null, sub = 'GUNSMITH', desc = '', hiSlot = null } = {}) {
-  const d = weaponDef(id, att);
+  const d = weaponDef(id, att), b = base || null;
   $('gs-name').textContent = (title || d.name).toUpperCase();
   $('gs-sub').textContent = sub;
-  $('gs-desc').textContent = desc;
-  $('gs-stats').innerHTML = statBars(d, base) + facts(d);
-  $('gs-eq').innerHTML = equippedRow(id, att, hiSlot);
+  $('gs-desc').innerHTML = (desc ? escHtml(desc) : '') + prosCons(d, b);
+  $('gs-stats').innerHTML = statBars(d, b) + statNums(d, b) + `<span class="gs-facts">${WCAT[d.id] || ''} · ${d.mode}${d.quiet ? ' · SUPPRESSED' : ''}</span>`;
+  $('gs-eq').innerHTML = `<div class="eq-k">ATTACHMENTS <b>${fitted(id, att)}/${slotsOf(id).length}</b></div><div class="eq-icons">${slotsOf(id).map(s =>
+    `<span class="${s === hiSlot ? 'hi' : ''}${EMPTY.has(att[s]) ? '' : ' mod'}" title="${SLOT_NAMES[s]}: ${ATTACHMENTS[s][att[s]].name}">${icon(s, att[s])}</span>`).join('')}</div>`;
   preview.show(id, att);
 }
-const EQ_ICO = {
-  frag: FRAG_ICO,
-  semtex: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="20" width="36" height="22" rx="3"/><path d="M14 28h36M22 20v-6h20v6"/><circle cx="40" cy="14" r="2" fill="currentColor"/></svg>',
-  knife: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 40l30-26 14-6-6 14-26 30z"/><path d="M14 46l-6 6M20 40l6 6"/></svg>',
-  shock: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="10" width="14" height="36" rx="5"/><path d="M44 14l-6 10h8l-8 12M14 18l6 6M12 34l8-2"/></svg>',
-  stun: '<svg viewBox="0 0 64 56" class="ico" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="14" width="18" height="34" rx="3"/><path d="M22 22h18M26 8h10v6H26zM46 12l6-4M48 22h8M46 32l6 4"/></svg>',
-};
-const eqCard = (slot, id, act, small = '') => { const e = EQUIPMENT[id]; return `<button class="lcard small"${act ? ` data-nav data-act="${act}"` : ' tabindex="-1"'}><span class="lc-k">${slot}</span>${EQ_ICO[id] || ''}<span class="lc-n">${e.name.toUpperCase()}</span><span class="lc-a"><small>${small || `×${e.count}`}</small></span></button>`; };
+const attNames = (id, att) => slotsOf(id).filter(s => !EMPTY.has(att[s])).map(s => ATTACHMENTS[s][att[s]].name.toUpperCase());
+
+// ---- loadouts: the class list and the showcase ----
 function loadoutCards(c, editable) {
   const p = c.primary, s = c.secondary || 'pistol', pa = clsAtt(c, p), sa = clsAtt(c, s);
-  const card = (k, id, att, cls, act) => `<button class="lcard ${cls}"${editable ? ` data-nav data-act="${act}"` : ' tabindex="-1"'}>
-      <span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span>
-      <span class="lc-a">${pips(id, att)}<small>${escHtml(attSummary(id, att).join(' · ') || 'STOCK')}</small></span></button>`;
-  return card('PRIMARY', p, pa, 'big', 'w:p') + card('SECONDARY', s, sa, '', 'w:s')
-    + eqCard('LETHAL', c.lethal || 'frag', editable ? 'e:l' : '') + eqCard('TACTICAL', c.tactical || 'stun', editable ? 'e:t' : '');
+  const nav = (act) => editable ? ` data-nav data-act="${act}"` : ' tabindex="-1"';
+  const gun = (k, id, att, act, cls) => `<button class="lcard gun ${cls}"${nav(act)}>
+      <span class="lc-k">${k}</span>${thumb(id)}
+      <span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span>
+      <span class="lc-a">${pips(id, att)}<small>${escHtml(attNames(id, att).join(' · ') || 'NO ATTACHMENTS')}</small></span></button>`;
+  const eq = (k, id, act) => `<button class="lcard eqc"${nav(act)}><span class="lc-k">${k}</span>${EQ_ICO[id] || ''}<span class="lc-n">${EQUIPMENT[id].name.toUpperCase()}</span><span class="lc-a"><small>×${EQUIPMENT[id].count}</small></span></button>`;
+  return gun('PRIMARY', p, pa, 'w:p', 'big') + gun('SECONDARY', s, sa, 'w:s', '') + eq('LETHAL', c.lethal || 'frag', 'e:l') + eq('TACTICAL', c.tactical || 'stun', 'e:t');
 }
-
-// ---- class list (MW2019 "Edit Loadouts") ----
 function renderClasses() {
   const had = document.querySelector('#cls-list .pad-focus'), keep = had && had.dataset.cls;
   const row = (key, c) => `<button class="cls-row${key === clsSel ? ' sel' : ''}${key === settings.cls ? ' eq' : ''}" data-cls="${key}" data-nav>
@@ -606,13 +610,13 @@ function renderClasses() {
   });
   const c = clsGet(clsSel), custom = isCustom(clsSel), on = clsSel === settings.cls;
   $('cls-name').textContent = c.name;
-  $('cls-kind').textContent = custom ? 'CUSTOM CLASS' : 'DEFAULT CLASS';
+  $('cls-kind').textContent = (custom ? 'CUSTOM CLASS' : 'DEFAULT CLASS') + (on ? ' · EQUIPPED' : '');
   $('cls-cards').innerHTML = loadoutCards(c, custom);
   $('cls-cards').querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => openEditor(clsSel, b.dataset.act)));
-  $('cls-equip').querySelector('span').textContent = on ? 'EQUIPPED ✓' : 'EQUIP';
+  $('cls-equip').querySelector('span').textContent = on ? 'EQUIPPED ✓' : 'EQUIP CLASS';
   $('cls-equip').classList.toggle('done', on);
   $('cls-edit').textContent = custom ? 'EDIT CLASS' : 'COPY TO A CUSTOM CLASS';
-  $('cls-note').textContent = custom ? 'Select a weapon card or Edit Class to open the gunsmith. Changes save automatically.' : 'Default classes can\'t be changed. Copy one into a custom slot to tweak it.';
+  $('cls-note').textContent = custom ? 'Pick a card or Edit Class to change it. Changes save as you make them.' : 'Default classes can\'t be changed: copy one into a custom slot to make it yours.';
   if (!editKey) { $('cls-viewslot').appendChild($('gs-viewbox')); preview.show(c.primary, clsAtt(c, c.primary)); }
   if (keep) focusEl($('cls-list').querySelector(`[data-cls="${keep}"]`));
 }
@@ -626,78 +630,87 @@ function equipClass() {
   renderClasses();
 }
 
-// ---- editor: overview (Pick 10) → weapon picker / attachment picker ----
-let ceView = 'over', ceFrom = null, retOptic = 'holo';   // 'over' | 'w:p' | 'w:s' | 'a:p:<slot>' | 'a:s:<slot>'
+// ---- editor: overview → weapon / attachment / equipment / reticle pickers ----
+let ceView = 'over', ceFrom = null, retOptic = 'holo';   // 'over' | 'w:p' | 'w:s' | 'a:p:<slot>' | 'a:s:<slot>' | 'e:l' | 'e:t' | 'r:p' | 'r:s'
 const ceGun = (c, which) => which === 'p' ? c.primary : (c.secondary || 'pistol');
+const pickDone = (focusAct) => { game.audio.play('ui', null, { ui: true }); ceView = 'over'; loadoutChanged(); renderEditor(focusAct); };
 function renderEditor(focusAct) {
   if (!editKey) return;
   const c = clsGet(editKey), main = $('ce-main');
+  // driving it with keys (a visible focus ring in the pane) or a pad: keep the focus in the redrawn view
+  const ae = document.activeElement, keys = game.input.lastDevice === 'pad' || (!!ae && $('pane-loadout').contains(ae) && ae.matches(':focus-visible, .pad-focus'));
   const parts = [c.name];
   $('ce-rn').style.display = ceView === 'over' ? '' : 'none';
   $('cls-back').textContent = ceView === 'over' ? '‹ ALL CLASSES' : '‹ BACK';
+  $('cls-editor').dataset.view = ceView[0];
   if (ceView === 'over') {
-    const slotTiles = (which) => { const id = ceGun(c, which), att = clsAtt(c, id);
-      return SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<button class="atile${att[s] !== GUNSMITH[id][s][0] ? ' mod' : ''}" data-nav data-act="a:${which}:${s}">
-        <span class="at-k">${SLOT_NAMES[s]}</span>${icon(s, att[s])}<span class="at-n">${ATTACHMENTS[s][att[s]].name}</span></button>`).join('')
-        + (id === 'monte' ? '' : `<button class="atile rtile" data-nav data-act="r:${which}"><span class="at-k">Reticle</span><img class="rprev" src="${reticlePreview(att.optic, settings.reticles[att.optic].shape, settings.reticles[att.optic].color, 96)}" alt=""><span class="at-n">${shapesFor(att.optic)[settings.reticles[att.optic].shape]}</span></button>`); };
-    const wbox = (which, k) => { const id = ceGun(c, which), att = clsAtt(c, id);
-      return `<button class="wbox" data-nav data-act="w:${which}"><span class="lc-k">${k}</span>${thumb(id, att)}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span><span class="lc-c">${WCAT[id]}</span></button>`; };
-    main.innerHTML = `<div class="p10">
-      <div class="p10-row">${wbox('p', 'PRIMARY')}<div class="p10-atts"><div class="p10-k">PRIMARY ATTACHMENTS ${pips(c.primary, clsAtt(c, c.primary))}</div><div class="atiles">${slotTiles('p')}</div></div></div>
-      <div class="p10-row">${wbox('s', 'SECONDARY')}<div class="p10-atts"><div class="p10-k">SECONDARY ATTACHMENTS ${pips(ceGun(c, 's'), clsAtt(c, ceGun(c, 's')))}</div><div class="atiles">${slotTiles('s') || '<span class="at-none">NO ATTACHMENTS FOR THIS WEAPON</span>'}</div></div></div>
-      <div class="p10-row eqp">${eqCard('LETHAL', c.lethal || 'frag', 'e:l')}${eqCard('TACTICAL', c.tactical || 'stun', 'e:t')}<div class="lcard small"><span class="lc-k">MELEE</span>${KNIFE_ICO}<span class="lc-n">COMBAT KNIFE</span><span class="lc-a"><small>ONE HIT</small></span></div></div>
-    </div>`;
+    // one column: each gun, then its slots, then the equipment
+    const gunRows = (which, k) => {
+      const id = ceGun(c, which), att = clsAtt(c, id);
+      const slots = slotsOf(id).map(s => `<button class="ce-row att${EMPTY.has(att[s]) ? ' empty' : ''}" data-nav data-act="a:${which}:${s}">${icon(s, att[s])}
+          <span class="cr-k">${SLOT_NAMES[s].toUpperCase()}</span><span class="cr-v">${ATTACHMENTS[s][att[s]].name}</span><span class="cr-go">›</span></button>`).join('');
+      const ret = id === 'monte' ? '' : `<button class="ce-row att" data-nav data-act="r:${which}"><img class="rprev" src="${reticlePreview(att.optic, settings.reticles[att.optic].shape, settings.reticles[att.optic].color, 96)}" alt="">
+          <span class="cr-k">RETICLE</span><span class="cr-v">${shapesFor(att.optic)[settings.reticles[att.optic].shape]}</span><span class="cr-go">›</span></button>`;
+      return `<div class="ce-sec"><div class="ce-h">${k} <span>${fitted(id, att)}/${slotsOf(id).length} ATTACHMENTS</span></div>
+        <button class="ce-row gun" data-nav data-act="w:${which}">${thumb(id)}<span class="cr-k">${WCAT[id]}</span><span class="cr-v">${WEAPONS[id].name.toUpperCase()}</span><span class="cr-go">CHANGE ›</span></button>
+        ${slots}${ret}</div>`;
+    };
+    main.innerHTML = `${gunRows('p', 'PRIMARY')}${gunRows('s', 'SECONDARY')}
+      <div class="ce-sec"><div class="ce-h">EQUIPMENT</div>
+        <button class="ce-row eq" data-nav data-act="e:l">${EQ_ICO[c.lethal || 'frag']}<span class="cr-k">LETHAL</span><span class="cr-v">${EQUIPMENT[c.lethal || 'frag'].name}</span><span class="cr-go">›</span></button>
+        <button class="ce-row eq" data-nav data-act="e:t">${EQ_ICO[c.tactical || 'stun']}<span class="cr-k">TACTICAL</span><span class="cr-v">${EQUIPMENT[c.tactical || 'stun'].name}</span><span class="cr-go">›</span></button>
+        <div class="ce-row eq fixed">${KNIFE_ICO}<span class="cr-k">MELEE</span><span class="cr-v">Combat Knife</span><span class="cr-go">ONE HIT</span></div></div>`;
     main.querySelectorAll('[data-act]').forEach(b => {
       const a = b.dataset.act, which = a.split(':')[1], id = ceGun(c, which), att = clsAtt(c, id);
-      if (a[0] === 'e') { b.addEventListener('click', () => { ceFrom = a; ceView = a; renderEditor(); }); return; }
-      const hover = () => a[0] === 'r' ? showDetail(id, att, { sub: 'RETICLE', desc: `${RET_OPTICS[att.optic]}: ${shapesFor(att.optic)[settings.reticles[att.optic].shape]}, ${RET_COLORS[settings.reticles[att.optic].color][0]}. Reticles apply to that sight on every weapon.` })
-        : a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: 'Choose a different weapon.' })
-        : showDetail(id, att, { sub: SLOT_NAMES[a.split(':')[2]].toUpperCase(), desc: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].desc, hiSlot: a.split(':')[2] });
+      const hover = () => a[0] === 'e' ? showDetail(c.primary, clsAtt(c, c.primary), { sub: a[2] === 'l' ? 'LETHAL' : 'TACTICAL', title: EQUIPMENT[c[a[2] === 'l' ? 'lethal' : 'tactical'] || (a[2] === 'l' ? 'frag' : 'stun')].name, desc: EQUIPMENT[c[a[2] === 'l' ? 'lethal' : 'tactical'] || (a[2] === 'l' ? 'frag' : 'stun')].desc })
+        : a[0] === 'r' ? showDetail(id, att, { sub: 'RETICLE', desc: `${RET_OPTICS[att.optic]}: ${shapesFor(att.optic)[settings.reticles[att.optic].shape]}, ${RET_COLORS[settings.reticles[att.optic].color][0]}. A reticle applies to that sight on every weapon.` })
+        : a[0] === 'w' ? showDetail(id, att, { sub: which === 'p' ? 'PRIMARY' : 'SECONDARY', desc: WEAPONS[id].blurb || '' })
+        : showDetail(id, att, { sub: SLOT_NAMES[a.split(':')[2]].toUpperCase(), title: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].name, desc: ATTACHMENTS[a.split(':')[2]][att[a.split(':')[2]]].desc, hiSlot: a.split(':')[2] });
       b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
       b.addEventListener('click', () => { ceFrom = a; ceView = a; if (a[0] === 'r') retOptic = att.optic; renderEditor(); });
     });
-    showDetail(c.primary, clsAtt(c, c.primary), { sub: 'PRIMARY' });
+    showDetail(c.primary, clsAtt(c, c.primary), { sub: 'PRIMARY', desc: WEAPONS[c.primary].blurb || '' });
   } else if (ceView[0] === 'w') {
-    const which = ceView[2], list = which === 'p' ? PRIMARIES : SECONDARIES, cur = ceGun(c, which);
+    const which = ceView[2], list = which === 'p' ? PRIMARIES : SECONDARIES, cur = ceGun(c, which), curDef = weaponDef(cur, clsAtt(c, cur));
     parts.push(which === 'p' ? 'PRIMARY' : 'SECONDARY');
     const cats = [...new Set(list.map(id => WCAT[id]))];
-    main.innerHTML = `<div class="wpick">${cats.map(cat => `<div class="wp-cat"><div class="group">${cat}</div><div class="wp-row">${list.filter(id => WCAT[id] === cat).map(id =>
-      `<button class="wpc${id === cur ? ' on' : ''}" data-nav data-w="${id}">${thumb(id, clsAtt(c, id))}<span class="lc-n">${WEAPONS[id].name.toUpperCase()}</span><span class="lc-c">${WEAPONS[id].mode}${id === cur ? ' · EQUIPPED' : ''}</span></button>`).join('')}</div></div>`).join('')}</div>`;
-    main.querySelectorAll('.wpc').forEach(b => {
-      const id = b.dataset.w, hover = () => showDetail(id, clsAtt(c, id), { sub: WCAT[id], desc: `${WEAPONS[id].mode} · ${WEAPONS[id].rpm} RPM · ${WEAPONS[id].damage}${WEAPONS[id].pellets > 1 ? '×' + WEAPONS[id].pellets : ''} DMG` });
+    main.innerHTML = cats.map(cat => `<div class="ce-sec"><div class="ce-h">${cat}</div>${list.filter(id => WCAT[id] === cat).map(id =>
+      `<button class="ce-row gun pick${id === cur ? ' on' : ''}" data-nav data-w="${id}">${thumb(id)}<span class="cr-k">${WEAPONS[id].mode} · ${WEAPONS[id].rpm} RPM</span><span class="cr-v">${WEAPONS[id].name.toUpperCase()}</span><span class="cr-go">${id === cur ? 'EQUIPPED' : ''}</span></button>`).join('')}</div>`).join('');
+    main.querySelectorAll('[data-w]').forEach(b => {
+      const id = b.dataset.w, hover = () => showDetail(id, clsAtt(c, id), { base: id === cur ? null : curDef, sub: WCAT[id], desc: id === cur ? 'Equipped.' : `Compared with your ${WEAPONS[cur].name}.` });
       b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
-      b.addEventListener('click', () => { if (which === 'p') c.primary = id; else c.secondary = id; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+      b.addEventListener('click', () => { if (which === 'p') c.primary = id; else c.secondary = id; pickDone(ceFrom); });
     });
-    showDetail(cur, clsAtt(c, cur), { sub: WCAT[cur] });
-    focusAct = focusAct || null;
+    showDetail(cur, clsAtt(c, cur), { sub: WCAT[cur], desc: 'Equipped.' });
   } else if (ceView[0] === 'e') {
     const slot = ceView[2] === 'l' ? 'lethal' : 'tactical', list = slot === 'lethal' ? LETHALS : TACTICALS, cur = c[slot] || list[0];
     parts.push(slot.toUpperCase());
-    main.innerHTML = `<div class="apick"><div class="ap-grid">${list.map(k => `<button class="aptile${k === cur ? ' on' : ''}" data-nav data-eq="${k}">${EQ_ICO[k]}<span class="at-n">${EQUIPMENT[k].name}</span>${k === cur ? '<span class="at-eq">EQUIPPED</span>' : ''}</button>`).join('')}</div>
-      <p class="pane-note" id="eq-desc">${escHtml(EQUIPMENT[cur].desc)}</p></div>`;
-    main.querySelectorAll('.aptile').forEach(b => {
-      const k = b.dataset.eq, hover = () => { $('eq-desc').textContent = EQUIPMENT[k].desc; };
-      b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
-      b.addEventListener('click', () => { c[slot] = k; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+    main.innerHTML = `<div class="ce-sec"><div class="ce-h">${slot.toUpperCase()}</div>${list.map(k => `<button class="ce-row eq pick${k === cur ? ' on' : ''}" data-nav data-eq="${k}">${EQ_ICO[k]}<span class="cr-k">×${EQUIPMENT[k].count}</span><span class="cr-v">${EQUIPMENT[k].name}</span><span class="cr-go">${k === cur ? 'EQUIPPED' : ''}</span></button>`).join('')}</div>`;
+    const detail = (k) => showDetail(c.primary, clsAtt(c, c.primary), { sub: slot.toUpperCase(), title: EQUIPMENT[k].name, desc: EQUIPMENT[k].desc });
+    main.querySelectorAll('[data-eq]').forEach(b => {
+      const k = b.dataset.eq;
+      b.addEventListener('focus', () => detail(k)); b.addEventListener('mouseenter', () => detail(k));
+      b.addEventListener('click', () => { c[slot] = k; pickDone(ceFrom); });
     });
-    showDetail(c.primary, clsAtt(c, c.primary), { sub: slot.toUpperCase(), desc: EQUIPMENT[cur].desc });
+    detail(cur);
   } else if (ceView[0] === 'r') {
     const which = ceView[2], id = ceGun(c, which), att = clsAtt(c, id), r = settings.reticles[retOptic];
     parts.push(WEAPONS[id].name.toUpperCase(), 'RETICLE');
     const shapes = shapesFor(retOptic);
-    main.innerHTML = `<div class="rpick"><div class="ap-tabs">${Object.keys(RET_OPTICS).map(o => `<span class="${o === retOptic ? 'on' : ''}">${RET_OPTICS[o]}${o === att.optic ? ' ●' : ''}</span>`).join('')}</div>
+    main.innerHTML = `<div class="ce-tabs">${Object.keys(RET_OPTICS).map(o => `<button class="${o === retOptic ? 'on' : ''}" data-nav data-ro="${o}">${RET_OPTICS[o]}${o === att.optic ? ' ●' : ''}</button>`).join('')}</div>
       <div class="rp-top"><div class="rp-view${retOptic === 'scope' ? ' scope' : retOptic === 'iron' ? ' iron' : ''}"><img src="${reticlePreview(retOptic, r.shape, r.color, 256)}" alt=""></div>
-        <div class="rp-info"><b>${shapes[r.shape]}</b><span>${RET_OPTICS[retOptic]} · ${RET_COLORS[r.color][0]}</span><small>Applies to the ${RET_OPTICS[retOptic]} on every weapon and class. ${glyph('prevSub', game.input.lastDevice)} ${glyph('nextSub', game.input.lastDevice)} switch sight.</small></div></div>
-      <div class="p10-k">RETICLE</div>
+        <div class="rp-info"><b>${shapes[r.shape]}</b><span>${RET_OPTICS[retOptic]} · ${RET_COLORS[r.color][0]}</span><small>Applies to the ${RET_OPTICS[retOptic]} on every weapon and class.</small></div></div>
+      <div class="ce-h">RETICLE</div>
       <div class="rp-grid">${Object.keys(shapes).map(k => `<button class="rptile${k === r.shape ? ' on' : ''}" data-nav data-rs="${k}"><img src="${reticlePreview(retOptic, k, r.color, 96)}" alt=""><span class="at-n">${shapes[k]}</span></button>`).join('')}</div>
-      <div class="p10-k">COLOUR</div>
-      <div class="rp-cols">${Object.keys(RET_COLORS).map(k => `<button class="rpcol${k === r.color ? ' on' : ''}" data-nav data-rc="${k}" title="${RET_COLORS[k][0]}"><i style="background:${RET_COLORS[k][1]};box-shadow:0 0 10px ${RET_COLORS[k][1]}"></i><span>${RET_COLORS[k][0]}</span></button>`).join('')}</div></div>`;
+      <div class="ce-h">COLOUR</div>
+      <div class="rp-cols">${Object.keys(RET_COLORS).map(k => `<button class="rpcol${k === r.color ? ' on' : ''}" data-nav data-rc="${k}" title="${RET_COLORS[k][0]}"><i style="background:${RET_COLORS[k][1]};box-shadow:0 0 10px ${RET_COLORS[k][1]}"></i><span>${RET_COLORS[k][0]}</span></button>`).join('')}</div>`;
     const set = (patch, el) => {
       settings.reticles = applyReticles({ ...settings.reticles, [retOptic]: { ...settings.reticles[retOptic], ...patch } });
       saveSettings(settings); game.audio.play('ui', null, { ui: true });
       const key = el.dataset.rs ? `[data-rs="${el.dataset.rs}"]` : `[data-rc="${el.dataset.rc}"]`;
       renderEditor(); setTimeout(() => { const f = main.querySelector(key); if (f) focusEl(f); }, 0);
     };
+    main.querySelectorAll('[data-ro]').forEach(b => b.addEventListener('click', () => { retOptic = b.dataset.ro; renderEditor(); }));
     main.querySelectorAll('.rptile').forEach(b => b.addEventListener('click', () => set({ shape: b.dataset.rs }, b)));
     main.querySelectorAll('.rpcol').forEach(b => b.addEventListener('click', () => set({ color: b.dataset.rc }, b)));
     showDetail(id, att, { sub: 'RETICLE', desc: `Equipped sight: ${RET_OPTICS[att.optic]}` });
@@ -706,25 +719,25 @@ function renderEditor(focusAct) {
   } else {
     const [, which, sl] = ceView.split(':'), id = ceGun(c, which), att = clsAtt(c, id), base = weaponDef(id, att);
     parts.push(WEAPONS[id].name.toUpperCase(), SLOT_NAMES[sl].toUpperCase());
-    main.innerHTML = `<div class="apick"><div class="ap-tabs">${SLOTS.filter(s => GUNSMITH[id][s]).map(s => `<span class="${s === sl ? 'on' : ''}">${SLOT_NAMES[s]}</span>`).join('')}</div>
-      <div class="ap-grid">${GUNSMITH[id][sl].map(k => `<button class="aptile${k === att[sl] ? ' on' : ''}" data-nav data-k="${k}">${icon(sl, k)}<span class="at-n">${ATTACHMENTS[sl][k].name}</span>${k === att[sl] ? '<span class="at-eq">EQUIPPED</span>' : ''}</button>`).join('')}</div>
-      <p class="pane-note">${glyph('prevSub', game.input.lastDevice)} ${glyph('nextSub', game.input.lastDevice)} switch slot</p></div>`;
-    main.querySelectorAll('.aptile').forEach(b => {
+    main.innerHTML = `<div class="ce-tabs">${slotsOf(id).map(s => `<button class="${s === sl ? 'on' : ''}" data-nav data-sl="${s}">${SLOT_NAMES[s]}</button>`).join('')}</div>
+      <div class="ce-sec">${GUNSMITH[id][sl].map(k => `<button class="ce-row att pick${k === att[sl] ? ' on' : ''}" data-nav data-k="${k}">${icon(sl, k)}<span class="cr-k">${escHtml(ATTACHMENTS[sl][k].desc)}</span><span class="cr-v">${ATTACHMENTS[sl][k].name}</span><span class="cr-go">${k === att[sl] ? 'EQUIPPED' : ''}</span></button>`).join('')}</div>`;
+    main.querySelectorAll('[data-sl]').forEach(b => b.addEventListener('click', () => { ceView = ceFrom = `a:${which}:${b.dataset.sl}`; renderEditor(); }));
+    main.querySelectorAll('[data-k]').forEach(b => {
       const k = b.dataset.k, cand = { ...att, [sl]: k };
-      const hover = () => showDetail(id, cand, { base, title: ATTACHMENTS[sl][k].name, sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][k].desc, hiSlot: sl });
+      const hover = () => showDetail(id, cand, { base: k === att[sl] ? null : base, title: ATTACHMENTS[sl][k].name, sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][k].desc, hiSlot: sl });
       b.addEventListener('focus', hover); b.addEventListener('mouseenter', hover);
-      b.addEventListener('mouseleave', () => showDetail(id, att, { sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl }));
-      b.addEventListener('click', () => { c.atts[id] = cand; loadoutChanged(); game.audio.play('ui', null, { ui: true }); ceView = 'over'; renderEditor(ceFrom); });
+      b.addEventListener('click', () => { c.atts[id] = cand; pickDone(ceFrom); });
     });
-    showDetail(id, att, { sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl });
+    main.addEventListener('mouseleave', () => { if (ceView === `a:${which}:${sl}`) showDetail(id, att, { title: ATTACHMENTS[sl][att[sl]].name, sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl }); });
+    showDetail(id, att, { title: ATTACHMENTS[sl][att[sl]].name, sub: SLOT_NAMES[sl].toUpperCase(), desc: ATTACHMENTS[sl][att[sl]].desc, hiSlot: sl });
   }
   crumbs('ce-crumbs', parts);
-  if (game.input.lastDevice === 'pad' || focusAct) setTimeout(() => {
-    const el = (focusAct && main.querySelector(`[data-act="${focusAct}"]`)) || main.querySelector('.wpc.on, .aptile.on') || main.querySelector('[data-nav]');
-    if (el && game.input.lastDevice === 'pad') focusEl(el);
+  if (keys) setTimeout(() => {
+    const el = (focusAct && main.querySelector(`[data-act="${focusAct}"]`)) || main.querySelector('.ce-row.pick.on') || main.querySelector('.ce-row[data-nav]') || main.querySelector('[data-nav]');
+    if (el) focusEl(el);
   }, 0);
 }
-// LT/RT in the attachment picker steps through the gun's slots
+// LT/RT in the attachment picker steps through the gun's slots (in the reticle picker: the sights)
 function ceStepSlot(dir) {
   if (editKey && ceView[0] === 'r') {
     const o = Object.keys(RET_OPTICS); retOptic = o[(o.indexOf(retOptic) + dir + o.length) % o.length]; renderEditor();
@@ -732,7 +745,7 @@ function ceStepSlot(dir) {
     return true;
   }
   if (!editKey || ceView[0] !== 'a') return false;
-  const [, which, sl] = ceView.split(':'), c = clsGet(editKey), id = ceGun(c, which), list = SLOTS.filter(s => GUNSMITH[id][s]);
+  const [, which, sl] = ceView.split(':'), c = clsGet(editKey), id = ceGun(c, which), list = slotsOf(id);
   const nx = list[(list.indexOf(sl) + dir + list.length) % list.length];
   ceView = ceFrom = `a:${which}:${nx}`; renderEditor();
   return true;
