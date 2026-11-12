@@ -118,8 +118,6 @@ input[type=range], input[type=checkbox] { accent-color: var(--mw-acc); }
 .tile:hover::before, .tile.pad-focus::before, .tile:focus-visible::before { background: linear-gradient(90deg, rgba(10, 11, 12, 0.86) 0%, rgba(10, 11, 12, 0.5) 50%, rgba(10, 11, 12, 0) 100%); }
 .tile:hover span, .tile.pad-focus span { color: var(--mw-ink); }
 .tile.cur::after { top: 12px; right: 14px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; color: var(--mw-sel-ink); background: var(--mw-sel); padding: 2px 7px; }
-body.mode-online #play-tiles .tile { outline-offset: 2px; }
-body.mode-online #play-tiles .tile b { font-weight: 600; }
 
 /* intel panel (right) */
 .intel { padding: 16px; gap: 8px 14px; }

@@ -1386,15 +1386,8 @@ body[data-gmode="ffa"] #opt-team option, body[data-gmode="gungame"] #opt-team op
 #lobby.classic { background: linear-gradient(90deg, rgba(4, 6, 9, 0.9) 0%, rgba(4, 6, 9, 0.72) 42%, rgba(4, 6, 9, 0.35) 100%); }
 #lobby.classic .cl::before { content: none; display: none; }
 body.mode-online #menu { background: linear-gradient(90deg, rgba(4, 6, 9, 0.9) 0%, rgba(4, 6, 9, 0.66) 45%, rgba(4, 6, 9, 0.3) 100%); }
-body.mode-online #play-tiles { gap: 0; }
-body.mode-online #play-tiles .tile { display: block; min-height: 0; padding: 3px 0; background: none; border: 0; transform: none; overflow: visible; }
-body.mode-online #play-tiles .tile .art, body.mode-online #play-tiles .tile::before, body.mode-online #play-tiles .tile small, body.mode-online #play-tiles .tile span, body.mode-online #play-tiles .tile.cur::after { display: none; }
-body.mode-online #play-tiles .tile b { font-family: var(--display); font-weight: 600; font-size: clamp(22px, 2.5vw, 32px); letter-spacing: 0.02em; color: #f2f2f0; }
-body.mode-online #play-tiles .tile:hover b, body.mode-online #play-tiles .tile.pad-focus b, body.mode-online #play-tiles .tile:focus-visible b { color: var(--amber); }
-body.mode-online #play-tiles .tile[data-tile="quick"] b::after { content: ' ●'; color: #6bd36b; font-size: 0.5em; vertical-align: middle; }
 .tile-desc { display: none; margin: 6px 0 0; min-height: 2.6em; font-size: 16px; line-height: 1.35; color: #d8d6d0; max-width: 40ch; }
 .tile-desc::before { content: '▸ '; font-size: 12px; }
-body.mode-online #menu[data-pv="root"] .tile-desc { display: block; }
 body.mode-online #menu[data-pv="root"] .intel { background: none; border: 0; padding: 0; }
 body.mode-online #menu[data-pv="root"] .intel-tile { display: none; }
 /* message of the day */

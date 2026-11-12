@@ -890,7 +890,7 @@ function renderBrowser() {
     <span class="mb-h">${escHtml(a.h || 'Public lobby')}</span><span>${escHtml(MODES[a.m] ? MODES[a.m].name : a.m)}</span><span>${a.map && MAPS[a.map] ? escHtml(MAPS[a.map].name) : '<i>Voting</i>'}</span>
     <span>${a.n}/${a.max}</span><span class="mb-st ${a.ig ? 'ig' : 'lb'}">${a.n >= a.max ? 'FULL' : a.ig ? 'IN MATCH' : 'IN LOBBY'}</span></button>`).join(''));
   if (focusCode) { const b = $('mb-list').querySelector(`[data-mb="${focusCode}"]`); if (b) focusEl(b); }
-  $('mb-note').textContent = !lobby.board.open ? 'Connecting…' : list.length ? `${list.length} match${list.length === 1 ? '' : 'es'} · updates every few seconds` : all.length ? 'No matches in the modes you picked right now.' : 'No public matches right now. Start one with Public Match, and it shows up here for everyone.';
+  $('mb-note').textContent = !lobby.board.open ? 'Connecting…' : list.length ? `${list.length} match${list.length === 1 ? '' : 'es'} · updates every few seconds` : all.length ? 'No matches in the modes you picked right now.' : 'No public matches right now. Quick Match starts one if it finds nothing, and it shows up here for everyone.';
 }
 function openBrowser() {
   lobby.board.connect();
