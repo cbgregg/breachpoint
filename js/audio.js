@@ -21,6 +21,9 @@ const SHOTS = {
   monte: { crack: 1600, body: 500, thump: 45, decay: 0.45, tail: 1.4, gain: 0.95 },
 };
 
+// how loud each recorded effect plays (the files are peak-normalized per kind by tools/gen_sfx.py)
+const SAMPLE_VOL = { shot: 0.9, explosion: 1, headshot: 0.75, hit: 0.6, kill: 0.7, hurt: 0.7, impact: 0.45, step: 0.5, casing: 0.35, whiz: 0.6, jump: 0.5, land: 0.6, slide: 0.55, melee: 0.7, meleehit: 0.8, pin: 0.6, bounce: 0.6, switch: 0.55, pickup: 0.6, dry: 0.6, doorkick: 0.9, shatter: 0.85 };
+
 export class GameAudio {
   constructor() {
     this.ctx = null;
@@ -307,10 +310,15 @@ export class GameAudio {
       return;
     }
     // a recording of this sound (per weapon for shots and reloads) plays instead of the synthesized one
-    const rec = this.samples && this.samples.size ? (opts.weapon && this.samples.get(`${name}_${opts.weapon}`)) || (opts.surface && this.samples.get(`${name}_${opts.surface}`)) || this.samples.get(name) : null;
+    const S = this.samples, has = S && S.size;
+    const rec = has ? (name === 'shot' && opts.quiet && S.get('shot_suppressed')) || (opts.weapon && S.get(`${name}_${opts.weapon}`)) || (opts.surface && S.get(`${name}_${opts.surface}`)) || S.get(name) : null;
     if (rec) {
-      // a far gunshot reaches you a moment late (sound covers 343 m a second)
-      this.playSample(rec, sp, { wet: name === 'shot' ? 0.9 : 0.2, muffle: opts.muffle, delay: name === 'shot' && sp.dist > 30 ? sp.dist / 343 : 0 });
+      // recordings carry their own room, so they get less of the space's echo than the synthesized sounds did;
+      // a far gunshot or blast reaches you a moment late (sound covers 343 m a second)
+      const late = (name === 'shot' || name === 'explosion') && sp.dist > 30 ? sp.dist / 343 : 0;
+      let vol = SAMPLE_VOL[name] ?? 0.8;
+      if (name === 'step') vol *= (opts.self ? 0.45 : 1) * (opts.run ? 1.2 : 1);
+      this.playSample(rec, sp, { wet: name === 'shot' || name === 'explosion' ? 0.4 : 0.15, vol, muffle: opts.muffle, delay: late });
       return;
     }
     if (!opts.ui && pos && this.voices > 30) return;
