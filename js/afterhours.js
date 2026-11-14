@@ -1,7 +1,7 @@
 // Afterhours: an arcade that kept going after the building ran out, the kind you only find in a dream. Far too
-// big and very quiet: a glowing cosmic carpet, cabinets playing to nobody, a starfield where the ceiling should
-// be, long neon tubes hanging in it. Nothing is scary, just slightly wrong: a cabinet row hangs upside down
-// from the sky, cabinets float, there's a lit doorway to nowhere and the PRIZES signs point both ways.
+// big and very quiet: a glowing cosmic carpet, cabinets playing to nobody, no ceiling, just open space and a
+// nebula overhead, long neon tubes hanging under it. Nothing is scary, just slightly wrong: a cabinet row hangs upside down
+// in mid-air, cabinets float, there's a lit doorway to nowhere and the PRIZES signs point both ways.
 //
 // It plays vertically, arena-shooter style. Point-mirrored. Three heights: a funhouse mirror maze under each
 // team's deck (chrome panels and a checkerboard floor, 2.9 m walls under a 3.7 m deck), the arcade floor, and
@@ -21,10 +21,10 @@ const SPAWNS = [[33, -22], [33, -15], [33, -8], [31, -2], [33, 4], [33, 10], [31
 export const AFTERHOURS = {
   id: 'afterhours',
   name: 'Afterhours',
-  blurb: 'A dreamlike arcade that goes on too long: mirror mazes under each team\'s deck, a starfield for a ceiling, ramps and bridges up to the prize tower',
+  blurb: 'A dreamlike arcade that goes on too long: mirror mazes under each team\'s deck, open to space overhead, ramps and bridges up to the prize tower',
   bounds: { hx: HX + 1, hz: HZ + 1 },
   skyline: false,
-  look: { exposure: 1.0, env: 0.7, hemi: 0.9, hemiSky: 0xd8c8ff, ground: 0x3a2a58, fog: 0.004, fogColor: 0x1a1030, sun: 0.0, sunColor: 0xfff4d0 },
+  look: { photo: { url: 'assets/sky/afterhours_space.jpg', u: 0.5, gain: 1.15 }, exposure: 1.12, env: 1.0, hemi: 1.6, hemiSky: 0xd8c8ff, ground: 0x3a2a58, fog: 0.004, fogColor: 0x1a1030, sun: 0.0, sunColor: 0xfff4d0 },
   spawns: SPAWNS,
   pickups: [
     { type: 'health', pos: [0, UP, 2.5] }, { type: 'ammo', pos: [0, UP, -2.5] },
@@ -74,13 +74,6 @@ const arcadeCarpetTex = () => canvasTex(512, 512, (g, W) => {
     else { g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + 20, y - 25, x + 35, y + 25, x + 55, y); g.stroke(); }
   }
 });
-// where the ceiling should be: a deep starfield with a faint violet haze
-const voidTex = () => canvasTex(1024, 1024, (g, W) => {
-  const r = rng(5);
-  const gr = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W * 0.7); gr.addColorStop(0, '#2a1450'); gr.addColorStop(1, '#05030c');
-  g.fillStyle = gr; g.fillRect(0, 0, W, W);
-  for (let i = 0; i < 1600; i++) { const a = r(); g.fillStyle = a < 0.85 ? `rgba(255,255,255,${0.3 + r() * 0.7})` : a < 0.93 ? 'rgba(255,140,230,0.9)' : 'rgba(140,240,255,0.9)'; const sz = r() < 0.95 ? 1.5 : 3; g.fillRect(r() * W, r() * W, sz, sz); }
-});
 // a cabinet's screen: an original made-up game (blocky ships, stars, a score, INSERT COIN)
 const screenTex = (seed) => canvasTex(128, 160, (g, W, H) => {
   const r = rng(seed), hue = (r() * 360) | 0;
@@ -110,7 +103,6 @@ function build(ctx) {
     checker: std({ map: checkerTex(), roughness: 0.15, metalness: 0.1 }),
     mirror: std({ color: 0xffffff, roughness: 0.04, metalness: 1, envMapIntensity: 1.8 }),
     arcadeCarpet: std({ map: arcadeCarpetTex(), roughness: 1, emissive: 0xffffff, emissiveMap: null, emissiveIntensity: 0 }),
-    void: new T.MeshBasicMaterial({ map: voidTex(), side: T.DoubleSide, fog: false }),
     cabinet: std({ color: 0xffffff, roughness: 0.5, metalness: 0.1 }),
     glassCase: new T.MeshStandardMaterial({ color: 0xbfe8ff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25, depthWrite: false }),
     tube: new T.MeshStandardMaterial({ color: 0xf4e8ff, emissive: 0xe8d8ff, emissiveIntensity: 2.6 }),
@@ -148,9 +140,8 @@ function build(ctx) {
     B(M.wall, w, CEIL, d, x, 0, z, 0, { grime: 0 });
     for (const [y, mat] of [[0.4, M.neonCyan], [3.2, M.neonPink], [7.5, M.neonCyan]]) B(mat, w > d ? w : 0.06, 0.08, w > d ? 0.06 : d, x - (w > d ? 0 : Math.sign(x) * 0.5), y, z - (w > d ? Math.sign(z) * 0.5 : 0), 0, { grime: 0, cast: false });   // neon bands
   }
-  // no ceiling: a starfield, and long neon tubes hanging in it
-  const ceil = new T.Mesh(new T.PlaneGeometry(2 * HX + 2, 2 * HZ + 2), M.void);
-  ceil.rotation.x = Math.PI / 2; ceil.position.y = CEIL; ceil.userData.noMinimap = true; ctx.group.add(ceil);
+  // no ceiling: the hall is open to space (the sky is a 360-degree nebula, look.photo), with long neon tubes
+  // hanging over it. (An invisible lid at the wall tops keeps grenades in.)
   solid(0, 0, 2 * HX + 2, 2 * HZ + 2, 1, CEIL, 'concrete');
   let ti = 0;
   for (let z = -HZ + 4; z < HZ; z += 6.5, ti++) {
@@ -253,7 +244,7 @@ function build(ctx) {
     // prize signs that disagree with each other
     { const [x, z] = P(14, 25.9); sign('PRIZES ←', '#fff04a', 2, 0.5, x, 3.2, z, s > 0 ? Math.PI : 0); }
     { const [x, z] = P(14, -25.9); sign('→ PRIZES', '#fff04a', 2, 0.5, x, 3.2, z, s > 0 ? 0 : Math.PI); }
-    // up in the air: a cabinet row hanging upside down from the starfield, and two cabinets drifting
+    // up in the air: a cabinet row hanging upside down in mid-air, and two cabinets drifting
     for (let i = 0; i < 6; i++) { const [cx, cz] = P(10 + i * 1.0, -6); cabinet(cx, cz, 0, s, CAB_TINTS[i % 6], i + 2, CEIL, false, true); }
     for (const [x, y, z] of [[18, 7.5, 6], [12, 8.8, -14]]) { const [cx, cz] = P(x, z); cabinet(cx, cz, s * 0.7, s * 0.7, CAB_TINTS[(x | 0) % 6], (y * 3) | 0, y, false); }
     // neon on the end wall over the deck
