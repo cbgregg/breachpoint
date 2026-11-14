@@ -9,6 +9,7 @@ import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
 import { OVERGROWTH } from './overgrowth.js';
+import { CANNERY } from './cannery.js';
 import { LINKLOOP } from './linkloop.js';
 import { PROPS, VEHICLES_BY_MAP, containerVariants, buildingVariants, propFit } from './props.js';
 import { buildStation, STATION_LIDS } from './station.js';
@@ -421,6 +422,7 @@ export const MAPS = {
   mart: MART,
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
+  cannery: CANNERY,
   link: LINKLOOP,
 };
 export const MAP_IDS = Object.keys(MAPS);
@@ -1411,7 +1413,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         break;
       }
       case 'stairs':
-        if (PROPS.stairs) {
+        // (extra.plain: plain concrete steps, no railed wooden model: for stairs you step off sideways at the top)
+        if (PROPS.stairs && !(extra && extra.plain)) {
           // wooden staircase model (CC-BY 4.0, "Wooden Stairs_5_MB" by Mehdi Shahsavan) over the step boxes:
           // one flight per stair run, placed on its first step
           if (extra === 1) {
@@ -1429,7 +1432,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
           break;
         }
         B(M.concrete, w, h, d, cx, y0, cz, 0, { grime: 0.35 });
-        if (extra % 2 === 0) put(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), M.dark, cx, h + 0.5, cz + Math.sign(cz) * (d / 2 - 0.05) * -1, 0, { grime: 0 });
+        if (!(extra && extra.plain) && extra % 2 === 0) put(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), M.dark, cx, h + 0.5, cz + Math.sign(cz) * (d / 2 - 0.05) * -1, 0, { grime: 0 });
         break;
       case 'wall': {
         const tint = plasterTints[(extra + (team ? 2 : 0)) % plasterTints.length];
@@ -2479,7 +2482,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       solid(cx, cz, al ? w : 0.3, al ? 0.3 : d, h - 0.3, y0 + 0.3, 'concrete');
     } else if (kind === 'bench') solid(cx, cz, w, d, 0.95, y0, 'wood').pass = true;
     else if (kind === 'rsign') solid(cx, cz, 0.12, 0.12, 2.2, y0, 'metal').pass = true;   // the post: stops you, not bullets
-    else if (kind === 'stairs' && PROPS.stairs) { /* the model's own treads (decorate) */ }
+    else if (kind === 'stairs' && PROPS.stairs && !(extra && extra.plain)) { /* the model's own treads (decorate) */ }
     else if (!NO_SOLID.has(kind)) solid(cx, cz, w, d, h, y0, SURFACE[kind] || 'concrete');
     decorate(cx, cz, w, d, h, y0, kind, extra ?? 0, team);
     for (let i = nb; i < physics.boxes.length; i++) if (!physics.boxes[i].src) physics.boxes[i].src = `${kind}@${+cx.toFixed(1)},${+cz.toFixed(1)}`; // for the collision audit
