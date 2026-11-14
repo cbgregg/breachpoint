@@ -35,8 +35,8 @@ export const OVERGROWTH = {
     { type: 'health', pos: [-20, 0, 0] },
     { type: 'ammo', pos: [11, 0, 21] },
     { type: 'ammo', pos: [-11, 0, -21] },
-    { type: 'ammo', pos: [27, 0, -21] },
-    { type: 'ammo', pos: [-27, 0, 21] },
+    { type: 'ammo', pos: [28.5, 0, -18.8] },
+    { type: 'ammo', pos: [-28.5, 0, 18.8] },
   ],
   photos: ['assets/loading/overgrowth-1.jpg', 'assets/loading/overgrowth-2.jpg', 'assets/loading/overgrowth-3.jpg'],
   build,
@@ -335,13 +335,48 @@ function build(ctx) {
     K(5.5, 9, 1.6, 1.6, 1.6, 0, 'crate');
     K(6, -9.5, 0.62, 0.62, 0.9, 0, 'barrel'); K(6.8, -10.1, 0.62, 0.62, 0.9, 0, 'barrel');
     K(21.5, 21, 0.62, 0.62, 0.9, 0, 'barrel');
-    K(4, 16, 3.2, 0.9, 1.1, 0, 'jersey'); K(19, -4, 0.9, 3.2, 1.1, 0, 'jersey');
+    K(4, 16, 3.2, 0.9, 1.1, 0, 'jersey'); K(18, -6.5, 0.9, 3.2, 1.1, 0, 'jersey');
     // spawn: staggered HESCO and an ammo crate
     for (const [x, z, w, d] of [[31, -8, 1, 4], [31, 9, 1, 4], [33, -24, 3, 1], [33, 25.5, 3, 1], [30.5, 0, 1, 2.4]]) K(x, z, w, d, 2.2, 0, 'hesco');
     K(37.5, 9, 2, 2, 1.2, 0, 'ammo');
 
+    // the valve house: a one-storey concrete room (3 m, like the yard's other single storeys) with a doorway at
+    // each end, between the mid track and the low tank: a second indoor fight on each half
+    {
+      const [cx, cz] = P(22, -1), VW = 5.4, VD = 4.2, VH = 3.0, T2 = 0.25, DW = 1.4;
+      // long walls (along x) solid; short walls (along z) with a centred doorway
+      for (const sz of [-1, 1]) { solid(cx, cz + sz * VD / 2, VW, T2, VH, 0, 'concrete'); B(M.concrete, VW, VH, T2, cx, 0, cz + sz * VD / 2, 0, { tint: 0xb0aa9a, grime: 0.6 }); }
+      for (const sx of [-1, 1]) {
+        const seg = (VD - DW) / 2;
+        for (const sz of [-1, 1]) { const z = cz + sz * (DW / 2 + seg / 2); solid(cx + sx * VW / 2, z, T2, seg, VH, 0, 'concrete'); B(M.concrete, T2, VH, seg, cx + sx * VW / 2, 0, z, 0, { tint: 0xb0aa9a, grime: 0.6 }); }
+        solid(cx + sx * VW / 2, cz, T2, DW, VH - 2.4, 2.4, 'concrete'); B(M.concrete, T2, VH - 2.4, DW, cx + sx * VW / 2, 2.4, cz, 0, { tint: 0xb0aa9a, grime: 0.6 });
+      }
+      solid(cx, cz, VW + T2, VD + T2, 0.2, VH, 'concrete'); B(M.concrete, VW + 0.5, 0.2, VD + 0.5, cx, VH, cz, 0, { tint: 0x9a968a, grime: 0.5 });
+      // inside: a valve bank along one long wall (waist-high cover), a light
+      solid(cx, cz - s * 1.45, 3.2, 0.7, 1.1, 0, 'metal'); B(M.dark, 3.2, 1.1, 0.7, cx, 0, cz - s * 1.45, 0, { grime: 0.4 });
+      for (const o of [-1, 0, 1]) put(new T.TorusGeometry(0.22, 0.035, 6, 16), M.rust, cx + o * 1, 1.25, cz - s * 1.45, 0, { rx: Math.PI / 2, grime: 0 });
+      put(new T.BoxGeometry(1.0, 0.05, 0.1), tube, cx, VH - 0.15, cz, 0, { grime: 0, cast: false }); glows.push([cx, VH - 0.25, cz, 1.0]);
+      put(new T.PlaneGeometry(VW - 0.4, 1.0), M.moss, cx, 0.5, cz + s * (VD / 2 + T2 / 2 + 0.01), s > 0 ? 0 : Math.PI, { grime: 0, tint: 0xb8c8a0, cast: false });
+    }
+    // the loading dock: a raised slab (+1 m, the yard's second level) with two steps up, crates on top
+    {
+      const [cx, cz] = P(5, 22.5), DWd = 6.5, DD = 4.5;
+      solid(cx, cz, DWd, DD, 1.0, 0, 'concrete'); B(M.concrete, DWd, 1.0, DD, cx, 0, cz, 0, { tint: 0xa8a294, grime: 0.6 });
+      B(M.dark, DWd, 0.12, 0.2, cx, 0.88, cz - s * (DD / 2 + 0.05), 0, { grime: 0.2 });   // the steel edge
+      for (const [k, h] of [[1, 0.5], [0, 1.0]]) { const z = cz - s * (DD / 2 + 0.3 + k * 0.6); solid(cx + s * 2.2, z, 1.6, 0.6, h, 0, 'concrete'); B(M.concrete, 1.6, h, 0.6, cx + s * 2.2, 0, z, 0, { tint: 0x9e988a, grime: 0.5 }); }
+    }
+    K(3.6, 23.3, 1.6, 1.6, 1.6, 1.0, 'crate'); K(6.4, 21.4, 1.3, 1.3, 1.3, 1.0, 'crate');
+    // more hard cover in the open stretches: a container, a pile of spare pipe, sandbags
+    K(6, -24, 7, 2.6, 2.6, 0, 'container', 0x6e7f86);
+    {
+      const [cx, cz] = P(26, -22);
+      solid(cx, cz, 4.4, 1.9, 1.15, 0, 'metal');
+      for (const [o, y] of [[-0.5, 0.3], [0.1, 0.3], [0.7, 0.3], [-0.2, 0.82], [0.4, 0.82]]) put(new T.CylinderGeometry(0.3, 0.3, 4.4, 14), M.rust, cx, y, cz + o * s, 0, { rz: Math.PI / 2, grime: 0.3 });
+    }
+    K(16.5, 0.5, 3, 0.8, 1.1, 0, 'sand'); K(30, 14, 0.8, 3, 1.1, 0, 'sand'); K(11.5, 16.5, 0.8, 3, 1.1, 0, 'sand');
+
     // greenery: alders (London plane builder, tinted young), hedges that hide you without stopping a bullet, ferns
-    for (const [x, z, h] of [[22, 6, 8.5], [6, 22, 9], [26, -23, 9.5], [34, 2, 7.5], [12, -9, 7], [36, -26, 8]]) K(x, z, 0, 0, h, 0, 'tree');
+    for (const [x, z, h] of [[22, 6, 8.5], [12.5, 24.5, 9], [26, -23, 9.5], [34, 2, 7.5], [12, -9, 7], [36, -26, 8]]) K(x, z, 0, 0, h, 0, 'tree');
     const hedge = (x, z, w, d, h) => {
       const [cx, cz] = P(x, z);
       solid(cx, cz, w, d, h, 0, 'cloth').pass = true;
@@ -361,7 +396,7 @@ function build(ctx) {
     // ferns and ground cover, scattered off the tracks
     for (let i = 0; i < (low ? 40 : 110); i++) {
       const x = 2 + rnd() * (HX - 4), z = (rnd() * 2 - 1) * (HZ - 2);
-      if (Math.abs(z) < 3 || Math.abs(x - 14) < 3 || (Math.abs(x) < PH + 2 && Math.abs(z) < PH + 2)) continue;
+      if (Math.abs(z) < 3 || Math.abs(x - 14) < 3 || (Math.abs(x) < PH + 2 && Math.abs(z) < PH + 2) || (Math.abs(x - 22) < 3.5 && Math.abs(z + 1) < 3) || (Math.abs(x - 5) < 4 && Math.abs(z - 22) < 4)) continue;
       const [cx, cz] = P(x, z), sc = 0.5 + rnd() * 0.6, ry = rnd() * Math.PI;
       for (const a of [0, Math.PI / 2]) put(new T.PlaneGeometry(1.4 * sc, 1.0 * sc), M.fern, cx, 0.5 * sc, cz, ry + a, { grime: 0, cast: false, tint: rnd() < 0.5 ? 0xa8c890 : 0xd0e0b0 });
     }
