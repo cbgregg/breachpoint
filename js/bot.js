@@ -801,7 +801,7 @@ export class BotBrain {
       } else if ((this.goalKind === 'hunt' || this.goalKind === 'rotate' || this.goalKind === 'health' || this.goalKind === 'ammo') && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5) {
         // there (the path follower counts 0.7 m as arrived, the goal checks want 2 m and the same floor): don't stand
         // on the spot waiting for a timer, check the angles and go on
-        this.goal = null; this.goalT = 0; this.lastKnownT = -99; this.idleT = rand(0.3, 0.8); this.pickLook(true);
+        this.goal = null; this.goalT = 0; this.idleT = rand(0.3, 0.8); this.pickLook(true);   // (the last sighting stays known: a grenade can still go after it)
       } else if ((this.noPathT += dt) > 1.2) {
         // no route to the mode's spot (or already standing on it): ask for a different one
         this.noPathT = 0; this.gmPatT = 0; this.gmOff = null; this.goal = null;
@@ -848,6 +848,27 @@ export class BotBrain {
       } else if (moved > 1) this.stuckN = 0;
       this.lastPos.copy(b.pos);
       this.stuckT = 0.8;
+    }
+    // progress: the stuck check above catches a bot pinned in place, not one jiggling along a wall or a door frame
+    // without getting anywhere (it covers ground, so it never reads as stuck). Every half second, how much route is
+    // left (along the path, so a detour round a building still counts as progress); if it hasn't shrunk by a metre
+    // in three seconds, back off into open space and plan again, and after two tries give the spot up
+    this.progClock = (this.progClock || 0) + dt;
+    if (this.progClock >= 0.5) {
+      const k = this.progClock; this.progClock = 0;
+      const moving = this.goal && !this.visible && this.goalKind !== 'cover' && !watching && wish.lengthSq() > 0.2 && this.unstickT <= 0 && this.idleT <= 0 && this.pathIdx < this.path.length;
+      if (!moving) { this.progT = 0; this.progBest = Infinity; }
+      else {
+        let left = Math.hypot(this.path[this.pathIdx].x - b.pos.x, this.path[this.pathIdx].z - b.pos.z);
+        for (let i = this.pathIdx + 1; i < this.path.length; i++) left += Math.hypot(this.path[i].x - this.path[i - 1].x, this.path[i].z - this.path[i - 1].z);
+        if (this.progGoal !== this.goal) { this.progGoal = this.goal; this.progBest = Infinity; this.progT = 0; this.progN = 0; }
+        if (left < (this.progBest ?? Infinity) - 1) { this.progBest = left; this.progT = 0; this.progN = 0; }
+        else if ((this.progT = (this.progT || 0) + k) >= 3) {
+          this.progT = 0; this.progBest = Infinity; this.repathT = 0; this.strafeDir *= -1;
+          this.startUnstick();
+          if (++this.progN >= 2) { this.progN = 0; this.goal = null; this.goalT = 0; }
+        }
+      }
     }
     b.wantCrouch = this.crouch; b.wantProne = this.prone;
     // no sprinting through a reload (the player can't either): a near-full top-up is dropped for the run, any
