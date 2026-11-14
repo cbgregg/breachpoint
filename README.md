@@ -9,7 +9,7 @@ Made by cbgregg. It's a one-person project, so if you enjoy it, [buy me a coffee
 ## What's in it
 
 - Team Deathmatch, Search & Destroy, Gunfight, Free-for-All, Gun Game and Infected
-- Six maps: Tarsa Market, Pioneer Square and the Seattle Underground under it, Link Loop (three light-rail stations you get between by riding the train), the Freshway supermarket, the Drive-In and Shuran Yard
+- Seven maps: Overgrowth (a small, fast arena: an abandoned pumping station taken back by the forest), Tarsa Market, Pioneer Square and the Seattle Underground under it, Link Loop (three light-rail stations you get between by riding the train), the Freshway supermarket, the Drive-In and Shuran Yard
 - Attachments, cookable frags, Semtex, throwing knives and stuns
 - Sprint, tac sprint, slide, prone and mantling
 - Breakable windows, boarded-up doorways you can kick through, and doors you can kick open
