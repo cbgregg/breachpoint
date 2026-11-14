@@ -1384,7 +1384,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; if (rep) t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
   };
   const fitCafe = (cx, cz, w, d, h, y0, T) => {
-    const X = w / 2 - T, Z = d / 2 - T, CEIL = h - 0.345;   // the room's half sizes; the ceiling (under the roof's cornice boxes)
+    // the room's half sizes; a dropped ceiling at 3.5 m (the shell's 4.4 m storey makes real-sized furniture look like a doll's house)
+    const X = w / 2 - T, Z = d / 2 - T, CEIL = Math.min(h - 0.345, 3.5);
     const WALL = 0.023;                                     // the brick lining's depth inside the wall
     const r = seeded(1889);
     // ---- materials (shared by nothing else)
@@ -1581,13 +1582,13 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     for (let i = 0; i < Math.round(BL / 0.6); i++) { const px = B0 + (i + 0.5) * BL / Math.round(BL / 0.6); box(0.52, 0.66, 0.02, M.wood, px, 0.14, BZ + 0.285, MID); box(0.03, 0.12, 0.03, brass, px + 0.18, 0.62, BZ + 0.3); }
     box(BL + 0.04, 0.04, 0.6, marble, BM, 0.9, BZ + 0.02, 0xf4f0ea);
     S(BM, BZ, BL, 0.56, 0.94);
-    for (const sy of [1.55, 1.98]) {
+    for (const sy of [1.45]) {
       box(BL - 0.4, 0.035, 0.26, M.wood, BM, sy, BB + 0.13, DARK);
       for (let i = 0; i < 4; i++) box(0.025, 0.14, 0.2, brass, B0 + 0.4 + i * (BL - 0.8) / 3, sy - 0.14, BB + 0.1);
     }
     if (small) {
-      for (let i = 0; i < 4; i++) md('ph_bottles', 'x', 0.6, B0 + 0.7 + i * 1.25, 2.015, BB + 0.12);
-      for (let i = 0; i < 12; i++) { cyl(0.045, 0.035, 0.09, china, B0 + 0.5 + i * 0.38, 1.585, BB + 0.12); if (i % 3 === 0) cyl(0.07, 0.07, 0.012, china, B0 + 0.62 + i * 0.38, 1.585, BB + 0.13); }
+      for (let i = 0; i < 3; i++) md('ph_bottles', 'x', 0.6, B0 + 0.6 + i * 1.9, 1.485, BB + 0.12);
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 4; k++) cyl(0.045, 0.035, 0.09, china, B0 + 1.25 + i * 1.9 + k * 0.13, 1.485, BB + 0.12);
       // jars of beans on the counter top, a grinder
       for (let i = 0; i < 4; i++) { cyl(0.075, 0.075, 0.22, caseGlass, B0 + 0.5 + i * 0.22, 0.94, BZ - 0.08); cyl(0.07, 0.07, 0.15, M.wood, B0 + 0.5 + i * 0.22, 0.945, BZ - 0.08, 0x3a2414, 10); cyl(0.078, 0.078, 0.025, brass, B0 + 0.5 + i * 0.22, 1.16, BZ - 0.08); }
       box(0.22, 0.34, 0.24, M.dark, -3.6, 0.94, BZ - 0.02, 0x8a1e1a); cyl(0.07, 0.1, 0.2, caseGlass, -3.6, 1.28, BZ - 0.02);
@@ -1595,7 +1596,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     md('ph_espresso', 'y', 1.72, -1.15, 0, BW + 0.55, Math.PI);
     S(-1.15, BW + 0.55, 1.5, 0.75, 1.1, 0, 'metal');
     // the menu: framed in dark wood
-    const MX = (B0 + B1) / 2, MY = 3.08, MW = 4.0, MH = 1.45;
+    const MX = (B0 + B1) / 2, MY = 2.55, MW = 4.6, MH = 1.15;
     { const g = new THREE.PlaneGeometry(MW, MH); P(g, menuM, MX, MY, BB + 0.012, 0, { cast: false }); }
     for (const [fw, fh, fx, fy] of [[MW + 0.16, 0.08, 0, MH / 2 + 0.04], [MW + 0.16, 0.08, 0, -MH / 2 - 0.04], [0.08, MH, MW / 2 + 0.04, 0], [0.08, MH, -MW / 2 - 0.04, 0]])
       box(fw, fh, 0.05, M.wood, MX + fx, MY + fy - fh / 2, BB + 0.025, DARK);
@@ -1695,15 +1696,15 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       // (the frames' glass draws as a dark sheet over the picture: left out)
       if (pc) md(name, 'x', len, x + nx * (pc.size.z / 2 + 0.004), y - pc.size.y / 2, z + nz * (pc.size.z / 2 + 0.004), ry, null, (m) => /glass/i.test(m.name || '') ? false : pic >= 0 && /canvas|artwork/i.test(m.name || '') ? artMats[pic] : null);
     };
-    art('ph_painting', 1.0, brickFace(-1), 2.15, -2.25, Math.PI / 2, 1, 0);
-    art('ph_photo', 0.9, brickFace(-1), 2.1, 4.25, Math.PI / 2, 1, 0, 0);
-    art('ph_photo', 0.95, brickFace(-1), 2.1, 6.55, Math.PI / 2, 1, 0, 1);
-    art('ph_photo', 0.85, brickFace(-1), 2.1, -0.15, Math.PI / 2, 1, 0, 2);
+    art('ph_painting', 1.35, brickFace(-1), 2.15, -2.25, Math.PI / 2, 1, 0);
+    art('ph_photo', 1.2, brickFace(-1), 2.15, 4.25, Math.PI / 2, 1, 0, 0);
+    art('ph_photo', 1.2, brickFace(-1), 2.15, 6.55, Math.PI / 2, 1, 0, 1);
+    art('ph_photo', 1.15, brickFace(-1), 2.15, -0.15, Math.PI / 2, 1, 0, 2);
     sconce(brickFace(-1), -1.2, Math.PI / 2, 1, 0); sconce(brickFace(-1), 5.4, Math.PI / 2, 1, 0);
-    art('ph_photo', 1.0, brickFace(1), 2.1, 2.62, -Math.PI / 2, -1, 0);
+    art('ph_photo', 1.2, brickFace(1), 2.2, 2.62, -Math.PI / 2, -1, 0);
     sconce(brickFace(1), -1.5, -Math.PI / 2, -1, 0);
-    art('ph_painting', 0.95, -1.7, 2.25, Z - WALL, Math.PI, 0, -1, 0);
-    art('ph_photo', 0.95, 2.7, 2.2, Z - WALL, Math.PI, 0, -1, 1);
+    art('ph_painting', 1.35, -1.7, 2.3, Z - WALL, Math.PI, 0, -1, 0);
+    art('ph_photo', 1.2, 2.7, 2.3, Z - WALL, Math.PI, 0, -1, 1);
 
     // ---- the window ledge on the north wall, stools along it
     { const lx0 = -3.25, lx1 = 3.6, ll = lx1 - lx0, lz = Z - WALL - 0.035 - 0.2;
@@ -1725,8 +1726,22 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     // ---- plants in the corners by the doors
     for (const [px, pz] of [[X - WALL - 0.45, Z - WALL - 0.45], [X - WALL - 0.4, -1.45], [1.0, -Z + WALL + 0.45]]) { if (md('ph_plant', 'y', 1.05, px, 0, pz, r() * 6)) S(px, pz, 0.5, 0.5, 0.45, 0, 'wood'); }
 
+    // ---- rugs under the two groups of tables: a worn red runner-style carpet with a navy border
+    const rugT = cafeTex(512, 256, (g, W, H) => {
+      g.fillStyle = '#2a3048'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#c8a466'; g.fillRect(14, 14, W - 28, H - 28); g.fillStyle = '#7a2420'; g.fillRect(22, 22, W - 44, H - 44);
+      g.strokeStyle = '#c8a466'; g.lineWidth = 3; g.strokeRect(40, 40, W - 80, H - 80);
+      g.fillStyle = '#2a3048'; g.beginPath(); g.moveTo(W / 2, 62); g.lineTo(W / 2 + 120, H / 2); g.lineTo(W / 2, H - 62); g.lineTo(W / 2 - 120, H / 2); g.fill();
+      g.fillStyle = '#c8a466'; g.beginPath(); g.moveTo(W / 2, 92); g.lineTo(W / 2 + 70, H / 2); g.lineTo(W / 2, H - 92); g.lineTo(W / 2 - 70, H / 2); g.fill();
+      g.fillStyle = '#7a2420'; g.beginPath(); g.arc(W / 2, H / 2, 22, 0, Math.PI * 2); g.fill();
+      for (const sx of [70, W - 70]) for (const sy of [70, H - 70]) { g.fillStyle = '#2a3048'; g.beginPath(); g.arc(sx, sy, 16, 0, Math.PI * 2); g.fill(); }
+      for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '0,0,0' : '255,240,220'},${r() * 0.07})`; g.fillRect(r() * W, r() * H, 2, 2); }
+    }, false);
+    const rugM = std({ map: rugT, roughness: 0.95 });
+    for (const [rx, rz, rw, rd] of [[-1.75, -1.55, 6.0, 2.6], [-1.15, 3.1, 5.6, 2.6]]) P(new THREE.PlaneGeometry(rw, rd), rugM, rx, 0.04, rz, 0, { rx: -Math.PI / 2, cast: false });
+
     // ---- the room's light: one warm lamp over the tables (pendants and sconces glow; they don't light)
-    const Lt = new THREE.PointLight(0xffc98e, 10, 14, 1.6); Lt.position.set(cx - 1, y0 + 3.2, cz); Lt.userData.mapLight = true; group.add(Lt);
+    const Lt = new THREE.PointLight(0xffc98e, 10, 14, 1.6); Lt.position.set(cx - 1, y0 + CEIL - 0.4, cz); Lt.userData.mapLight = true; group.add(Lt);
   };
 
   // sandbag: a pillowy bag that pinches at the ends, so rows nest into each other
