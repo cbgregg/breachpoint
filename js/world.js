@@ -321,7 +321,7 @@ const PIONEER_CENTER = [
   [-18.5, 11.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-11, 18.5, 1.6, 1.6, 1.2, -UG, 'crate'], [-18, 19, 1.4, 1.4, 0.9, -UG, 'crate'], [-11.5, 11.5, 1.2, 1.2, 0.9, -UG, 'crate'],
   [15.25, 3.5, 9, 4.4, 3.8, 0, 'pergola'],
   // the totem pole, plane trees, benches, lamps, a few planters and the information kiosk
-  [1.5, -21, 1.0, 1.0, 15, 0, 'totem'], [1.5, -21, 3.2, 3.2, 0.9, 0, 'railing', { open: 's' }],
+  [0.8, -24.6, 1.0, 1.0, 15, 0, 'totem'], [0.8, -24.6, 3.2, 3.2, 0.9, 0, 'railing', { open: 's' }],   // (clear of the Underground stairwell: its railing used to cross the stairs at head height)
   [-1.5, -6, 0, 0, 9, 0, 'tree'], [6.5, -6.5, 0, 0, 9.5, 0, 'tree'], [-1.5, -14, 0, 0, 10, 0, 'tree'], [5, -14.5, 0, 0, 9, 0, 'tree'], [-1.8, -27, 0, 0, 9, 0, 'tree'],
   [2.2, -9.5, 1.8, 0.6, 0.95, 0, 'bench'], [-2.4, -24.5, 1.8, 0.6, 0.95, 0, 'bench'], [9.5, -1.8, 1.8, 0.6, 0.95, 0, 'bench'],
   [-3.2, -2.5, 0, 0, 0, 0, 'vlamp'], [11, -5, 0, 0, 0, 0, 'vlamp'], [-3.2, -23, 0, 0, 0, 0, 'vlamp'], [4.5, -0.6, 0, 0, 0, 0, 'vlamp'],
