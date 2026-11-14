@@ -341,7 +341,7 @@ const PIONEER_CENTER = [
   // ---- the Sinking Ship garage on the wedge between James St and Yesler
   [0, 0, 0, 0, 12, 0, 'flatiron', { pts: PS_GARAGE, prow: 0 }],
   // ---- west of 1st Ave: the Mutual Life Building on the corner, more brick blocks, an alley, a café
-  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8, shop: { e: [['d', -3.5], ['w', 1], ['d', 4.5]], n: [['d', -4.5], ['w', 0.5], ['d', 5]], w: [['d', 2]], s: [['w', 3]], props: [['bar', -3.5, -5.6, 0], ['table', -5, -1], ['table', -1.5, 1.5], ['table', 2.5, -1.5], ['table', 5, 2], ['table', -5, 3.8], ['table', 1.5, 4.5], ['shelf', 6.5, -5.6, 0], ['crates', -7, 5.5]], light: 1 } }],   // Mutual Life Building: a café on the ground floor
+  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8, shop: { e: [['d', -3.5], ['w', 1], ['d', 4.5]], n: [['d', -4.5], ['w', 0.5], ['d', 5]], w: [['d', 2]], s: [['w', 3]], fit: 'cafe' } }],   // Mutual Life Building: a café on the ground floor (fitCafe)
   [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true, shop: { e: [['d', -6], ['w', 0], ['d', 6]], n: [['d', 0]], w: [['d', 4]], props: [['books', -4.5, -7, 0], ['books', 0, -7, 0], ['books', -4.5, -4, 0], ['books', 0, -4, 0], ['books', -4.5, -1, 0], ['books', 0, -1, 0], ['books', -4.5, 2, 0], ['books', 0, 2, 0], ['books', -4.5, 5, 0], ['books', 0, 5, 0], ['table', 5, 7.5], ['crates', 5.5, -8]], light: 1 } }],   // a bookshop: rows of shelves
   [-31, -15, 9, 5, 3.6, 0, 'house', { s: [['d', 1.5]], n: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['table', 0, 0], ['shelf', 3, 1.5, 0]], light: 1 }],
   [-34.5, 33.5, 17, 13, 15, 0, 'brick', { shop: { s: [['d', -4.5], ['w', 0], ['d', 4.5]], e: [['d', 0]], w: [['d', -2]], props: [['bar', 0, 4.6, 0], ['table', -4, -1.5], ['table', 0, -2], ['table', 4, -1.5], ['table', -5, 2], ['table', 5, 2], ['crates', -7, 4.5]], light: 1 } }],   // a saloon
@@ -389,7 +389,7 @@ const PIONEER_CENTER = [
   [96, -14, 12, 12, 62, 0, 'tower'],
   // ---- more cover in the open stretches of the plaza and the spawn lots, and a raised loading dock on James St
   [-18, -12, 3.2, 0.9, 1.1, 0, 'jersey'], [-21, -15, 1.6, 1.6, 1.6, 0, 'crate'], [38, -18, 1.6, 1.6, 1.6, 0, 'crate'], [38.1, -18, 1.3, 1.3, 1.3, 1.6, 'crate'],
-  [33.5, -6.5, 3.2, 0.9, 1.1, 0, 'jersey'], [-36, 1, 0.9, 3.2, 1.1, 0, 'jersey'],
+  [33.5, -6.5, 3.2, 0.9, 1.1, 0, 'jersey'],
   // ---- perimeter
   [0, 40.5, 110, 1, 10, 0, 'boundary'], [0, -40.5, 110, 1, 10, 0, 'boundary'],
   [54.5, 0, 1, 82, 10, 0, 'boundary'], [-54.5, 0, 1, 82, 10, 0, 'boundary'],
@@ -624,6 +624,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   scene.add(group);
   const rnd = seeded(1337);
   const breakables = [];   // what can be broken through (js/breach.js): glazed and boarded-up openings, from the houses
+  const interiors = [];    // [x0, z0, x1, z1] of every room you can walk into at street level: no street litter or puddles in them
 
   // XF: a rotated local frame { x, z, a } (origin and yaw). While set, everything put / solid places is authored in
   // that frame: pieces are turned and moved into place, and collision follows the turned footprint in thin strips.
@@ -1152,6 +1153,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   };
   const buildHouse = (cx, cz, w, d, h, y0, spec, team) => {
     const T = 0.3;
+    if (Math.abs(y0) < 0.5) interiors.push([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2]);
     const brick = spec.stone ? true : rnd() < 0.5;
     const wallMat = spec.stone ? M.stone : brick ? M.brick : M.plaster;
     const tint = spec.stone ? 0xa79d8c : brick ? 0xf2e6dc : plasterTints[Math.floor(rnd() * plasterTints.length)];
@@ -1163,6 +1165,18 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       { k: 'e', ax: 0, az: 1, nx: 1, nz: 0, len: d - 2 * T, ox: cx + w / 2 - T / 2, oz: cz },
       { k: 'w', ax: 0, az: 1, nx: -1, nz: 0, len: d - 2 * T, ox: cx - w / 2 + T / 2, oz: cz },
     ];
+    // wainscoting on the inside of side S from a to b along it, `top` high: panelling, a baseboard, a cap rail and
+    // stiles every 70 cm, standing proud of the brick lining
+    const wainscot = (S, a, b, top) => {
+      const at = (t, o) => [S.ox + S.ax * t - S.nx * o, S.oz + S.az * t - S.nz * o];
+      const bx = (t, len, hh, dep, o, yb, tint) => { const [x, z] = at(t, o); put(flatBox(S.ax ? len : dep, hh, S.az ? len : dep, scaleOf(M.wood)), M.wood, x, y0 + yb + hh / 2, z, 0, { grime: 0, tint }); };
+      const L = b - a, mid = (a + b) / 2, face = T / 2 + 0.023;
+      bx(mid, L - 0.008, top - 0.012, 0.035, face + 0.0175, 0, 0x8a6446);   // (inside the rail and baseboard's ends and top: no shared faces)
+      bx(mid, L, 0.17, 0.05, face + 0.025, 0, 0x4a3020);
+      bx(mid, L, 0.055, 0.065, face + 0.0325, top - 0.055, 0x5a3a26);
+      const n = Math.max(1, Math.round(L / 0.7));
+      if (top > 0.6) for (let i = 1; i < n; i++) bx(a + i * L / n, 0.07, top - 0.23, 0.014, face + 0.042, 0.17, 0x6a4a32);
+    };
     for (const S of sides) {
       const ry = Math.atan2(S.nx, S.nz);
       const seg = (a, b, y1, y2) => {
@@ -1173,6 +1187,12 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         solid(x, z, bw, bd, y2 - y1, y0 + y1, brick ? 'brick' : 'concrete');
         put(flatBox(bw, y2 - y1, bd, scaleOf(wallMat), 0.012), wallMat, x, y0 + y1 + (y2 - y1) / 2, z, 0, { tint, grime: 0.45, base: y0 });
         if (spec.stone) put(flatBox(S.ax ? L : 0.02, y2 - y1, S.az ? L : 0.02, scaleOf(M.brick)), M.brick, x - S.nx * (T / 2 + 0.012), y0 + y1 + (y2 - y1) / 2, z - S.nz * (T / 2 + 0.012), 0, { tint: 0xe8a888, grime: 0.15, base: y0 });
+        // a fitted-out room: dark wood wainscoting along the foot of the inside walls (the long walls run corner to
+        // corner, the short ones stop at their panelling), lower under a window's sill
+        if (spec.fit && y1 < 1.2) {
+          const lim = S.ax ? S.len / 2 - T : S.len / 2 - 0.065, a2 = Math.max(a, -lim), b2 = Math.min(b, lim);
+          if (b2 - a2 > 0.05) wainscot(S, a2, b2, y2 < 1.2 ? y2 - 0.07 : 1.15);
+        }
         if (y1 === 0 && L > 0.3) {
           // a darker rendered plinth along the foot of the outside wall
           const ox = S.nx * (T / 2 + 0.03), oz = S.nz * (T / 2 + 0.03);
@@ -1249,6 +1269,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(flatBox(w + 0.5, 0.16, d + 0.5, 3, 0.02), M.concrete, cx, y0 + h - 0.26, cz, 0, { grime: 0.1, tint: 0xd0c9bc });
     if (rnd() < 0.6 && !spec.light) put(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 14), M.metal, cx + (rnd() - 0.5) * (w - 2), y0 + h + 0.75, cz + (rnd() - 0.5) * (d - 2), 0, { tint: 0x3d6b8a, grime: 0.2, base: y0 + h });
     // floor
+    if (!spec.fit) {
     const fl = new THREE.PlaneGeometry(w - 2 * T, d - 2 * T);
     const center = cx === 0 && cz === 0 && M.centerFloor;
     const flMat = spec.stone ? M.wood : center ? M.centerFloor : M.houseFloor || M.tile, flS = spec.stone ? 1.4 : center ? 3.2 : M.houseFloor ? 2.2 : 1.6;
@@ -1256,6 +1277,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     put(fl, flMat, cx, y0 + 0.03, cz, 0, { rx: -Math.PI / 2, grime: 0, cast: false, tint: spec.stone ? 0xd2a070 : flMat === M.tile ? 0xd8cbb4 : 0xf2ece2 });
     // a corkboard of maps and notes on the back wall of the big halls (CC-BY 4.0, "Corkboard" by XIN)
     if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.07, Math.PI, { grime: 0, cast: false });   // clear of a brick-lined wall's veneer
+    }
     // props
     // a real furniture model (CC0, Poly Haven), fitted to `len` along `axis`, or false if it didn't load
     const model = (name, axis, len, x, y, z, ry = 0) => {
@@ -1336,6 +1358,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         put(flatBox(0.8, 0.5, 0.6, 0), M.paint, px + 0.1, y0 + 1.45, pz, 0.3, { grime: 0.1, tint: 0x4d5536 });
       }
     }
+    if (spec.fit === 'cafe') { fitCafe(cx, cz, w, d, h, y0, T); return; }
     // hanging bulb (and a real light if asked)
     put(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4), M.dark, cx, y0 + h - 0.3, cz, 0, { grime: 0, cast: false });
     put(new THREE.SphereGeometry(0.06, 10, 8), M.bulb, cx, y0 + h - 0.65, cz, 0, { grime: 0, cast: false });
@@ -1349,6 +1372,361 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       put(new THREE.SphereGeometry(0.07, 10, 8), M.bulb, lx, y0 + h - 0.95, lz, 0, { grime: 0, cast: false });
       glows.push([lx, y0 + h - 0.95, lz, 0.5]);
     }
+  };
+
+  // ---------- Pioneer Square's café: the Mutual Life Building's ground floor, fitted out as one real place ----------
+  // A marble-topped counter with a pastry case, a back bar of shelves and a chalkboard menu, a kitchen behind a
+  // partition with a serving hatch, leather banquettes along the west wall, a window ledge with stools, bistro
+  // tables under globe pendants; hex mosaic floor, wainscoting, a pressed-tin ceiling. One matched set: dark wood,
+  // oxblood leather, marble, brass, milk glass. Local x runs east, z north, from the room's centre.
+  const cafeTex = (W, H, draw, rep = true) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; draw(c.getContext('2d'), W, H);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; if (rep) t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
+  };
+  const fitCafe = (cx, cz, w, d, h, y0, T) => {
+    const X = w / 2 - T, Z = d / 2 - T, CEIL = h - 0.345;   // the room's half sizes; the ceiling (under the roof's cornice boxes)
+    const WALL = 0.023;                                     // the brick lining's depth inside the wall
+    const r = seeded(1889);
+    // ---- materials (shared by nothing else)
+    // hexagonal mosaic, 1.2 m a repeat: white hexes, grey grout, a slate rosette with a terracotta heart every 60 cm
+    const HXS = 1024 / (24 * Math.sqrt(3)), HROWS = 2 * Math.round(1024 / (3 * HXS)), HH = Math.round(HROWS * 1.5 * HXS);
+    const hexT = cafeTex(1024, HH, (g, W, H) => {
+      g.fillStyle = '#8f897c'; g.fillRect(0, 0, W, H);
+      const dark = new Set(), heart = new Set(), key = (c, rr) => `${(c + 24) % 24},${(rr + HROWS) % HROWS}`;
+      for (const [c0, r0] of [[3, 3], [15, 3], [9, 3 + HROWS / 2], [21, 3 + HROWS / 2]]) {
+        heart.add(key(c0, r0));
+        const odd = r0 % 2;
+        for (const [dc, dr] of [[-1, 0], [1, 0], [odd - 1, -1], [odd, -1], [odd - 1, 1], [odd, 1]]) dark.add(key(c0 + dc, r0 + dr));
+      }
+      for (let rr = 0; rr < HROWS; rr++) for (let c = 0; c < 24; c++) {
+        const k = key(c, rr), v = 226 + Math.floor(r() * 14);
+        g.fillStyle = heart.has(k) ? '#9a4a2e' : dark.has(k) ? '#2b312e' : `rgb(${v},${v - 4},${v - 12})`;
+        const hx = c * Math.sqrt(3) * HXS + (rr % 2) * Math.sqrt(3) * HXS / 2, hy = rr * 1.5 * HXS;
+        for (const ox of [-W, 0, W]) for (const oy of [-H, 0, H]) {
+          g.beginPath();
+          for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; g.lineTo(hx + ox + Math.cos(a) * (HXS - 1.6), hy + oy + Math.sin(a) * (HXS - 1.6)); }
+          g.fill();
+        }
+      }
+    });
+    const hexM = std({ map: hexT, roughness: 0.42 });
+    // pressed tin, 61 cm squares: a raised frame, a bevelled field and a round medallion, painted cream
+    const tinT = cafeTex(256, 256, (g, W) => {
+      g.fillStyle = '#d6cdb6'; g.fillRect(0, 0, W, W);
+      const bevel = (i, lw, lite, dk) => { g.lineWidth = lw; g.strokeStyle = lite; g.beginPath(); g.moveTo(i, W - i); g.lineTo(i, i); g.lineTo(W - i, i); g.stroke(); g.strokeStyle = dk; g.beginPath(); g.moveTo(W - i, i); g.lineTo(W - i, W - i); g.lineTo(i, W - i); g.stroke(); };
+      bevel(5, 6, '#efe8d6', '#9d947e'); bevel(30, 4, '#9d947e', '#efe8d6'); bevel(44, 3, '#ece4d0', '#a39a84');
+      const md = g.createRadialGradient(W / 2 - 10, W / 2 - 10, 4, W / 2, W / 2, 62);
+      md.addColorStop(0, '#f2ecdc'); md.addColorStop(0.7, '#cfc5ad'); md.addColorStop(1, '#a89e86');
+      g.fillStyle = md; g.beginPath(); g.arc(W / 2, W / 2, 58, 0, Math.PI * 2); g.fill();
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.fillStyle = '#e8e0cc'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * 80, W / 2 + Math.sin(a) * 80, 9, 0, Math.PI * 2); g.fill(); g.fillStyle = '#a39a84'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * 80 + 3, W / 2 + Math.sin(a) * 80 + 3, 9, 0, Math.PI); g.fill(); }
+    });
+    const tinM = std({ map: tinT, roughness: 0.5, metalness: 0.2 });
+    // the chalkboard menu over the back bar
+    const menuT = cafeTex(1024, 384, (g, W, H) => {
+      g.fillStyle = '#1e2420'; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(230,230,220,${0.02 + r() * 0.05})`; g.fillRect(r() * W, r() * H, 1 + r() * 3, 1 + r() * 2); }
+      for (let i = 0; i < 14; i++) { g.strokeStyle = 'rgba(220,220,210,0.05)'; g.lineWidth = 18 + r() * 30; g.beginPath(); const y = r() * H; g.moveTo(0, y); g.bezierCurveTo(W * 0.3, y + 40 * (r() - 0.5), W * 0.7, y + 40 * (r() - 0.5), W, y + 30 * (r() - 0.5)); g.stroke(); }
+      const chalk = 'rgba(242,238,226,0.93)';
+      g.fillStyle = chalk; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      g.font = 'bold 62px Georgia, "Times New Roman", serif'; g.fillText('PIONEER COFFEE', W / 2, 74);
+      g.font = 'italic 24px Georgia, "Times New Roman", serif'; g.fillStyle = 'rgba(232,200,120,0.9)'; g.fillText('fresh roasted on Occidental Ave  ·  est. 1889', W / 2, 108);
+      g.strokeStyle = chalk; g.lineWidth = 2; g.beginPath(); g.moveTo(90, 126); g.lineTo(W - 90, 126); g.stroke();
+      const col = (x0, title, items) => {
+        g.textAlign = 'left'; g.fillStyle = 'rgba(232,200,120,0.92)'; g.font = 'bold 30px Georgia, "Times New Roman", serif'; g.fillText(title, x0, 172);
+        g.font = '25px Georgia, "Times New Roman", serif';
+        items.forEach(([n, p], i) => {
+          const y = 212 + i * 34; g.fillStyle = chalk; g.textAlign = 'left'; g.fillText(n, x0, y);
+          g.textAlign = 'right'; g.fillText(p, x0 + 400, y);
+          g.fillStyle = 'rgba(242,238,226,0.35)'; const nw = g.measureText(p).width; g.textAlign = 'left';
+          for (let x = x0 + g.measureText(n).width + 12; x < x0 + 400 - nw - 12; x += 11) g.fillRect(x, y - 4, 3, 3);
+        });
+      };
+      g.font = '25px Georgia, "Times New Roman", serif';
+      col(70, 'ESPRESSO BAR', [['Espresso', '2.75'], ['Americano', '3.25'], ['Cappuccino', '4.25'], ['Latte', '4.50'], ['Mocha', '4.75']]);
+      col(W - 470, 'FROM THE OVEN', [['Butter croissant', '3.50'], ['Carrot cake', '4.75'], ['Morning bun', '3.75'], ['Oat scone', '3.25'], ['Pot of tea', '3.00']]);
+    });
+    const menuM = std({ map: menuT, roughness: 0.95 });
+    // old Seattle photographs for the frames (sepia, grain, vignette): Rainier over the bay, a steamer, 1st Avenue
+    const sepia = (draw) => cafeTex(512, 384, (g, W, H) => {
+      draw(g, W, H);
+      const im = g.getImageData(0, 0, W, H), px = im.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const x = (i / 4) % W, y = Math.floor(i / 4 / W), v = (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]) * (1 - 0.55 * Math.pow(Math.hypot(x / W - 0.5, y / H - 0.5) * 1.3, 2.4)) + (r() - 0.5) * 22;
+        px[i] = Math.min(255, v * 1.08 + 18); px[i + 1] = Math.min(255, v * 0.94 + 10); px[i + 2] = Math.min(255, v * 0.74);
+      }
+      g.putImageData(im, 0, 0);
+    });
+    const artMats = [
+      sepia((g, W, H) => {   // Mount Rainier over Elliott Bay
+        const sky = g.createLinearGradient(0, 0, 0, H * 0.62); sky.addColorStop(0, '#9a9a9a'); sky.addColorStop(1, '#e6e6e6'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+        g.fillStyle = '#b8b8b8'; g.beginPath(); g.moveTo(40, H * 0.62); g.lineTo(250, H * 0.2); g.lineTo(300, H * 0.24); g.lineTo(470, H * 0.62); g.fill();
+        g.fillStyle = '#f4f4f4'; g.beginPath(); g.moveTo(195, H * 0.31); g.lineTo(250, H * 0.2); g.lineTo(300, H * 0.24); g.lineTo(338, H * 0.34); g.lineTo(300, H * 0.31); g.lineTo(270, H * 0.36); g.lineTo(240, H * 0.3); g.fill();
+        g.fillStyle = '#5a5a5a'; g.fillRect(0, H * 0.6, W, H * 0.06); for (let x = 0; x < W; x += 14) g.fillRect(x, H * 0.57 - (x * 7 % 13), 9, 20);
+        const sea = g.createLinearGradient(0, H * 0.66, 0, H); sea.addColorStop(0, '#8a8a8a'); sea.addColorStop(1, '#3a3a3a'); g.fillStyle = sea; g.fillRect(0, H * 0.66, W, H);
+        g.fillStyle = '#222'; g.fillRect(320, H * 0.7, 90, 12); g.fillRect(350, H * 0.66, 10, 18);
+      }),
+      sepia((g, W, H) => {   // a steamer at the Yesler Way dock
+        g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, W, H);
+        g.fillStyle = '#4a4a4a'; g.fillRect(0, H * 0.68, W, H);
+        g.fillStyle = '#2a2a2a'; g.beginPath(); g.moveTo(70, H * 0.6); g.lineTo(450, H * 0.6); g.lineTo(420, H * 0.72); g.lineTo(100, H * 0.72); g.fill();
+        g.fillStyle = '#ececec'; g.fillRect(130, H * 0.5, 260, H * 0.1); g.fillStyle = '#d0d0d0'; g.fillRect(170, H * 0.43, 170, H * 0.07);
+        g.fillStyle = '#1a1a1a'; g.fillRect(220, H * 0.25, 20, H * 0.18); g.fillRect(280, H * 0.27, 20, H * 0.16);
+        g.fillStyle = 'rgba(80,80,80,0.5)'; for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(230 - i * 18, H * 0.22 - i * 7, 14 + i * 3, 0, Math.PI * 2); g.fill(); }
+        g.strokeStyle = '#333'; g.lineWidth = 2; g.beginPath(); g.moveTo(150, H * 0.5); g.lineTo(150, H * 0.18); g.moveTo(370, H * 0.5); g.lineTo(370, H * 0.2); g.stroke();
+        g.fillStyle = '#3a3a3a'; for (let x = 0; x < 70; x += 12) g.fillRect(x, H * 0.55, 6, H * 0.2);
+      }),
+      sepia((g, W, H) => {   // 1st Avenue: brick blocks and a cable car
+        g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, W, H);
+        for (const [x0, x1, top] of [[0, 140, 0.12], [140, 260, 0.22], [260, 400, 0.08], [400, 512, 0.18]]) {
+          g.fillStyle = ['#6a6a6a', '#808080', '#5c5c5c', '#747474'][x0 % 4 === 0 ? (x0 / 140 | 0) % 4 : 1]; g.fillRect(x0, H * top, x1 - x0, H);
+          g.fillStyle = '#2a2a2a'; for (let y = H * top + 16; y < H * 0.66; y += 34) for (let x = x0 + 12; x < x1 - 14; x += 26) g.fillRect(x, y, 12, 20);
+        }
+        g.fillStyle = '#9a9a9a'; g.fillRect(0, H * 0.74, W, H);
+        g.fillStyle = '#3a3a3a'; g.fillRect(180, H * 0.6, 150, H * 0.15); g.fillStyle = '#e0e0e0'; for (let x = 190; x < 320; x += 22) g.fillRect(x, H * 0.63, 14, 16);
+        g.fillStyle = '#1e1e1e'; for (const x of [60, 95, 400, 440]) { g.fillRect(x, H * 0.66, 9, 26); g.beginPath(); g.arc(x + 4.5, H * 0.645, 6, 0, Math.PI * 2); g.fill(); }
+      }),
+    ].map(t => std({ map: t, roughness: 0.8 }));
+    // an old painted advertisement for the partition, and a clock face
+    const adT = cafeTex(512, 256, (g, W, H) => {
+      g.fillStyle = '#7a2a20'; g.fillRect(0, 0, W, H);
+      g.strokeStyle = '#e6c27a'; g.lineWidth = 6; g.strokeRect(12, 12, W - 24, H - 24); g.lineWidth = 2; g.strokeRect(22, 22, W - 44, H - 44);
+      g.fillStyle = '#f2e6c8'; g.textAlign = 'center'; g.font = 'bold 54px Georgia, "Times New Roman", serif'; g.fillText('PIONEER', W / 2, 86);
+      g.fillStyle = '#e6c27a'; g.font = 'bold 40px Georgia, "Times New Roman", serif'; g.fillText('COFFEE & TEA', W / 2, 140);
+      g.fillStyle = '#f2e6c8'; g.font = 'italic 24px Georgia, "Times New Roman", serif'; g.fillText('roasted daily on Occidental Avenue', W / 2, 186);
+      g.font = 'bold 22px Georgia, "Times New Roman", serif'; g.fillText('—  5¢ A CUP  —', W / 2, 220);
+      for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(30,20,10,${r() * 0.18})`; g.fillRect(r() * W, r() * H, 1 + r() * 6, 1 + r() * 3); }
+    });
+    const adM = std({ map: adT, roughness: 0.85 });
+    const clockT = cafeTex(256, 256, (g, W) => {
+      g.fillStyle = '#efe8d6'; g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#1a1a1a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 26px Georgia, "Times New Roman", serif';
+      ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'].forEach((n, i) => { const a = i * Math.PI / 6; g.fillText(n, W / 2 + Math.sin(a) * 96, W / 2 - Math.cos(a) * 96); });
+      g.lineCap = 'round'; g.strokeStyle = '#1a1a1a';
+      g.lineWidth = 7; g.beginPath(); g.moveTo(W / 2, W / 2); g.lineTo(W / 2 + Math.sin(2.1) * 55, W / 2 - Math.cos(2.1) * 55); g.stroke();
+      g.lineWidth = 4; g.beginPath(); g.moveTo(W / 2, W / 2); g.lineTo(W / 2 + Math.sin(5.0) * 82, W / 2 - Math.cos(5.0) * 82); g.stroke();
+    }, false);
+    const clockM = std({ map: clockT, roughness: 0.4 });
+    const brass = std({ color: 0xb8904e, roughness: 0.32, metalness: 0.9 });
+    const leather = std({ color: 0x6a2620, roughness: 0.5 });
+    const marble = std({ color: 0xe8e3d8, roughness: 0.2 });
+    const china = std({ color: 0xf2efe8, roughness: 0.25 });
+    const glow = new THREE.MeshStandardMaterial({ color: 0xfff4e2, emissive: 0xffd49a, emissiveIntensity: 1.5, roughness: 0.4 });
+    const caseGlass = new THREE.MeshStandardMaterial({ color: 0xe6f2ee, transparent: true, opacity: 0.14, roughness: 0.04, metalness: 0.2, depthWrite: false });
+    const DARK = 0x4a3020, MID = 0x7a5436;
+    // ---- helpers, all in the room's frame (y from the floor)
+    const P = (geo, mat, x, y, z, ry = 0, o = {}) => put(geo, mat, cx + x, y0 + y, cz + z, ry, { grime: 0, ...o });
+    const box = (bw, bh, bd, mat, x, y, z, tint, ry = 0, o = {}) => P(flatBox(bw, bh, bd, scaleOf(mat)), mat, x, y + bh / 2, z, ry, { tint, ...o });
+    const S = (x, z, sw, sd, sh, y = 0, surf = 'wood') => solid(cx + x, cz + z, sw, sd, sh, y0 + y, surf);
+    const cyl = (rt, rb, ch, mat, x, y, z, tint, seg = 12) => P(new THREE.CylinderGeometry(rt, rb, ch, seg), mat, x, y + ch / 2, z, 0, { tint });
+    // a model fitted to `len` along `axis`, centred on x/z, base at y, turned ry; swap(mat) can replace a material
+    const md = (name, axis, len, x, y, z, ry = 0, match = null, swap = null) => {
+      const pc = PROPS[name] && propFit(name, match, axis, len, 0);
+      if (!pc) return null;
+      for (const { geo, mat } of pc.parts) P(geo.clone(), (swap && swap(mat)) || mat, x, y, z, ry);
+      return pc;
+    };
+    const lit = (m) => /glass|globe|bulb/i.test(m.name || '') ? glow : null;
+    const hot = (x, y, z, s) => glowsHot.push([cx + x, y0 + y, cz + z, s]);
+    const small = !LOW_DETAIL;   // the table-top clutter: left out on Mobile
+
+    // ---- floor: the mosaic, a slate border two hexes wide along the walls; the kitchen's quarry tile; a rubber mat behind the counter
+    const flat = (pw, pd, mat, x, y, z, ur, vr, tint) => {
+      const g = new THREE.PlaneGeometry(pw, pd), uv = g.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (x + (uv.getX(i) - 0.5) * pw) / ur, (-z + (uv.getY(i) - 0.5) * pd) / vr);
+      P(g, mat, x, y, z, 0, { rx: -Math.PI / 2, cast: false, tint });
+    };
+    const HU = 1.2, HV = 1.2 * HH / 1024;
+    flat(2 * X, 2 * Z, hexM, 0, 0.03, 0, HU, HV, 0xe4ddd0);
+    const KX = 4.0, KZ = -4.6;   // the kitchen: x KX..X, z -Z..KZ (partition centres)
+    for (const [bw2, bd2, bxp, bzp] of [[2 * X, 0.16, 0, Z - 0.08], [KX + X, 0.16, (KX - X) / 2, -Z + 0.08], [0.16, 2 * Z, -X + 0.08, 0], [0.16, Z - KZ, X - 0.08, (Z + KZ) / 2]])
+      flat(bw2, bd2, hexM, bxp, 0.033, bzp, HU, HV, 0x3a4440);
+    flat(X - KX, KZ + Z, M.tile, (X + KX) / 2, 0.036, (KZ - Z) / 2, 0.6, 0.6, 0xb0583a);
+    flat(6.2, 0.9, M.rubber, -3.6, 0.036, -5.9, 0.5, 0.5, 0x2a2a2a);
+
+    // ---- ceiling: pressed tin, a dark crown moulding round the walls
+    { const g = new THREE.PlaneGeometry(2 * X, 2 * Z), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2 * X / 0.61, uv.getY(i) * 2 * Z / 0.61); P(g, tinM, 0, CEIL - 0.003, 0, 0, { rx: Math.PI / 2, cast: false, tint: 0xbdb39c }); }
+    for (const [mw, md2, mx, mz] of [[2 * X, 0.12, 0, Z - WALL - 0.06], [2 * X, 0.12, 0, -Z + WALL + 0.06], [0.12, 2 * Z - 2 * WALL - 0.25, X - WALL - 0.06, 0], [0.12, 2 * Z - 2 * WALL - 0.25, -X + WALL + 0.06, 0]])
+      box(mw, 0.16, md2, M.wood, mx, CEIL - 0.165, mz, DARK);
+
+    // ---- the counter: dark panelled front, marble top, brass foot rail; customers' side faces north
+    const C0 = -7.0, C1 = 0.6, CZ = -4.2, CL = C1 - C0, CM = (C0 + C1) / 2;
+    box(CL, 0.92, 0.66, M.wood, CM, 0.1, CZ, DARK);
+    box(CL - 0.04, 0.1, 0.58, M.dark, CM, 0, CZ - 0.02, 0x1a1a1a);   // a recessed toe kick
+    for (let i = 0; i < Math.round(CL / 0.95); i++) { const px = C0 + (i + 0.5) * CL / Math.round(CL / 0.95); box(0.78, 0.6, 0.02, M.wood, px, 0.26, CZ + 0.34, MID); box(0.62, 0.44, 0.012, M.wood, px, 0.34, CZ + 0.355, DARK); }
+    box(CL + 0.12, 0.05, 0.8, marble, CM, 1.02, CZ + 0.04, 0xf4f0ea);
+    { const g = new THREE.CylinderGeometry(0.025, 0.025, CL - 0.3, 10); g.rotateZ(Math.PI / 2); P(g, brass, CM, 0.2, CZ + 0.55); for (let i = 0; i < 5; i++) box(0.03, 0.06, 0.24, brass, C0 + 0.3 + i * (CL - 0.6) / 4, 0.17, CZ + 0.44); }
+    S(CM, CZ, CL, 0.7, 1.07);
+    // on the counter: the register, a tip jar, cups, the milk jug and the pastry case at the end
+    box(0.42, 0.2, 0.36, M.dark, -5.7, 1.07, CZ - 0.02, 0x2a2622); box(0.4, 0.14, 0.2, M.dark, -5.7, 1.27, CZ - 0.1, 0x2a2622, 0, { rx: -0.5 });
+    box(0.2, 0.02, 0.14, brass, -5.7, 1.27, CZ + 0.1);
+    if (small) {
+      cyl(0.06, 0.055, 0.16, caseGlass, -5.1, 1.07, CZ + 0.15);
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 4 + i; k++) cyl(0.045, 0.035, 0.09, china, -4.6 + i * 0.13, 1.07 + k * 0.07, CZ - 0.15);
+      md('ph_teaset', 'x', 0.9, -3.4, 1.07, CZ + 0.02, 0.2);
+      md('ph_jug', 'x', 0.26, -2.4, 1.07, CZ - 0.1, 2.4);
+    }
+    const PC = -0.55, PL = 1.8;
+    box(PL, 0.06, 0.5, M.wood, PC, 1.07, CZ, DARK);
+    box(PL - 0.04, 0.46, 0.46, caseGlass, PC, 1.13, CZ, undefined, 0, { cast: false });
+    box(PL - 0.08, 0.012, 0.42, caseGlass, PC, 1.36, CZ, undefined, 0, { cast: false });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.025, 0.47, 0.025, brass, PC + sx * (PL / 2 - 0.02), 1.13, CZ + sz * 0.23);
+    box(PL, 0.03, 0.5, M.wood, PC, 1.59, CZ, DARK);
+    md('ph_cake', 'x', 0.26, PC - 0.5, 1.13, CZ); md('ph_cake', 'x', 0.26, PC + 0.45, 1.13, CZ + 0.02, 1.1);
+    for (let i = 0; i < 5; i++) md('ph_croissant', 'x', 0.17, PC - 0.62 + i * 0.3, 1.372, CZ + (i % 2 ? 0.07 : -0.06), (i % 3) * 0.6);
+
+    // ---- the back bar along the south wall: cabinets with a marble top, two shelves on brass brackets, the menu above
+    const BB = -Z + WALL, BW = BB + 0.035;          // the brick's face, the wainscot's
+    const B0 = -X + WALL + 0.035, B1 = -2.4, BL = B1 - B0, BM = (B0 + B1) / 2, BZ = BW + 0.28;
+    box(BL, 0.9, 0.56, M.wood, BM, 0, BZ, DARK);
+    for (let i = 0; i < Math.round(BL / 0.6); i++) { const px = B0 + (i + 0.5) * BL / Math.round(BL / 0.6); box(0.52, 0.66, 0.02, M.wood, px, 0.14, BZ + 0.285, MID); box(0.03, 0.12, 0.03, brass, px + 0.18, 0.62, BZ + 0.3); }
+    box(BL + 0.04, 0.04, 0.6, marble, BM, 0.9, BZ + 0.02, 0xf4f0ea);
+    S(BM, BZ, BL, 0.56, 0.94);
+    for (const sy of [1.55, 1.98]) {
+      box(BL - 0.4, 0.035, 0.26, M.wood, BM, sy, BB + 0.13, DARK);
+      for (let i = 0; i < 4; i++) box(0.025, 0.14, 0.2, brass, B0 + 0.4 + i * (BL - 0.8) / 3, sy - 0.14, BB + 0.1);
+    }
+    if (small) {
+      for (let i = 0; i < 4; i++) md('ph_bottles', 'x', 0.6, B0 + 0.7 + i * 1.25, 2.015, BB + 0.12);
+      for (let i = 0; i < 12; i++) { cyl(0.045, 0.035, 0.09, china, B0 + 0.5 + i * 0.38, 1.585, BB + 0.12); if (i % 3 === 0) cyl(0.07, 0.07, 0.012, china, B0 + 0.62 + i * 0.38, 1.585, BB + 0.13); }
+      // jars of beans on the counter top, a grinder
+      for (let i = 0; i < 4; i++) { cyl(0.075, 0.075, 0.22, caseGlass, B0 + 0.5 + i * 0.22, 0.94, BZ - 0.08); cyl(0.07, 0.07, 0.15, M.wood, B0 + 0.5 + i * 0.22, 0.945, BZ - 0.08, 0x3a2414, 10); cyl(0.078, 0.078, 0.025, brass, B0 + 0.5 + i * 0.22, 1.16, BZ - 0.08); }
+      box(0.22, 0.34, 0.24, M.dark, -3.6, 0.94, BZ - 0.02, 0x8a1e1a); cyl(0.07, 0.1, 0.2, caseGlass, -3.6, 1.28, BZ - 0.02);
+    }
+    md('ph_espresso', 'y', 1.72, -1.15, 0, BW + 0.55, Math.PI);
+    S(-1.15, BW + 0.55, 1.5, 0.75, 1.1, 0, 'metal');
+    // the menu: framed in dark wood
+    const MX = (B0 + B1) / 2, MY = 3.08, MW = 4.0, MH = 1.45;
+    { const g = new THREE.PlaneGeometry(MW, MH); P(g, menuM, MX, MY, BB + 0.012, 0, { cast: false }); }
+    for (const [fw, fh, fx, fy] of [[MW + 0.16, 0.08, 0, MH / 2 + 0.04], [MW + 0.16, 0.08, 0, -MH / 2 - 0.04], [0.08, MH, MW / 2 + 0.04, 0], [0.08, MH, -MW / 2 - 0.04, 0]])
+      box(fw, fh, 0.05, M.wood, MX + fx, MY + fy - fh / 2, BB + 0.025, DARK);
+
+    // ---- the kitchen: plaster partitions with a door and a serving hatch, quarry tile, steel shelving and a prep table
+    const PT = 0.15, plaster = (pw, ph, pd, x, y, z) => { box(pw, ph, pd, M.plaster, x, y, z, 0xeae2cc); S(x, z, pw, pd, ph, y, 'concrete'); };
+    const ND0 = 5.0, ND1 = 6.0, HZ0 = -6.7, HZ1 = -5.5;
+    plaster(ND0 - KX + PT / 2, CEIL, PT, (KX - PT / 2 + ND0) / 2, 0, KZ);
+    plaster(X - ND1, CEIL, PT, (ND1 + X) / 2, 0, KZ);
+    plaster(ND1 - ND0, CEIL - 2.25, PT, (ND0 + ND1) / 2, 2.25, KZ);
+    plaster(PT, CEIL, HZ0 + Z, KX, 0, (HZ0 - Z) / 2);
+    plaster(PT, CEIL, KZ - PT / 2 - HZ1, KX, 0, (HZ1 + KZ - PT / 2) / 2);
+    plaster(PT, 1.0, HZ1 - HZ0, KX, 0, (HZ0 + HZ1) / 2);
+    plaster(PT, CEIL - 2.1, HZ1 - HZ0, KX, 2.1, (HZ0 + HZ1) / 2);
+    box(0.36, 0.05, HZ1 - HZ0 + 0.1, M.wood, KX, 1.0, (HZ0 + HZ1) / 2, MID);   // the hatch's shelf
+    // wainscoting on the partitions' café sides, the old painted ad and a clock on the north one
+    const pw = (a, b, top, along, face) => {   // along x at z = face (facing north), or along z at x = face (facing west)
+      const L = b - a, m = (a + b) / 2, pb = (len, hh, dep, o, yb, tint) => box(along ? len : dep, hh, along ? dep : len, M.wood, along ? m : face - o, yb, along ? face + o : m, tint);
+      pb(L - 0.008, top - 0.012, 0.035, 0.0175, 0, 0x8a6446); pb(L, 0.17, 0.05, 0.025, 0, 0x4a3020); pb(L, 0.055, 0.065, 0.0325, top - 0.055, 0x5a3a26);
+    };
+    const NF = KZ + PT / 2, WFp = KX - PT / 2;
+    pw(KX - PT / 2, ND0, 1.15, true, NF); pw(ND1, X - WALL - 0.035, 1.15, true, NF);
+    pw(-Z + WALL + 0.035, HZ0, 1.15, false, WFp); pw(HZ0, HZ1, 0.93, false, WFp); pw(HZ1, NF, 1.15, false, WFp);
+    { const ax = (ND1 + X - WALL) / 2; P(new THREE.PlaneGeometry(1.8, 0.9), adM, ax, 2.55, NF + 0.004, 0, { cast: false }); }
+    { const kx = (WFp + ND0) / 2; P(new THREE.CircleGeometry(0.29, 32), clockM, kx, 2.7, NF + 0.03, 0, { cast: false }); P(new THREE.TorusGeometry(0.3, 0.025, 8, 32), brass, kx, 2.7, NF + 0.03); P(new THREE.CylinderGeometry(0.3, 0.3, 0.025, 32), M.wood, kx, 2.7, NF + 0.0135, 0, { rx: Math.PI / 2, tint: DARK }); }
+    for (const [fx2, fz2, fw2, fd2, fh2, fy2] of [[ND0 + 0.04, KZ, 0.08, PT + 0.04, 2.25, 0], [ND1 - 0.04, KZ, 0.08, PT + 0.04, 2.25, 0], [(ND0 + ND1) / 2, KZ, ND1 - ND0, PT + 0.04, 0.08, 2.2]])
+      box(fw2, fh2, fd2, M.wood, fx2, fy2, fz2, DARK);
+    // prep table along the east wall, steel shelving on the south one
+    { const tx = X - WALL - 0.42, tz = (HZ0 + KZ) / 2 - 0.2;
+      box(0.75, 0.04, 1.7, M.metal, tx, 0.88, tz, 0xd8dadc); box(0.7, 0.03, 1.6, M.metal, tx, 0.2, tz, 0xc8cacc);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.04, 0.9, 0.04, M.metal, tx + sx * 0.32, 0, tz + sz * 0.78, 0xb8babc);
+      S(tx, tz, 0.75, 1.7, 0.92, 0, 'metal');
+      cyl(0.17, 0.17, 0.3, M.metal, tx, 0.92, tz - 0.4, 0xc0c4c8, 16); cyl(0.13, 0.13, 0.12, M.metal, tx + 0.05, 0.92, tz + 0.35, 0x8a8e92, 14);
+      box(0.4, 0.03, 0.28, M.wood, tx - 0.05, 0.92, tz + 0.05, 0xb08a5a); }
+    if (PROPS.ph_shelfunit) {
+      const one = propFit('ph_shelfunit', null, 'y', 2.0, 0), sx0 = (KX + X) / 2 - 0.3, sz0 = -Z + WALL + 0.035 + one.size.z / 2;
+      md('ph_shelfunit', 'y', 2.0, sx0, 0, sz0);
+      S(sx0, sz0, one.size.x, one.size.z, 2.0, 0, 'metal');
+      for (const f of [0.02, 0.36, 0.69]) for (let i = 0; i < 2; i++) md('ph_cbox', 'x', one.size.x * 0.44, sx0 + (i - 0.5) * one.size.x * 0.48, 2.0 * f + 0.03, sz0, i * 0.1);
+    }
+    hot((KX + X) / 2, CEIL - 0.6, (KZ - Z) / 2, 0.6);
+    cyl(0.006, 0.006, 0.5, M.dark, (KX + X) / 2, CEIL - 0.5, (KZ - Z) / 2); P(new THREE.SphereGeometry(0.06, 10, 8), glow, (KX + X) / 2, CEIL - 0.6, (KZ - Z) / 2, 0, { cast: false });
+
+    // ---- bistro tables: a round marble top on a cast-iron pedestal; chairs (dark wood, leather seats) around them
+    const chairFace = Math.PI;   // the model's front faces -z
+    const chair = (x, z, toward) => {
+      const ry = Math.atan2(toward[0] - x, toward[1] - z) + chairFace + (r() - 0.5) * 0.35;
+      if (!md('ph_dchair', 'y', 0.95, x, 0, z, ry)) return;
+      S(x, z, 0.46, 0.46, 0.9).pass = true;   // (stops you, not bullets)
+    };
+    const bistro = (x, z, rad, seats, cups = seats) => {
+      P(new THREE.CylinderGeometry(rad, rad, 0.035, 28), marble, x, 0.745, z, 0, { tint: 0xf6f2ec });
+      P(new THREE.CylinderGeometry(rad + 0.012, rad + 0.012, 0.02, 28), brass, x, 0.72, z);
+      cyl(0.03, 0.04, 0.7, M.iron, x, 0.03, z, 0x1f2422, 10);
+      P(new THREE.CylinderGeometry(0.06, 0.24, 0.05, 16), M.iron, x, 0.055, z, 0, { tint: 0x1f2422 });
+      S(x, z, rad * 1.5, rad * 1.5, 0.06, 0.71);
+      for (const a of seats) chair(x + Math.sin(a) * (rad + 0.34), z + Math.cos(a) * (rad + 0.34), [x, z]);
+      if (!small) return;
+      const cup = (ox, oz) => { md('ph_teaset', 'x', 0.15, x + ox, 0.763, z + oz, r() * 6, /saucer_circular_04/); md('ph_teaset', 'x', 0.11, x + ox, 0.778, z + oz + 0.01, r() * 6, /cup_small_01$/); };
+      cup(Math.sin(cups[0]) * rad * 0.55, Math.cos(cups[0]) * rad * 0.55);
+      if (cups.length > 1 && r() < 0.6) cup(Math.sin(cups[1]) * rad * 0.55, Math.cos(cups[1]) * rad * 0.55);
+      if (r() < 0.5) { cyl(0.09, 0.09, 0.012, china, x - 0.05, 0.763, z + 0.1); md('ph_croissant', 'x', 0.15, x - 0.05, 0.775, z + 0.1, r() * 3); }
+      cyl(0.025, 0.028, 0.09, caseGlass, x + 0.08, 0.763, z - 0.08); cyl(0.027, 0.027, 0.03, M.metal, x + 0.08, 0.853, z - 0.08, 0xd0d4d8);
+    };
+    // pendants: a milk-glass globe on a brass fitter, hung on its cord from the tin
+    const pendant = (x, z, low = 2.32) => {
+      if (md('ph_globe', 'y', 0.95, x, low, z, 0, null, lit)) cyl(0.005, 0.005, CEIL - low - 0.95, M.dark, x, low + 0.95, z, undefined, 4);
+      else { cyl(0.005, 0.005, CEIL - low - 0.2, M.dark, x, low + 0.2, z, undefined, 4); P(new THREE.SphereGeometry(0.18, 14, 10), glow, x, low + 0.12, z, 0, { cast: false }); }
+      cyl(0.08, 0.08, 0.02, brass, x, CEIL - 0.02, z);
+      hot(x, low + 0.2, z, 0.9);
+    };
+    const MIDT = [[-3.6, -1.7, [Math.PI / 2, -Math.PI / 2]], [0.1, -1.4, [0, Math.PI, Math.PI / 2]], [3.7, -2.2, [Math.PI / 2, -Math.PI / 2]], [-3.0, 2.7, [Math.PI / 2, -Math.PI / 2, Math.PI]], [0.7, 3.5, [Math.PI / 2, -Math.PI / 2]], [4.3, 1.2, [0, Math.PI]]];
+    for (const [x, z, seats] of MIDT) { bistro(x, z, 0.38, seats); pendant(x, z); }
+    for (const px of [-5.6, -3.1, -0.6]) pendant(px, CZ, 2.5);
+
+    // ---- banquettes along the west wall: oxblood leather on a dark wood base, small tables in front
+    const WF = -X + WALL + 0.035;   // the wainscot's face
+    for (const [z0, z1] of [[-3.3, 0.75], [3.25, Z - WALL - 0.04]]) {
+      const L = z1 - z0, zm = (z0 + z1) / 2;
+      box(0.52, 0.4, L, M.wood, WF + 0.27, 0, zm, DARK);
+      P(worldBox(0.5, 0.09, L - 0.02, 0, 0.035), leather, WF + 0.28, 0.445, zm);
+      for (let i = 0; i < Math.round(L / 0.62); i++) P(worldBox(0.13, 0.56, L / Math.round(L / 0.62) - 0.02, 0, 0.05), leather, WF + 0.075, 0.82, z0 + (i + 0.5) * L / Math.round(L / 0.62), 0, { rz: 0.08 });
+      box(0.16, 0.06, L, M.wood, WF + 0.08, 1.12, zm, DARK);
+      S(WF + 0.27, zm, 0.54, L, 0.49); S(WF + 0.08, zm, 0.16, L, 1.18);
+      for (const tz of [z0 + L * 0.27, z0 + L * 0.73]) bistro(WF + 0.95, tz, 0.3, [Math.PI / 2], [-Math.PI / 2, Math.PI / 2]);
+    }
+    // sconces between the paintings above the banquettes; paintings in gilt frames on the brick
+    const brickFace = (side) => side * (X - WALL);   // x of the west (-1) or east (1) wall's brick
+    const sconce = (x, z, ry, nx, nz) => {
+      const pc = PROPS.ph_sconce && propFit('ph_sconce', null, 'y', 0.36, 0);
+      if (!pc) return;
+      md('ph_sconce', 'y', 0.36, x + nx * pc.size.z / 2, 1.78, z + nz * pc.size.z / 2, ry, null, lit);
+      hot(x + nx * 0.18, 1.86, z + nz * 0.18, 0.55);
+    };
+    const NOGLASS = /^(?!.*glass)/i;   // (the frames' glass draws as a dark sheet over the picture)
+    const art = (name, len, x, y, z, ry, nx, nz, pic = -1) => {
+      const pc = PROPS[name] && propFit(name, NOGLASS, 'x', len, 0);
+      if (pc) md(name, 'x', len, x + nx * (pc.size.z / 2 + 0.004), y - pc.size.y / 2, z + nz * (pc.size.z / 2 + 0.004), ry, NOGLASS, (m) => pic >= 0 && /canvas|artwork/i.test(m.name || '') ? artMats[pic] : null);
+    };
+    art('ph_painting', 1.0, brickFace(-1), 2.15, -2.25, Math.PI / 2, 1, 0);
+    art('ph_photo', 0.9, brickFace(-1), 2.1, 4.25, Math.PI / 2, 1, 0, 0);
+    art('ph_photo', 0.95, brickFace(-1), 2.1, 6.55, Math.PI / 2, 1, 0, 1);
+    art('ph_photo', 0.85, brickFace(-1), 2.1, -0.15, Math.PI / 2, 1, 0, 2);
+    sconce(brickFace(-1), -1.2, Math.PI / 2, 1, 0); sconce(brickFace(-1), 5.4, Math.PI / 2, 1, 0);
+    art('ph_photo', 1.0, brickFace(1), 2.1, 2.62, -Math.PI / 2, -1, 0);
+    sconce(brickFace(1), -1.5, -Math.PI / 2, -1, 0);
+    art('ph_painting', 0.95, -1.7, 2.25, Z - WALL, Math.PI, 0, -1, 0);
+    art('ph_photo', 0.95, 2.7, 2.2, Z - WALL, Math.PI, 0, -1, 1);
+
+    // ---- the window ledge on the north wall, stools along it
+    { const lx0 = -3.25, lx1 = 3.6, ll = lx1 - lx0, lz = Z - WALL - 0.035 - 0.2;
+      box(ll, 0.05, 0.4, M.wood, (lx0 + lx1) / 2, 1.03, lz, MID);
+      for (let i = 0; i < 4; i++) box(0.04, 0.22, 0.3, brass, lx0 + 0.3 + i * (ll - 0.6) / 3, 0.82, lz + 0.03);
+      S((lx0 + lx1) / 2, lz, ll, 0.4, 0.06, 1.0);
+      for (const sx of [-2.6, -1.3, 0.05, 1.4, 2.75]) {
+        const sz = lz - 0.55;
+        P(new THREE.CylinderGeometry(0.18, 0.17, 0.06, 18), leather, sx, 0.74, sz);
+        P(new THREE.TorusGeometry(0.17, 0.018, 6, 18), M.wood, sx, 0.715, sz, 0, { rx: Math.PI / 2, tint: DARK });
+        for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; P(new THREE.CylinderGeometry(0.018, 0.022, 0.72, 6), M.wood, sx + Math.sin(a) * 0.13, 0.36, sz + Math.cos(a) * 0.13, 0, { tint: DARK, rx: Math.cos(a) * 0.08, rz: -Math.sin(a) * 0.08 }); }
+        P(new THREE.TorusGeometry(0.15, 0.012, 5, 16), brass, sx, 0.26, sz, 0, { rx: Math.PI / 2 });
+        S(sx, sz, 0.38, 0.38, 0.77).pass = true;
+        if (small && r() < 0.5) md('ph_teaset', 'x', 0.11, sx + 0.05, 1.08, lz + 0.05, r() * 6, /cup_small_01$/);
+      }
+      pendant(-0.9, lz - 0.1, 2.45); pendant(2.0, lz - 0.1, 2.45);
+    }
+
+    // ---- plants in the corners by the doors
+    for (const [px, pz] of [[X - WALL - 0.45, Z - WALL - 0.45], [X - WALL - 0.4, -1.45], [1.0, -Z + WALL + 0.45]]) { if (md('ph_plant', 'y', 1.05, px, 0, pz, r() * 6)) S(px, pz, 0.5, 0.5, 0.45, 0, 'wood'); }
+
+    // ---- the room's light: one warm lamp over the tables (pendants and sconces glow; they don't light)
+    const Lt = new THREE.PointLight(0xffc98e, 10, 14, 1.6); Lt.position.set(cx - 1, y0 + 3.2, cz); Lt.userData.mapLight = true; group.add(Lt);
   };
 
   // sandbag: a pillowy bag that pinches at the ends, so rows nest into each other
@@ -2562,7 +2940,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
 
   // ---------- street dressing: puddles, litter, posters (all batched, no extra draw calls) ----------
   if (street) {
-    const blocked = (x, z, r) => HOLES.some(h => x > h[0] - r && x < h[2] + r && z > h[1] - r && z < h[3] + r) || physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
+    const blocked = (x, z, r) => HOLES.some(h => x > h[0] - r && x < h[2] + r && z > h[1] - r && z < h[3] + r) || interiors.some(h => x > h[0] - r && x < h[2] + r && z > h[1] - r && z < h[3] + r) || physics.boxes.some(b => b.maxy > 0.2 && b.miny < 2 && x > b.minx - r && x < b.maxx + r && z > b.minz - r && z < b.maxz + r);
     const inside = (x, z) => Math.abs(x) < HX - 3 && Math.abs(z) < HZ - 3;
     // rain puddles: near-black water that mirrors the dusk sky, soft-edged, in the open streets
     const puddleMat = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.8,

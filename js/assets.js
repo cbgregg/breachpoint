@@ -79,12 +79,13 @@ const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/model
 // map only downloads its own (setProp names them veh_<slot>). A map built before they arrive, or a model that
 // fails to load, uses the procedural vehicle instead.
 const vehicleLoads = new Map();
+// a map's own furnishing (CC0, Poly Haven), loaded with its vehicles: Pioneer Square's café
+const MAP_PROPS = { pioneer: ['ph_dchair', 'ph_globe', 'ph_sconce', 'ph_painting', 'ph_photo', 'ph_plant', 'ph_espresso', 'ph_croissant', 'ph_cake', 'ph_teaset', 'ph_jug'] };
 export function loadMapVehicles(mapId) {
-  return Promise.all((VEHICLES_BY_MAP[mapId] || []).map(slot => {
-    const name = 'veh_' + slot;
+  return Promise.all([...(VEHICLES_BY_MAP[mapId] || []).map(s => 'veh_' + s), ...(MAP_PROPS[mapId] || [])].map(name => {
     if (!vehicleLoads.has(name)) vehicleLoads.set(name, new GLTFLoader().loadAsync(`assets/models/${name}.glb`)
       .then(g => setProp(name, g.scene))
-      .catch(e => console.warn('Vehicle model unavailable, using procedural:', name, e)));
+      .catch(e => console.warn('Model unavailable, using procedural:', name, e)));
     return vehicleLoads.get(name);
   }));
 }
