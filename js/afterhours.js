@@ -1,14 +1,13 @@
-// Afterhours: an arcade that kept going after the building ran out. You come in through the backrooms, a low
-// maze of humming mono-yellow wallpaper and damp carpet, and out into a hall that is far too big: a cosmic
-// arcade carpet, rows of cabinets glowing at nobody, claw machines, air hockey, a ball pit, and a prize tower in
-// the middle under a drop ceiling twelve metres up. Not scary, just wrong in a fun way: a cabinet row hangs
-// upside down from the ceiling, cabinets float, there's a doorway to nowhere and the exit signs disagree.
+// Afterhours: an arcade that kept going after the building ran out, the kind you only find in a dream. Far too
+// big and very quiet: a glowing cosmic carpet, cabinets playing to nobody, a starfield where the ceiling should
+// be, long neon tubes hanging in it. Nothing is scary, just slightly wrong: a cabinet row hangs upside down
+// from the sky, cabinets float, there's a lit doorway to nowhere and the PRIZES signs point both ways.
 //
-// It plays vertically, arena-shooter style. Point-mirrored. Three heights: the backrooms maze under each team's
-// deck (2.9 m walls under a 3.7 m deck), the arcade floor, and the upper level at 4 m: each team's deck over its
-// maze, a long carpeted ramp up to it along the side wall, a bridge from the deck to the prize tower's top, and a
-// second ramp from the floor straight up the tower's flank. The tower top is the power spot, reachable from
-// both bridges and both ramps.
+// It plays vertically, arena-shooter style. Point-mirrored. Three heights: a funhouse mirror maze under each
+// team's deck (chrome panels and a checkerboard floor, 2.9 m walls under a 3.7 m deck), the arcade floor, and
+// the upper level at 4 m: each team's deck over its maze, a long carpeted ramp up to it along the side wall, a
+// bridge from the deck to the prize tower's top, and a second ramp from the floor straight up the tower's
+// flank. The tower top is the power spot, reachable from both bridges and both ramps.
 import * as THREE from 'three';
 
 const HX = 36, HZ = 26;          // the hall's inside walls
@@ -22,10 +21,10 @@ const SPAWNS = [[33, -22], [33, -15], [33, -8], [31, -2], [33, 4], [33, 10], [31
 export const AFTERHOURS = {
   id: 'afterhours',
   name: 'Afterhours',
-  blurb: 'An arcade at the end of the backrooms: a yellow maze under each team\'s deck, a hall that\'s far too big, ramps and bridges up to the prize tower',
+  blurb: 'A dreamlike arcade that goes on too long: mirror mazes under each team\'s deck, a starfield for a ceiling, ramps and bridges up to the prize tower',
   bounds: { hx: HX + 1, hz: HZ + 1 },
   skyline: false,
-  look: { exposure: 0.95, env: 0.5, hemi: 0.75, hemiSky: 0xfff2c8, ground: 0x4a3a58, fog: 0.004, fogColor: 0x2a2236, sun: 0.0, sunColor: 0xfff4d0 },
+  look: { exposure: 1.0, env: 0.7, hemi: 0.9, hemiSky: 0xd8c8ff, ground: 0x3a2a58, fog: 0.004, fogColor: 0x1a1030, sun: 0.0, sunColor: 0xfff4d0 },
   spawns: SPAWNS,
   pickups: [
     { type: 'health', pos: [0, UP, 2.5] }, { type: 'ammo', pos: [0, UP, -2.5] },
@@ -47,20 +46,20 @@ function canvasTex(w, h, draw, rep = true) {
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
-// the backrooms: mono-yellow wallpaper, a faint vertical chevron stripe, water stains
-const wallpaperTex = () => canvasTex(256, 256, (g, W) => {
+// the walls: deep indigo with a faint 80s pattern of triangles and dashes
+const wallTex = () => canvasTex(256, 256, (g, W) => {
   const r = rng(3);
-  g.fillStyle = '#c8b45e'; g.fillRect(0, 0, W, W);
-  for (let x = 0; x < W; x += 16) {
-    g.strokeStyle = 'rgba(150,128,60,0.35)'; g.lineWidth = 2;
-    g.beginPath(); for (let y = 0; y <= W; y += 16) { g.lineTo(x + ((y / 16) % 2 ? 5 : 11), y); } g.stroke();
+  g.fillStyle = '#1c1238'; g.fillRect(0, 0, W, W);
+  for (let i = 0; i < 26; i++) {
+    const x = r() * W, y = r() * W, c = ['rgba(255,63,208,0.22)', 'rgba(41,240,255,0.2)', 'rgba(162,107,255,0.25)'][i % 3];
+    g.strokeStyle = c; g.lineWidth = 3;
+    if (i % 2) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 18, y + 4); g.lineTo(x + 6, y + 18); g.closePath(); g.stroke(); }
+    else { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 24, y - 10); g.stroke(); }
   }
-  for (let i = 0; i < 6; i++) { const x = r() * W, y = r() * W, rad = 20 + r() * 50, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(120,96,40,0.18)'); gr.addColorStop(1, 'rgba(120,96,40,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
 });
-const damplCarpetTex = () => canvasTex(256, 256, (g, W) => {
-  const r = rng(9);
-  g.fillStyle = '#a8955e'; g.fillRect(0, 0, W, W);
-  for (let i = 0; i < 9000; i++) { const v = 120 + r() * 60; g.fillStyle = `rgba(${v},${v * 0.88},${v * 0.55},0.35)`; g.fillRect(r() * W, r() * W, 1.5, 1.5); }
+// the mirror maze's floor: a glossy black-and-white checkerboard
+const checkerTex = () => canvasTex(256, 256, (g, W) => {
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#f2f0f6' : '#121018'; g.fillRect(i * 64, j * 64, 64, 64); }
 });
 // the arcade carpet: deep navy with neon squiggles, zig-zags, rings and triangles
 const arcadeCarpetTex = () => canvasTex(512, 512, (g, W) => {
@@ -75,10 +74,12 @@ const arcadeCarpetTex = () => canvasTex(512, 512, (g, W) => {
     else { g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + 20, y - 25, x + 35, y + 25, x + 55, y); g.stroke(); }
   }
 });
-const ceilingTex = () => canvasTex(256, 256, (g, W) => {
-  g.fillStyle = '#d8d2bc'; g.fillRect(0, 0, W, W);
-  const r = rng(5); for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(150,140,110,${r() * 0.2})`; g.fillRect(r() * W, r() * W, 1, 1); }
-  g.strokeStyle = '#8a8470'; g.lineWidth = 4; g.strokeRect(0, 0, W, W);
+// where the ceiling should be: a deep starfield with a faint violet haze
+const voidTex = () => canvasTex(1024, 1024, (g, W) => {
+  const r = rng(5);
+  const gr = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W * 0.7); gr.addColorStop(0, '#2a1450'); gr.addColorStop(1, '#05030c');
+  g.fillStyle = gr; g.fillRect(0, 0, W, W);
+  for (let i = 0; i < 1600; i++) { const a = r(); g.fillStyle = a < 0.85 ? `rgba(255,255,255,${0.3 + r() * 0.7})` : a < 0.93 ? 'rgba(255,140,230,0.9)' : 'rgba(140,240,255,0.9)'; const sz = r() < 0.95 ? 1.5 : 3; g.fillRect(r() * W, r() * W, sz, sz); }
 });
 // a cabinet's screen: an original made-up game (blocky ships, stars, a score, INSERT COIN)
 const screenTex = (seed) => canvasTex(128, 160, (g, W, H) => {
@@ -105,20 +106,20 @@ function build(ctx) {
   const T = THREE;
   const std = (o) => new T.MeshStandardMaterial({ vertexColors: true, ...o });
   Object.assign(M, {
-    wallpaper: std({ map: wallpaperTex(), roughness: 0.95 }),
-    dampCarpet: std({ map: damplCarpetTex(), roughness: 1 }),
+    wall: std({ map: wallTex(), roughness: 0.6 }),
+    checker: std({ map: checkerTex(), roughness: 0.15, metalness: 0.1 }),
+    mirror: std({ color: 0xffffff, roughness: 0.04, metalness: 1, envMapIntensity: 1.8 }),
     arcadeCarpet: std({ map: arcadeCarpetTex(), roughness: 1, emissive: 0xffffff, emissiveMap: null, emissiveIntensity: 0 }),
-    ceilTile: std({ map: ceilingTex(), roughness: 0.9, emissive: 0xffffff, emissiveMap: null, emissiveIntensity: 0.45 }),
+    void: new T.MeshBasicMaterial({ map: voidTex(), side: T.DoubleSide, fog: false }),
     cabinet: std({ color: 0xffffff, roughness: 0.5, metalness: 0.1 }),
     glassCase: new T.MeshStandardMaterial({ color: 0xbfe8ff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25, depthWrite: false }),
-    fluoro: new T.MeshStandardMaterial({ color: 0xfffbe8, emissive: 0xfff6d0, emissiveIntensity: 2.4 }),
+    tube: new T.MeshStandardMaterial({ color: 0xf4e8ff, emissive: 0xe8d8ff, emissiveIntensity: 2.6 }),
     neonPink: new T.MeshStandardMaterial({ color: 0xff3fd0, emissive: 0xff3fd0, emissiveIntensity: 3 }),
     neonCyan: new T.MeshStandardMaterial({ color: 0x29f0ff, emissive: 0x29f0ff, emissiveIntensity: 3 }),
     neonYellow: new T.MeshStandardMaterial({ color: 0xfff04a, emissive: 0xfff04a, emissiveIntensity: 2.5 }),
   });
-  M.ceilTile.emissiveMap = M.ceilTile.map;   // the drop ceiling glows a little, lit by its own panels
   M.arcadeCarpet.emissiveMap = M.arcadeCarpet.map; M.arcadeCarpet.emissiveIntensity = 0.35;   // the UV glow
-  Object.assign(S, { wallpaper: 3, dampCarpet: 3, arcadeCarpet: 6, ceilTile: 1.2, cabinet: 0 });
+  Object.assign(S, { wall: 3, checker: 2.4, arcadeCarpet: 6, mirror: 0, cabinet: 0 });
   const rnd = rng(2077);
   const both = (f) => { f(1); f(-1); };
   const SB = (mat, w, h, d, x, y, z, opts = {}, surf = 'concrete') => { const b = solid(x, z, w, d, h, y, surf); B(mat, w, h, d, x, y, z, 0, { grime: 0, ...opts }); return b; };
@@ -141,22 +142,22 @@ function build(ctx) {
 
   // ---------- the hall: floor, walls, ceiling, lights ----------
   plane(M.arcadeCarpet, 2 * DECK_X, 2 * HZ, 0, 0, 0.005);
-  both((s) => plane(M.dampCarpet, HX - DECK_X, 2 * HZ, s * (DECK_X + HX) / 2, 0, 0.006));
+  both((s) => plane(M.checker, HX - DECK_X, 2 * HZ, s * (DECK_X + HX) / 2, 0, 0.006));
   for (const [x, z, w, d] of [[0, HZ + 0.5, 2 * HX + 2, 1], [0, -(HZ + 0.5), 2 * HX + 2, 1], [HX + 0.5, 0, 1, 2 * HZ], [-(HX + 0.5), 0, 1, 2 * HZ]]) {
     solid(x, z, w, d, CEIL + 2, 0, 'concrete');
-    B(M.wallpaper, w, CEIL, d, x, 0, z, 0, { grime: 0.2 });
-    B(M.dampCarpet, w > d ? w : 0.06, 0.15, w > d ? 0.06 : d, x - (w > d ? 0 : Math.sign(x) * 0.5), 0, z - (w > d ? Math.sign(z) * 0.5 : 0), 0, { grime: 0, tint: 0x8a7a4a });   // skirting
+    B(M.wall, w, CEIL, d, x, 0, z, 0, { grime: 0 });
+    for (const [y, mat] of [[0.4, M.neonCyan], [3.2, M.neonPink], [7.5, M.neonCyan]]) B(mat, w > d ? w : 0.06, 0.08, w > d ? 0.06 : d, x - (w > d ? 0 : Math.sign(x) * 0.5), y, z - (w > d ? Math.sign(z) * 0.5 : 0), 0, { grime: 0, cast: false });   // neon bands
   }
-  const ceil = new T.Mesh(new T.PlaneGeometry(2 * HX + 2, 2 * HZ + 2), M.ceilTile);
-  { const uv = ceil.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (2 * HX + 2) / 1.2, uv.getY(i) * (2 * HZ + 2) / 1.2); }
+  // no ceiling: a starfield, and long neon tubes hanging in it
+  const ceil = new T.Mesh(new T.PlaneGeometry(2 * HX + 2, 2 * HZ + 2), M.void);
   ceil.rotation.x = Math.PI / 2; ceil.position.y = CEIL; ceil.userData.noMinimap = true; ctx.group.add(ceil);
   solid(0, 0, 2 * HX + 2, 2 * HZ + 2, 1, CEIL, 'concrete');
-  for (let x = -HX + 3; x < HX; x += 6) for (let z = -HZ + 3; z < HZ; z += 6) {
-    if (rnd() < 0.12) continue;   // a few dead tubes, like any drop ceiling
-    const m = new T.Mesh(new T.BoxGeometry(2.4, 0.06, 1.2), M.fluoro); m.position.set(x, CEIL - 0.04, z); m.userData.noMinimap = true; ctx.group.add(m);
-    if (((x + z) | 0) % 12 === 0) glows.push([x, CEIL - 0.3, z, 2.2]);
+  let ti = 0;
+  for (let z = -HZ + 4; z < HZ; z += 6.5, ti++) {
+    const tube = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 2 * HX - 6, 8), ti % 2 ? M.neonPink : M.tube);
+    tube.rotation.z = Math.PI / 2; tube.position.set(0, CEIL - 2.2, z); tube.userData.noMinimap = true; ctx.group.add(tube);
+    for (let x = -HX + 6; x < HX - 4; x += 12) glows.push([x, CEIL - 2.6, z, 2.0]);
   }
-
   // ---------- the prize tower: a deck at 4 m on pillars, glass prize counters round its foot ----------
   SB(M.cabinet, 2 * TW, 0.3, 2 * TW, 0, UP - 0.3, 0, { tint: 0x2a1a4a });
   B(M.neonCyan, 2 * TW + 0.1, 0.06, 2 * TW + 0.1, 0, UP - 0.34, 0, 0, { grime: 0, cast: false });
@@ -194,19 +195,20 @@ function build(ctx) {
   };
   both((s) => {
     const P = (x, z) => [s * x, s * z];
-    // the deck over the backrooms (y 3.7..4), its rail along the hall side, its pillars
+    // the deck over the mirror maze (y 3.7..4), its rail along the hall side, its pillars
     SB(M.cabinet, HX - DECK_X, 0.3, 2 * HZ, s * (DECK_X + HX) / 2, UP - 0.3, 0, { tint: 0x3a2a1a });
-    plane(M.dampCarpet, HX - DECK_X, 2 * HZ, s * (DECK_X + HX) / 2, 0, UP + 0.005);
+    plane(M.arcadeCarpet, HX - DECK_X, 2 * HZ, s * (DECK_X + HX) / 2, 0, UP + 0.005);
     B(M.neonCyan, 0.08, 0.06, 2 * HZ, s * DECK_X, UP - 0.34, 0, 0, { grime: 0, cast: false });
     // the rail: open where the ramp (z 21.5..25.5) and the bridge (z 1.5..4.5) arrive (s-space)
     for (const [a, b] of [[-HZ, 1.5], [4.5, 21.5]]) { const [x, z] = P(DECK_X + 0.15, (a + b) / 2); SB(M.cabinet, 0.3, 1.0, b - a, x, UP, z, { tint: 0x5a1a4a }); }
-    for (let z = -HZ + 4; z < HZ; z += 8) { const [x, zz] = P(DECK_X + 0.4, z); SB(M.wallpaper, 0.6, UP - 0.3, 0.6, x, 0, zz); }
-    // the backrooms maze under the deck: wallpaper partitions 2.9 m tall (the deck is 3.7 m up), doorways between
+    for (let z = -HZ + 4; z < HZ; z += 8) { const [x, zz] = P(DECK_X + 0.4, z); SB(M.mirror, 0.6, UP - 0.3, 0.6, x, 0, zz); }
+    // the funhouse mirror maze under the deck: chrome panels 2.9 m tall (the deck is 3.7 m up) on a checkerboard,
+    // neon along their tops, doorways between
     const mz = [[29, -22, 0.25, 6], [29, -10, 0.25, 6], [29, 7, 0.25, 7], [32.5, -16, 5, 0.25], [32.5, -3, 5, 0.25], [32.5, 13, 5, 0.25], [34, 19, 3.5, 0.25], [30.5, 22.5, 0.25, 4], [33, 0, 0.25, 4]];
-    for (const [x, z, w, d] of mz) { const [cx, cz] = P(x, z); SB(M.wallpaper, w, 2.9, d, cx, 0, cz, { grime: 0.15 }); }
-    // fluorescent panels under the deck (the backrooms hum)
-    for (let z = -HZ + 4; z < HZ; z += 7) { const [x, zz] = P(31.5, z); put(new T.BoxGeometry(1.6, 0.05, 0.8), M.fluoro, x, UP - 0.33, zz, 0, { grime: 0, cast: false }); glows.push([x, UP - 0.6, zz, 1.4]); }
-    { const [x, z] = P(29.5, 0); sign('EXIT', '#ff2a2a', 1.4, 0.45, x, 2.5, z, s > 0 ? -Math.PI / 2 : Math.PI / 2); }
+    for (const [x, z, w, d] of mz) { const [cx, cz] = P(x, z); SB(M.mirror, w, 2.9, d, cx, 0, cz, { tint: 0xe8e0ff }, 'glass'); B(M.neonPink, w + 0.02, 0.06, d + 0.02, cx, 2.9, cz, 0, { grime: 0, cast: false }); }
+    // neon panels under the deck
+    for (let z = -HZ + 4; z < HZ; z += 7) { const [x, zz] = P(31.5, z); put(new T.BoxGeometry(1.6, 0.05, 0.8), M.neonCyan, x, UP - 0.33, zz, 0, { grime: 0, cast: false }); glows.push([x, UP - 0.6, zz, 1.4]); }
+    { const [x, z] = P(29.5, 0); sign('MIRROR MAZE', '#29f0ff', 2.6, 0.6, x, 3.2, z, s > 0 ? -Math.PI / 2 : Math.PI / 2); }
 
     // the long ramp up to the deck along the side wall, and the bridge from the deck to the tower
     ramp(s * 16, s * DECK_X, s * 21.5, s * 25.5, 0, UP);
@@ -245,13 +247,13 @@ function build(ctx) {
     // the dance machine: a lit platform and its screen
     { const [cx, cz] = P(21, 16); solid(cx, cz, 2, 2, 0.3, 0, 'metal'); B(M.neonCyan, 2, 0.3, 2, cx, 0, cz, 0, { grime: 0 });
       const [sx, sz] = P(21, 17.6); SB(M.cabinet, 2, 2.6, 0.6, sx, 0, sz, { tint: 0x6a1a6a }); }
-    // the doorway to nowhere: a wallpapered frame standing in the middle of the carpet
-    { const [cx, cz] = P(6, -12); for (const o of [-0.7, 0.7]) SB(M.wallpaper, 0.3, 2.4, 0.3, cx + o, 0, cz); SB(M.wallpaper, 1.7, 0.4, 0.3, cx, 2.4, cz);
-      for (const ry of [0, Math.PI]) put(new T.PlaneGeometry(1.1, 2.4), M.fluoro, cx, 1.2, cz, ry, { grime: 0, cast: false }); }
-    // exit signs that disagree with each other
-    { const [x, z] = P(14, 25.9); sign('EXIT ←', '#ff2a2a', 2, 0.5, x, 3.2, z, s > 0 ? Math.PI : 0); }
-    { const [x, z] = P(14, -25.9); sign('→ EXIT', '#ff2a2a', 2, 0.5, x, 3.2, z, s > 0 ? 0 : Math.PI); }
-    // up in the air: a cabinet row hanging upside down from the ceiling, and two cabinets drifting
+    // the doorway to nowhere: a lit neon frame standing in the middle of the carpet
+    { const [cx, cz] = P(6, -12); for (const o of [-0.7, 0.7]) SB(M.neonCyan, 0.3, 2.4, 0.3, cx + o, 0, cz); SB(M.neonCyan, 1.7, 0.4, 0.3, cx, 2.4, cz);
+      for (const ry of [0, Math.PI]) put(new T.PlaneGeometry(1.1, 2.4), M.tube, cx, 1.2, cz, ry, { grime: 0, cast: false }); }
+    // prize signs that disagree with each other
+    { const [x, z] = P(14, 25.9); sign('PRIZES ←', '#fff04a', 2, 0.5, x, 3.2, z, s > 0 ? Math.PI : 0); }
+    { const [x, z] = P(14, -25.9); sign('→ PRIZES', '#fff04a', 2, 0.5, x, 3.2, z, s > 0 ? 0 : Math.PI); }
+    // up in the air: a cabinet row hanging upside down from the starfield, and two cabinets drifting
     for (let i = 0; i < 6; i++) { const [cx, cz] = P(10 + i * 1.0, -6); cabinet(cx, cz, 0, s, CAB_TINTS[i % 6], i + 2, CEIL, false, true); }
     for (const [x, y, z] of [[18, 7.5, 6], [12, 8.8, -14]]) { const [cx, cz] = P(x, z); cabinet(cx, cz, s * 0.7, s * 0.7, CAB_TINTS[(x | 0) % 6], (y * 3) | 0, y, false); }
     // neon on the end wall over the deck

@@ -9,7 +9,7 @@ Made by cbgregg. It's a one-person project, so if you enjoy it, [buy me a coffee
 ## What's in it
 
 - Team Deathmatch, Search & Destroy, Gunfight, Free-for-All, Gun Game and Infected
-- Nine maps: Afterhours (an arcade at the end of the backrooms: weird, not scary, all ramps and bridges), Cannery (a two-storey salmon cannery on a Puget Sound spit, built to Black Ops map scale), Overgrowth (a small, fast arena: an abandoned pumping station taken back by the forest), Tarsa Market, Pioneer Square and the Seattle Underground under it, Link Loop (three light-rail stations you get between by riding the train), the Freshway supermarket, the Drive-In and Shuran Yard
+- Nine maps: Afterhours (a dreamlike arcade that goes on too long: a starfield for a ceiling, mirror mazes, ramps and bridges), Cannery (a two-storey salmon cannery on a Puget Sound spit, built to Black Ops map scale), Overgrowth (a small, fast arena: an abandoned pumping station taken back by the forest), Tarsa Market, Pioneer Square and the Seattle Underground under it, Link Loop (three light-rail stations you get between by riding the train), the Freshway supermarket, the Drive-In and Shuran Yard
 - Attachments, cookable frags, Semtex, throwing knives and stuns
 - Sprint, tac sprint, slide, prone and mantling
 - Breakable windows, boarded-up doorways you can kick through, and doors you can kick open
