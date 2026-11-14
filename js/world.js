@@ -1186,7 +1186,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const bw = S.ax ? L : T, bd = S.az ? L : T;
         solid(x, z, bw, bd, y2 - y1, y0 + y1, brick ? 'brick' : 'concrete');
         put(flatBox(bw, y2 - y1, bd, scaleOf(wallMat), 0.012), wallMat, x, y0 + y1 + (y2 - y1) / 2, z, 0, { tint, grime: 0.45, base: y0 });
-        if (spec.stone) put(flatBox(S.ax ? L : 0.02, y2 - y1, S.az ? L : 0.02, scaleOf(M.brick)), M.brick, x - S.nx * (T / 2 + 0.012), y0 + y1 + (y2 - y1) / 2, z - S.nz * (T / 2 + 0.012), 0, { tint: 0xe8a888, grime: 0.15, base: y0 });
+        if (spec.stone) put(flatBox(S.ax ? L : 0.02, y2 - y1, S.az ? L : 0.02, spec.fit ? 0.8 : scaleOf(M.brick)), M.brick, x - S.nx * (T / 2 + 0.012), y0 + y1 + (y2 - y1) / 2, z - S.nz * (T / 2 + 0.012), 0, { tint: 0xe8a888, grime: 0.15, base: y0 });
         // a fitted-out room: dark wood wainscoting along the foot of the inside walls (the long walls run corner to
         // corner, the short ones stop at their panelling), lower under a window's sill
         if (spec.fit && y1 < 1.2) {
@@ -1668,8 +1668,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       cyl(0.08, 0.08, 0.02, brass, x, CEIL - 0.02, z);
       hot(x, low + 0.2, z, 0.9);
     };
-    const MIDT = [[-3.6, -1.7, [Math.PI / 2, -Math.PI / 2]], [0.1, -1.4, [0, Math.PI, Math.PI / 2]], [3.7, -2.2, [Math.PI / 2, -Math.PI / 2]], [-3.0, 2.7, [Math.PI / 2, -Math.PI / 2, Math.PI]], [0.7, 3.5, [Math.PI / 2, -Math.PI / 2]], [4.3, 1.2, [0, Math.PI]]];
-    for (const [x, z, seats] of MIDT) { bistro(x, z, 0.38, seats); pendant(x, z); }
+    const E = Math.PI / 2, Wd = -Math.PI / 2, N = 0, Sd = Math.PI;
+    const MIDT = [[-3.6, -1.7, [E, Wd, N]], [0.1, -1.4, [N, Sd, E, Wd]], [3.7, -2.2, [E, Wd]], [-3.0, 2.7, [E, Wd, Sd]], [0.7, 3.5, [N, Sd, E, Wd]], [4.3, 1.2, [N, Sd, Wd]]];
+    for (const [x, z, seats] of MIDT) { bistro(x, z, seats.length > 3 ? 0.5 : 0.44, seats); pendant(x, z); }
+    // cast-iron columns carrying the floors above (every old block here has them): fluted shaft, flared capital, square base
+    for (const [x, z] of [[-1.8, 0.6], [2.3, 0.4], [-1.8, 5.0], [2.6, 5.2]]) {
+      cyl(0.1, 0.12, CEIL - 0.5, M.iron, x, 0.3, z, 0x26302c, 12);
+      box(0.34, 0.3, 0.34, M.iron, x, 0, z, 0x26302c); cyl(0.13, 0.17, 0.06, M.iron, x, 0.3, z, 0x26302c, 12);
+      cyl(0.22, 0.11, 0.2, M.iron, x, CEIL - 0.26, z, 0x26302c, 12); box(0.5, 0.06, 0.5, M.iron, x, CEIL - 0.06, z, 0x26302c);
+      S(x, z, 0.3, 0.3, CEIL, 0, 'metal');
+    }
     for (const px of [-5.6, -3.1, -0.6]) pendant(px, CZ, 2.5);
 
     // ---- banquettes along the west wall: oxblood leather on a dark wood base, small tables in front
