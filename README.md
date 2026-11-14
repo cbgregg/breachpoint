@@ -50,6 +50,7 @@ Pushes to `main` deploy to GitHub Pages. Server setup and everything else is in 
 - Matchmaking: [Trystero](https://github.com/dmotz/trystero) by Dan Motzenbecker (MIT).
 - First-person hands: "Rigged Hand" (2015), converted to glTF.
 - Textures: CC0 sets from [ambientCG](https://ambientcg.com) and [Poly Haven](https://polyhaven.com).
+- Skies (`assets/sky/`): CC0 360° photos from [Poly Haven](https://polyhaven.com/hdris): Kloofendal 48d Partly Cloudy (Tarsa), Abandoned Tank Farm 03 (Shuran), Portland Landing Pad (Pioneer Square), Sunset JHB Central (Link Loop), Rooftop Night (Drive-In), Suburban Parking Area (Freshway), Lilienstein (Overgrowth).
 
 Weapon and prop models from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), resized, re-oriented and trimmed for the game:
 

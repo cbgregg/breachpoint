@@ -19,9 +19,8 @@ export const MART = {
   name: 'Freshway',
   // indoors under fluorescent tubes: a touch less exposure than the street maps, so the floor doesn't glare
   // a heavy haze outside, and no city skyline: the store sits in a ring of trees on the edge of town
-  look: { exposure: 0.8, env: 0.45, hemi: 0.55, fog: 0.013, fogColor: 0xbcc6cc },
+  look: { exposure: 0.8, env: 0.45, hemi: 0.55, fog: 0.006, fogColor: 0x9a9c8c, sunElev: 24, photo: { url: 'assets/sky/suburban_parking_area.jpg', u: 0.6001, gain: 1.2 } },
   skyline: false,
-  mountain: false,
   blurb: 'Indoor supermarket: tall aisles, frozen foods, produce, deli, bakery, upstairs offices, doors that open and close; parking lot and loading yard',
   photos: ['assets/loading/mart-1.jpg', 'assets/loading/mart-2.jpg', 'assets/loading/mart-3.jpg'],
   bounds: { hx: 42, hz: 34 },   // wider side lanes: the parking strip (+z) and the service alley (-z)

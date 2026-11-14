@@ -21,9 +21,9 @@ export const DRIVEIN = {
   name: 'Drive-In',
   blurb: '1950s drive-in at dusk: screen towers at both ends, rows of parked cars between them, the snack bar and its projection booth roof in the middle',
   bounds: { hx: HX, hz: HZ },
-  skyline: false, mountain: false,
+  skyline: false,
   // dusk: the sun just down behind the trees, a violet sky, the lot lit by lamps, neon and the screens
-  look: { dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 14, sunAz: 205,
+  look: { photo: { url: 'assets/sky/rooftop_night.jpg', u: 0.5874, gain: 1.2 }, dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 14, sunAz: 205,
     hemi: 1.0, hemiSky: 0x7a7ab8, ground: 0x3a3028, exposure: 1.05, env: 0.55 },
   spawns: DRIVEIN_SPAWNS,
   pickups: [
@@ -327,7 +327,6 @@ function build(ctx) {
     head: new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0xfff0d0, emissiveIntensity: 0.6 }),
     tube: new THREE.MeshStandardMaterial({ color: 0xf0f6ff, emissive: 0xe8f0ff, emissiveIntensity: 3 }),
     popcorn: std({ color: 0xf2d68a, roughness: 0.8 }),
-    pine: std({ color: 0xffffff, roughness: 0.95 }),
     chaseA: new THREE.MeshStandardMaterial({ color: 0xffe8b0, emissive: 0xffc860, emissiveIntensity: 8 }),
     chaseB: new THREE.MeshStandardMaterial({ color: 0xffe8b0, emissive: 0xffc860, emissiveIntensity: 0.3 }),
     // the projector beam: a soft additive volume that's bright at the lens and fades toward the screen, with dust
@@ -1091,16 +1090,14 @@ function build(ctx) {
       for (const dx of [-0.75, 0.75]) B(M.wood, 0.08, 0.72, 1.6, x + dx, 0, s * z, 0, { tint: 0x6a5a48 });
     }
   }
-  // tree line beyond the fence
+  // tree line beyond the fence: real leafy trees (the sky photo carries the far woods)
   {
     const r = rng(31);
-    for (let i = 0; i < 150; i++) {
-      const a = r() * Math.PI * 2, rx = HX + 4 + r() * 40, rz = HZ + 4 + r() * 40;
-      const x = Math.cos(a) * rx * 1.0, z = Math.sin(a) * rz;
+    for (let i = 0, n = 0; i < 400 && n < 40; i++) {
+      const a = r() * Math.PI * 2, rx = HX + 4 + r() * 18, rz = HZ + 4 + r() * 18;
+      const x = Math.cos(a) * rx, z = Math.sin(a) * rz;
       if (Math.abs(x) < HX + 2 && Math.abs(z) < HZ + 2) continue;
-      const h = 9 + r() * 10;
-      P0(new THREE.CylinderGeometry(0.2, 0.3, h * 0.4, 6), M.woodOld, x, h * 0.2, z, 0, { tint: 0x4a3a2a, cast: false });
-      for (let k = 0; k < 3; k++) P0(new THREE.ConeGeometry(h * (0.28 - k * 0.06), h * 0.45, 8), M.pine, x, h * (0.35 + k * 0.2), z, r() * 3, { tint: [0x24321e, 0x2a3a22, 0x1e2a1a][k], cast: false });
+      ctx.addKind(x, z, 0, 0, 9 + r() * 6, 0, 'tree', 0, 0); n++;
     }
   }
 

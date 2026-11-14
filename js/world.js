@@ -403,10 +403,10 @@ const PIONEER_PICKUPS = [
 const PIONEER_SITES = [[-15, 15, -UG], [18, 34]];
 
 export const MAPS = {
-  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg', 'assets/loading/tarsa-3.jpg'] },
-  shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, photos: ['assets/loading/shuran-1.jpg', 'assets/loading/shuran-2.jpg', 'assets/loading/shuran-3.jpg'] },
+  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.2 }, sunElev: 44, fog: 0.0026, fogColor: 0xa7afbd }, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg', 'assets/loading/tarsa-3.jpg'] },
+  shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, look: { photo: { url: 'assets/sky/abandoned_tank_farm_03.jpg', u: 0.6011, gain: 1.2 }, sunElev: 40, fog: 0.003, fogColor: 0x9e9b92 }, photos: ['assets/loading/shuran-1.jpg', 'assets/loading/shuran-2.jpg', 'assets/loading/shuran-3.jpg'] },
   pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; and the Seattle Underground beneath the sidewalks, corner to corner; bomb site A is down in the buried intersection', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_UG.level, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
-    look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
+    look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true, photo: { url: 'assets/sky/portland_landing_pad.jpg', u: 0.5991, gain: 1.2 }, sunElev: 44 }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
   mart: MART,
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
@@ -2705,7 +2705,6 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
 
   rankGroundLayers();
   batch.build(group);
-  if (LAYOUT.mountain !== false) group.add(buildMountain());
 
   for (const [k, m] of Object.entries(M)) if (m && m.isMaterial && !m.name) m.name = k;   // named, for the map audit's reports
   const world = { id: LAYOUT.id, name: LAYOUT.name, pickupSpots: LAYOUT.pickups, group, spawns: [[], []], materials: M, textures: tex, breakables };
@@ -2760,72 +2759,6 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   world.bounds = { hx: HX, hz: HZ };
   world.look = LAYOUT.look;
   return world;
-}
-
-// Mount Rainier on the horizon: a broad stratovolcano with glaciers, rock ribs and forested foothills,
-// far beyond the fog (it uses its own haze so it stays visible), lined up with the lanes to the east so
-// it looms over the rooftops. The low sun behind the player lights it with alpenglow.
-function buildMountain() {
-  const rnd = seeded(4392);
-  const R = 1500, H = 640, segR = LOW_DETAIL ? 50 : 110, segA = LOW_DETAIL ? 90 : 180;
-  const pos = [], col = [], idx = [];
-  // value noise for ridges
-  const N = 64, tab = Array.from({ length: N * N }, () => rnd());
-  const vn = (x, y) => {
-    const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
-    const g = (i, j) => tab[((i % N + N) % N) + ((j % N + N) % N) * N];
-    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-    return (g(xi, yi) * (1 - sx) + g(xi + 1, yi) * sx) * (1 - sy) + (g(xi, yi + 1) * (1 - sx) + g(xi + 1, yi + 1) * sx) * sy;
-  };
-  const fbm = (x, y) => vn(x, y) * 0.5 + vn(x * 2.1, y * 2.1) * 0.27 + vn(x * 4.3, y * 4.3) * 0.15 + vn(x * 9, y * 9) * 0.08;
-  const snow = new THREE.Color(0.86, 0.87, 0.93), rock = new THREE.Color(0.34, 0.31, 0.32), forest = new THREE.Color(0.1, 0.14, 0.11), c = new THREE.Color();
-  for (let i = 0; i <= segR; i++) {
-    const t = i / segR;                         // 0 at the summit, 1 at the base
-    // concave flanks under a broad rounded summit dome, with a shoulder (Little Tahoma) on one side
-    const dome = t < 0.1 ? 0.012 * Math.cos(t / 0.1 * Math.PI / 2) : 0;
-    const prof = Math.pow(1 - t, 2.1) * 0.74 + (1 - t) * 0.26 + dome;
-    for (let j = 0; j <= segA; j++) {
-      const a = (j / segA) * Math.PI * 2;
-      const r = t * R * (0.86 + 0.28 * vn(Math.cos(a) * 3 + 9, Math.sin(a) * 3 + 9));
-      const ridge = fbm(Math.cos(a) * 6 + t * 2, Math.sin(a) * 6 + t * 2);
-      // summit plateau with twin crater rims (Columbia Crest and Liberty Cap)
-      const crest = t < 0.05 ? -0.01 * (1 - t / 0.05) : 0;
-      const shoulder = 0.05 * Math.exp(-Math.pow((t - 0.3) / 0.08, 2)) * Math.max(0, Math.cos(a - 3.6)) ** 4;
-      const h = H * (prof + crest + shoulder) + (ridge - 0.5) * H * 0.16 * Math.min(1, t * 3) * (1 - t * 0.6);
-      pos.push(Math.cos(a) * r, Math.max(0, h), Math.sin(a) * r);
-      // glaciers down to ~40% of the height, broken by rock ribs; forest on the foothills
-      const hn = h / H;
-      const rib = fbm(Math.cos(a) * 14 + 3, Math.sin(a) * 14 + t * 6);
-      const snowLine = 0.36 + (rib - 0.5) * 0.35;
-      if (hn > snowLine) c.copy(snow).lerp(rock, rib > 0.72 && hn < 0.85 ? 0.75 : 0.04);
-      else if (hn > 0.16) c.copy(rock).lerp(snow, Math.max(0, (hn - snowLine + 0.06) / 0.06));
-      else c.copy(forest).lerp(rock, hn / 0.16 * 0.6);
-      col.push(c.r, c.g, c.b);
-    }
-  }
-  for (let i = 0; i < segR; i++) for (let j = 0; j < segA; j++) {
-    const a = i * (segA + 1) + j, b = a + segA + 1;
-    idx.push(a, b, a + 1, a + 1, b, b + 1);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, fog: false });
-  // distance haze of its own: the base melts into the dusk sky, the summit stays crisp
-  mat.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vMy;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvMy = position.y;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMy;')
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
-        float hz = 1.0 - smoothstep(0.0, ${(H * 0.75).toFixed(1)}, vMy);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.66, 0.72, 0.8), 0.25 + 0.6 * hz);`);
-  };
-  const m = new THREE.Mesh(g, mat);
-  m.position.set(1750, -20, 160);
-  m.frustumCulled = false;
-  m.renderOrder = -2;
-  return m;
 }
 
 // Top-down render of the map for the minimap (needs the renderer, so it runs after the scene is built). Async:

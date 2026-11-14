@@ -23,7 +23,7 @@ export const OVERGROWTH = {
   bounds: { hx: HX, hz: HZ },
   skyline: false,
   // a soft overcast morning in the foothills: cool green-grey light, mist in the trees
-  look: { turbidity: 3.5, rayleigh: 1.8, mie: 0.004, fog: 0.0038, fogColor: 0x8f9e92, sun: 2.8, sunColor: 0xfff0d8, hemi: 1.25, hemiSky: 0xc4d4cc,
+  look: { photo: { url: 'assets/sky/lilienstein.jpg', u: 0.5942, gain: 1.2 }, sunElev: 29, turbidity: 3.5, rayleigh: 1.8, mie: 0.004, fog: 0.0038, fogColor: 0x7f8a74, sun: 2.8, sunColor: 0xfff0d8, hemi: 1.25, hemiSky: 0xc4d4cc,
     ground: 0x4c5a3a, exposure: 1.0, env: 0.85, clouds: true },
   spawns: SPAWNS,
   pickups: [
@@ -161,9 +161,8 @@ function build(ctx) {
     tankA: std({ map: rustTex(5), roughness: 0.85, metalness: 0.35 }),
     tankB: std({ map: rustTex(11), roughness: 0.85, metalness: 0.35 }),
     hedge: std({ color: 0xffffff, roughness: 1 }),
-    needles: std({ color: 0xffffff, roughness: 1, side: T.DoubleSide }),
-  });
-  Object.assign(S, { ivy: 0, moss: 6, gravel: 5, tankA: 0, tankB: 0, hedge: 0, needles: 0, fern: 0 });
+      });
+  Object.assign(S, { ivy: 0, moss: 6, gravel: 5, tankA: 0, tankB: 0, hedge: 0, fern: 0 });
   const rnd = rng(2026);
   // both halves: f(s) with s = 1 for team 1's half (+x) and -1 for the point-mirrored copy
   const both = (f) => { f(1); f(-1); };
@@ -367,20 +366,6 @@ function build(ctx) {
       for (const a of [0, Math.PI / 2]) put(new T.PlaneGeometry(1.4 * sc, 1.0 * sc), M.fern, cx, 0.5 * sc, cz, ry + a, { grime: 0, cast: false, tint: rnd() < 0.5 ? 0xa8c890 : 0xd0e0b0 });
     }
 
-    // the perimeter: a mossy concrete wall with chain-link above, dark firs behind it
-    const fir = (x, z, h) => {
-      const [cx, cz] = [x, z];
-      put(new T.CylinderGeometry(0.18, 0.3, h * 0.3, 6), M.woodOld, cx, h * 0.15, cz, 0, { tint: 0x6a5240, grime: 0, cast: false });
-      for (let k = 0; k < 7; k++) {
-        const r = h * (0.24 - k * 0.03) * (0.9 + rnd() * 0.2), y = h * (0.22 + k * 0.1);
-        put(new T.ConeGeometry(r, h * 0.2, 9, 1, true), M.needles, cx, y + h * 0.1, cz, rnd() * 3, { tint: k % 2 ? 0x1e3019 : 0x263a20, grime: 0, cast: false, rz: (rnd() - 0.5) * 0.06 });
-      }
-    };
-    for (let i = 0; i < 26; i++) {
-      const x = (rnd() * 2 - 1) * (HX + 14), z = s * (HZ + 4 + rnd() * 14);
-      fir(x, z, 12 + rnd() * 12);
-    }
-    for (let i = 0; i < 10; i++) fir(s * (HX + 4 + rnd() * 12), (rnd() * 2 - 1) * (HZ + 6), 12 + rnd() * 10);
   });
 
   // perimeter wall (collision + a concrete wall with moss along its foot)

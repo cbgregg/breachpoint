@@ -1337,8 +1337,8 @@ export const LINKLOOP = {
   name: 'Link Loop',
   blurb: 'Three light rail stations joined only by the trains: a brick vault under Pioneer Square, Symphony\'s grand hall and the open-air Chinatown platforms. Ride the loop, and hope nobody on the other side got on with you',
   bounds: { hx: HX, hz: HZ },
-  skyline: false, mountain: false,
-  look: { turbidity: 2.6, rayleigh: 2.2, mie: 0.004, fog: 0.004, fogColor: 0xb4c0cc, sun: 3.2, sunColor: 0xfff0dc, hemi: 1.0, hemiSky: 0xc8d8ec, ground: 0x8a8478, exposure: 1.0, env: 0.8, blueSky: true },
+  skyline: false,
+  look: { turbidity: 2.6, rayleigh: 2.2, mie: 0.004, fog: 0.004, fogColor: 0x9c918e, sun: 3.0, sunColor: 0xffd2a8, sunElev: 18, photo: { url: 'assets/sky/sunset_jhbcentral.jpg', u: 0.6343, gain: 1.2 }, hemi: 1.0, hemiSky: 0xc8d8ec, ground: 0x8a8478, exposure: 1.0, env: 0.8, blueSky: true },
   holes, lids,
   spawns2: [[...at(SPAWN_P, STATIONS[0].ox), ...at(SPAWN_SW, STATIONS[1].ox)], [...at(SPAWN_C, STATIONS[2].ox), ...at(SPAWN_SE, STATIONS[1].ox)]],
   pickups: [

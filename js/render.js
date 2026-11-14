@@ -235,6 +235,44 @@ export class Renderer {
     this.dome = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), this.domeMat);
     this.dome.visible = false; this.dome.renderOrder = -2;
     scene.add(this.dome);
+    // a photographed sky (a map's look.photo: a 360° equirectangular photo, CC0 from Poly Haven): real clouds and a
+    // real horizon. The sphere follows the camera, so the horizon never shifts as you move, and it's turned (yaw) so
+    // the sun in the photo sits where the map's sunlight comes from.
+    this.photoMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { map: { value: null }, yaw: { value: 0 }, gain: { value: 1 } },
+      vertexShader: 'varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }',
+      fragmentShader: `uniform sampler2D map; uniform float yaw, gain; varying vec3 vDir;
+        void main(){ vec3 d = normalize(vDir);
+          float u = fract((atan(d.z, d.x) + yaw) * 0.15915494 + 0.5), v = asin(clamp(d.y, -1.0, 1.0)) * 0.31830989 + 0.5;
+          gl_FragColor = vec4(texture2D(map, vec2(u, v)).rgb * gain, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    this.photoSky = new THREE.Mesh(new THREE.SphereGeometry(420, 48, 24), this.photoMat);
+    this.photoSky.visible = false; this.photoSky.renderOrder = -3; this.photoSky.frustumCulled = false;
+    this.photoSky.onBeforeRender = (_r, _s, cam) => { this.photoSky.position.copy(cam.position); this.photoSky.updateMatrixWorld(); };
+    scene.add(this.photoSky);
+    this.photoTex = new Map();
+  }
+
+  // load (once) the photo sky for a map, then show it and light the map from it
+  usePhoto(url, yaw, gain, groundCol) {
+    const show = (tex) => {
+      if (this.photoWant !== url) return;   // another map was picked meanwhile
+      this.photoMat.uniforms.map.value = tex; this.photoMat.uniforms.yaw.value = yaw; this.photoMat.uniforms.gain.value = gain;
+      this.photoSky.visible = true; this.sky.visible = false; this.dome.visible = false; this.clouds.visible = false;
+      this.makeEnv(groundCol);
+    };
+    this.photoWant = url;
+    const have = this.photoTex.get(url);
+    if (have) { if (have.isTexture) show(have); return; }
+    const p = new THREE.TextureLoader().loadAsync(url).then((tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;   // (no mips: the u seam would show)
+      this.photoTex.set(url, tex); show(tex);
+    }).catch(() => { this.photoTex.delete(url); });
+    this.photoTex.set(url, p);
   }
 
   makeEnv(groundCol) {
@@ -245,7 +283,8 @@ export class Renderer {
     const envSky = new Sky();
     envSky.scale.setScalar(100);
     Object.keys(u).forEach(k => { envSky.material.uniforms[k].value = u[k].value; });
-    if (this.dome && this.dome.visible) envScene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 32, 16), this.domeMat)); else envScene.add(envSky);
+    if (this.photoSky && this.photoSky.visible) envScene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 48, 24), this.photoMat));
+    else if (this.dome && this.dome.visible) envScene.add(new THREE.Mesh(new THREE.SphereGeometry(90, 32, 16), this.domeMat)); else envScene.add(envSky);
     // ground bounce in the environment
     const ground = new THREE.Mesh(new THREE.CircleGeometry(90, 32), new THREE.MeshBasicMaterial({ color: groundCol }));
     ground.rotation.x = -Math.PI / 2;
@@ -269,6 +308,13 @@ export class Renderer {
     du.top.value.set(dc[0]); du.mid.value.set(dc[1]); du.bottom.value.set(dc[2]);
     du.sunDir.value.copy(L.sunElev != null ? new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAz ?? 222)) : SUN_DIR);
     this.dome.visible = !!(L.blueSky || L.dome); this.sky.visible = !this.dome.visible;
+    this.photoSky.visible = false; this.photoWant = null;
+    if (L.photo) {
+      // the photo's sun (photo.u: its column, 0..1; photo.elev: degrees) moved onto the map's sun direction
+      const P = L.photo, az = THREE.MathUtils.degToRad(L.sunAz ?? 222), el = THREE.MathUtils.degToRad(L.sunElev ?? 32);
+      const sunA = Math.atan2(Math.sin(Math.PI / 2 - el) * Math.cos(az), Math.sin(Math.PI / 2 - el) * Math.sin(az));
+      this.usePhoto(P.url, (P.u - 0.5) * Math.PI * 2 - sunA, P.gain ?? 1, L.ground);
+    }
     this.makeEnv(L.ground);
     this.scene.fog.density = L.fog; this.scene.fog.color.set(L.fogColor);
     // maps can move the sun (a low dusk sun); the default is SUN_DIR
@@ -279,7 +325,7 @@ export class Renderer {
     this.hemi.intensity = L.hemi; this.hemi.color.set(L.hemiSky); this.hemi.groundColor.set(L.ground);
     this.renderer.toneMappingExposure = L.exposure;
     this.scene.environmentIntensity = L.env;
-    this.clouds.visible = !!L.clouds;
+    this.clouds.visible = !!L.clouds && !L.photo;
   }
 
   // q: a resolved quality (qualityFrom in config.js): a preset or the player's custom settings
