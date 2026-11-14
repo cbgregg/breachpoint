@@ -1644,8 +1644,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const chairFace = Math.PI;   // the model's front faces -z
     const chair = (x, z, toward) => {
       const ry = Math.atan2(toward[0] - x, toward[1] - z) + chairFace + (r() - 0.5) * 0.35;
-      if (!md('ph_dchair', 'y', 0.95, x, 0, z, ry)) return;
-      S(x, z, 0.46, 0.46, 0.9).pass = true;   // (stops you, not bullets)
+      if (!md('ph_dchair', 'y', 1.05, x, 0, z, ry)) return;   // a high-backed dining chair: 1.05 m, its seat at 47 cm
+      S(x, z, 0.5, 0.5, 1.0).pass = true;   // (stops you, not bullets)
     };
     const bistro = (x, z, rad, seats, cups = seats) => {
       P(new THREE.CylinderGeometry(rad, rad, 0.035, 28), marble, x, 0.745, z, 0, { tint: 0xf6f2ec });
@@ -1653,7 +1653,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       cyl(0.03, 0.04, 0.7, M.iron, x, 0.03, z, 0x1f2422, 10);
       P(new THREE.CylinderGeometry(0.06, 0.24, 0.05, 16), M.iron, x, 0.055, z, 0, { tint: 0x1f2422 });
       S(x, z, rad * 1.5, rad * 1.5, 0.06, 0.71);
-      for (const a of seats) chair(x + Math.sin(a) * (rad + 0.34), z + Math.cos(a) * (rad + 0.34), [x, z]);
+      for (const a of seats) chair(x + Math.sin(a) * (rad + 0.37), z + Math.cos(a) * (rad + 0.37), [x, z]);
       if (!small) return;
       const cup = (ox, oz) => { md('ph_teaset', 'x', 0.15, x + ox, 0.763, z + oz, r() * 6, /saucer_circular_04/); md('ph_teaset', 'x', 0.11, x + ox, 0.778, z + oz + 0.01, r() * 6, /cup_small_01$/); };
       cup(Math.sin(cups[0]) * rad * 0.55, Math.cos(cups[0]) * rad * 0.55);
