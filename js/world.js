@@ -11,6 +11,7 @@ import { DRIVEIN } from './drivein.js';
 import { OVERGROWTH } from './overgrowth.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
+import { PIONEER2 } from './pioneer2.js';
 import { LINKLOOP } from './linkloop.js';
 import { PROPS, VEHICLES_BY_MAP, containerVariants, buildingVariants, propFit } from './props.js';
 import { buildStation, STATION_LIDS } from './station.js';
@@ -285,7 +286,7 @@ const UG_DOORS = [['W1', 'W2', -35, 3], ['W2', 'W3', -35, 3], ['W3', 'W4', -9.5,
 const UG_STAIRS = [['W1', -44, -38, 1], ['P1', -4, -20, -1], ['PR', 12, 3.5, -1], ['V', 26, 28.5, -1], ['SE', 44, 32, -1]];
 const UG_SW = 6.5;   // stair length
 // rooms and stairs as layout pieces ('tunnel' with door gaps, 'stairdown'), and the bots' map of the level
-function undergroundLayout(rooms, doors, stairs, depth) {
+export function undergroundLayout(rooms, doors, stairs, depth) {
   const gaps = Object.fromEntries(Object.keys(rooms).map(k => [k, []]));
   // (the tunnel piece's 'n' wall is its +z side and 's' its -z side)
   const side = (r, q) => r[2] === q[0] ? ['e', 'w', 'z'] : r[0] === q[2] ? ['w', 'e', 'z'] : r[3] === q[1] ? ['n', 's', 'x'] : r[1] === q[3] ? ['s', 'n', 'x'] : null;
@@ -425,6 +426,7 @@ export const MAPS = {
   overgrowth: OVERGROWTH,
   cannery: CANNERY,
   afterhours: AFTERHOURS,
+  pioneer2: PIONEER2,
   link: LINKLOOP,
 };
 export const MAP_IDS = Object.keys(MAPS);
@@ -675,7 +677,16 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     return g;
   };
   const FLAT = new Set(['PlaneGeometry', 'CircleGeometry', 'RingGeometry']);
+  // a blockout (LAYOUT.blockout): every textured surface drawn as plain grey, so a layout is judged on its shape
+  // and flow before it's dressed (glass and lights stay as they are, so windows and lamps still read)
+  const greyed = new Map();
+  const greyOf = (mat) => {
+    let g = greyed.get(mat);
+    if (!g) { g = mat.clone(); g.map = null; g.normalMap = null; g.roughnessMap = null; g.aoMap = null; if (g.color) g.color.setHex(0xb8b8b4); g.roughness = 0.92; g.metalness = 0; g.needsUpdate = true; greyed.set(mat, g); }
+    return g;
+  };
   const put = (geo, mat, x, y, z, ry = 0, opts = {}) => {
+    if (LAYOUT.blockout && mat && mat.isMeshStandardMaterial && !mat.transparent && !(mat.emissive && mat.emissive.getHex() && mat.emissiveIntensity > 0.6)) mat = greyOf(mat);   // (glass and lit things stay)
     // a flat piece lying face-up just above a floor: a ground overlay
     if (opts.rx === -Math.PI / 2 && !opts.rz && FLAT.has(geo.type)) mat = layerMat(mat, y);
     if (XF) { [x, z] = xfPt(x, z); ry += XF.a; }
