@@ -1641,7 +1641,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     cyl(0.006, 0.006, 0.5, M.dark, (KX + X) / 2, CEIL - 0.5, (KZ - Z) / 2); P(new THREE.SphereGeometry(0.06, 10, 8), glow, (KX + X) / 2, CEIL - 0.6, (KZ - Z) / 2, 0, { cast: false });
 
     // ---- bistro tables: a round marble top on a cast-iron pedestal; chairs (dark wood, leather seats) around them
-    const chairFace = Math.PI;   // the model's front faces -z
+    const chairFace = 0;   // the model's front faces +z
     const chair = (x, z, toward) => {
       const ry = Math.atan2(toward[0] - x, toward[1] - z) + chairFace + (r() - 0.5) * 0.35;
       if (!md('ph_dchair', 'y', 1.05, x, 0, z, ry)) return;   // a high-backed dining chair: 1.05 m, its seat at 47 cm
@@ -1669,7 +1669,8 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       hot(x, low + 0.2, z, 0.9);
     };
     const E = Math.PI / 2, Wd = -Math.PI / 2, N = 0, Sd = Math.PI;
-    const MIDT = [[-3.6, -1.7, [E, Wd, N]], [0.1, -1.4, [N, Sd, E, Wd]], [3.7, -2.2, [E, Wd]], [-3.0, 2.7, [E, Wd, Sd]], [0.7, 3.5, [N, Sd, E, Wd]], [4.3, 1.2, [N, Sd, Wd]]];
+    const MIDT = [[-3.6, -1.7, [N, Sd, E, Wd]], [0.1, -1.4, [N, Sd, E, Wd]], [3.7, -2.2, [E, Wd, N]], [-3.0, 2.7, [N, Sd, E, Wd]], [0.7, 3.5, [N, Sd, E, Wd]], [4.3, 1.2, [N, Sd, E, Wd]],
+      [-4.9, 0.5, [E, Wd]], [2.4, -6.2, [E, Wd]], [6.3, -0.9, [N, Sd]], [6.3, 2.6, [E, Wd]]];
     for (const [x, z, seats] of MIDT) { bistro(x, z, seats.length > 3 ? 0.5 : 0.44, seats); pendant(x, z); }
     // cast-iron columns carrying the floors above (every old block here has them): fluted shaft, flared capital, square base
     for (const [x, z] of [[-1.8, 0.6], [2.3, 0.4], [-1.8, 5.0], [2.6, 5.2]]) {
