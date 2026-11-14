@@ -71,7 +71,10 @@ const GUN_FILES = {
 const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/models/mags.glb', corkboard: 'assets/models/corkboard.glb', stairs: 'assets/models/stairs.glb', downtown: 'assets/models/downtown.glb', bin: 'assets/models/bin.glb',
   fridge: 'assets/models/fridge.glb', lantern: 'assets/models/lantern.glb', cone: 'assets/models/cone.glb',
   dumpster: 'assets/models/dumpster.glb', locker: 'assets/models/locker.glb', office: 'assets/models/office.glb', kitchen: 'assets/models/kitchen.glb',
-  signs: 'assets/models/signs.glb', roadsigns: 'assets/models/roadsigns.glb' };
+  signs: 'assets/models/signs.glb', roadsigns: 'assets/models/roadsigns.glb',
+  // room furniture (CC0, Poly Haven): drawn in place of the procedural tables, shelves, crates and bar bottles
+  ph_table: 'assets/models/ph_table.glb', ph_chair: 'assets/models/ph_chair.glb', ph_shelfunit: 'assets/models/ph_shelfunit.glb',
+  ph_crate: 'assets/models/ph_crate.glb', ph_cbox: 'assets/models/ph_cbox.glb', ph_bottles: 'assets/models/ph_bottles.glb', ph_books: 'assets/models/ph_books.glb' };
 // Vehicles: real models (CC0 / CC-BY, credited in the README), loaded per map on the match loading screen so a
 // map only downloads its own (setProp names them veh_<slot>). A map built before they arrive, or a model that
 // fails to load, uses the procedural vehicle instead.

@@ -341,12 +341,12 @@ const PIONEER_CENTER = [
   // ---- the Sinking Ship garage on the wedge between James St and Yesler
   [0, 0, 0, 0, 12, 0, 'flatiron', { pts: PS_GARAGE, prow: 0 }],
   // ---- west of 1st Ave: the Mutual Life Building on the corner, more brick blocks, an alley, a café
-  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8, shop: { e: [['d', -3.5], ['w', 1], ['d', 4.5]], n: [['d', -4.5], ['w', 0.5], ['d', 5]], w: [['d', 2]], s: [['w', 3]], props: [['table', -3, -2], ['table', 3, 2.5], ['bar', -3.5, -5.2, 0], ['crates', 5.5, 5], ['shelf', 1, -5, 1]], light: 1 } }],   // Mutual Life Building: a café on the ground floor
-  [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true, shop: { e: [['d', -6], ['w', 0], ['d', 6]], n: [['d', 0]], w: [['d', 4]], props: [['shelf', -3, -5, 0], ['shelf', 3, -1, 0], ['shelf', -3, 3, 0], ['crates', 4.5, 6.5], ['table', 2, -7]], light: 1 } }],   // a bookshop: rows of shelves
+  [-34.5, -4, 17, 16, 21, 0, 'brick', { tint: 0xe9c6a8, shop: { e: [['d', -3.5], ['w', 1], ['d', 4.5]], n: [['d', -4.5], ['w', 0.5], ['d', 5]], w: [['d', 2]], s: [['w', 3]], props: [['bar', -3.5, -5.6, 0], ['table', -5, -1], ['table', -1.5, 1.5], ['table', 2.5, -1.5], ['table', 5, 2], ['table', -5, 3.8], ['table', 1.5, 4.5], ['shelf', 6.5, -5.6, 0], ['crates', -7, 5.5]], light: 1 } }],   // Mutual Life Building: a café on the ground floor
+  [-34.5, -29.5, 17, 21, 17, 0, 'brick', { stone: true, shop: { e: [['d', -6], ['w', 0], ['d', 6]], n: [['d', 0]], w: [['d', 4]], props: [['books', -4.5, -7, 0], ['books', 0, -7, 0], ['books', -4.5, -4, 0], ['books', 0, -4, 0], ['books', -4.5, -1, 0], ['books', 0, -1, 0], ['books', -4.5, 2, 0], ['books', 0, 2, 0], ['books', -4.5, 5, 0], ['books', 0, 5, 0], ['table', 5, 7.5], ['crates', 5.5, -8]], light: 1 } }],   // a bookshop: rows of shelves
   [-31, -15, 9, 5, 3.6, 0, 'house', { s: [['d', 1.5]], n: [['d', -1.5]], e: [['d', 0]], w: [['w', 0]], props: [['table', 0, 0], ['shelf', 3, 1.5, 0]], light: 1 }],
-  [-34.5, 33.5, 17, 13, 15, 0, 'brick', { shop: { s: [['d', -4.5], ['w', 0], ['d', 4.5]], e: [['d', 0]], w: [['d', -2]], props: [['table', -3, 1.5], ['table', 3, 2], ['bar', 0, 4.5, 0], ['crates', -6, -3.5]], light: 1 } }],   // a saloon
+  [-34.5, 33.5, 17, 13, 15, 0, 'brick', { shop: { s: [['d', -4.5], ['w', 0], ['d', 4.5]], e: [['d', 0]], w: [['d', -2]], props: [['bar', 0, 4.6, 0], ['table', -4, -1.5], ['table', 0, -2], ['table', 4, -1.5], ['table', -5, 2], ['table', 5, 2], ['crates', -7, 4.5]], light: 1 } }],   // a saloon
   // ---- south of Yesler: the corner block, the tavern (bomb site B), Occidental's pedestrian mall, one more block
-  [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890, shop: { s: [['d', -3.5], ['w', 1], ['d', 4.5]], w: [['d', -2.5], ['w', 2.5]], e: [['d', 2]], props: [['shelf', -2, 1, 0], ['table', 3, 3.5], ['crates', -5, 4.5], ['shelf', 4, -2, 1]], light: 1 } }],
+  [3.5, 33, 15, 14, 18, 0, 'brick', { tint: 0xd8a890, shop: { s: [['d', -3.5], ['w', 1], ['d', 4.5]], w: [['d', -2.5], ['w', 2.5]], e: [['d', 2]], props: [['shelf', -3, -1, 0], ['shelf', 1, -1, 0], ['shelf', -3, 2.5, 0], ['shelf', 1, 2.5, 0], ['bar', 4.5, 4.8, 0], ['crates', -5.5, -4.5]], light: 1 } }],
   [18, 33.5, 10, 11, 3.8, 0, 'house', { n: [['d', -2], ['w', 2.2]], e: [['d', 1.5]], w: [['d', 0]], s: [['w', 0]], props: [['table', -2, 1.5], ['table', 2, 2.5], ['shelf', 3.4, -3.2, 0]], light: 1 }],
   [29, 33, 8, 14, 0, 0, 'paving', 'brick'], [29, 33, 0, 0, 8.5, 0, 'tree'], [29, 37, 0, 0, 9, 0, 'tree'],
   [38, 35.5, 10, 9, 13, 0, 'brick', { stone: true }],
@@ -404,7 +404,7 @@ const PIONEER_PICKUPS = [
   { type: 'health', pos: [1.5, 0, -11] },
   { type: 'health', pos: [-30, -UG, -7] },     // the speakeasy
   { type: 'ammo', pos: [4, -UG, 30] },         // the corner block's basement
-  { type: 'health', pos: [-31, 0, -14] },
+  { type: 'health', pos: [-33.5, 0, -14] },
   { type: 'health', pos: [26.5, 0, 34] },
   { type: 'ammo', pos: [18, 0, 35] },
   { type: 'ammo', pos: [-15, 0, 0.5] },
@@ -1257,14 +1257,53 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     // a corkboard of maps and notes on the back wall of the big halls (CC-BY 4.0, "Corkboard" by XIN)
     if (PROPS.corkboard && w >= 10) for (const pt of PROPS.corkboard.parts) put(pt.geo.clone(), pt.mat, cx, y0 + 1.65, cz + d / 2 - T - 0.07, Math.PI, { grime: 0, cast: false });   // clear of a brick-lined wall's veneer
     // props
+    // a real furniture model (CC0, Poly Haven), fitted to `len` along `axis`, or false if it didn't load
+    const model = (name, axis, len, x, y, z, ry = 0) => {
+      const pc = PROPS[name] && propFit(name, null, axis, len, ry);
+      if (!pc) return false;
+      for (const { geo, mat } of pc.parts) put(geo.clone(), mat, x, y, z, 0, { grime: 0 });
+      return pc;
+    };
     for (const [k, dx, dz, rot] of spec.props || []) {
       const px = cx + dx, pz = cz + dz;
-      if (k === 'table') {
+      if (k === 'table' && PROPS.ph_table) {
+        // a round café table and two chairs facing each other across it
+        solid(px, pz, 0.9, 0.9, 0.1, y0 + 0.68, 'wood');
+        model('ph_table', 'x', 0.9, px, y0, pz);
+        for (const s of [-1, 1]) {
+          const along = (dx + dz + s) % 2 === 0, ox = along ? s * 0.75 : 0, oz = along ? 0 : s * 0.75;
+          model('ph_chair', 'y', 0.95, px + ox, y0, pz + oz, Math.atan2(-ox, -oz) + Math.PI);
+          solid(px + ox, pz + oz, 0.48, 0.48, 0.9, y0, 'wood').pass = true;   // (stops you, not bullets)
+        }
+      } else if ((k === 'shelf' || k === 'books') && PROPS.ph_shelfunit) {
+        // a steel shelving unit stacked with cardboard boxes, or with books ('books': a bookshop's); solid, it blocks
+        // bullets and most of the view
+        const along = !rot;
+        // units side by side to fill the 1.8 m run (one unit is narrower than that)
+        const one = PROPS.ph_shelfunit && propFit('ph_shelfunit', null, 'y', 2.0, along ? 0 : Math.PI / 2);
+        const uw = one ? Math.max(one.size.x, one.size.z) : 1.8, nu = Math.max(1, Math.round(1.8 / uw));
+        let pc = null;
+        for (let u = 0; u < nu; u++) { const o = (u - (nu - 1) / 2) * uw; pc = model('ph_shelfunit', 'y', 2.0, px + (along ? o : 0), y0, pz + (along ? 0 : o), along ? 0 : Math.PI / 2); }
+        const sw = pc ? (along ? uw * nu : pc.size.x) : along ? 1.8 : 0.5, sd = pc ? (along ? pc.size.z : uw * nu) : along ? 0.5 : 1.8, wide = Math.max(sw, sd);
+        solid(px, pz, sw, sd, 2.0, y0, 'metal');
+        // every shelf full of boxes, so the unit reads (and blocks) as solid as its collision
+        const n = Math.max(2, Math.floor(wide / 0.5)), step = wide / n;
+        for (const f of [0.02, 0.36, 0.69]) for (let i = 0; i < n; i++) {
+          const o = (i - (n - 1) / 2) * step;
+          if (k === 'books' && PROPS.ph_books) model('ph_books', 'x', step * 0.95, px + (along ? o : 0), y0 + 2.0 * f + 0.03, pz + (along ? 0 : o), (along ? 0 : Math.PI / 2) + (i % 2) * Math.PI);
+          else model('ph_cbox', 'x', step * 0.92, px + (along ? o : 0), y0 + 2.0 * f + 0.03, pz + (along ? 0 : o), ((i + dx) % 3) * 0.08 + (along ? 0 : Math.PI / 2));
+        }
+      } else if (k === 'crates' && PROPS.ph_crate) {
+        const pc = model('ph_crate', 'x', 1.2, px, y0, pz, (dx % 2) * 0.12);
+        const ch = pc ? pc.size.y : 1.2;
+        solid(px, pz, pc ? pc.size.x : 1.2, pc ? pc.size.z : 1.2, ch, y0, 'wood');   // (the crate's own size: no invisible edges)
+        model('ph_cbox', 'y', 0.45, px + 0.1, y0 + ch, pz - 0.05, 0.3);
+      } else if (k === 'table') {
         solid(px, pz, 1.6, 0.9, 0.12, y0 + 0.7, 'wood');   // only the top: you can shoot (and crawl) under it
         put(flatBox(1.6, 0.06, 0.9, 1.2), M.wood, px, y0 + 0.77, pz, 0, { grime: 0, tint: 0x9a7a52 });
         for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(flatBox(0.06, 0.74, 0.06, 0), M.wood, px + sx * 0.72, y0 + 0.37, pz + sz * 0.38, 0, { grime: 0, tint: 0x6a5238 });
         put(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), M.paint, px + 0.3, y0 + 0.86, pz, 0, { grime: 0, tint: 0xd8d2c0 });
-      } else if (k === 'shelf') {
+      } else if (k === 'shelf' || k === 'books') {
         // tall metal shelving unit with boxes: blocks the view straight through the house
         const along = !rot;
         const sw = along ? 1.8 : 0.5, sd = along ? 0.5 : 1.8;
@@ -1284,8 +1323,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         solid(px, pz, bw2, bd2, 1.1, y0, 'wood');
         put(flatBox(bw2, 1.05, bd2, 1.2), M.wood, px, y0 + 0.525, pz, 0, { grime: 0.1, tint: 0x6a4a30 });
         put(flatBox(bw2 + 0.1, 0.06, bd2 + 0.15, 1.2), M.wood, px, y0 + 1.08, pz, 0, { grime: 0, tint: 0x8a6440 });
+        if (PROPS.ph_bottles) for (const t of [-1.2, 0.3, 1.5]) model('ph_bottles', 'x', 0.55, px + (along ? t : 0.12), y0 + 1.11, pz + (along ? 0.12 : t), along ? 0 : Math.PI / 2);
         for (let i = 0; i < 9; i++) {
           const t = -L / 2 + 0.3 + i * (L - 0.6) / 8;
+          if (PROPS.ph_bottles) { if (i % 2 === 0) { const sx = px + (along ? t : -0.75), sz = pz + (along ? -0.75 : t); put(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), M.wood, sx, y0 + 0.75, sz, 0, { grime: 0, tint: 0x5a3a24 }); } continue; }
           put(new THREE.CylinderGeometry(0.035, 0.04, 0.28, 8), M.glass, px + (along ? t : 0.12), y0 + 1.25, pz + (along ? 0.12 : t), 0, { grime: 0, tint: [0x5a8a4a, 0xa86a2a, 0xd8d2c0][i % 3] });
           if (i % 2 === 0) { const sx = px + (along ? t : -0.75), sz = pz + (along ? -0.75 : t); put(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), M.wood, sx, y0 + 0.75, sz, 0, { grime: 0, tint: 0x5a3a24 }); put(new THREE.CylinderGeometry(0.03, 0.03, 0.72, 6), M.metal, sx, y0 + 0.36, sz, 0, { grime: 0 }); }
         }
