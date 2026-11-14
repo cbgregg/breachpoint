@@ -49,6 +49,7 @@ const TARSA_HALF = [
   // plaza edge: low walls that give the plaza cover without closing it
   [9, 7.5, 0.6, 5, 1.1, 0, 'wall', 0],
   [10, -6.5, 3, 0.8, 1.1, 0, 'sand'],
+  [5, -10, 5, 3, 1.0, 0, 'dock', { steps: 'n', tint: 0xc4b8a4 }],   // a raised market stage: the plaza's second level
   // mid street: low market arcades on alternating sides, so the lane bends instead of running straight
   [27.5, 9.25, 7, 5.5, 3.2, 0, 'house', { s: [['d', -1.6], ['w', 1.6]], w: [['d', -1.2]], e: [['w', 1.3]], props: [['crates', 2, 0.8]] }],   // against the north divider
   [15.5, -9.25, 7, 5.5, 3.2, 0, 'house', { n: [['d', 1.6], ['w', -1.6]], e: [['d', 1.2]], w: [['w', -1.3]], props: [['shelf', -1.6, 0, 1]] }], // against the south divider
@@ -189,6 +190,12 @@ const SHURAN_HALF = [
   [12, -27, 2, 2, 2, 0, 'pallet'],
   [3, -24, 0.8, 3, 1.1, 0, 'sand'],
   [4, -29, 2, 2, 1.8, 0, 'crate'],
+  // a second level: the north-lane house's roof (stairs up its south face, parapets), a loading dock in the yard
+  // and a raised plinth in mid, all a metre or more up (measured against BO2's Raid: 0 / +1 / 3 m levels)
+  [12, 23.85, 7, 0.3, 0.6, 3.45, 'parapet'], [15.35, 20.85, 0.3, 5.7, 0.6, 3.45, 'parapet'], [8.65, 20.85, 0.3, 5.7, 0.6, 3.45, 'parapet'], [10.75, 18.15, 4.5, 0.3, 0.6, 3.45, 'parapet'],
+  [25, -24, 5, 4, 1.0, 0, 'dock', { steps: 'n' }], [24, -24.5, 1.5, 1.5, 1.5, 1.0, 'crate'],
+  [15.5, -3.5, 4, 3, 1.0, 0, 'dock', { steps: 'w' }],
+  [3, 20.2, 1.6, 1.6, 1.6, 0, 'crate'], [3.1, 20.2, 1.3, 1.3, 1.3, 1.6, 'crate'], [16, 26.5, 3, 0.8, 1.1, 0, 'sand'], [22, -28.3, 3, 0.8, 1.1, 0, 'sand'],
   // spawn
   [28.5, 9, 3, 1, 3.5, 0, 'hesco'],
   [29.5, -14, 2, 1, 3.5, 0, 'hesco'],
@@ -206,6 +213,7 @@ const SHURAN_HALF = [
   [0, 30.5, 86, 1, 8, 0, 'boundary'],
   [42.5, 0, 1, 62, 8, 0, 'boundary'],
 ];
+for (let k = 1; k <= 7; k++) SHURAN_HALF.push([9 + k * 0.9, 16.4, 0.9, 3, k * 0.5, 0, 'stairs', k]);   // up to the north-lane house's roof
 const SHURAN_SPAWNS = [[38, -24], [38, -15], [38, -5], [38, 5], [38, 15], [38, 24], [35, -11], [35, 11]];
 const SHURAN_PICKUPS = [
   { type: 'health', pos: [0, 0, 20] },
@@ -377,6 +385,9 @@ const PIONEER_CENTER = [
   [-39, -15.5, 1.9, 1.35, 1.25, 0, 'dumpster', {}], [-24.2, 30.5, 1.35, 1.9, 1.25, 0, 'dumpster', { dark: true }],
   // ---- Smith Tower, up Yesler to the east
   [96, -14, 12, 12, 62, 0, 'tower'],
+  // ---- more cover in the open stretches of the plaza and the spawn lots, and a raised loading dock on James St
+  [-18, -12, 3.2, 0.9, 1.1, 0, 'jersey'], [-21, -15, 1.6, 1.6, 1.6, 0, 'crate'], [38, -18, 1.6, 1.6, 1.6, 0, 'crate'], [38.1, -18, 1.3, 1.3, 1.3, 1.6, 'crate'],
+  [33.5, -6.5, 3.2, 0.9, 1.1, 0, 'jersey'], [-36, 1, 0.9, 3.2, 1.1, 0, 'jersey'],
   // ---- perimeter
   [0, 40.5, 110, 1, 10, 0, 'boundary'], [0, -40.5, 110, 1, 10, 0, 'boundary'],
   [54.5, 0, 1, 82, 10, 0, 'boundary'], [-54.5, 0, 1, 82, 10, 0, 'boundary'],
@@ -727,7 +738,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     return solidPoly([[cx - w / 2, cz - d / 2], [cx + w / 2, cz - d / 2], [cx + w / 2, cz + d / 2], [cx - w / 2, cz + d / 2]].map(([x, z]) => xfPt(x, z)), h, y0, surface);
   };
   const SURFACE = { dumpster: 'metal', infokiosk: 'wood', bus: 'metal', truck: 'metal', tent: 'wood', kiosk: 'brick', container: 'metal', car: 'metal', barrel: 'metal', crate: 'wood', pallet: 'wood', stall: 'wood', sand: 'concrete', hesco: 'concrete', palm: 'wood', ammo: 'metal', hutwall: 'brick' };
-  const NO_SOLID = new Set(['station', 'house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
+  const NO_SOLID = new Set(['dock', 'station', 'house', 'lamp', 'lights', 'light', 'brick', 'tunnel', 'stairdown', 'paving', 'tracks', 'cable', 'tree', 'pergola', 'vlamp', 'tower', 'railing', 'aframe', 'pioneerbldg', 'flatiron', 'droad', 'bollard', 'prism']);
 
   // ---------- vehicle models (CC-BY, credited in the README; js/assets.js loads a map's own before it's built) ----------
   // Every vehicle the layouts place has a procedural build and, when its model loaded, the real thing instead:
@@ -1541,6 +1552,23 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         // tattered poster
         put(new THREE.PlaneGeometry(0.8, 1.1), M.cloth, cx, 1.8, cz + Math.sign(cz) * -(d / 2 + 0.01), Math.sign(cz) > 0 ? Math.PI : 0, { grime: 0, tint: 0xb9a37a });
         break;
+      case 'dock': {
+        // a raised concrete platform (a loading dock, a stage, a plinth): h high (about 1 m, a second level to
+        // fight from), a steel edge, and steps up the `steps` side ('n' +z, 's' -z, 'e' +x, 'w' -x) at `at` along it
+        const side = (extra && extra.steps) || 's', at = (extra && extra.at) || 0, tint = (extra && extra.tint) || 0xb4ae9e;
+        solid(cx, cz, w, d, h, y0, 'concrete');
+        B(M.concrete, w, h, d, cx, y0, cz, 0, { tint, grime: 0.6, base: y0 });
+        B(M.dark, w + 0.06, 0.1, d + 0.06, cx, y0 + h - 0.106, cz, 0, { grime: 0.2 });   // (its top just under the slab's: no flicker)
+        const nx = side === 'e' ? 1 : side === 'w' ? -1 : 0, nz = side === 'n' ? 1 : side === 's' ? -1 : 0, n = Math.max(1, Math.round(h / 0.45) - 1);
+        for (let k = 0; k < n; k++) {
+          const sh = h * (n - k) / (n + 1), off = 0.3 + k * 0.6;
+          const sx = cx + nx * (w / 2 + off) + (nz ? at : 0), sz = cz + nz * (d / 2 + off) + (nx ? at : 0);
+          const sw = nz ? 1.8 : 0.6, sd = nz ? 0.6 : 1.8;
+          solid(sx, sz, sw, sd, sh, y0, 'concrete');
+          B(M.concrete, sw, sh, sd, sx, y0, sz, 0, { tint: 0xa8a294, grime: 0.5, base: y0 });
+        }
+        break;
+      }
       case 'hesco': {
         // interlocking concrete yard blocks ("lego blocks") stacked in running bond, as walls round a works yard
         const along = d >= w, L = along ? d : w, T = along ? w : d;
@@ -2467,6 +2495,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const mx = kind === 'house' ? mirrorSpec(extra) : kind === 'lights' ? [-extra[0], -extra[1], -extra[2], -extra[3]]
       : kind === 'cable' ? [-extra[0], -extra[1], extra[2], -extra[3], -extra[4], extra[5]]
       : kind === 'stairdown' ? { ...extra, dir: -((extra && extra.dir) || 1) }
+      : kind === 'dock' ? { ...extra, steps: flipSide[(extra && extra.steps) || 's'] }
       : kind === 'dumpster' || kind === 'rsign' ? { ...extra, ry: ((extra && extra.ry) || 0) + Math.PI }
       : kind === 'tunnel' ? { ...extra, gaps: (extra && extra.gaps || []).map(([k, at, wd]) => [flipSide[k], -at, wd]) }
       : extra;

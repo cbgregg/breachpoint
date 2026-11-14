@@ -1058,6 +1058,18 @@ function build(ctx) {
     placeItem(...it); placeItem(-it[0], -it[1], ...it.slice(2));
   }
   flushFleet();   // the vehicle models placed above
+  // a second level and more hard cover (the lot was a quarter built over; BO2-sized maps run near half): a raised
+  // viewing deck by the snack bar, an equipment trailer by the back fence, film-reel crates under the screen, a
+  // dumpster and a barrier between rows. Point-mirrored like the rest of the lot.
+  for (const s of [1, -1]) {
+    ctx.addKind(s * 7.2, s * 9.5, 4.5, 3.5, 1.2, 0, 'dock', { steps: s > 0 ? 'w' : 'e', tint: 0x9a8a78 }, 0);
+    ctx.addKind(s * 7.8, s * 10.2, 1.4, 1.4, 1.2, 1.2, 'crate', 0, 0);
+    ctx.addKind(s * 30, s * 27, 6, 2.4, 2.6, 0, 'container', 0x8a3d2c, 0);
+    ctx.addKind(s * 38.5, s * 16, 1.6, 1.6, 1.6, 0, 'crate', 0, 0);
+    ctx.addKind(s * 38.6, s * 16, 1.3, 1.3, 1.3, 1.6, 'crate', 0, 0);
+    ctx.addKind(s * 31, s * -21, 1.9, 1.35, 1.25, 0, 'dumpster', { ry: s > 0 ? 0 : Math.PI }, 0);
+    ctx.addKind(s * 5, s * -9, 3.2, 0.9, 1.1, 0, 'jersey', 0, 0);
+  }
 
   // lamps: along the perimeter road and the lawns, arms out over the lot
   for (const s of [-1, 1]) {
