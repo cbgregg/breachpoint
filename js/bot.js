@@ -798,6 +798,10 @@ export class BotBrain {
         if (this.coverGoal && this.coverGoal.crouch) this.crouch = true;
       } else if (this.goalKind === 'roam' || this.goalKind === 'intel') {
         this.goalT = 0;
+      } else if ((this.goalKind === 'hunt' || this.goalKind === 'rotate' || this.goalKind === 'health' || this.goalKind === 'ammo') && this.goal && Math.hypot(this.goal.x - b.pos.x, this.goal.z - b.pos.z) < 2.5) {
+        // there (the path follower counts 0.7 m as arrived, the goal checks want 2 m and the same floor): don't stand
+        // on the spot waiting for a timer, check the angles and go on
+        this.goal = null; this.goalT = 0; this.lastKnownT = -99; this.idleT = rand(0.3, 0.8); this.pickLook(true);
       } else if ((this.noPathT += dt) > 1.2) {
         // no route to the mode's spot (or already standing on it): ask for a different one
         this.noPathT = 0; this.gmPatT = 0; this.gmOff = null; this.goal = null;
@@ -827,7 +831,10 @@ export class BotBrain {
     // to move (standing still on purpose, or having only just set off, isn't stuck), and the ground covered counts
     // as well as the net displacement (a strafe that turns round ends up where it started without being stuck)
     if (wish.lengthSq() <= 0.2 || this.atCover || this.strafeStop > 0 || watching || this.fleeing) this.stuckIdle();
-    this.stuckT -= dt; this.movedAcc += Math.hypot(b.vel.x, b.vel.z) * dt;
+    // (ground actually covered since the last step, not the velocity asked for: a bot running into a wall still
+    // has a velocity, and counting it meant the stuck check never fired)
+    if (!this.prevP) this.prevP = b.pos.clone();
+    this.stuckT -= dt; this.movedAcc += Math.hypot(b.pos.x - this.prevP.x, b.pos.z - this.prevP.z); this.prevP.copy(b.pos);
     if (this.stuckT <= 0) {
       const moved = Math.max(this.movedAcc, Math.hypot(b.pos.x - this.lastPos.x, b.pos.z - this.lastPos.z));
       this.movedAcc = 0;
@@ -872,7 +879,7 @@ export class BotBrain {
   }
 
   // not trying to move: the stuck clock waits, and the next sample measures from here
-  stuckIdle() { this.stuckT = Math.max(this.stuckT, 0.8); this.lastPos.copy(this.bot.pos); this.movedAcc = 0; }
+  stuckIdle() { this.stuckT = Math.max(this.stuckT, 0.8); this.lastPos.copy(this.bot.pos); this.movedAcc = 0; if (this.prevP) this.prevP.copy(this.bot.pos); }
 
   // is the body blocked a little way along this direction? (ignores low steps)
   blockedDir(x, z, dist = 0.55) {
