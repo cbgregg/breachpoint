@@ -10,6 +10,7 @@ import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
 import { OVERGROWTH } from './overgrowth.js';
 import { CANNERY } from './cannery.js';
+import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
 import { PROPS, VEHICLES_BY_MAP, containerVariants, buildingVariants, propFit } from './props.js';
 import { buildStation, STATION_LIDS } from './station.js';
@@ -423,6 +424,7 @@ export const MAPS = {
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
   cannery: CANNERY,
+  afterhours: AFTERHOURS,
   link: LINKLOOP,
 };
 export const MAP_IDS = Object.keys(MAPS);
