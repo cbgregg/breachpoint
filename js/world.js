@@ -1522,7 +1522,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const md = (name, axis, len, x, y, z, ry = 0, match = null, swap = null) => {
       const pc = PROPS[name] && propFit(name, match, axis, len, 0);
       if (!pc) return null;
-      for (const { geo, mat } of pc.parts) P(geo.clone(), (swap && swap(mat)) || mat, x, y, z, ry);
+      for (const { geo, mat } of pc.parts) { const m = swap && swap(mat); if (m !== false) P(geo.clone(), m || mat, x, y, z, ry); }   // (false: leave that part out)
       return pc;
     };
     const lit = (m) => /glass|globe|bulb/i.test(m.name || '') ? glow : null;
@@ -1690,10 +1690,10 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
       md('ph_sconce', 'y', 0.36, x + nx * pc.size.z / 2, 1.78, z + nz * pc.size.z / 2, ry, null, lit);
       hot(x + nx * 0.18, 1.86, z + nz * 0.18, 0.55);
     };
-    const NOGLASS = /^(?!.*glass)/i;   // (the frames' glass draws as a dark sheet over the picture)
     const art = (name, len, x, y, z, ry, nx, nz, pic = -1) => {
-      const pc = PROPS[name] && propFit(name, NOGLASS, 'x', len, 0);
-      if (pc) md(name, 'x', len, x + nx * (pc.size.z / 2 + 0.004), y - pc.size.y / 2, z + nz * (pc.size.z / 2 + 0.004), ry, NOGLASS, (m) => pic >= 0 && /canvas|artwork/i.test(m.name || '') ? artMats[pic] : null);
+      const pc = PROPS[name] && propFit(name, null, 'x', len, 0);
+      // (the frames' glass draws as a dark sheet over the picture: left out)
+      if (pc) md(name, 'x', len, x + nx * (pc.size.z / 2 + 0.004), y - pc.size.y / 2, z + nz * (pc.size.z / 2 + 0.004), ry, null, (m) => /glass/i.test(m.name || '') ? false : pic >= 0 && /canvas|artwork/i.test(m.name || '') ? artMats[pic] : null);
     };
     art('ph_painting', 1.0, brickFace(-1), 2.15, -2.25, Math.PI / 2, 1, 0);
     art('ph_photo', 0.9, brickFace(-1), 2.1, 4.25, Math.PI / 2, 1, 0, 0);
