@@ -20,8 +20,8 @@ export const FRESHWAY = blendMap(DATA, {
   id: 'mart',
   name: 'Freshway',
   blurb: 'A supermarket between two car parks: grocery aisles down the middle, produce and dairy by the checkouts, the deli and a stockroom behind, doors that open and close, a delivery yard at each end',
-  scale: { plaster: 3, brick: 1.6, paint: 2, storefloor: 2.4, concrete: 3, asphalt: 6, cement: 3, metal: 2, wood: 1.5, marble: 2, whitetile: 1.2, rubber: 1, woodold: 1.4, dirt: 2 },
-  noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck/,
+  scale: { v_hedge: 1.3, plaster: 3, brick: 1.6, paint: 2, storefloor: 2.4, concrete: 3, asphalt: 6, cement: 3, metal: 2, wood: 1.5, marble: 2, whitetile: 1.2, rubber: 1, woodold: 1.4, dirt: 2 },
+  noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck|floor light|lot light/,
   groundSurface: 'concrete',
   // under the roof the light is the sky's fill and the sun through the skylights: more fill, a little less exposure
   look: { photo: { url: 'assets/sky/suburban_parking_area.jpg', u: 0.6001, gain: 1.2 }, sunElev: 58, fog: 0.004, fogColor: 0x9a9c8c, sun: 4.0, hemi: 1.25, hemiSky: 0xe8eef8, ground: 0xb0aca4, exposure: 0.95, env: 0.75 },

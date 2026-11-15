@@ -17,20 +17,20 @@ from mapkit import *
 HX, HY, H, T, PI = 40, 28, 5.6, 0.4, math.pi
 setup({
     'shell': ('plaster:store wall', 0xf0ece0), 'inner': ('plaster:partition', 0xe6e8e4), 'brick': ('brick:brick base', 0xd8c8b8), 'fascia': ('paint:green fascia', 0x2f7a4e), 'stripe': ('paint:fascia stripe', 0xf2e8c8),
-    'floor': ('storefloor:shop floor', 0xffffff), 'slab': ('concrete:back floor', 0xc8c8c4), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('concrete:pavement', 0xe6e2d8), 'kerb': ('concrete:kerb', 0xd8d8d0),
+    'floor': ('storefloor:shop floor', 0xe9e5dc), 'slab': ('concrete:back floor', 0xc8c8c4), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('concrete:pavement', 0xe6e2d8), 'kerb': ('concrete:kerb', 0xd8d8d0),
     'roof': ('metal:roof deck', 0xe4e6e8), 'truss': ('metal:truss', 0x9aa0a6), 'steel': ('metal:steel', 0xc4c8cc), 'rack': ('paint:racking', 0x2c5a9a), 'orange': ('paint:rack beam', 0xe07a1c),
     'gondola': ('flat:gondola', 0xdcdcd8), 'case': ('flat:case', 0xf2f2f0), 'cardboard': ('flat:cardboard', 0xb48c5a), 'counter': ('wood:counter', 0xc8a070), 'top': ('marble:counter top', 0xf0f0f0), 'tile': ('whitetile:wall tile', 0xffffff), 'belt': ('rubber:belt', 0x30302e),
     'wood': ('woodold:pallet', 0xd8c0a0), 'atlas': ('atlas:store', 0xffffff), 'glass': ('flat:glass', 0x9ab8c4), 'dark': ('flat:dark', 0x18181a), 'line': ('flat:paint line', 0xf0f0e8), 'yellow': ('flat:yellow paint', 0xe8c020),
-    'green': ('paint:dumpster', 0x2c5a40), 'hedge': ('flat:hedge', 0x3f7034), 'soil': ('dirt:soil', 0x8a7460), 'sign': ('flat:sign white', 0xf8f8f4), 'red': ('flat:sign red', 0xc8281e), 'fence': ('metal:fence', 0x8a9096),
+    'green': ('paint:dumpster', 0x2c5a40), 'hedge': ('v_hedge:hedge', 0xf0f0f0), 'shadow': ('soft:shadow', 0x000000), 'pool': ('soft:floor light', 0xf0f4ff), 'warm': ('soft:lot light', 0xffe0b0), 'soil': ('dirt:soil', 0x8a7460), 'sign': ('flat:sign white', 0xf8f8f4), 'red': ('flat:sign red', 0xc8281e), 'fence': ('metal:fence', 0x8a9096),
     'frame': ('metal:door frame', 0x8a9096), 'cover': ('flat:cover', 0xc8731a), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x7c8a70), 'decal': ('decal:ground wear', 0xffffff), 'cart': ('metal:trolley', 0xd0d4d8),
     'tomato': ('flat:tomato', 0xc8322a), 'orange f': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58), 'melon': ('flat:melon', 0x3f7a3a),
-}, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0}, rough={'glass': 0.08, 'floor': 0.35, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
-   shade={'shell': 0xb8b4ac, 'inner': 0xb4b8b8, 'hedge': 0x23401f, 'tomato': 0x7a1c1c, 'orange f': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a, 'melon': 0x1f4420, 'gondola': 0xa8a8a8, 'case': 0xb8bcc4, 'cardboard': 0x7a5c38})
+}, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0}, rough={'glass': 0.08, 'floor': 0.22, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
+   shade={'shell': 0xb8b4ac, 'inner': 0xb4b8b8, 'hedge': 0x4a5a44, 'tomato': 0x7a1c1c, 'orange f': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a, 'melon': 0x1f4420, 'gondola': 0xa8a8a8, 'case': 0xb8bcc4, 'cardboard': 0x7a5c38})
 use_atlas('mart'); rnd = random.Random(7)
 SH = ('shelf_a', 'shelf_b', 'shelf_c', 'shelf_d', 'shelf_e')
 SIDES = ((0, (0, -1)), (PI, (0, 1)), (PI / 2, (1, 0)), (-PI / 2, (-1, 0)))   # a face's yaw and the way it looks
 def carton_stack(x, y, h=1.34, piece='cartons', mirror=True, name='pallet stack'):
-    box(name, x - 0.6, y - 0.6, x + 0.6, y + 0.6, 0, h, 'cardboard', surface='wood', mirror=mirror)
+    pool(x, y, 2.3, 2.3, 'shadow', mirror=mirror); box(name, x - 0.6, y - 0.6, x + 0.6, y + 0.6, 0, h, 'cardboard', surface='wood', mirror=mirror)
     for yaw, (dx, dy) in SIDES: facade(piece, x + dx * 0.61, y + dy * 0.61, 0, yaw, mirror=mirror)
 
 # ---------- ground ----------
@@ -51,7 +51,7 @@ for y in range(-12, 13, 4):
     deco('truss', -23.6, y - 0.08, 0, y + 0.08, H - 0.5, H - 0.38, 'truss'); deco('truss', -23.6, y - 0.06, 0, y + 0.06, H - 0.1, H, 'truss')
     for i in range(24): bar('truss web', (-23.6 + i, y, H - 0.44), (-23.1 + i, y, H - 0.05), 0.02, 'truss'); bar('truss web', (-23.1 + i, y, H - 0.05), (-22.6 + i, y, H - 0.44), 0.02, 'truss')
 for x in range(-21, 0, 4):
-    for y in (-13.5, -9.5, -5.5, -1.5, 2.5, 6.5, 10.5, 14): deco('light fitting', x - 0.75, y - 0.12, x + 0.75, y + 0.12, H - 0.72, H - 0.66, 'steel'); deco('tube', x - 0.7, y - 0.08, x + 0.7, y + 0.08, H - 0.76, H - 0.72, 'lamp')
+    for y in (-13.5, -9.5, -5.5, -1.5, 2.5, 6.5, 10.5, 14): deco('light fitting', x - 0.75, y - 0.12, x + 0.75, y + 0.12, H - 0.72, H - 0.66, 'steel'); deco('tube', x - 0.7, y - 0.08, x + 0.7, y + 0.08, H - 0.76, H - 0.72, 'lamp'); pool(x, y, 4.2, 2.6, 'pool', 0.034)
 # outside: brick base, fascia, a canopy over the entrance, the name, storefront glazing
 for a, b in ((-16, -11), (-7, 11.2), (12.8, 16)): deco('brick base', -24.07, a, -24, b, 0, 1.0, 'brick'); deco('base cap', -24.1, a, -24, b, 1.0, 1.07, 'kerb')
 deco('fascia', -24.12, -16.1, -24, 16.1, H - 1.3, H + 0.35, 'fascia'); deco('fascia stripe', -24.14, -16.1, -24, 16.1, H - 1.45, H - 1.3, 'stripe')
@@ -80,7 +80,7 @@ text('DAIRY', -16.9, -14.68, 2.12, PI, 0.2, 'fascia', mirror=True, depth=0.02)
 
 # ---------- the grocery aisles ----------
 for n, y in enumerate((-5, -1.7, 1.7, 5)):
-    box('gondola', -13.2, y - 0.45, -3.6, y + 0.45, 0, 2.0, 'gondola'); deco('gondola top', -13.25, y - 0.5, -3.55, y + 0.5, 2.0, 2.06, 'gondola')
+    pool(-8.4, y, 11.6, 2.3, 'shadow'); box('gondola', -13.2, y - 0.45, -3.6, y + 0.45, 0, 2.0, 'gondola'); deco('gondola top', -13.25, y - 0.5, -3.55, y + 0.5, 2.0, 2.06, 'gondola')
     for i in range(8):
         facade(SH[(i + n) % 5], -12.6 + i * 1.2, y - 0.46, 0, 0); facade(SH[(i + n + 2) % 5], -12.6 + i * 1.2, y + 0.46, 0, PI)
     for x, yaw, o in ((-13.7, -PI / 2, -0.26), (-3.1, PI / 2, 0.26)):   # end caps
@@ -91,7 +91,7 @@ for n, y in enumerate((-5, -1.7, 1.7, 5)):
         text(str(n + 1), -8.4, ym - 0.035, 3.25, 0, 0.34, 'sign', mirror=True, depth=0.01); text(str(n + 1), -8.4, ym + 0.035, 3.25, PI, 0.34, 'sign', mirror=True, depth=0.01)
 # the cross aisle: chest freezers either side of a promo stack at the very middle
 carton_stack(0, 0, 1.5, 'cartons_b', mirror=False, name='promo stack')
-box('chest freezer', -1.0, 3.2, 1.0, 6.2, 0, 0.9, 'case'); deco('chest rim', -1.04, 3.16, 1.04, 6.24, 0.9, 0.96, 'steel'); deco('chest glow', -0.85, 3.35, 0.85, 6.05, 0.97, 0.975, 'glow')
+pool(0, 4.7, 3.0, 4.0, 'shadow'); pool(0, 0, 2.4, 2.4, 'shadow', mirror=False); box('chest freezer', -1.0, 3.2, 1.0, 6.2, 0, 0.9, 'case'); deco('chest rim', -1.04, 3.16, 1.04, 6.24, 0.9, 0.96, 'steel'); deco('chest glow', -0.85, 3.35, 0.85, 6.05, 0.97, 0.975, 'glow')
 for i in range(5): deco('frozen box', -0.7 + (i % 2) * 0.75, 3.5 + i * 0.5, -0.1 + (i % 2) * 0.75, 3.9 + i * 0.5, 0.93, 0.99, ('tomato', 'apple', 'lemon', 'plum', 'orange f')[i])
 
 # ---------- produce (the front half of the side lane) ----------
@@ -104,14 +104,14 @@ def heap(x0, y0, x1, y1, z, kinds, r=0.11):
             for q in range(3):
                 ico('produce', x0 + (i + 0.3 + 0.4 * (q % 2)) * (x1 - x0) / n, y0 + (j + 0.3 + 0.2 * q) * (y1 - y0) / m, z + 0.16 + 0.07 * (q == 2), r, r, r * 0.9, k, sub=1)
 for x in (-12.5, -7.2):
-    box('produce table', x - 1.9, -12.6, x + 1.9, -10.6, 0, 0.85, 'counter', surface='wood'); deco('table skirt', x - 1.95, -12.65, x + 1.95, -10.55, 0.1, 0.3, 'fascia')
+    pool(x, -11.6, 5.0, 3.2, 'shadow'); box('produce table', x - 1.9, -12.6, x + 1.9, -10.6, 0, 0.85, 'counter', surface='wood'); deco('table skirt', x - 1.95, -12.65, x + 1.95, -10.55, 0.1, 0.3, 'fascia')
     heap(x - 1.8, -12.5, x + 1.8, -10.7, 0.85, ('tomato', 'apple', 'orange f', 'lemon', 'plum', 'melon') if x < -10 else ('melon', 'lemon', 'apple', 'tomato', 'orange f', 'plum'))
     deco('price board', x - 0.5, -11.62, x + 0.5, -11.58, 1.25, 1.6, 'sign'); bar('board post', (x, -11.6, 0.85), (x, -11.6, 1.25), 0.012, 'steel')
 facade('poster_c', -4.5, -15.58, 1.3, PI); prop('potted_plant_04', -3.6, -14.6, 0, 0.4, 1.3, solid=(0.6, 0.6, 1.2, True)); prop('WetFloorSign_01', -5.6, -8.6, 0.02, 0.6, 1.0)
 
 # ---------- checkouts (inside the entrance) ----------
 for y in (-4.4, -1.6, 1.2, 4.0):
-    box('checkout', -20.4, y - 0.35, -17.6, y + 0.35, 0, 0.92, 'gondola'); deco('belt', -20.3, y - 0.26, -18.6, y + 0.26, 0.92, 0.935, 'belt'); deco('scanner', -18.5, y - 0.26, -17.9, y + 0.26, 0.92, 0.94, 'steel')
+    pool(-19.0, y + 0.15, 4.0, 2.2, 'shadow'); box('checkout', -20.4, y - 0.35, -17.6, y + 0.35, 0, 0.92, 'gondola'); deco('belt', -20.3, y - 0.26, -18.6, y + 0.26, 0.92, 0.935, 'belt'); deco('scanner', -18.5, y - 0.26, -17.9, y + 0.26, 0.92, 0.94, 'steel')
     box('till', -18.2, y + 0.35, -17.6, y + 0.85, 0, 1.05, 'gondola'); deco('screen', -18.05, y + 0.5, -17.75, y + 0.56, 1.05, 1.42, 'dark'); deco('screen glow', -18.02, y + 0.495, -17.78, y + 0.5, 1.12, 1.38, 'glow')
     cyl('lane light pole', -17.75, y + 0.75, 1.05, 2.3, 0.02, 'steel', seg=6); deco('lane light', -17.9, y + 0.6, -17.6, y + 0.9, 2.3, 2.55, 'neon' if y != 1.2 else 'red'); deco('bag rack', -17.55, y - 0.3, -17.2, y + 0.3, 0.3, 0.85, 'steel')
     deco('sweet rack', -21.0, y - 0.3, -20.45, y + 0.3, 0, 1.25, 'gondola')
@@ -135,7 +135,7 @@ for y in (1.6, 4.0):
 collide(-30.05, 1.5, -28.75, 4.1, 0, 1.1, 'metal', soft=1); deco('corral sign', -29.9, 2.75, -28.9, 2.8, 1.5, 1.9, 'fascia'); bar('corral sign post', (-29.4, 2.78, 0), (-29.4, 2.78, 1.5), 0.02, 'steel')
 
 # ---------- deli counter and prep room ----------
-box('deli counter', -10.2, 9.6, -2.6, 10.5, 0, 0.95, 'counter', surface='wood'); deco('counter top', -10.25, 9.55, -2.55, 10.55, 0.95, 1.0, 'top')
+pool(-6.4, 10.0, 8.6, 2.0, 'shadow'); pool(-16.9, -14.6, 14.4, 2.6, 'shadow'); pool(-20.2, 7.0, 7.6, 2.2, 'shadow'); box('deli counter', -10.2, 9.6, -2.6, 10.5, 0, 0.95, 'counter', surface='wood'); deco('counter top', -10.25, 9.55, -2.55, 10.55, 0.95, 1.0, 'top')
 deco('deli case glass', -10.1, 9.62, -2.7, 9.66, 1.0, 1.42, 'glass'); deco('deli case top', -10.1, 9.62, -2.7, 10.2, 1.42, 1.46, 'steel'); deco('case glow', -10.0, 9.7, -2.8, 10.15, 1.38, 1.4, 'glow')
 for i in range(12): ico('loaf', -9.7 + i * 0.6, 9.9, 1.07, 0.2, 0.11, 0.08, ('counter', 'lemon', 'orange f')[i % 3], sub=1)
 box('back counter', -10.8, 12.9, -3.0, 13.6, 0, 0.95, 'steel', surface='metal'); deco('scales', -8.2, 13.0, -7.7, 13.4, 0.95, 1.2, 'case'); deco('slicer', -5.6, 13.0, -5.0, 13.45, 0.95, 1.3, 'steel')
@@ -153,7 +153,7 @@ def racking(x0, x1, y):
             if (i + int(z)) % 4 == 3: continue
             cx = x0 + 0.15 + (i + 0.5) * (x1 - x0 - 0.3) / n; deco('pallet', cx - 0.58, y - 0.48, cx + 0.58, y + 0.48, z, z + 0.14, 'wood'); deco('load', cx - 0.56, y - 0.44, cx + 0.56, y + 0.44, z + 0.14, z + 1.2, 'cardboard')
             for sgn, yw in ((-1, 0), (1, PI)): facade('cartons' if (i % 2) else 'cartons_b', cx, y + sgn * 0.45, z, yw)
-    collide(x0, y - 0.5, x1, y + 0.5, 0, 4.2, 'wood')
+    collide(x0, y - 0.5, x1, y + 0.5, 0, 4.2, 'wood'); pool((x0 + x1) / 2, y, x1 - x0 + 1.2, 2.4, 'shadow')
 racking(-23.4, -19.6, 10.3); racking(-14.4, -11.4, 14.9); carton_stack(-22.2, 14.2)
 prop('hand_truck', -13.2, 9.3, 0.02, 1.2, 1.0, solid=(0.6, 0.6, 1.2, True)); prop('wooden_crate_02', -19.5, 14.8, 0.02, 0.3, 1.0, solid=(0.9, 0.9, 0.8, False)); deco('hazard line', -18.6, 14.9, -15.4, 15.0, 0.025, 0.03, 'yellow')
 for a, b in ((-23.6, -16.6), (-13.4, -11.2)): deco('stock stripe', a, 8.0, b, 8.02, 1.0, 1.15, 'yellow')
@@ -166,11 +166,12 @@ prop('trashbag', -2.6, 17.3, 0, 0.4, 1.0); prop('trashbag', -2.0, 17.8, 0, 2.0, 
 box('yard wall', -30, 19, -29.6, 26, 0, 2.2, 'brick'); deco('wall cap', -30.05, 18.95, -29.55, 26.05, 2.2, 2.28, 'kerb')
 # planted islands in the car park and along the side strip: cover with hedges
 for x0, y0, x1, y1 in ((-31.5, -1.2, -27.5, 1.2), (-38, -15.5, -31, -13.9), (-38, 13.9, -31, 15.5), (-22, -22, -14, -20.4), (-9, -24, -3, -22.4)):
-    box('planter', x0, y0, x1, y1, 0, 0.45, 'kerb'); deco('planter soil', x0 + 0.12, y0 + 0.12, x1 - 0.12, y1 - 0.12, 0.45, 0.48, 'soil'); box('hedge', x0 + 0.25, y0 + 0.3, x1 - 0.25, y1 - 0.3, 0.45, 1.35, 'hedge', surface='dirt')
+    pool((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0 + 1.0, y1 - y0 + 1.0, 'shadow'); box('planter', x0, y0, x1, y1, 0, 0.45, 'kerb'); deco('planter soil', x0 + 0.12, y0 + 0.12, x1 - 0.12, y1 - 0.12, 0.45, 0.48, 'soil'); box('hedge', x0 + 0.25, y0 + 0.3, x1 - 0.25, y1 - 0.3, 0.45, 1.35, 'hedge', surface='dirt')
     for i in range(int((x1 - x0) / 0.9)): cut(2, x0 + 0.5 + i * 0.9, y0 + 0.28, 0.4, 1.2, 1.1, 0); cut(2, x0 + 0.5 + i * 0.9, y1 - 0.28, 0.4, 1.2, 1.1, PI)
 prop('painted_wooden_bench', -25.2, 2.0, 0.12, -PI / 2, 1.0, solid=(0.6, 1.6, 0.8, True)); prop('potted_plant_02', -25.3, -4.6, 0.12, 0, 1.4, solid=(0.6, 0.6, 1.0, True)); prop('potted_plant_02', -25.3, -13.4, 0.12, 1, 1.4, solid=(0.6, 0.6, 1.0, True))
 for y in (-14, 0, 14):
     cyl('lot lamp', -31.9, y, 0, 6.5, 0.09, 'steel', seg=8); deco('lot lamp arm', -32.9, y - 0.05, -30.9, y + 0.05, 6.45, 6.55, 'steel'); collide(-32, y - 0.1, -31.8, y + 0.1, 0, 6.5, 'metal')
+    pool(-31.9, y, 9, 7, 'warm', 0.02)
     for xa in (-33.2, -31.2): deco('lot lamp head', xa, y - 0.15, xa + 0.6, y + 0.15, 6.36, 6.46, 'lamp')
 # the fence round it all, trees beyond
 for x0, y0, x1, y1 in ((-HX, -HY, -HX + 0.1, HY), (-HX, HY - 0.1, 0, HY), (-HX, -HY, 0, -HY + 0.1)):

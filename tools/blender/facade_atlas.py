@@ -101,7 +101,9 @@ def shop_door():
 STEEL = mat('shelf steel', (0.78, 0.78, 0.76), 0.5, 0.3); CASE = mat('case white', (0.9, 0.9, 0.88), 0.35); ALU = mat('aluminium', (0.55, 0.57, 0.6), 0.35, 0.8); CARD = mat('cardboard', (0.5, 0.36, 0.2), 0.9)
 GLOW = bpy.data.materials.new('case light'); GLOW.use_nodes = True; GLOW.node_tree.nodes['Principled BSDF'].inputs['Emission Color'].default_value = (1, 1, 1, 1); GLOW.node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 3.0
 def colour(): 
-    h = rnd.random(); import colorsys; return mat('pack', colorsys.hsv_to_rgb(h, rnd.uniform(0.55, 0.95), rnd.uniform(0.45, 0.95)), 0.45)
+    import colorsys; q = rnd.random()
+    if q < 0.3: return mat('pack', rnd.choice(((0.86, 0.85, 0.8), (0.8, 0.74, 0.6), (0.5, 0.38, 0.24), (0.08, 0.08, 0.09), (0.7, 0.72, 0.74), (0.9, 0.88, 0.7))), 0.5)
+    return mat('pack', colorsys.hsv_to_rgb(rnd.choice((0.0, 0.03, 0.08, 0.12, 0.3, 0.36, 0.58, 0.62, 0.66, 0.98)) + rnd.uniform(-0.02, 0.02), rnd.uniform(0.35, 0.85), rnd.uniform(0.3, 0.85)), 0.45)
 def C(x, z0, h, r, y, m): bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=r, depth=h, location=(x, y, z0 + h / 2)); o = bpy.context.object; o.data.materials.append(m); bpy.ops.object.shade_smooth(); return o
 def stock(x0, x1, z, room, y=0.06, kinds=('box', 'can', 'bottle', 'jar')):
     """A shelf's worth of goods between x0 and x1 standing on z: runs of one product several facings wide."""
