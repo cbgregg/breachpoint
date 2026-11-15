@@ -14,6 +14,7 @@ export const VEHICLES_BY_MAP = {
   mart: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'van', 'semi', 'forklift'],
   drivein: ['car50', 'car50b', 'pickup50', 'van50', 'stepvan'],
   link: ['lightrail'],
+  vacancy: ['sedan', 'boxtruck', 'van'],
 };
 
 // Bake a loaded scene into a list of { geo, mat } parts in its own world space (node transforms applied),

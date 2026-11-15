@@ -3129,7 +3129,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   }
   // custom maps build themselves with the same helpers
   let custom = null;
-  if (!street) custom = LAYOUT.build({ addKind: add, low: LOW_DETAIL, THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
+  if (!street) custom = LAYOUT.build({ vehMat, addKind: add, low: LOW_DETAIL, THREE, tex, pbr, M, S, B, put, solid, plane, decal, glows, group, rnd, scaleOf, worldBox, flatBox, buildCar, buildHouse, windowDecor, physics, poolMat, glowTex, bag, plasterTints });
 
   // street lamps and power poles inside the map edge
   if (street) for (const sz of [-1, 1]) for (let x = -(HX - 18); x <= HX - 18; x += 16) {
