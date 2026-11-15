@@ -10,7 +10,7 @@ The plan is point-mirrored: what is built for the west team is turned half a tur
 is '<texture set>:<what it is>'; the game swaps in its own texture set of that name (js/vacancy.js), tinted with the
 colour given here, and the UVs are in metres. 'flat' has no texture.
 """
-import bpy, json, os, math
+import bpy, json, os, math, re
 from mathutils import Matrix, Vector
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
@@ -32,20 +32,21 @@ def mat(name, hexrgb, rough=0.9, metal=0.0, emit=0.0):
         MATS[name] = m
     return MATS[name]
 M = {
-    'asphalt': ('asphalt:lot', 0xb9b9b9), 'verge': ('dirt:verge', 0x8c9a6a), 'deck': ('flat:pool deck', 0xd6d0c2), 'joint': ('flat:paving joint', 0xaaa496), 'walk': ('concrete:walkway', 0xdedad0),
-    'stucco': ('plaster:stucco', 0xf0e2c4), 'base': ('plaster:base band', 0xb9a98a), 'fascia': ('paint:fascia', 0x2f7f86), 'roof': ('asphalt:roof', 0x8c8880),
+    'asphalt': ('v_asphalt:lot', 0xdcd6c4), 'verge': ('v_grass:verge', 0xd0d8c0), 'deck': ('v_paving:pool deck', 0xf6f2ea), 'walk': ('v_paving:walkway', 0xd2cdc2),
+    'stucco': ('v_stucco:stucco', 0xf7e6c2), 'base': ('v_stucco:base band', 0xb59f7a), 'fascia': ('paint:fascia', 0x2f7f86), 'roof': ('v_gravel:roof', 0xb8b4ac),
     'cap': ('flat:metal cap', 0x4a4d50), 'door': ('paint:door', 0x2a8c92), 'frame': ('flat:white trim', 0xf2efe6), 'glass': ('flat:glass', 0x1a2430),
     'curtain': ('cloth:curtain', 0xd9c9a0), 'ac': ('metal:air conditioner', 0xbfc3c4), 'dark': ('flat:dark', 0x1c1d1f), 'step': ('concrete:stairs', 0xbdb8ac),
     'rail': ('flat:rail', 0x26474a), 'carpet': ('cloth:carpet', 0x7a3b34), 'wood': ('wood:wood', 0xa97c50), 'sheet': ('flat:bed linen', 0xf1ede2),
     'blanket': ('cloth:blanket', 0x2f7f86), 'tile': ('whitetile:pool tile', 0xe9f3f2), 'water': ('flat:water', 0x2aa6c4), 'hedge': ('flat:hedge', 0x3f6a34),
-    'planter': ('concrete:planter', 0xf0ece2), 'block': ('plaster:block wall', 0xe2d8c2), 'line': ('flat:paint line', 0xe8e6da), 'red': ('paint:vending', 0xb3261e),
+    'planter': ('v_paving:planter', 0xf2eee6), 'block': ('v_stucco:block wall', 0xe6dcc6), 'line': ('flat:paint line', 0xe8e6da), 'red': ('paint:vending', 0xb3261e),
     'white': ('paint:white', 0xeceae4), 'green': ('paint:dumpster', 0x2f5a3a), 'pine': ('flat:pine', 0x24452c), 'trunk': ('flat:trunk', 0x4a3626),
     'pole': ('flat:pole', 0x5a4a3a), 'sign': ('paint:sign', 0x16636b), 'chrome': ('flat:chrome', 0xc8ccd0), 'far': ('flat:far building', 0x9a948a),
-    'cover': ('flat:cover', 0xc8731a), 'lobby': ('tile:lobby floor', 0xd9cfbb),
+    'cover': ('flat:cover', 0xc8731a), 'lobby': ('tile:lobby floor', 0xd9cfbb), 'firs': ('card:fir', 0xffffff), 'decal': ('decal:ground wear', 0xffffff),
+    'pooltile': ('whitetile:pool floor', 0x9fdcdc), 'pink': ('flat:float pink', 0xff5fa0), 'yellow': ('flat:float yellow', 0xffd23f), 'towel': ('cloth:towel', 0xe86a4a), 'mat': ('cloth:door mat', 0x4a3a2e),
 }
 EMIT = {'neon pink': 0xff3d7f, 'neon aqua': 0x39e6d8, 'neon white': 0xfff2d0, 'lamp': 0xffd9a0, 'bulb': 0xffc56e, 'screen': 0xbfe6ff}
 def m_(k):
-    if k in EMIT: return mat('flat:' + k, EMIT[k], 0.4, 0, 4.0)
+    if k in EMIT: return mat('flat:' + k, EMIT[k], 0.4, 0, 2.2 if k == 'neon pink' else 4.0)
     name, col = M[k]
     return mat(name, col, {'glass': 0.08, 'water': 0.05, 'chrome': 0.25, 'cap': 0.5}.get(k, 0.9), {'chrome': 0.9, 'cap': 0.6, 'ac': 0.4}.get(k, 0.0))
 
@@ -97,6 +98,47 @@ def text(body, x, y, z, yaw, size, k, mirror=False, depth=0.03, half_turn=False)
     o.matrix_world = (HALF_TURN if half_turn else Matrix.Identity(4)) @ Matrix.Translation((x, y, z)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'X')
     return finish(o, k, mirror, uv=False)
 
+KITDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kit')
+KIT = {}
+def kit(name):
+    if name not in KIT:
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=os.path.join(KITDIR, name + '.glb'))
+        bpy.context.view_layer.update()
+        KIT[name] = [(o, o.matrix_world.copy()) for o in bpy.data.objects if o not in before and o.type == 'MESH']
+        for o in bpy.data.objects:
+            if o not in before: o['kit'] = 1
+    return KIT[name]
+def prop(name, x, y, z=0, yaw=0, scale=1, mirror=True, solid=None, only=None):
+    """A model from tools/blender/kit (CC0, Poly Haven), base at (x, y, z). solid = (w, d, h, soft): its collision, centred
+    here; soft stops players but not bullets (a chair, a plant)."""
+    for s in ((1, -1) if mirror else (1,)):
+        m4 = (HALF_TURN if s < 0 else Matrix.Identity(4)) @ Matrix.Translation((x, y, z)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Scale(scale, 4)
+        for o, mw in kit(name):
+            if only and not re.search(only, o.name): continue
+            c = o.copy(); c.data = o.data.copy(); del c['kit']; bpy.context.collection.objects.link(c); c.parent = None; c.matrix_world = m4 @ mw
+        if solid:
+            w, d, h, soft = solid
+            boxes.append([round(s * x - w / 2, 3), round(z, 3), round(-s * y - d / 2, 3), round(s * x + w / 2, 3), round(z + h, 3), round(-s * y + d / 2, 3), 'wood', 1 if soft else 0])
+def card(x, y, h, v):
+    """A fir drawn on two crossed cards (assets/textures/vacancy/firs.png holds two trees side by side)."""
+    for a in (0.4, 0.4 + math.pi / 2):
+        bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, h / 2 - 0.15)); o = bpy.context.object; o.name = 'fir'
+        o.scale = (h * 0.5, h, 1); o.rotation_euler = (math.pi / 2, 0, a + x)
+        for l in o.data.uv_layers.active.data: l.uv = ((v + l.uv.x) / 2, l.uv.y)
+        finish(o, 'firs', False, uv=False)
+def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
+    """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)
+    for l in o.data.uv_layers.active.data: l.uv = ((kind % 2 + l.uv.x) / 2, 1 - (kind // 2 + 1 - l.uv.y) / 2)
+    finish(o, 'decal', mirror, uv=False)
+def paint(body, x, y, yaw, size, mirror=True):
+    """Lettering painted flat on the ground, read from the south when yaw is 0."""
+    bpy.ops.object.text_add(location=(0, 0, 0)); o = bpy.context.object; o.data.body = body; o.data.size = size; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
+    bpy.ops.object.convert(target='MESH'); o = bpy.context.object; o.name = 'painted ' + body
+    o.matrix_world = Matrix.Translation((x, y, 0.013)) @ Matrix.Rotation(yaw, 4, 'Z')
+    finish(o, 'line', mirror, uv=False)
+
 def wall_x(name, y0, y1, xa, xb, z1, openings=(), k='stucco'):
     """A wall running east-west between xa and xb, with (centre, width, sill, head) openings, each framed."""
     cur = xa
@@ -126,8 +168,6 @@ DOOR = (1.5, 0, 2.2); WIN = (1.8, 1.0, 2.1)   # width, sill, head
 deco('verge', -HX - 60, -HY - 60, HX + 60, HY + 60, -0.2, -0.02, 'verge', mirror=False)
 deco('lot', -HX, -HY, HX, HY, -0.1, 0, 'asphalt', mirror=False)
 deco('pool deck', -18, -6.8, 18, 6.8, 0, 0.02, 'deck', mirror=False)
-for x in range(-16, 17, 2): deco('paving joint', x - 0.015, -6.8, x + 0.015, 6.8, 0.02, 0.023, 'joint', mirror=False)
-for y in range(-6, 7, 2): deco('paving joint', -18, y - 0.015, 18, y + 0.015, 0.02, 0.023, 'joint', mirror=False)
 deco('walkway', -18.4, 6.8, 18.4, 8, 0, 0.03, 'walk')             # under each wing's eaves, both sides
 deco('walkway', -18.4, 15, 18.4, 16.3, 0, 0.03, 'walk')
 for x in range(-16, 17, 3):
@@ -163,6 +203,7 @@ def room_front(xc, y, out, number):
     (a, b) = yy(0, 0.22); deco('room air conditioner', wx - 0.38, a, wx + 0.38, b, 0.38, 0.8, 'ac')
     (a, b) = yy(0.22, 0.23); deco('grille', wx - 0.32, a, wx + 0.32, b, 0.44, 0.74, 'dark')
     (a, b) = yy(0, 0.12); deco('door lamp', xc - 0.07, a, xc + 0.07, b, 2.2, 2.42, 'lamp')
+    (a, b) = yy(0.1, 0.65); deco('door mat', dx - 0.4, a, dx + 0.4, b, 0.03, 0.045, 'mat')
 
 # ---------- the north wing (the south wing is its twin): rooms x -18..18, y 8..15 ----------
 W0, W1, Y0, Y1 = -18, 18, 8, 15
@@ -239,7 +280,8 @@ box('stair wall', SX0, 10.0, SX1, 10.2, 0, H + 1.0, 'stucco')
 deco('stair wall cap', SX0 - 0.03, 9.97, SX1 + 0.03, 10.23, H + 1.0, H + 1.05, 'cap')
 
 # ---------- the courtyard: the pool, cabanas and planters breaking the long views, lights strung between the wings ----------
-deco('pool water', -5, -2.5, 5, 2.5, 0.02, 0.27, 'water', mirror=False)
+deco('pool floor', -5, -2.5, 5, 2.5, 0.02, 0.035, 'pooltile', mirror=False)
+deco('pool water', -5, -2.5, 5, 2.5, 0.25, 0.27, 'water', mirror=False)
 for a in ((-5.4, -2.9, 5.4, -2.5), (-5.4, -2.5, -5, 2.5)):
     box('pool coping', *a, 0, 0.35, 'tile')
 for y in (-1.6, -1.0): bar('pool ladder', (-4.9, y, 0.1), (-4.9, y, 1.0), 0.025, 'chrome'); bar('pool ladder', (-4.9, y, 1.0), (-5.5, y, 1.0), 0.025, 'chrome'); bar('pool ladder', (-5.5, y, 1.0), (-5.5, y, 0.02), 0.025, 'chrome')
@@ -314,13 +356,10 @@ deco('ice machine door', -19.3, 16.1, -18.3, 16.12, 0.3, 1.0, 'ac'); text('ICE',
 # ---------- beyond the wall: the highway's poles and wires, pines, a few far buildings ----------
 import random
 rnd = random.Random(7)
-def pine(x, y, h):
-    cyl('pine trunk', x, y, 0, h * 0.3, 0.16, 'trunk', mirror=False, seg=6)
-    for i in range(3): cyl('pine', x, y, h * (0.2 + 0.24 * i), h * (0.56 + 0.22 * i) if i < 2 else h, h * (0.26 - 0.06 * i), 'pine', mirror=False, seg=7, r2=0.02)
-for i in range(46):
+for i in range(70):
     side = i % 4; t = rnd.uniform(-1, 1)
-    x, y = ((t * (HX + 14), HY + rnd.uniform(9, 22)), (t * (HX + 14), -HY - rnd.uniform(5, 20)), (HX + rnd.uniform(5, 20), t * (HY + 10)), (-HX - rnd.uniform(5, 20), t * (HY + 10)))[side]
-    pine(x, y, rnd.uniform(7, 13))
+    x, y = ((t * (HX + 22), HY + rnd.uniform(10, 30)), (t * (HX + 22), -HY - rnd.uniform(4, 26)), (HX + rnd.uniform(4, 26), t * (HY + 16)), (-HX - rnd.uniform(4, 26), t * (HY + 16)))[side]
+    card(x, y, rnd.uniform(10, 17), i % 2)
 deco('highway', -HX - 60, HY + 2.5, HX + 60, HY + 8, -0.02, 0.0, 'asphalt', mirror=False)
 deco('highway line', -HX - 60, HY + 5.2, HX + 60, HY + 5.32, 0, 0.012, 'line', mirror=False)
 for x in range(-70, 71, 20):
@@ -332,11 +371,62 @@ for x in range(-70, 71, 20):
 for x0, y0, w, d, h in ((-58, -44, 16, 9, 6), (44, -46, 12, 10, 4.5), (50, 6, 9, 14, 5), (-60, 8, 10, 12, 7)):
     deco('far building', x0, y0, x0 + w, y0 + d, 0, h, 'far', mirror=False)
 
+# ---------- props from the kit, ground wear, wall fittings ----------
+PI = math.pi
+# the courtyard: plastic chairs at the bar and by the loungers, a folding table set under each wing's eave, plants at the doors
+for y in (3.9, 4.9, 5.9): prop('plastic_monobloc_chair_01', 7.75, y, 0, PI / 2 + (y - 4.9) * 0.3, solid=(0.5, 0.5, 0.85, True))
+prop('plastic_monobloc_chair_01', 2.1, -5.3, 0, 0.5, solid=(0.5, 0.5, 0.85, True))
+prop('outdoor_table_chair_set_01', -15.2, 5.9, 0, PI / 2, solid=(1.7, 0.8, 0.78, True))
+prop('outdoor_table_chair_set_01', 9.3, 6.0, 0, PI / 2, solid=(1.7, 0.8, 0.78, True))
+for x, y in ((-10.6, 7.5), (13.2, 7.5), (-11.4, 15.5), (16.8, 15.5), (2.6, 7.4), (6.4, 7.4), (-7.6, 1.6), (-21.6, 3.9)):
+    prop('potted_plant_02', x, y, 0.02, x * 1.7, 1.15, solid=(0.45, 0.45, 0.5, True))
+prop('potted_plant_04', -24.9, 0.1, 1.15, 0.4, 1.6); prop('potted_plant_04', 6.6, 3.8, 1.15, 1.1, 1.5)
+prop('WetFloorSign_01', -6.3, 0.6, 0.02, 0.3); prop('lifebuoy', -8.6, 1.92, 1.7, 0)
+prop('plastic_crate_02', 6.6, 6.75, 0, 0.2, solid=(0.5, 0.42, 0.5, True)); prop('plastic_crate_02', 6.62, 6.74, 0.25, -0.1)
+prop('propane_tank', 7.3, 3.05, 0, 0); prop('propane_tank', 6.9, 3.0, 0, 1.0)
+deco('pool rules board', -7.99, 2.6, -7.96, 3.8, 1.1, 2.3, 'frame'); text('POOL RULES', -7.95, 3.2, 2.1, PI / 2, 0.15, 'sign', mirror=True, depth=0.006)
+for i, z in enumerate((1.85, 1.7, 1.55, 1.4, 1.25)): deco('rules line', -7.955, 2.75, -7.95, 3.65 - 0.12 * (i % 2), z, z + 0.035, 'dark')
+for x, k in ((-2.9, 'towel'), (-0.6, 'blanket')): deco('towel', x + 0.3, -5.58, x + 1.2, -4.92, 0.4, 0.42, k)
+for (x, y, k) in ((-2.2, 0.9, 'pink'), (2.6, -1.1, 'yellow')):   # pool floats
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.42, minor_radius=0.13, major_segments=18, minor_segments=8, location=(x, y, 0.33)); finish(bpy.context.object, k, False, uv=False)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.22, segments=12, ring_count=8, location=(0.6, 1.5, 0.42)); finish(bpy.context.object, 'neon white' if False else 'frame', False, uv=False)
+# the walk-through rooms: a dresser with a television, a picture over the bed
+box('dresser', -11.98, 10.5, -11.5, 12.1, 0, 0.8, 'wood', surface='wood'); prop('television_02', -11.72, 11.3, 0.8, PI / 2, 1.5)
+box('dresser', 17.2, 10.5, 17.68, 12.1, 0, 0.8, 'wood', surface='wood'); prop('television_02', 17.44, 11.3, 0.8, -PI / 2, 1.5)
+prop('fancy_picture_frame_01', -6.02, 11.35, 1.75, -PI / 2, 1.5); prop('fancy_picture_frame_01', 12.02, 11.65, 1.75, PI / 2, 1.5)
+for x in (-12, 12):   # curtains drawn back at the walk-throughs' lot windows
+    pass
+# the office: chairs for the waiting, a plant, a rack of brochures
+prop('plastic_monobloc_chair_01', -28.2, 3.6, 0, -PI / 2, solid=(0.5, 0.5, 0.85, True)); prop('plastic_monobloc_chair_01', -28.2, 2.8, 0, -PI / 2, solid=(0.5, 0.5, 0.85, True))
+prop('potted_plant_02', -28.1, -4.1, 0.02, 1, 1.2, solid=(0.45, 0.45, 0.5, True))
+deco('brochure rack', -22.36, -4.3, -22.3, -3.3, 0.9, 1.9, 'wood')
+for i in range(8): deco('brochure', -22.39, -4.25 + (i % 4) * 0.24, -22.36, -4.07 + (i % 4) * 0.24, 1.0 + (i // 4) * 0.45, 1.33 + (i // 4) * 0.45, ('fascia', 'red', 'frame', 'blanket')[i % 4])
+# the lots and the back street: bin bags by the dumpsters, a hand truck behind the box truck, a picnic table, wall lights
+for x, y, a in ((-24.4, 22.3, 0.3), (-24.3, 23.2, 1.9), (-27.6, 20.9, 4.0)): prop('trashbag', x, y, 0, a, 1.1, solid=(0.5, 0.5, 0.45, True))
+prop('hand_truck', -4.3, 21.6, 0, 0.4, solid=(0.55, 0.55, 1.3, True))
+prop('wooden_picnic_table', -31.2, 17.2, 0, 0, 0.8, solid=(1.8, 2.4, 0.6, False))
+for x in (-27, -15, -3, 9, 21): prop('security_light', x, HY - 0.08, 2.1, 0); deco('light glow', x - 0.08, HY - 0.36, x + 0.08, HY - 0.3, 2.06, 2.12, 'lamp')
+for y in (-14, 0, 14): prop('security_light', -HX + 0.02, y, 2.1, PI / 2); deco('light glow', -HX + 0.3, y - 0.08, -HX + 0.36, y + 0.08, 2.06, 2.12, 'lamp')
+prop('street_lamp_02', -20.5, 9.98, 2.5, 0)   # over each roof stair
+# wall fittings on the wings: downspouts, an electric meter and conduit on the end wall, vent pipes on the roof
+for x in (-12.0, -6.0, 6.0, 12.0):
+    for y in (Y0 - 0.07, Y1 + 0.07): cyl('downspout', x, y, 0.05, H - 0.2, 0.045, 'cap', seg=8)
+deco('meter box', -18.14, 12.0, -18.0, 12.5, 1.2, 1.9, 'ac'); deco('meter', -18.16, 12.12, -18.14, 12.38, 1.5, 1.76, 'dark'); bar('conduit', (-18.05, 12.25, 1.9), (-18.05, 12.25, H), 0.02, 'cap')
+for x, y in ((-14, 10.5), (-3, 13.2), (5, 10.2), (14.5, 13)): cyl('roof vent', x, y, H, H + 0.55, 0.09, 'cap', seg=8); cyl('vent cap', x, y, H + 0.55, H + 0.62, 0.16, 'cap', seg=8)
+# ground wear: oil under the bays, cracks and tar patches across the lot, tyre marks where cars turn in, damp round the pool
+for i, x in enumerate(range(-16, 16, 3)):
+    if i % 3 != 1: wear(0, x + 1.5 + (i % 2) * 0.3, 18.6 + (i % 3) * 0.5, 1.5 + (i % 2) * 0.6, 2.0, i * 1.3)
+for x, y, w, d, a in ((-25, 18, 6, 6, 0.4), (-6, 23, 7, 5, 2.0), (17, 21.5, 6, 6, 4.1), (-29, 8, 5, 6, 1.0), (27, 22, 6, 5, 3.0), (5, 17.8, 5, 4, 5.2)): wear(1, x, y, w, d, a)
+for x, y, w, d, a in ((-9, 22.6, 3.4, 2.2, 0.05), (22, 22.5, 2.6, 3.4, 1.6), (-30.5, -16, 3, 2.2, 0.1)): wear(2, x, y, w, d, a)
+for x, y, a in ((-22.5, 19, 0.5), (4.5, 22.8, 1.5), (-30, 12, 0.1)): wear(3, x, y, 2.6, 7, a)
+for x, y, w, d in ((-6.2, 0.8, 2.2, 2.6), (0.5, -3.3, 3.4, 1.4), (5.9, -1.2, 1.8, 2.4)): wear(0, x, y, w, d, x, z=0.026, mirror=False)
+paint('OFFICE', -25.5, 7.2, 0, 0.7); paint('NO PARKING', -1.5, 22.6, 0, 0.55); paint('FIRE LANE', -30.8, 0, PI / 2, 0.6)
+
 # ---------- export ----------
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, 'assets', 'maps', 'vacancy.blend'))   # (the editable scene keeps every named piece)
-for o in [o for o in bpy.data.objects if 'vehicle' in o]: bpy.data.objects.remove(o)
+for o in [o for o in bpy.data.objects if 'vehicle' in o or 'kit' in o or o.type != 'MESH']: bpy.data.objects.remove(o)
 by = {}
-for o in list(bpy.data.objects): by.setdefault(o.data.materials[0].name, []).append(o)
+for o in list(bpy.data.objects): by.setdefault(o.data.materials[0].name if o.data.materials and o.data.materials[0] else 'none', []).append(o)
 tris = 0
 for name, objs in by.items():
     bpy.ops.object.select_all(action='DESELECT')

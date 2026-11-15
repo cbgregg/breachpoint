@@ -12,15 +12,17 @@ const [HX, HZ] = DATA.half;
 let scenePromise = null;   // the exported scene, fetched once
 
 // metres per repeat of each of the game's texture sets (the scene's UVs are in metres)
-const TEX_SCALE = { asphalt: 4, concrete: 2.5, plaster: 3, paint: 1.6, metal: 2.4, wood: 1.6, cloth: 1.5, dirt: 5, tile: 2.6, whitetile: 1.2 };
-const NO_SHADOW = /paving joint|lot|verge|pool deck|walkway|paint line|water|carpet|lobby floor|roof$|festoon|wire|neon|lamp|bulb|screen|far building|pine|trunk/;
+const TEX_SCALE = { asphalt: 4, concrete: 2.5, plaster: 3, paint: 1.6, metal: 2.4, wood: 1.6, cloth: 1.5, dirt: 5, tile: 2.6, whitetile: 1.2,
+  // the map's own sets (assets/textures/vacancy, CC0 from Poly Haven)
+  v_asphalt: 9, v_paving: 3, v_stucco: 3.2, v_gravel: 2.2, v_grass: 4.5 };
+const NO_SHADOW = /ground wear|fir|door mat|pool floor|towel|lot|verge|pool deck|walkway|paint line|water|carpet|lobby floor|roof$|festoon|wire|neon|lamp|bulb|screen|far building|pine|trunk/;
 // which way each vehicle model's nose points in its file, as the turn that brings it to +x; and paints for the cars
 const VEH_FRONT = { sedan: Math.PI, boxtruck: Math.PI / 2, van: Math.PI / 2 };
 const CAR_PAINT = [{ tint: 0x9a3b2f }, null, { tint: 0x3d5a78 }, { tint: 0xc9b98a }, { tint: 0x4f6b52 }, null, { tint: 0x2c2f33 }, { tint: 0xb9bcc0 }];
 
 function build(ctx) {
   const { solid, group, tex, put, B, M, vehMat } = ctx;
-  for (const [x0, y0, z0, x1, y1, z1, surface] of DATA.boxes) solid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1 - y0, y0, surface);
+  for (const [x0, y0, z0, x1, y1, z1, surface, soft] of DATA.boxes) { const b = solid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1 - y0, y0, surface); if (soft) b.pass = true; }   // (soft: stops you, not bullets)
   // parked vehicles: the game's own models on the scene's footprints, collision fitted to what's drawn
   DATA.vehicles.forEach((v, i) => {
     const along = Math.abs(Math.sin(v.yaw)) < 0.5, len = Math.max(v.w, v.d);
@@ -31,8 +33,18 @@ function build(ctx) {
     solid(v.x, v.z, along ? pc.size.x : pc.size.z, along ? pc.size.z : pc.size.x, pc.size.y * (v.slot === 'sedan' ? 0.96 : 1), 0, 'metal');
   });
   // the scene: each material takes the game's texture set named before the colon, tinted with its own colour
-  const sets = new Map();
+  const sets = new Map(), loader = new THREE.TextureLoader();
+  const own = (file, srgb, k) => {   // one of the map's own textures (the scene's UVs are glTF's: not flipped)
+    const t = loader.load('assets/textures/vacancy/' + file); t.flipY = false; t.anisotropy = 8;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    if (k) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(k, k); }
+    return t;
+  };
   const setFor = (name) => {
+    if (!sets.has(name) && name.startsWith('v_')) {
+      const n = name.slice(2), k = 1 / (TEX_SCALE[name] || 2);
+      sets.set(name, { map: own(n + '/color.jpg', true, k), normalMap: own(n + '/normal.jpg', false, k), roughnessMap: own(n + '/rough.jpg', false, k) });
+    }
     if (!sets.has(name)) {
       const src = tex[name], k = 1 / (TEX_SCALE[name] || 2);
       const cp = (t) => { if (!t) return null; const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(k, k); c.needsUpdate = true; return c; };
@@ -45,8 +57,12 @@ function build(ctx) {
     const s = scene.clone(true);
     s.traverse(o => {
       if (!o.isMesh) return;
-      const m = o.material.clone(), [setName, what = ''] = (m.name || 'flat:').split(':'), set = setName !== 'flat' && setFor(setName);
+      const m = o.material.clone(), [setName, what = ''] = (m.name || 'flat:').split(':'), special = setName === 'flat' || setName === 'card' || setName === 'decal' || !m.name.includes(':');
+      const set = !special && setFor(setName);
       if (set) { m.map = set.map; m.normalMap = set.normalMap; m.roughnessMap = set.roughnessMap; m.roughness = 1; }
+      if (setName === 'card') { m.map = (sets.get('card') || sets.set('card', own('firs.png', true)).get('card')); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }
+      if (setName === 'decal') { m.map = (sets.get('decal') || sets.set('decal', own('decals.png', true)).get('decal')); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
+      if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
       if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
       m.needsUpdate = true; o.material = m;
       o.receiveShadow = true; o.castShadow = !NO_SHADOW.test(what);
