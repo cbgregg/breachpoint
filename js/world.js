@@ -13,6 +13,7 @@ import { VACANCY } from './vacancy.js';
 import { CASTLE } from './castle.js';
 import { ZENITH } from './zenith.js';
 import { TARSA } from './tarsa.js';
+import { FRESHWAY } from './freshway.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
@@ -425,7 +426,8 @@ export const MAPS = {
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, look: { photo: { url: 'assets/sky/abandoned_tank_farm_03.jpg', u: 0.6011, gain: 1.2 }, sunElev: 40, fog: 0.003, fogColor: 0x9e9b92 }, photos: ['assets/loading/shuran-1.jpg', 'assets/loading/shuran-2.jpg', 'assets/loading/shuran-3.jpg'] },
   pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; and the Seattle Underground beneath the sidewalks, corner to corner; bomb site A is down in the buried intersection', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_UG.level, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true, photo: { url: 'assets/sky/portland_landing_pad.jpg', u: 0.5991, gain: 1.2 }, sunElev: 44 }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },
-  mart: MART,
+  mart: FRESHWAY,   // (rebuilt in Blender; the earlier one follows)
+  mart_classic: { ...MART, id: 'mart_classic', name: 'Freshway (classic)', photos: [1, 2, 3].map(n => `assets/loading/mart_classic-${n}.jpg`) },
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
   vacancy: VACANCY,
