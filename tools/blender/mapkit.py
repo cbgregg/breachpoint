@@ -25,10 +25,11 @@ def mat(name, hexrgb, rough=0.9, metal=0.0, emit=0.0):
         if emit: b.inputs['Emission Color'].default_value = (*rgb, 1); b.inputs['Emission Strength'].default_value = emit
         MATS[name] = m
     return MATS[name]
-M, EMIT, ROUGH, METAL, EMIT_K, DEFAULT = {}, {}, {}, {}, {}, ['stucco']
-def setup(palette, emit=None, rough=None, metal=None, emit_strength=None, default=None):
-    """palette: key -> ('<set>:<what>', 0xrrggbb). emit: key -> colour of a glowing material. default: box()'s material."""
-    M.update(palette); EMIT.update(emit or {}); ROUGH.update(rough or {}); METAL.update(metal or {}); EMIT_K.update(emit_strength or {})
+M, EMIT, ROUGH, METAL, EMIT_K, DEFAULT, SHADE = {}, {}, {}, {}, {}, ['stucco'], {}
+def setup(palette, emit=None, rough=None, metal=None, emit_strength=None, default=None, shade=None):
+    """palette: key -> ('<set>:<what>', 0xrrggbb). emit: key -> colour of a glowing material. default: box()'s material.
+    shade: key -> the colour its undersides and feet fall to (baked into vertex colours: see shade_mesh)."""
+    SHADE.update(shade or {}); M.update(palette); EMIT.update(emit or {}); ROUGH.update(rough or {}); METAL.update(metal or {}); EMIT_K.update(emit_strength or {})
     if default: DEFAULT[0] = default
 def m_(k):
     if k in EMIT: return mat('flat:' + k, EMIT[k], 0.4, 0, EMIT_K.get(k, 4.0))
@@ -37,6 +38,21 @@ def m_(k):
 
 boxes, vehicles = [], []   # collision in the game's axes: [minx, miny, minz, maxx, maxy, maxz, surface]
 
+def shade_mesh(o, hexcol):
+    """Soft shading baked into vertex colours (they multiply the material's colour in the game): white where a
+    surface faces up or is high on its object, falling to `hexcol` where it faces down or is at the foot. Gives
+    clouds, canopies and plain stone their form whatever the graphics setting."""
+    me = o.data; sh = [lin(((hexcol >> b) & 255) / 255) for b in (16, 8, 0)]
+    bpy.context.view_layer.update(); mw = o.matrix_world; n3 = mw.to_3x3()
+    zs = [(mw @ v.co).z for v in me.vertices]; z0 = min(zs); span = max(max(zs) - z0, 1e-6)
+    ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    for p in me.polygons:
+        for li in p.loop_indices:
+            vi = me.loops[li].vertex_index
+            n = (n3 @ (me.vertices[vi].normal if p.use_smooth else p.normal)).normalized()
+            t = 0.6 * (n.z * 0.5 + 0.5) + 0.4 * (zs[vi] - z0) / span; t = t * t * (3 - 2 * t)
+            ca.data[li].color = (sh[0] + (1 - sh[0]) * t, sh[1] + (1 - sh[1]) * t, sh[2] + (1 - sh[2]) * t, 1)
+    me.color_attributes.active_color = ca
 def finish(o, k, mirror, uv=True):
     """Material, metre UVs, and the half-turn twin."""
     o.data.materials.append(m_(k))
@@ -48,6 +64,7 @@ def finish(o, k, mirror, uv=True):
             for li in p.loop_indices:
                 c = mw @ o.data.vertices[o.data.loops[li].vertex_index].co
                 uvl[li].uv = (c.y, c.z) if ax == 0 else (c.x, c.z) if ax == 1 else (c.x, c.y)
+    if k in SHADE: shade_mesh(o, SHADE[k])
     if mirror:
         t = o.copy(); t.data = o.data.copy(); t.name = o.name + '.E'; bpy.context.collection.objects.link(t); t.matrix_world = HALF_TURN @ o.matrix_world
     return o
@@ -224,7 +241,7 @@ def export(name, data):
         bpy.context.object.name = mname
         tris += sum(len(p.vertices) - 2 for p in bpy.context.object.data.polygons)
     glb = os.path.join(ROOT, 'assets', 'maps', name + '.glb')
-    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=True, export_yup=True)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=True, export_yup=True, export_vertex_color='ACTIVE' if SHADE else 'MATERIAL')
     # weld and quantize the file if gltf-transform is about (tools/blender/pack.mjs; needs GLTF_TOOLS=<dir with node_modules>)
     tools = os.environ.get('GLTF_TOOLS')
     if tools: subprocess.run(['node', os.path.join(tools, 'pack.mjs'), glb], check=False, capture_output=True)

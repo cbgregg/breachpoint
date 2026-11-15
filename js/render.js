@@ -301,6 +301,8 @@ export class Renderer {
     const key = JSON.stringify(L);
     if (key === this.lookKey) return;
     this.lookKey = key;
+    // (a map with a low sun over big plain surfaces can ask for more shadow bias: look.shadowNormalBias)
+    this.sun.shadow.normalBias = L.shadowNormalBias ?? 0.03; this.sun.shadow.bias = L.shadowBias ?? -0.00015;
     const u = this.sky.material.uniforms;
     u.turbidity.value = L.turbidity; u.rayleigh.value = L.rayleigh; u.mieCoefficient.value = L.mie;
     // the dome: blue for clear-day maps, or a map's own gradient (look.dome: [top, mid, bottom])

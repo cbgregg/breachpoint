@@ -16,7 +16,8 @@ const VEH_FRONT = { sedan: Math.PI, hatch: Math.PI / 2, boxtruck: Math.PI / 2, v
 const CAR_PAINT = [{ tint: 0x9a3b2f }, null, { tint: 0x3d5a78 }, { tint: 0xc9b98a }, { tint: 0x4f6b52 }, null, { tint: 0x2c2f33 }, { tint: 0xb9bcc0 }];
 const scenes = new Map();   // the exported scenes, fetched once each
 
-// o: { id, name, blurb, look, scale: { v_set: metres }, noShadow: RegExp over a material's 'what', extra: build()'s return }
+// o: { id, name, blurb, look, scale: { v_set: metres }, noShadow: RegExp over a material's 'what', soft: RegExp (those get a
+// sheen), softTint, extra: build()'s return }
 export function blendMap(DATA, o) {
   const [HX, HZ] = DATA.half, dir = `assets/textures/${o.id}/`, scale = { ...GAME_SCALE, ...(o.scale || {}) };
   function build(ctx) {
@@ -50,7 +51,13 @@ export function blendMap(DATA, o) {
       const s = scene.clone(true);
       s.traverse(ob => {
         if (!ob.isMesh) return;
-        const m = ob.material.clone(), named = (m.name || '').includes(':'), [setName, what = ''] = named ? m.name.split(':') : ['', ''];
+        let m = ob.material.clone();
+        const named = (m.name || '').includes(':'), [setName, what = ''] = named ? m.name.split(':') : ['', ''];
+        // soft things (cloud, a cotton-ball canopy): a velvety sheen, so their edges catch the light
+        if (o.soft && o.soft.test(what)) {
+          const pm = new THREE.MeshPhysicalMaterial({ color: m.color, vertexColors: m.vertexColors, roughness: 1, metalness: 0, sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(o.softTint || 0xffffff) });
+          pm.name = m.name; m = pm;
+        }
         const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setName !== 'cutout' && setFor(setName);
         if (set) { m.map = set.map; m.normalMap = set.normalMap; m.roughnessMap = set.roughnessMap; m.roughness = 1; }
         if (setName === 'card') { m.map = once('card', () => own('cards.png', true)); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }

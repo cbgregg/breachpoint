@@ -15,12 +15,15 @@ HX, HY = 38, 28
 POD = 1.2                # the temple's podium
 PI = math.pi
 setup({
-    'rock': ('v_rock:island rock', 0xe8ecf2), 'grass': ('v_grass:island grass', 0xc4f8d4), 'marble': ('flat:cream stone', 0xf3ecdc), 'floor': ('whitetile:temple floor', 0xf2eee2),
+    'rock': ('v_rock:island rock', 0xe8ecf2), 'grass': ('v_grass:island grass', 0xc4f8d4), 'marble': ('flat:cream stone', 0xf0e6d2), 'floor': ('whitetile:temple floor', 0xf2eee2),
     'gold': ('flat:gold', 0xd8b048), 'goldleaf': ('flat:golden leaves', 0xe8b430), 'bark': ('flat:pale bark', 0xc8bca8), 'cut': ('cutout:greenery', 0xffffff),
     'cloud': ('flat:cloud', 0xffffff), 'water': ('flat:water', 0x5ac8e8), 'rope': ('flat:rope', 0xb8a070), 'plank': ('wood:bridge planks', 0xe8d8b8), 'frame': ('flat:cream trim', 0xe6dcc6),
     'cover': ('flat:cover', 0xc8731a), 'butter': ('flat:butter', 0xffe58a), 'mint': ('flat:mint', 0xa4ecc0), 'sky': ('flat:sky blue', 0x8ccdfc), 'lav': ('flat:lavender', 0xbcaef8),
     'basket': ('flat:basket', 0xb89060), 'pink': ('flat:pink', 0xffa2c8), 'blush': ('flat:cloud blush', 0xffd2e6),
-}, emit={'crystal': 0x18c8f0, 'glow': 0xfff0c0, 'fall': 0xbff0ff, 'star': 0xffd84a, 'rb butter': 0xffe27a, 'rb mint': 0x8fe8b4, 'rb sky': 0x7cc4ff, 'rb lav': 0xb4a4ff, 'rb pink': 0xff96c4}, rough={'marble': 0.7, 'gold': 0.3, 'water': 0.05, 'cloud': 1.0}, metal={'gold': 0.9}, emit_strength={'crystal': 1.1, 'glow': 2.0, 'fall': 0.5, 'star': 1.6, 'rb butter': 0.55, 'rb mint': 0.55, 'rb sky': 0.55, 'rb lav': 0.55, 'rb pink': 0.55}, default='marble')
+}, emit={'crystal': 0x18c8f0, 'glow': 0xfff0c0, 'fall': 0xbff0ff, 'star': 0xffd84a, 'rb butter': 0xffe27a, 'rb mint': 0x8fe8b4, 'rb sky': 0x7cc4ff, 'rb lav': 0xb4a4ff, 'rb pink': 0xff96c4}, rough={'marble': 0.7, 'gold': 0.3, 'water': 0.05, 'cloud': 1.0}, metal={'gold': 0.9}, emit_strength={'crystal': 1.1, 'glow': 2.0, 'fall': 0.5, 'star': 1.6, 'rb butter': 0.55, 'rb mint': 0.55, 'rb sky': 0.55, 'rb lav': 0.55, 'rb pink': 0.55}, default='marble',
+    # what each plain surface shades to underneath and at its foot (lavender-blue for cloud, a deeper tone of itself for the rest)
+    shade={'cloud': 0x9aa6dc, 'blush': 0xcf96c4, 'pink': 0xdc8cb8, 'butter': 0xe2bc6c, 'mint': 0x8accae, 'sky': 0x90b0ec, 'lav': 0xa696e4, 'marble': 0xa8a0c0, 'frame': 0xa8a0c0,
+           'bark': 0xa098b8, 'gold': 0xa87838, 'rock': 0x8c8ca8})
 rnd = random.Random(8)
 ISLANDS = []   # what you can stand on at z = 0, for bots (this half's; mapkit takes the twins)
 

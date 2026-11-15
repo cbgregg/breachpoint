@@ -10,9 +10,10 @@ export const ZENITH = blendMap(DATA, {
   name: 'Zenith',
   blurb: 'Islands resting on cloud: a temple under a rainbow in the middle, groves of cotton-ball trees, star posts, and walkways of cloud between them. Mind the edge',
   scale: { v_rock: 4, v_grass: 4.5, marble: 2.4, wood: 1.6, concrete: 3.5 },
-  noShadow: /island grass|cloud|water|rope|glow|crystal|star|rb |balloon|islet/,
+  noShadow: /island grass|water|rope|glow|crystal|star|rb |balloon|islet/,
+  soft: /cloud|^(pink|butter|mint|sky blue|lavender)$/, softTint: 0xfff4ea,
   groundSurface: 'grass',
-  // high, clear and bright: light comes up off the cloud as well as down from the sun
-  look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.25 }, sunElev: 50, fog: 0.0038, fogColor: 0xf6e6f0, sun: 4.4, sunColor: 0xfff6e4, hemi: 1.35, hemiSky: 0xd6e6ff,
-    ground: 0xe6eef6, exposure: 1.05, env: 1.0 },
+  // a low warm sun for long soft shadows, cool lavender light coming up off the cloud: form, not flat white
+  look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.15 }, sunElev: 36, fog: 0.0042, fogColor: 0xe6d8ee, sun: 5.2, sunColor: 0xffe6c4, hemi: 0.7, hemiSky: 0xcfe0ff,
+    ground: 0x8e98cc, exposure: 0.96, env: 0.55, shadowNormalBias: 0.09, shadowBias: -0.0005 },
 });
