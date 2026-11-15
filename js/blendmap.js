@@ -53,6 +53,8 @@ export function blendMap(DATA, o) {
       const src = tex[name], cp = (t) => { if (!t) return null; const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(k, k); c.needsUpdate = true; return c; };
       return src ? { map: cp(src.map), normalMap: cp(src.normalMap), roughnessMap: cp(src.roughnessMap) } : null;
     });
+    // a baked light map (light.jpg on the scene's second UV set: tools/blender/mapkit.py bake_light), o.lightmap its strength
+    const lm = o.lightmap ? own('light.jpg', true) : null; if (lm) lm.channel = 1;
     preloadBlendScene(o.id); scenes.get(o.id).then((scene) => {
       const s = scene.clone(true);
       s.traverse(ob => {
@@ -72,6 +74,7 @@ export function blendMap(DATA, o) {
         if (setName === 'soft') { m.map = once('soft', () => own('soft.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; m.metalness = 0; m.vertexColors = false;
           if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.09; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.5; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
+        if (lm && ob.geometry.attributes.uv1 && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
         m.needsUpdate = true; ob.material = m;

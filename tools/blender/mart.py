@@ -16,7 +16,7 @@ from mapkit import *
 
 HX, HY, H, T, PI = 40, 28, 5.6, 0.4, math.pi
 setup({
-    'shell': ('plaster:store wall', 0xf0ece0), 'inner': ('plaster:partition', 0xe6e8e4), 'brick': ('brick:brick base', 0xd8c8b8), 'fascia': ('paint:green fascia', 0x2f7a4e), 'stripe': ('paint:fascia stripe', 0xf2e8c8),
+    'shell': ('plaster:store wall', 0xf0ece0), 'inner': ('flat:partition', 0xe9e9e4), 'brick': ('brick:brick base', 0xd8c8b8), 'fascia': ('paint:green fascia', 0x2f7a4e), 'stripe': ('paint:fascia stripe', 0xf2e8c8),
     'floor': ('storefloor:shop floor', 0xe9e5dc), 'slab': ('concrete:back floor', 0xc8c8c4), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('concrete:pavement', 0xe6e2d8), 'kerb': ('concrete:kerb', 0xd8d8d0),
     'roof': ('metal:roof deck', 0xe4e6e8), 'truss': ('metal:truss', 0x9aa0a6), 'steel': ('metal:steel', 0xc4c8cc), 'rack': ('paint:racking', 0x2c5a9a), 'orange': ('paint:rack beam', 0xe07a1c),
     'gondola': ('flat:gondola', 0xdcdcd8), 'case': ('flat:case', 0xf2f2f0), 'cardboard': ('flat:cardboard', 0xb48c5a), 'counter': ('wood:counter', 0xc8a070), 'top': ('marble:counter top', 0xf0f0f0), 'tile': ('whitetile:wall tile', 0xffffff), 'belt': ('rubber:belt', 0x30302e),
@@ -26,7 +26,7 @@ setup({
     'tomato': ('flat:tomato', 0xc8322a), 'orange f': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58), 'melon': ('flat:melon', 0x3f7a3a),
 }, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0}, rough={'glass': 0.08, 'floor': 0.22, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
    shade={'shell': 0xb8b4ac, 'inner': 0xb4b8b8, 'hedge': 0x4a5a44, 'tomato': 0x7a1c1c, 'orange f': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a, 'melon': 0x1f4420, 'gondola': 0xa8a8a8, 'case': 0xb8bcc4, 'cardboard': 0x7a5c38})
-use_atlas('mart'); rnd = random.Random(7)
+use_atlas('mart'); rnd = random.Random(7); POOLS[0] = False   # (the light is baked: see the export at the foot)
 SH = ('shelf_a', 'shelf_b', 'shelf_c', 'shelf_d', 'shelf_e')
 SIDES = ((0, (0, -1)), (PI, (0, 1)), (PI / 2, (1, 0)), (-PI / 2, (-1, 0)))   # a face's yaw and the way it looks
 def carton_stack(x, y, h=1.34, piece='cartons', mirror=True, name='pallet stack'):
@@ -167,7 +167,6 @@ box('yard wall', -30, 19, -29.6, 26, 0, 2.2, 'brick'); deco('wall cap', -30.05, 
 # planted islands in the car park and along the side strip: cover with hedges
 for x0, y0, x1, y1 in ((-31.5, -1.2, -27.5, 1.2), (-38, -15.5, -31, -13.9), (-38, 13.9, -31, 15.5), (-22, -22, -14, -20.4), (-9, -24, -3, -22.4)):
     pool((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0 + 1.0, y1 - y0 + 1.0, 'shadow'); box('planter', x0, y0, x1, y1, 0, 0.45, 'kerb'); deco('planter soil', x0 + 0.12, y0 + 0.12, x1 - 0.12, y1 - 0.12, 0.45, 0.48, 'soil'); box('hedge', x0 + 0.25, y0 + 0.3, x1 - 0.25, y1 - 0.3, 0.45, 1.35, 'hedge', surface='dirt')
-    for i in range(int((x1 - x0) / 0.9)): cut(2, x0 + 0.5 + i * 0.9, y0 + 0.28, 0.4, 1.2, 1.1, 0); cut(2, x0 + 0.5 + i * 0.9, y1 - 0.28, 0.4, 1.2, 1.1, PI)
 prop('painted_wooden_bench', -25.2, 2.0, 0.12, -PI / 2, 1.0, solid=(0.6, 1.6, 0.8, True)); prop('potted_plant_02', -25.3, -4.6, 0.12, 0, 1.4, solid=(0.6, 0.6, 1.0, True)); prop('potted_plant_02', -25.3, -13.4, 0.12, 1, 1.4, solid=(0.6, 0.6, 1.0, True))
 for y in (-14, 0, 14):
     cyl('lot lamp', -31.9, y, 0, 6.5, 0.09, 'steel', seg=8); deco('lot lamp arm', -32.9, y - 0.05, -30.9, y + 0.05, 6.45, 6.55, 'steel'); collide(-32, y - 0.1, -31.8, y + 0.1, 0, 6.5, 'metal')
@@ -183,4 +182,5 @@ export('mart', {
     'half': [HX, HY], 'roof': H,
     'spawns': [[37, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],
     'pickups': [['health', 0, 0, 1.6], ['health', 0, 0, -1.6], ['ammo', -20, 0, -12], ['ammo', 20, 0, 12], ['ammo', -9.8, 0, 13.6], ['ammo', 9.8, 0, -13.6], ['health', -6, 0, -11.8], ['health', 6, 0, 11.8], ['ammo', -28, 0, -22], ['ammo', 28, 0, 22]],
-})
+}, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), emit_k=12,
+            only='wall|partition|floor|car park|pavement|kerb|roof deck|gondola|case|counter|tile|brick|fascia|pallet|cardboard|dumpster|hedge|soil|fence|store|belt|racking'))

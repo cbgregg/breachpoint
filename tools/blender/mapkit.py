@@ -163,6 +163,7 @@ def facade(piece, x, y, z, yaw=0, k='atlas', mirror=True):
 def pool(x, y, w, d, k, z=0.03, yaw=0, mirror=True):
     """A soft-edged patch on the floor (assets/textures/<map>/soft.png): a contact shadow spreading from under a
     piece of furniture, or a pool of light under a lamp, by its material k ('soft:shadow' / 'soft:... light')."""
+    if not POOLS[0]: return
     o = quad('soft'); o.location = (x, y, z); o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw); finish(o, k, mirror, uv=False)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
@@ -258,7 +259,43 @@ def collide(x0, y0, x1, y1, z0, z1, surface='wood', soft=0, mirror=True):
 
 DOOR = (1.5, 0, 2.2); WIN = (1.8, 1.0, 2.1)   # an opening's width, sill, head
 
-def export(name, data):
+POOLS = [True]
+def bake_light(name, size=2048, samples=32, sky=(0.78, 0.86, 1.0), sky_k=1.0, emit_k=1.0, scale=0.5, skip=('card', 'decal', 'soft', 'cutout'), hide=('glass', 'water'), only=None):
+    """Bake the scene's indirect light (the sky and every glowing material; not the sun, which the game casts live)
+    with Cycles into one light map, assets/textures/<name>/light.jpg, on a second UV set unwrapped here. Call from
+    export() once the scene is one mesh per material. Stored at `scale` of its value so bright pools fit."""
+    import numpy as np
+    from PIL import Image
+    objs = [o for o in bpy.data.objects if o.type == 'MESH']; bake = []
+    for o in objs:
+        m = o.data.materials[0] if o.data.materials else None; nm = m.name if m else ''
+        glow = bool(m and m.node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value > 0)
+        if nm.split(':')[0] in skip or any(h in nm for h in hide): o.hide_render = True
+        elif glow: m.node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value *= emit_k
+        elif only is None or re.search(only, nm.split(':')[-1]): bake.append(o)   # (only: the big surfaces; small parts would eat the map)
+    import time; t0 = time.time()
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in bake:
+        if not o.data.uv_layers: o.data.uv_layers.new(name='UVMap')
+        o.data.uv_layers.active = o.data.uv_layers.new(name='Light'); o.select_set(True)
+    bpy.context.view_layer.objects.active = bake[0]
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.average_islands_scale(); bpy.ops.uv.pack_islands(margin=0.0012); bpy.ops.object.mode_set(mode='OBJECT')
+    img = bpy.data.images.new('light', size, size, float_buffer=True)
+    for o in bake:
+        nt = o.data.materials[0].node_tree; nd = nt.nodes.new('ShaderNodeTexImage'); nd.image = img; nt.nodes.active = nd
+    sc = bpy.context.scene; sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = samples; sc.cycles.use_denoising = True; sc.cycles.max_bounces = 4
+    w = bpy.data.worlds.new('sky'); sc.world = w; w.use_nodes = True; bg = w.node_tree.nodes['Background']; bg.inputs[0].default_value = (*sky, 1); bg.inputs[1].default_value = sky_k
+    bpy.ops.object.bake(type='DIFFUSE', pass_filter={'DIRECT', 'INDIRECT'}, margin=8, use_clear=True)
+    px = np.array(img.pixels[:], dtype=np.float32).reshape(size, size, 4)[::-1, :, :3] * scale
+    out = os.path.join(ROOT, 'assets', 'textures', name); os.makedirs(out, exist_ok=True)
+    from PIL import ImageFilter
+    Image.fromarray((np.clip(px, 0, 1) ** (1 / 2.2) * 255).astype('uint8')).filter(ImageFilter.MedianFilter(3)).filter(ImageFilter.GaussianBlur(0.8)).save(os.path.join(out, 'light.jpg'), quality=90)
+    print('bake seconds', round(time.time() - t0))
+    print('light map: mean', float(px.mean()), 'max', float(px.max()), 'clipped', float((px > 1).mean()))
+    for o in bake: o.data.uv_layers.active = o.data.uv_layers[0]; o.data.uv_layers[0].active_render = True
+def export(name, data, bake=None):
     """Save the editable scene, export the game's copy (one mesh per material) and its data module."""
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, 'assets', 'maps', name + '.blend'))   # (keeps every named piece)
     try: os.remove(os.path.join(ROOT, 'assets', 'maps', name + '.blend1'))
@@ -275,6 +312,7 @@ def export(name, data):
         if len(objs) > 1: bpy.ops.object.join()
         bpy.context.object.name = mname
         tris += sum(len(p.vertices) - 2 for p in bpy.context.object.data.polygons)
+    if bake is not None: bake_light(name, **bake)
     glb = os.path.join(ROOT, 'assets', 'maps', name + '.glb')
     bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=True, export_yup=True, export_vertex_color='ACTIVE' if SHADE else 'MATERIAL')
     # weld and quantize the file if gltf-transform is about (tools/blender/pack.mjs; needs GLTF_TOOLS=<dir with node_modules>)

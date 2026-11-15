@@ -23,8 +23,9 @@ export const FRESHWAY = blendMap(DATA, {
   scale: { v_hedge: 1.3, plaster: 3, brick: 1.6, paint: 2, storefloor: 2.4, concrete: 3, asphalt: 6, cement: 3, metal: 2, wood: 1.5, marble: 2, whitetile: 1.2, rubber: 1, woodold: 1.4, dirt: 2 },
   noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck|floor light|lot light|^steel$/,
   groundSurface: 'concrete',
+  lightmap: 3.2,
   // under the roof the light is the sky's fill and the sun through the skylights: more fill, a little less exposure
-  look: { photo: { url: 'assets/sky/suburban_parking_area.jpg', u: 0.6001, gain: 1.2 }, sunElev: 58, fog: 0.004, fogColor: 0x9a9c8c, sun: 4.0, hemi: 1.0, hemiSky: 0xe8eef8, ground: 0xb0aca4, exposure: 0.86, env: 0.75 },
+  look: { photo: { url: 'assets/sky/suburban_parking_area.jpg', u: 0.6001, gain: 1.2 }, sunElev: 58, fog: 0.004, fogColor: 0x9a9c8c, sun: 4.0, hemi: 0.45, hemiSky: 0xe8eef8, ground: 0xb0aca4, exposure: 0.9, env: 0.75 },
   extra: {
     ambient: { music: 'muzak', inside },
     doors: [...DOORS, ...DOORS.map(d => ({ ...d, x: -d.x, z: -d.z }))],
