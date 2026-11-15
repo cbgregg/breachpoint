@@ -8,11 +8,11 @@ import DATA from './maps/zenith.data.js';
 export const ZENITH = blendMap(DATA, {
   id: 'zenith',
   name: 'Zenith',
-  blurb: 'Floating islands over a sea of cloud: a temple in the middle, groves of golden trees, glowing crystals, and bridges between them. Mind the edge',
+  blurb: 'Islands resting on cloud: a temple under a rainbow in the middle, groves of cotton-ball trees, star posts, and walkways of cloud between them. Mind the edge',
   scale: { v_rock: 4, v_grass: 4.5, marble: 2.4, wood: 1.6, concrete: 3.5 },
-  noShadow: /island grass|cloud|water|rope|glow|crystal/,
+  noShadow: /island grass|cloud|water|rope|glow|crystal|star|rb |balloon|islet/,
   groundSurface: 'grass',
   // high, clear and bright: light comes up off the cloud as well as down from the sun
-  look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.25 }, sunElev: 50, fog: 0.0042, fogColor: 0xdfeaf6, sun: 4.4, sunColor: 0xfff6e4, hemi: 1.35, hemiSky: 0xd6e6ff,
+  look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.25 }, sunElev: 50, fog: 0.0038, fogColor: 0xf6e6f0, sun: 4.4, sunColor: 0xfff6e4, hemi: 1.35, hemiSky: 0xd6e6ff,
     ground: 0xe6eef6, exposure: 1.05, env: 1.0 },
 });
