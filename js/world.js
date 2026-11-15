@@ -1151,6 +1151,23 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
     const neg = (l) => (l || []).map(([k, at, wd]) => [k, -at, wd]);
     return { n: neg(sp.s), s: neg(sp.n), e: neg(sp.w), w: neg(sp.e), props: (sp.props || []).map(([k, a, b, r]) => [k, -a, -b, r]), light: sp.light };
   };
+  // a shelf's row of book spines, painted once: cloth and leather bindings with gilt bands
+  let spineMat = null;
+  const spines = () => {
+    if (spineMat) return spineMat;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'), r = seeded(77);
+    const cols = ['#5a1f1c', '#1f3a2c', '#2a2f4a', '#6a4a22', '#3a2a1c', '#7a6a4a', '#1c1c1e', '#4a2a3a', '#8a3a22', '#c8b890'];
+    for (let x = 0; x < 256;) {
+      const bw = 10 + Math.floor(r() * 16), top = Math.floor(r() * 22);
+      g.fillStyle = '#17120e'; g.fillRect(x, 0, bw, 128);
+      g.fillStyle = cols[Math.floor(r() * cols.length)]; g.fillRect(x + 1, top, bw - 2, 128 - top);
+      g.fillStyle = 'rgba(214,180,100,0.8)'; g.fillRect(x + 2, top + 12, bw - 4, 2); g.fillRect(x + 2, 104, bw - 4, 2); if (r() < 0.6) g.fillRect(x + 3, top + 24, bw - 6, 14);
+      g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x + 1, top, 2, 128 - top);
+      x += bw;
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    return (spineMat = std({ map: t, roughness: 0.8 }));
+  };
   const buildHouse = (cx, cz, w, d, h, y0, spec, team) => {
     const T = 0.3;
     if (Math.abs(y0) < 0.5) interiors.push([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2]);
@@ -1312,7 +1329,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
         const n = Math.max(2, Math.floor(wide / 0.5)), step = wide / n;
         for (const f of [0.02, 0.36, 0.69]) for (let i = 0; i < n; i++) {
           const o = (i - (n - 1) / 2) * step;
-          if (k === 'books' && PROPS.ph_books) model('ph_books', 'x', step * 0.95, px + (along ? o : 0), y0 + 2.0 * f + 0.03, pz + (along ? 0 : o), (along ? 0 : Math.PI / 2) + (i % 2) * Math.PI);
+          if (k === 'books') put(flatBox(step * 0.95, 0.27 + ((i * 7 + Math.round(f * 10)) % 3) * 0.02, 0.2, 0), spines(), px + (along ? o : 0), y0 + 2.0 * f + 0.175, pz + (along ? 0 : o), (along ? 0 : Math.PI / 2) + (i % 2) * Math.PI, { grime: 0 });   // a row of books: one box with painted spines (a modelled set cost 30,000 triangles a row)
           else model('ph_cbox', 'x', step * 0.92, px + (along ? o : 0), y0 + 2.0 * f + 0.03, pz + (along ? 0 : o), ((i + dx) % 3) * 0.08 + (along ? 0 : Math.PI / 2));
         }
       } else if (k === 'crates' && PROPS.ph_crate) {
