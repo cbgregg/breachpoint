@@ -45,6 +45,11 @@ def cube(name, loc, scale, rot=(0, 0, 0)):
     me = bpy.data.meshes.new(name); me.from_pydata(CUBE_V, [], CUBE_F); me.uv_layers.new(name='UVMap'); me.update()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); o.location = loc; o.scale = scale; o.rotation_euler = rot
     return o
+def quad(name):
+    """A unit square in the xy plane with 0..1 UVs, made directly as mesh data (see cube)."""
+    me = bpy.data.meshes.new(name); me.from_pydata([(-.5, -.5, 0), (.5, -.5, 0), (.5, .5, 0), (-.5, .5, 0)], [], [(0, 1, 2, 3)]); uv = me.uv_layers.new(name='UVMap')
+    for l, c in zip(uv.data, ((0, 0), (1, 0), (1, 1), (0, 1))): l.uv = c
+    me.update(); o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); return o
 def world_of(o):
     """An unparented object's world matrix from its own transform (no scene update needed: far quicker than waiting on one per piece)."""
     return Matrix.LocRotScale(o.location, o.rotation_euler, o.scale)
@@ -89,16 +94,21 @@ def box(name, x0, y0, x1, y1, z0, z1, k=None, solid=True, surface='concrete', mi
     return o
 def deco(name, x0, y0, x1, y1, z0, z1, k, mirror=True):
     return box(name, x0, y0, x1, y1, z0, z1, k, solid=False, mirror=mirror)
+def tube(name, seg, r1, r2, depth, loc):
+    """A cylinder or cone along z, made directly as mesh data (see cube)."""
+    ring = lambda r, z: [(r * math.cos(2 * math.pi * i / seg), r * math.sin(2 * math.pi * i / seg), z) for i in range(seg)]
+    v = ring(r1, -depth / 2) + ring(max(r2, 1e-4), depth / 2)
+    f = [(i, (i + 1) % seg, seg + (i + 1) % seg, seg + i) for i in range(seg)] + [tuple(range(seg - 1, -1, -1)), tuple(range(seg, 2 * seg))]
+    me = bpy.data.meshes.new(name); me.from_pydata(v, [], f); me.uv_layers.new(name='UVMap'); me.update()
+    o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); o.location = loc; return o
 def cyl(name, x, y, z0, z1, r, k, mirror=True, seg=10, r2=None, rot=None):
-    bpy.ops.mesh.primitive_cone_add(vertices=seg, radius1=r, radius2=r if r2 is None else r2, depth=z1 - z0, location=(x, y, (z0 + z1) / 2))
-    o = bpy.context.object; o.name = name
+    o = tube(name, seg, r, r if r2 is None else r2, z1 - z0, (x, y, (z0 + z1) / 2))
     if rot: o.rotation_euler = rot
     return finish(o, k, mirror, uv=False)
 def bar(name, a, b, r, k, mirror=True):
     """A thin round bar from point a to point b."""
     a, b = Vector(a), Vector(b); d = b - a
-    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=r, depth=d.length, location=(a + b) / 2)
-    o = bpy.context.object; o.name = name; o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+    o = tube(name, 6, r, r, d.length, (a + b) / 2); o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
     return finish(o, k, mirror, uv=False)
 def text(body, x, y, z, yaw, size, k, mirror=False, depth=0.03, half_turn=False):
     """Lettering standing upright, centred on (x, y, z), reading left to right for someone it faces (yaw 0 faces south)."""
@@ -146,7 +156,7 @@ def facade(piece, x, y, z, yaw=0, k='atlas', mirror=True):
     """A window, shutter, door or shop front from the atlas, flat against a wall. (x, y, z) is where the piece's own
     origin sits (the middle of an opening's foot); yaw 0 faces south, pi/2 east. k: its material (its colour tints it)."""
     p = ATLAS[piece]; (ox, oz), (w, h), (u0, v0, u1, v1) = p['origin'], p['size'], p['uv']
-    bpy.ops.mesh.primitive_plane_add(size=1); o = bpy.context.object; o.name = piece; o.scale = (w, h, 1); o.rotation_euler = (math.pi / 2, 0, yaw)
+    o = quad(piece); o.scale = (w, h, 1); o.rotation_euler = (math.pi / 2, 0, yaw)
     c, s_ = math.cos(yaw), math.sin(yaw); a = ox + w / 2; o.location = (x + c * a, y + s_ * a, z + oz + h / 2)
     for l in o.data.uv_layers.active.data: l.uv = (u0 + l.uv.x * (u1 - u0), v0 + l.uv.y * (v1 - v0))
     finish(o, k, mirror, uv=False)
@@ -196,9 +206,9 @@ def vehicle(slot, x0, y0, x1, y1, h, yaw):
 def cut(kind, x, y, z0, w, h, yaw=0, mirror=True, off=0.03):
     """A cut-out from the map's greenery atlas (assets/textures/<map>/cutouts.png: 0 ivy, 1 hanging vines, 2 a shrub,
     3 tall grass), standing upright with its foot at z0, facing south at yaw 0 and `off` metres proud of (x, y)."""
-    bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0)); o = bpy.context.object; o.name = 'greenery'
+    o = quad('greenery')
     for l in o.data.uv_layers.active.data: l.uv = ((kind % 2 + l.uv.x) / 2, 1 - (kind // 2 + 1 - l.uv.y) / 2)
-    o.matrix_world = Matrix.Translation((x + math.sin(yaw) * off, y - math.cos(yaw) * off, z0 + h / 2)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'X') @ Matrix.Diagonal((w, h, 1, 1))
+    o.location = (x + math.sin(yaw) * off, y - math.cos(yaw) * off, z0 + h / 2); o.rotation_euler = (math.pi / 2, 0, yaw); o.scale = (w, h, 1)
     return finish(o, 'cut', mirror, uv=False)
 def slab(name, cx, cy, cz, sx, sy, sz, rot, k, mirror=True):
     """A box turned any way (rot: Euler angles), drawn only: a sloped roof, an awning, a brace."""

@@ -19,7 +19,7 @@ STUCCO = {'ochre': 0xf0c078, 'terra': 0xe89870, 'cream': 0xf8ecd0, 'sage': 0xc4d
 setup({
     **{k: ('v_stucco:' + k + ' stucco', c) for k, c in STUCCO.items()},
     'cobble': ('v_cobble:street', 0xe8e0d4), 'paving': ('v_paving:square', 0xf2ead8), 'plinth': ('v_paving:plinth', 0xb8ae9c), 'rooftile': ('v_rooftile:roof tiles', 0xf0e0d0),
-    'timber': ('v_timber:timber', 0xc8a880), 'frame': ('v_paving:white trim', 0xfaf6ec), 'glass': ('flat:glass', 0x1c2630), 'iron': ('flat:iron', 0x26292c), 'dark': ('flat:dark', 0x151514),
+    'timber': ('v_timber:timber', 0xc8a880), 'frame': ('plaster:white trim', 0xfaf6ec), 'glass': ('flat:glass', 0x1c2630), 'iron': ('flat:iron', 0x26292c), 'dark': ('flat:dark', 0x151514),
     'sh green': ('atlas:green shutter', 0x5f9a78), 'sh blue': ('atlas:blue shutter', 0x5c8ac0), 'sh red': ('atlas:red shutter', 0xc45a4a), 'atlas': ('atlas:facade', 0xffffff), 'pot': ('v_rooftile:terracotta', 0xd89878),
     'aw red': ('cloth:red awning', 0xb03a30), 'aw cream': ('cloth:cream awning', 0xf0e4c8), 'aw green': ('cloth:green awning', 0x3f7a58), 'aw blue': ('cloth:blue awning', 0x3a66a0), 'aw gold': ('cloth:gold awning', 0xd8a838),
     'water': ('flat:water', 0x4aa8c0), 'hedge': ('flat:hedge', 0x4a7a3c), 'tomato': ('flat:tomato', 0xc8322a), 'orange': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58),
@@ -82,9 +82,10 @@ def face(a0, a1, fixed, axis, out, z0, z1, shop=0, seed=0):
         if shop:
             aw = AWN[(i + seed) % 4]
             if i % 2 == 0:
-                stick('shop_door', c, z0); (x, y) = at(c + 0.95, 0.12); deco('shop lamp arm', x - 0.02, y - 0.02, x + 0.02, y + 0.02, z0 + 2.5, z0 + 2.56, 'iron'); piece('shop lamp', c + 0.87, c + 1.03, 0.1, 0.26, z0 + 2.22, z0 + 2.5, 'lamp')
+                stick('shop_door', c, z0, d=0.1); (x, y) = at(c + 0.95, 0.12); deco('shop lamp arm', x - 0.02, y - 0.02, x + 0.02, y + 0.02, z0 + 2.5, z0 + 2.56, 'iron'); piece('shop lamp', c + 0.87, c + 1.03, 0.1, 0.26, z0 + 2.22, z0 + 2.5, 'lamp')
+                (x, y) = at(c - 0.95, 0.45); deco('hanging sign', x - (0.3 if axis == 'x' else 0.025), y - (0.025 if axis == 'x' else 0.3), x + (0.3 if axis == 'x' else 0.025), y + (0.025 if axis == 'x' else 0.3), z0 + 2.75, z0 + 3.2, AWN[(i + seed + 1) % 4]); (xa, ya), (xb, yb) = at(c - 0.95, 0), at(c - 0.95, 0.8); bar('sign bracket', (xa, ya, z0 + 3.26), (xb, yb, z0 + 3.26), 0.014, 'iron'); bar('sign bracket', (xa, ya, z0 + 2.95), (x, y, z0 + 3.26), 0.01, 'iron')
                 piece('doormat', c - 0.45, c + 0.45, 0.2, 0.8, z0, z0 + 0.015, 'dark')
-            else: stick('shop_window', c, z0)
+            else: stick('shop_window', c, z0, d=0.1)
             (x, y) = at(c, 0.75); slab('awning', x, y, z0 + 2.95, bw - 0.5 if axis == 'x' else 1.6, 1.6 if axis == 'x' else bw - 0.5, 0.04, (out * 0.42, 0, 0) if axis == 'x' else (0, -out * 0.42, 0), aw)
             for q in range(int((bw - 0.5) / 0.6)):   # stripes down the awning
                 (x, y) = at(c - (bw - 0.5) / 2 + 0.3 + q * 0.6 + 0.0, 0.75); slab('awning stripe', x, y, z0 + 2.962, 0.3 if axis == 'x' else 1.6, 1.6 if axis == 'x' else 0.3, 0.04, (out * 0.42, 0, 0) if axis == 'x' else (0, -out * 0.42, 0), 'aw cream')
