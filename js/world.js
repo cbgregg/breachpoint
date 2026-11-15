@@ -12,6 +12,7 @@ import { OVERGROWTH } from './overgrowth.js';
 import { VACANCY } from './vacancy.js';
 import { CASTLE } from './castle.js';
 import { ZENITH } from './zenith.js';
+import { TARSA } from './tarsa.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
@@ -419,7 +420,8 @@ const PIONEER_PICKUPS = [
 const PIONEER_SITES = [[-15, 15, -UG], [18, 34]];
 
 export const MAPS = {
-  tarsa: { id: 'tarsa', name: 'Tarsa Market', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.2 }, sunElev: 44, fog: 0.0026, fogColor: 0xa7afbd }, photos: ['assets/loading/tarsa-1.jpg', 'assets/loading/tarsa-2.jpg', 'assets/loading/tarsa-3.jpg'] },
+  tarsa: TARSA,   // (rebuilt in Blender; the layout below is the earlier one)
+  tarsa_classic: { id: 'tarsa_classic', name: 'Tarsa Market (classic)', blurb: 'Three lanes: market street, the centre plaza with its rooftop, and the yard; connectors through houses and alleys', center: TARSA_CENTER, half: TARSA_HALF, spawns: TARSA_SPAWNS, pickups: TARSA_PICKUPS, bounds: { hx: 58, hz: 40 }, facadeFloors: 3, look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.2 }, sunElev: 44, fog: 0.0026, fogColor: 0xa7afbd }, photos: ['assets/loading/tarsa_classic-1.jpg', 'assets/loading/tarsa_classic-2.jpg', 'assets/loading/tarsa_classic-3.jpg'] },
   shuran: { id: 'shuran', name: 'Shuran Yard', blurb: 'Three lanes: market street, yard, container stacks', center: SHURAN_CENTER, half: SHURAN_HALF, spawns: SHURAN_SPAWNS, pickups: SHURAN_PICKUPS, look: { photo: { url: 'assets/sky/abandoned_tank_farm_03.jpg', u: 0.6011, gain: 1.2 }, sunElev: 40, fog: 0.003, fogColor: 0x9e9b92 }, photos: ['assets/loading/shuran-1.jpg', 'assets/loading/shuran-2.jpg', 'assets/loading/shuran-3.jpg'] },
   pioneer: { id: 'pioneer', name: 'Pioneer Square', blurb: '1st & Yesler on the real street plan: Pioneer Place, the pergola, the Pioneer Building and James St; and the Seattle Underground beneath the sidewalks, corner to corner; bomb site A is down in the buried intersection', center: PIONEER_CENTER, half: PIONEER_HALF, spawns: PIONEER_SPAWNS, pickups: PIONEER_PICKUPS, sites: PIONEER_SITES, lower: PIONEER_UG.level, bounds: { hx: 54, hz: 40 }, facadeFloors: 5, facadeStyle: 'brick', daylight: true, roads: PIONEER_ROADS,
     look: { turbidity: 2.2, rayleigh: 2.6, mie: 0.003, fog: 0.0017, fogColor: 0xc4d4e4, sun: 4.2, sunColor: 0xfff3e2, hemi: 1.15, hemiSky: 0xcfe0f8, ground: 0x9a958a, exposure: 1.12, env: 1.0, clouds: true, blueSky: true, photo: { url: 'assets/sky/portland_landing_pad.jpg', u: 0.5991, gain: 1.2 }, sunElev: 44 }, photos: ['assets/loading/pioneer-1.jpg', 'assets/loading/pioneer-2.jpg', 'assets/loading/pioneer-3.jpg'] },

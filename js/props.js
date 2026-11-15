@@ -8,7 +8,8 @@ export const PROPS = {};
 // Which vehicle models each map uses (assets.js loads them on the match loading screen; a map only ever draws
 // its own, so what it looks like and its collision never depend on which maps were played before)
 export const VEHICLES_BY_MAP = {
-  tarsa: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
+  tarsa: ['sedan', 'boxtruck', 'van'],
+  tarsa_classic: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
   shuran: ['sedan', 'hatch', 'boxtruck', 'foodtruck'],
   pioneer: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'bus', 'streetcar'],
   mart: ['sedan', 'hatch', 'boxtruck', 'foodtruck', 'van', 'semi', 'forklift'],

@@ -38,12 +38,22 @@ def m_(k):
 
 boxes, vehicles = [], []   # collision in the game's axes: [minx, miny, minz, maxx, maxy, maxz, surface]
 
+CUBE_V = [(-.5, -.5, -.5), (.5, -.5, -.5), (.5, .5, -.5), (-.5, .5, -.5), (-.5, -.5, .5), (.5, -.5, .5), (.5, .5, .5), (-.5, .5, .5)]
+CUBE_F = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+def cube(name, loc, scale, rot=(0, 0, 0)):
+    """A unit cube made directly as mesh data (Blender's add-a-cube operator slows to a crawl in a scene of thousands)."""
+    me = bpy.data.meshes.new(name); me.from_pydata(CUBE_V, [], CUBE_F); me.uv_layers.new(name='UVMap'); me.update()
+    o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); o.location = loc; o.scale = scale; o.rotation_euler = rot
+    return o
+def world_of(o):
+    """An unparented object's world matrix from its own transform (no scene update needed: far quicker than waiting on one per piece)."""
+    return Matrix.LocRotScale(o.location, o.rotation_euler, o.scale)
 def shade_mesh(o, hexcol):
     """Soft shading baked into vertex colours (they multiply the material's colour in the game): white where a
     surface faces up or is high on its object, falling to `hexcol` where it faces down or is at the foot. Gives
     clouds, canopies and plain stone their form whatever the graphics setting."""
     me = o.data; sh = [lin(((hexcol >> b) & 255) / 255) for b in (16, 8, 0)]
-    bpy.context.view_layer.update(); mw = o.matrix_world; n3 = mw.to_3x3()
+    mw = world_of(o); n3 = mw.to_3x3()
     zs = [(mw @ v.co).z for v in me.vertices]; z0 = min(zs); span = max(max(zs) - z0, 1e-6)
     ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
     for p in me.polygons:
@@ -55,10 +65,9 @@ def shade_mesh(o, hexcol):
     me.color_attributes.active_color = ca
 def finish(o, k, mirror, uv=True):
     """Material, metre UVs, and the half-turn twin."""
-    o.data.materials.append(m_(k))
-    bpy.context.view_layer.update()
+    o.data.materials.append(m_(k)); mw = world_of(o)
     if uv and o.data.uv_layers:
-        uvl = o.data.uv_layers.active.data; mw = o.matrix_world; n3 = mw.to_3x3()
+        uvl = o.data.uv_layers.active.data; n3 = mw.to_3x3()
         for p in o.data.polygons:
             n = (n3 @ p.normal).normalized(); ax = max(range(3), key=lambda i: abs(n[i]))
             for li in p.loop_indices:
@@ -66,13 +75,12 @@ def finish(o, k, mirror, uv=True):
                 uvl[li].uv = (c.y, c.z) if ax == 0 else (c.x, c.z) if ax == 1 else (c.x, c.y)
     if k in SHADE: shade_mesh(o, SHADE[k])
     if mirror:
-        t = o.copy(); t.data = o.data.copy(); t.name = o.name + '.E'; bpy.context.collection.objects.link(t); t.matrix_world = HALF_TURN @ o.matrix_world
+        t = o.copy(); t.data = o.data.copy(); t.name = o.name + '.E'; bpy.context.collection.objects.link(t); t.matrix_world = HALF_TURN @ mw
     return o
 
 def box(name, x0, y0, x1, y1, z0, z1, k=None, solid=True, surface='concrete', mirror=True, top=None):
     """An axis-aligned block (and its half-turn twin unless mirror=False). top: collision reaches higher than what's drawn."""
-    bpy.ops.mesh.primitive_cube_add(size=1, location=((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
-    o = bpy.context.object; o.scale = (abs(x1 - x0), abs(y1 - y0), z1 - z0); o.name = name
+    o = cube(name, ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), (abs(x1 - x0), abs(y1 - y0), z1 - z0))
     finish(o, k or DEFAULT[0], mirror)
     if solid:
         for s in ((1, -1) if mirror else (1,)):
@@ -122,13 +130,14 @@ def prop(name, x, y, z=0, yaw=0, scale=1, mirror=True, solid=None, only=None):
         if solid:
             w, d, h, soft = solid
             boxes.append([round(s * x - w / 2, 3), round(z, 3), round(-s * y - d / 2, 3), round(s * x + w / 2, 3), round(z + h, 3), round(-s * y + d / 2, 3), 'wood', 1 if soft else 0])
-def card(x, y, h, v):
-    """A fir drawn on two crossed cards (assets/textures/vacancy/cards.png holds two trees side by side)."""
+def card(x, y, h, v, aspect=0.5, mirror=False):
+    """A tree drawn on two crossed cards (assets/textures/<map>/cards.png holds two views side by side). h is the
+    card's height; aspect its width over that."""
     for a in (0.4, 0.4 + math.pi / 2):
-        bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, h / 2 - 0.15)); o = bpy.context.object; o.name = 'fir'
-        o.scale = (h * 0.5, h, 1); o.rotation_euler = (math.pi / 2, 0, a + x)
+        bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, h / 2 - 0.15)); o = bpy.context.object; o.name = 'tree card'
+        o.scale = (h * aspect, h, 1); o.rotation_euler = (math.pi / 2, 0, a + x)
         for l in o.data.uv_layers.active.data: l.uv = ((v + l.uv.x) / 2, l.uv.y)
-        finish(o, 'firs', False, uv=False)
+        finish(o, 'firs', mirror, uv=False)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)
@@ -181,7 +190,7 @@ def cut(kind, x, y, z0, w, h, yaw=0, mirror=True, off=0.03):
     return finish(o, 'cut', mirror, uv=False)
 def slab(name, cx, cy, cz, sx, sy, sz, rot, k, mirror=True):
     """A box turned any way (rot: Euler angles), drawn only: a sloped roof, an awning, a brace."""
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, cz)); o = bpy.context.object; o.name = name; o.scale = (sx, sy, sz); o.rotation_euler = rot
+    o = cube(name, (cx, cy, cz), (sx, sy, sz), rot)
     return finish(o, k, mirror)
 def tri(name, pts, k, mirror=True):
     """A flat triangle seen from both sides (a pennant)."""

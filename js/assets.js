@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { setGunModel } from './weapons.js';
 import { setProp, VEHICLES_BY_MAP } from './props.js';
+import { preloadBlendScene } from './blendmap.js';
 
 export const ASSETS = { soldier: null, photo: {}, hands: null };
 
@@ -81,13 +82,14 @@ const PROP_FILES = { containers: 'assets/models/trucks.glb', mags: 'assets/model
 const vehicleLoads = new Map();
 // a map's own furnishing (CC0, Poly Haven), loaded with its vehicles: Pioneer Square's café
 const MAP_PROPS = { pioneer: ['ph_dchair', 'ph_globe', 'ph_sconce', 'ph_painting', 'ph_photo', 'ph_plant', 'ph_espresso', 'ph_croissant', 'ph_cake', 'ph_teaset', 'ph_jug'] };
+const BLEND_MAPS = new Set(['tarsa', 'vacancy', 'castle', 'zenith']);   // maps whose scene is a file (js/blendmap.js): fetched here too
 export function loadMapVehicles(mapId) {
-  return Promise.all([...(VEHICLES_BY_MAP[mapId] || []).map(s => 'veh_' + s), ...(MAP_PROPS[mapId] || [])].map(name => {
+  return Promise.all([BLEND_MAPS.has(mapId) ? preloadBlendScene(mapId) : null, ...[...(VEHICLES_BY_MAP[mapId] || []).map(s => 'veh_' + s), ...(MAP_PROPS[mapId] || [])].map(name => {
     if (!vehicleLoads.has(name)) vehicleLoads.set(name, new GLTFLoader().loadAsync(`assets/models/${name}.glb`)
       .then(g => setProp(name, g.scene))
       .catch(e => console.warn('Model unavailable, using procedural:', name, e)));
     return vehicleLoads.get(name);
-  }));
+  })]);
 }
 async function loadProps() {
   await Promise.all(Object.entries(PROP_FILES).map(async ([name, file]) => {

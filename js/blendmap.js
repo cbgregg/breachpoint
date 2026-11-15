@@ -15,6 +15,8 @@ const GAME_SCALE = { asphalt: 4, concrete: 2.5, plaster: 3, paint: 1.6, metal: 2
 const VEH_FRONT = { sedan: Math.PI, hatch: Math.PI / 2, boxtruck: Math.PI / 2, van: Math.PI / 2 };
 const CAR_PAINT = [{ tint: 0x9a3b2f }, null, { tint: 0x3d5a78 }, { tint: 0xc9b98a }, { tint: 0x4f6b52 }, null, { tint: 0x2c2f33 }, { tint: 0xb9bcc0 }];
 const scenes = new Map();   // the exported scenes, fetched once each
+// fetch a map's scene ahead of building it (the match loading screen waits on this: assets.js loadMapVehicles)
+export const preloadBlendScene = (id) => { if (!scenes.has(id)) scenes.set(id, new GLTFLoader().loadAsync(`assets/maps/${id}.glb`).then(g => g.scene)); return scenes.get(id).catch(() => null); };
 
 // o: { id, name, blurb, look, scale: { v_set: metres }, noShadow: RegExp over a material's 'what', soft: RegExp (those get a
 // sheen), softTint, extra: build()'s return }
@@ -32,9 +34,12 @@ export function blendMap(DATA, o) {
       for (const { geo, mat } of pc.parts) put(geo.clone(), vehMat(mat, paint), v.x, 0, v.z, v.yaw, { grime: 0, cast: !mat.transparent });
       solid(v.x, v.z, along ? pc.size.x : pc.size.z, along ? pc.size.z : pc.size.x, pc.size.y * (v.slot === 'sedan' ? 0.96 : 1), 0, 'metal');
     });
-    const sets = new Map(), loader = new THREE.TextureLoader();
+    const ready = { done: false };   // set once the scene is in and its textures have loaded (tools wait on it)
+    const mgr = new THREE.LoadingManager(); let texLeft = 0, inScene = false;
+    const settle = () => { if (inScene && texLeft <= 0) ready.done = true; };
+    const sets = new Map(), loader = new THREE.TextureLoader(mgr);
     const own = (file, srgb, k) => {   // one of the map's own textures (the scene's UVs are glTF's: not flipped)
-      const t = loader.load(dir + file); t.flipY = false; t.anisotropy = 8;
+      texLeft++; const t = loader.load(dir + file, () => { texLeft--; settle(); }, undefined, () => { texLeft--; settle(); }); t.flipY = false; t.anisotropy = 8;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
       if (k) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(k, k); }
       return t;
@@ -46,8 +51,7 @@ export function blendMap(DATA, o) {
       const src = tex[name], cp = (t) => { if (!t) return null; const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(k, k); c.needsUpdate = true; return c; };
       return src ? { map: cp(src.map), normalMap: cp(src.normalMap), roughnessMap: cp(src.roughnessMap) } : null;
     });
-    if (!scenes.has(o.id)) scenes.set(o.id, new GLTFLoader().loadAsync(`assets/maps/${o.id}.glb`).then(g => g.scene));
-    scenes.get(o.id).then((scene) => {
+    preloadBlendScene(o.id); scenes.get(o.id).then((scene) => {
       const s = scene.clone(true);
       s.traverse(ob => {
         if (!ob.isMesh) return;
@@ -68,10 +72,10 @@ export function blendMap(DATA, o) {
         m.needsUpdate = true; ob.material = m;
         ob.receiveShadow = true; ob.castShadow = !(setName === 'card' || setName === 'decal' || setName === 'cutout' || (o.noShadow && o.noShadow.test(what)));
       });
-      group.add(s);
+      group.add(s); inScene = true; settle();
     }).catch(e => console.warn(o.name + ': the map scene failed to load', e));
     return {
-      upper: DATA.upper,
+      upper: DATA.upper, ready,
       noGround: !!DATA.holes,   // (bots mind the edges)
       groundSurface: o.groundSurface || 'concrete',
       indoorAt: () => 0,
@@ -79,6 +83,6 @@ export function blendMap(DATA, o) {
       ...(o.extra || {}),
     };
   }
-  return { id: o.id, name: o.name, blurb: o.blurb, bounds: { hx: HX, hz: HZ }, skyline: false, look: o.look, spawns: DATA.spawns, holes: DATA.holes,   // (holes: where there's no ground at all)
+  return { id: o.id, name: o.name, blurb: o.blurb, bounds: { hx: HX, hz: HZ }, skyline: false, look: o.look, spawns: DATA.spawns, photos: [1, 2, 3].map(n => `assets/loading/${o.id}-${n}.jpg`), holes: DATA.holes,   // (holes: where there's no ground at all)
     pickups: (DATA.pickups || []).map(([type, x, y, z]) => ({ type, pos: [x, y, z] })), build };
 }

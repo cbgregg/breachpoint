@@ -18,7 +18,11 @@ const [W, H] = arg('size', '1600x900').split('x').map(Number);
 
 // [camera position, point it looks at] per shot, in world metres; the first of each map is its thumbnail
 const SHOTS = {
-  tarsa: [[[44, 22, 30], [0, 0, 0]], [[-52, 9, -24], [10, 1, -18]], [[30, 8, 0], [-20, 2, 0]]],
+  tarsa: [[[-38, 26, 40], [0, 0, 2]], [[-31, 1.7, 0], [0, 3, 0]], [[-20, 5.5, -11], [4, 1, 2]]],
+  tarsa_classic: [[[44, 22, 30], [0, 0, 0]], [[-52, 9, -24], [10, 1, -18]], [[30, 8, 0], [-20, 2, 0]]],
+  vacancy: [[[-26, 9, -24], [2, 1, -2]], [[-17, 1.7, 2], [10, 1.6, -2]], [[-20, 1.7, -21], [10, 2.2, -17]]],
+  castle: [[[-30, 22, 34], [0, 0, 2]], [[-27, 1.7, -1], [-8, 2.5, 1]], [[5.5, 1.7, -1.2], [-4, 0.6, 2.5]]],
+  zenith: [[[-44, 26, 40], [0, -3, 0]], [[-27, 1.7, 0], [0, 5, 0]], [[-5, 2.9, 2.5], [8, 2.6, -3]]],
   shuran: [[[37, 22, 28], [0, 0, 0]], [[-32, 11, -16], [15, 1, -8]], [[32, 11, 16], [-15, 1, 8]]],
   pioneer: [[[40, 24, 30], [0, 0, 0]], [[-15, 7, -36], [-12, 1, 10]], [[-10, -1.7, 20], [-20, -2.2, 10]]],   // the third: down in the Underground
   mart: [[[-40, 4, -14], [-22, 3, 4]], [[8, 4.8, 18], [-12, 1, -6]], [[-16, 1.8, -3], [16, 1.5, -3]]],
@@ -43,8 +47,10 @@ const maps = arg('maps', null)?.split(',') || await page.evaluate(async () => (a
 for (const map of maps) {
   const views = await page.evaluate(async (map) => {
     const g = window.__game;
+    await (await import('/js/assets.js')).loadMapVehicles(map);   // (a map's own vehicle and prop models)
     g.loadMap(map, true);
     await new Promise(r => setTimeout(r, 500));
+    for (let i = 0; i < 240 && g.world.ready && !g.world.ready.done; i++) await new Promise(r => setTimeout(r, 250));   // (a scene from a file: wait for it and its textures)
     const w = g.world, c = (l) => l.reduce((a, p) => [a[0] + p.x / l.length, a[1] + p.z / l.length], [0, 0]);
     const [ax, az] = c(w.spawns[0]), [bx, bz] = c(w.spawns[1]), b = w.bounds || { hx: 50, hz: 40 };
     const back = (x, z, k) => [x * k, 0, z * k];

@@ -41,7 +41,7 @@ async function lab(defaults) {
 
   // a fresh match: seeded dice, the renderer's loop off (the lab steps the game), no countdown, the human parked
   // dead so the bots fight each other and the test's dummies only
-  function boot({ map = 'tarsa', mode = 'tdm', teamSize = 2, difficulty = defaults.difficulty, seed = defaults.seed } = {}) {
+  function boot({ map = 'tarsa_classic', mode = 'tdm', teamSize = 2, difficulty = defaults.difficulty, seed = defaults.seed } = {}) {
     while (walls.length) unwall(walls[walls.length - 1]);   // (a scenario's leftover walls: the map stays loaded between boots)
     Math.random = mulberry(seed);
     g.renderer.renderer.setAnimationLoop(null);
