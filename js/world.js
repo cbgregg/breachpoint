@@ -10,6 +10,7 @@ import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
 import { OVERGROWTH } from './overgrowth.js';
 import { VACANCY } from './vacancy.js';
+import { CASTLE } from './castle.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
@@ -425,6 +426,7 @@ export const MAPS = {
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
   vacancy: VACANCY,
+  castle: CASTLE,
   cannery: CANNERY,
   afterhours: AFTERHOURS,
   link: LINKLOOP,
