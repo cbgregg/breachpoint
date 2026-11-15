@@ -70,7 +70,7 @@ export function blendMap(DATA, o) {
         if (setName === 'cutout') { m.map = once('cutout', () => own('cutouts.png', true)); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
         if (setName === 'atlas') { m.map = once('atlas', () => own('atlas.webp', true)); m.alphaTest = 0.5; m.roughness = 0.75; m.metalness = 0; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1; }
         if (setName === 'soft') { m.map = once('soft', () => own('soft.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; m.metalness = 0; m.vertexColors = false;
-          if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.3; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.6; }
+          if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.09; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.5; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
