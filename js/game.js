@@ -599,7 +599,12 @@ export class Game {
     pf.worst = Math.max(pf.worst, Math.min(gap, 2000));
     this.input.poll(this.live ? dt : Math.min(0.05, (now - (this.lastPoll || now)) / 1000));
     this.lastPoll = now;
-    if (this.live) this.update(dt);
+    if (this.live) {
+      this.update(dt);
+      // a slow frame (under 20 fps) is caught up in further 50 ms steps, up to 0.2 s: the match keeps real-time
+      // speed on a slow machine (capped at one step, everything ran in slow motion: players, bots, the clock)
+      for (let extra = Math.min(0.15, Math.max(0, use) / 1000 - dt); extra > 0.004 && this.live; extra -= 0.05) { this.input.endFrame(); this.update(Math.min(0.05, extra)); }
+    }
     else if (this.state === 'menu' || this.state === 'ended') this.menuCamera(dt);
     if (this.world.update) this.world.update(dt, performance.now() / 1000, this.netClock());
     this.cullSmall();
