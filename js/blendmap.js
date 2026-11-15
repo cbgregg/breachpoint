@@ -5,7 +5,7 @@
 // Materials are named '<texture set>:<what it is>' in the scene: the set is one of the game's own (plaster, wood...)
 // or, starting with v_, one of the map's own in assets/textures/<id>/<set>/{color,normal,rough}.jpg; the scene's
 // colour tints it and its UVs are in metres. 'card' is the map's tree cards (cards.png, alpha-tested), 'decal' its
-// ground wear atlas (decals.png), 'flat' a plain colour.
+// ground wear atlas (decals.png), 'cutout' its greenery atlas (cutouts.png, alpha-tested), 'flat' a plain colour.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PROPS, propFit } from './props.js';
@@ -51,14 +51,15 @@ export function blendMap(DATA, o) {
       s.traverse(ob => {
         if (!ob.isMesh) return;
         const m = ob.material.clone(), named = (m.name || '').includes(':'), [setName, what = ''] = named ? m.name.split(':') : ['', ''];
-        const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setFor(setName);
+        const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setName !== 'cutout' && setFor(setName);
         if (set) { m.map = set.map; m.normalMap = set.normalMap; m.roughnessMap = set.roughnessMap; m.roughness = 1; }
         if (setName === 'card') { m.map = once('card', () => own('cards.png', true)); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }
+        if (setName === 'cutout') { m.map = once('cutout', () => own('cutouts.png', true)); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
         m.needsUpdate = true; ob.material = m;
-        ob.receiveShadow = true; ob.castShadow = !(setName === 'card' || setName === 'decal' || (o.noShadow && o.noShadow.test(what)));
+        ob.receiveShadow = true; ob.castShadow = !(setName === 'card' || setName === 'decal' || setName === 'cutout' || (o.noShadow && o.noShadow.test(what)));
       });
       group.add(s);
     }).catch(e => console.warn(o.name + ': the map scene failed to load', e));

@@ -10,8 +10,8 @@ export const CASTLE = blendMap(DATA, {
   name: 'Castle',
   blurb: 'A medieval castle: the keep\'s great hall in the middle, archways through the cross-walls between the wards, stables and a smithy, and the battlements along both long walls',
   // the map's own texture sets (assets/textures/castle, CC0 from Poly Haven): metres per repeat
-  scale: { v_wall: 3.2, v_ashlar: 2.2, v_cobble: 3, v_mud: 5, v_flag: 2.2, v_timber: 2, v_slate: 3, v_thatch: 2.5 },
-  noShadow: /ward$|earth|hall floor|water|flame|ember|banner|rope/,
+  scale: { v_wall: 3.2, v_ashlar: 2.2, v_cobble: 3, v_mud: 5, v_flag: 2.2, v_timber: 2, v_slate: 3, v_thatch: 2.5, v_grass: 4.5 },
+  noShadow: /ward$|earth|lawn|hall floor|floorboards|carpet|water|flame|ember|banner|rope/,
   groundSurface: 'concrete',
   // a soft overcast morning: cool grey light, mist beyond the walls
   look: { photo: { url: 'assets/sky/lilienstein.jpg', u: 0.5942, gain: 1.2 }, sunElev: 32, turbidity: 3.5, rayleigh: 1.8, mie: 0.004, fog: 0.0034, fogColor: 0x8a9088, sun: 3.0, sunColor: 0xfff0d8, hemi: 1.25, hemiSky: 0xc8d2d0,

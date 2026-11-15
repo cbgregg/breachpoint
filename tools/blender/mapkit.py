@@ -155,6 +155,28 @@ def vehicle(slot, x0, y0, x1, y1, h, yaw):
     bpy.ops.mesh.primitive_cube_add(size=1, location=((x0 + x1) / 2, (y0 + y1) / 2, h / 2)); o = bpy.context.object; o.scale = (x1 - x0, y1 - y0, h); o.name = 'VEHICLE ' + slot
     o.data.materials.append(m_('cover')); o['vehicle'] = slot   # (kept in the .blend as a stand-in; not exported)
 
+def cut(kind, x, y, z0, w, h, yaw=0, mirror=True, off=0.03):
+    """A cut-out from the map's greenery atlas (assets/textures/<map>/cutouts.png: 0 ivy, 1 hanging vines, 2 a shrub,
+    3 tall grass), standing upright with its foot at z0, facing south at yaw 0 and `off` metres proud of (x, y)."""
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0)); o = bpy.context.object; o.name = 'greenery'
+    for l in o.data.uv_layers.active.data: l.uv = ((kind % 2 + l.uv.x) / 2, 1 - (kind // 2 + 1 - l.uv.y) / 2)
+    o.matrix_world = Matrix.Translation((x + math.sin(yaw) * off, y - math.cos(yaw) * off, z0 + h / 2)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'X') @ Matrix.Diagonal((w, h, 1, 1))
+    return finish(o, 'cut', mirror, uv=False)
+def slab(name, cx, cy, cz, sx, sy, sz, rot, k, mirror=True):
+    """A box turned any way (rot: Euler angles), drawn only: a sloped roof, an awning, a brace."""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, cz)); o = bpy.context.object; o.name = name; o.scale = (sx, sy, sz); o.rotation_euler = rot
+    return finish(o, k, mirror)
+def tri(name, pts, k, mirror=True):
+    """A flat triangle seen from both sides (a pennant)."""
+    me = bpy.data.meshes.new(name); me.from_pydata([tuple(p) for p in pts], [], [(0, 1, 2), (2, 1, 0)]); me.update()
+    o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
+    return finish(o, k, mirror, uv=False)
+def collide(x0, y0, x1, y1, z0, z1, surface='wood', soft=0, mirror=True):
+    """Collision alone, for something drawn with other pieces (and its twin's)."""
+    for s in ((1, -1) if mirror else (1,)):
+        a0, a1 = sorted((s * x0, s * x1)); b0, b1 = sorted((s * y0, s * y1))
+        boxes.append([round(a0, 3), round(z0, 3), round(-b1, 3), round(a1, 3), round(z1, 3), round(-b0, 3), surface] + ([1] if soft else []))
+
 DOOR = (1.5, 0, 2.2); WIN = (1.8, 1.0, 2.1)   # an opening's width, sill, head
 
 def export(name, data):
