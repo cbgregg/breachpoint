@@ -168,7 +168,12 @@ export class NavGrid {
   // it): a path between levels walks to a stair, climbs it waypoint by waypoint, and carries on.
   levelOf(p) {
     let best = 0, bd = Math.abs(p.y);
-    this.levels.forEach((L, i) => { const d = Math.abs(p.y - L.y); if (d < bd) { bd = d; best = i + 1; } });
+    // (the nearest in height among the levels p stands over: two roofs at one height are told apart by where they are)
+    this.levels.forEach((L, i) => {
+      const B = L.bounds, d = Math.abs(p.y - L.y);
+      if (B && B.minX !== undefined && (p.x < B.minX - 1 || p.x > B.maxX + 1 || p.z < B.minZ - 1 || p.z > B.maxZ + 1)) return;
+      if (d < bd) { bd = d; best = i + 1; }
+    });
     return best;
   }
   // the grid for the level p is on (this one on the street)

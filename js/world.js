@@ -9,6 +9,7 @@ import { makeTextureSets } from './textures.js';
 import { MART } from './supermarket.js';
 import { DRIVEIN } from './drivein.js';
 import { OVERGROWTH } from './overgrowth.js';
+import { VACANCY } from './vacancy.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
@@ -423,6 +424,7 @@ export const MAPS = {
   mart: MART,
   drivein: DRIVEIN,
   overgrowth: OVERGROWTH,
+  vacancy: VACANCY,
   cannery: CANNERY,
   afterhours: AFTERHOURS,
   link: LINKLOOP,
@@ -3250,7 +3252,7 @@ export function buildWorld(scene, physics, mapId = 'tarsa') {
   if (world.upper) {
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
     world.nav.levels = [].concat(world.upper).map(u => ({
-      grid: new NavGrid(physics, u.bounds, 0.5, 0.35, { floorY: u.y }), y: u.y,
+      grid: new NavGrid(physics, u.bounds, 0.5, 0.35, { floorY: u.y }), y: u.y, bounds: u.bounds,
       portals: u.portals.map(q => ({ link: q.link || 0, climb: q.climb.map(V), rect: q.rect })),
     }));
     world.upperPoint = () => {
