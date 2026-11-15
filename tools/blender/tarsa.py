@@ -19,15 +19,16 @@ STUCCO = {'ochre': 0xf0c078, 'terra': 0xe89870, 'cream': 0xf8ecd0, 'sage': 0xc4d
 setup({
     **{k: ('v_stucco:' + k + ' stucco', c) for k, c in STUCCO.items()},
     'cobble': ('v_cobble:street', 0xe8e0d4), 'paving': ('v_paving:square', 0xf2ead8), 'plinth': ('v_paving:plinth', 0xb8ae9c), 'rooftile': ('v_rooftile:roof tiles', 0xf0e0d0),
-    'timber': ('v_timber:timber', 0xc8a880), 'frame': ('flat:white trim', 0xf2eee4), 'glass': ('flat:glass', 0x1c2630), 'iron': ('flat:iron', 0x26292c), 'dark': ('flat:dark', 0x151514),
-    'sh green': ('flat:green shutter', 0x3f6a52), 'sh blue': ('flat:blue shutter', 0x3d6088), 'sh red': ('flat:red shutter', 0x8a3a30),
+    'timber': ('v_timber:timber', 0xc8a880), 'frame': ('v_paving:white trim', 0xfaf6ec), 'glass': ('flat:glass', 0x1c2630), 'iron': ('flat:iron', 0x26292c), 'dark': ('flat:dark', 0x151514),
+    'sh green': ('atlas:green shutter', 0x5f9a78), 'sh blue': ('atlas:blue shutter', 0x5c8ac0), 'sh red': ('atlas:red shutter', 0xc45a4a), 'atlas': ('atlas:facade', 0xffffff), 'pot': ('v_rooftile:terracotta', 0xd89878),
     'aw red': ('cloth:red awning', 0xb03a30), 'aw cream': ('cloth:cream awning', 0xf0e4c8), 'aw green': ('cloth:green awning', 0x3f7a58), 'aw blue': ('cloth:blue awning', 0x3a66a0), 'aw gold': ('cloth:gold awning', 0xd8a838),
     'water': ('flat:water', 0x4aa8c0), 'hedge': ('flat:hedge', 0x4a7a3c), 'tomato': ('flat:tomato', 0xc8322a), 'orange': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58),
     'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x7c8a70), 'decal': ('decal:ground wear', 0xffffff), 'cover': ('flat:cover', 0xc8731a), 'roofdeck': ('v_paving:roof terrace', 0xc8beac),
-    'line': ('flat:paint', 0xe8e4d8), 'sign': ('flat:sign', 0x2a3a34), 'gold': ('flat:gold', 0xc8a040),
+    'line': ('flat:paint', 0xe8e4d8), 'sign': ('v_timber:sign', 0x3a5a4c), 'gold': ('flat:gold', 0xc8a040),
 }, emit={'lamp': 0xffd9a0, 'bulb': 0xffc56e}, rough={'glass': 0.08, 'water': 0.06, 'iron': 0.5, 'gold': 0.35}, metal={'iron': 0.7, 'gold': 0.9}, default='cream',
    shade={**{k: 0xb4a8a0 for k in STUCCO}, 'frame': 0xb8b4c0, 'hedge': 0x2a4a2c, 'tomato': 0x7a1c1c, 'orange': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a,
-          'sh green': 0x243e30, 'sh blue': 0x243a54, 'sh red': 0x54221c, 'plinth': 0x8a8478})
+          'plinth': 0x8a8478})
+use_atlas('tarsa')
 rnd = random.Random(4)
 SHUT = ('sh green', 'sh blue', 'sh red'); AWN = ('aw red', 'aw green', 'aw blue', 'aw gold')
 NAMES = ['PANADERIA', 'FRUTAS', 'CAFE TARSA', 'MERCADO', 'FLORES', 'VINOS', 'QUESOS', 'TABACOS', 'LIBROS', 'FARMACIA']
@@ -39,31 +40,63 @@ def face(a0, a1, fixed, axis, out, z0, z1, shop=0, seed=0):
     def at(a, d): return (a, fixed + out * d) if axis == 'x' else (fixed + out * d, a)
     def piece(name, a_lo, a_hi, d_lo, d_hi, zl, zh, k):
         (xa, ya), (xb, yb) = at(a_lo, d_lo), at(a_hi, d_hi); deco(name, min(xa, xb), min(ya, yb), max(xa, xb), max(ya, yb), zl, zh, k)
+    yaw = {('x', -1): 0, ('x', 1): PI, ('y', 1): PI / 2, ('y', -1): -PI / 2}[(axis, out)]; sgn = math.cos(yaw) - math.sin(yaw) if axis == 'x' else math.sin(yaw) + math.cos(yaw)
+    sgn = 1 if (axis, out) in (('x', -1), ('y', 1)) else -1   # which way the piece's own +x runs along the wall
+    def stick(name, a, z, k='atlas', d=0.02):
+        (x, y) = at(a, d); facade(name, x, y, z, yaw, k)
     n = max(1, round((a1 - a0) / 3.2)); bw = (a1 - a0) / n; gf = 3.5 if shop else 0.4
-    piece('plinth', a0, a1, 0, 0.04, z0, z0 + 0.45, 'plinth')
+    piece('plinth', a0, a1, 0, 0.05, z0, z0 + 0.5, 'plinth'); piece('plinth cap', a0, a1, 0, 0.08, z0 + 0.5, z0 + 0.56, 'frame')
     floors = int((z1 - z0 - gf - 0.6) / 3.0)
+    for f in range(floors + (1 if shop else 0)):   # a string course at each floor line
+        zc = z0 + gf + f * 3.0 - (0.05 if shop else -2.75)
+        if zc < z1 - 0.8: piece('string course', a0, a1, 0, 0.07, zc, zc + 0.14, 'frame'); piece('string course', a0, a1, 0, 0.04, zc - 0.06, zc, 'frame')
+    for i in range(n + 1):   # pilaster strips between bays, a downpipe on some
+        e = a0 + i * bw
+        if 0 < i < n and (i + seed) % 3 == 0:
+            (x, y) = at(e, 0.09); bar('downpipe', (x, y, z0), (x, y, z1 - 0.3), 0.045, 'iron')
+            for zz in (z0 + 1.2, z0 + 3.4, z0 + 5.6):
+                if zz < z1 - 0.5: piece('pipe clip', e - 0.07, e + 0.07, 0, 0.15, zz, zz + 0.05, 'iron')
     for i in range(n):
         c = a0 + (i + 0.5) * bw; sh = SHUT[(i + seed) % 3]
         for f in range(floors):
-            zb = z0 + gf + 0.9 + f * 3.0
-            piece('window', c - 0.5, c + 0.5, 0, 0.03, zb, zb + 1.5, 'glass')
-            for s in (-1, 1): piece('shutter', c + s * 0.5 if s > 0 else c - 0.95, c + 0.95 if s > 0 else c - 0.5, 0, 0.06, zb, zb + 1.5, sh)
-            piece('sill', c - 0.62, c + 0.62, 0, 0.14, zb - 0.1, zb, 'frame'); piece('lintel', c - 0.6, c + 0.6, 0, 0.07, zb + 1.5, zb + 1.62, 'frame')
-            if (i + f + seed) % 4 == 1:
-                piece('balcony', c - 0.9, c + 0.9, 0, 0.7, zb - 0.22, zb - 0.1, 'frame')
-                for t in range(7):
-                    (x, y) = at(c - 0.85 + t * 0.283, 0.66); bar('balcony rail', (x, y, zb - 0.1), (x, y, zb + 0.75), 0.015, 'iron')
-                (xa, ya), (xb, yb) = at(c - 0.88, 0.66), at(c + 0.88, 0.66); bar('balcony rail', (xa, ya, zb + 0.75), (xb, yb, zb + 0.75), 0.02, 'iron')
+            zb = z0 + gf + 0.9 + f * 3.0; balc = (i + f + seed) % 4 == 1
+            if balc:
+                stick('balcony_door', c, zb - 0.1)
+                piece('balcony', c - 0.95, c + 0.95, 0, 0.75, zb - 0.22, zb - 0.1, 'frame'); piece('balcony edge', c - 0.98, c + 0.98, 0, 0.78, zb - 0.26, zb - 0.22, 'frame')
+                for t in (-0.6, 0.6): piece('balcony bracket', c + t - 0.05, c + t + 0.05, 0, 0.5, zb - 0.5, zb - 0.26, 'frame')
+                for t in range(13):
+                    (x, y) = at(c - 0.9 + t * 0.15, 0.7); bar('balcony rail', (x, y, zb - 0.1), (x, y, zb + 0.85), 0.011, 'iron')
+                for sd in (-0.9, 0.9):
+                    for t in range(4): (x, y) = at(c + sd, 0.12 + t * 0.15); bar('balcony rail', (x, y, zb - 0.1), (x, y, zb + 0.85), 0.011, 'iron')
+                    (xa, ya), (xb, yb) = at(c + sd, 0), at(c + sd, 0.7); bar('balcony rail', (xa, ya, zb + 0.85), (xb, yb, zb + 0.85), 0.02, 'iron')
+                for zz in (zb + 0.85, zb + 0.0): (xa, ya), (xb, yb) = at(c - 0.9, 0.7), at(c + 0.9, 0.7); bar('balcony rail', (xa, ya, zz), (xb, yb, zz), 0.02 if zz > zb + 0.5 else 0.012, 'iron')
+                for t in (-0.55, 0.1, 0.6):
+                    (x, y) = at(c + t, 0.5); cyl('balcony pot', x, y, zb - 0.1, zb + 0.22, 0.13, 'pot', seg=8); cut(2, x, y, zb + 0.15, 0.5, 0.5, yaw + 0.5, True)
+            else:
+                stick('window', c, zb)
+                if (i + 2 * f + seed) % 5 != 3:
+                    for sd in (-1, 1): stick('shutter', c + sd * 0.87, zb, sh, 0.035)
+                if (i + f + seed) % 3 == 0:   # a window box of flowers
+                    piece('window box', c - 0.55, c + 0.55, 0.12, 0.34, zb - 0.28, zb - 0.06, 'pot'); (x, y) = at(c, 0.23)
+                    cut(2, x, y, zb - 0.12, 1.15, 0.42, yaw, True); cut(3, x, y, zb - 0.1, 1.0, 0.4, yaw + PI / 2, True)
         if shop:
             aw = AWN[(i + seed) % 4]
-            if i % 2 == 0: piece('shop door', c - 0.55, c + 0.55, 0, 0.05, z0, z0 + 2.2, 'timber'); piece('door glass', c - 0.4, c + 0.4, 0.05, 0.06, z0 + 1.0, z0 + 2.0, 'glass')
-            else: piece('shop window', c - 1.15, c + 1.15, 0, 0.04, z0 + 0.7, z0 + 2.3, 'glass'); piece('shop sill', c - 1.25, c + 1.25, 0, 0.12, z0 + 0.55, z0 + 0.7, 'frame')
-            (x, y) = at(c, 0.75); slab('awning', x, y, z0 + 2.75, bw - 0.5 if axis == 'x' else 1.6, 1.6 if axis == 'x' else bw - 0.5, 0.05, (out * 0.42, 0, 0) if axis == 'x' else (0, -out * 0.42, 0), aw)
-            (x, y) = at(c, 1.45); deco('awning fringe', x - ((bw - 0.5) / 2 if axis == 'x' else 0.02), y - (0.02 if axis == 'x' else (bw - 0.5) / 2), x + ((bw - 0.5) / 2 if axis == 'x' else 0.02), y + (0.02 if axis == 'x' else (bw - 0.5) / 2), z0 + 2.2, z0 + 2.42, 'aw cream')
+            if i % 2 == 0:
+                stick('shop_door', c, z0); (x, y) = at(c + 0.95, 0.12); deco('shop lamp arm', x - 0.02, y - 0.02, x + 0.02, y + 0.02, z0 + 2.5, z0 + 2.56, 'iron'); piece('shop lamp', c + 0.87, c + 1.03, 0.1, 0.26, z0 + 2.22, z0 + 2.5, 'lamp')
+                piece('doormat', c - 0.45, c + 0.45, 0.2, 0.8, z0, z0 + 0.015, 'dark')
+            else: stick('shop_window', c, z0)
+            (x, y) = at(c, 0.75); slab('awning', x, y, z0 + 2.95, bw - 0.5 if axis == 'x' else 1.6, 1.6 if axis == 'x' else bw - 0.5, 0.04, (out * 0.42, 0, 0) if axis == 'x' else (0, -out * 0.42, 0), aw)
+            for q in range(int((bw - 0.5) / 0.6)):   # stripes down the awning
+                (x, y) = at(c - (bw - 0.5) / 2 + 0.3 + q * 0.6 + 0.0, 0.75); slab('awning stripe', x, y, z0 + 2.962, 0.3 if axis == 'x' else 1.6, 1.6 if axis == 'x' else 0.3, 0.04, (out * 0.42, 0, 0) if axis == 'x' else (0, -out * 0.42, 0), 'aw cream')
+            for q in range(int((bw - 0.5) / 0.3)):   # a scalloped valance
+                a_ = c - (bw - 0.5) / 2 + q * 0.3; piece('valance', a_ + 0.01, a_ + 0.29, 1.47, 1.49, z0 + 2.38 + (0.05 if q % 2 else 0), z0 + 2.64, aw if q % 2 else 'aw cream')
+            for sd in (-1, 1): (xa, ya), (xb, yb) = at(c + sd * (bw - 0.6) / 2, 0.02), at(c + sd * (bw - 0.6) / 2, 1.46); bar('awning arm', (xa, ya, z0 + 2.5), (xb, yb, z0 + 2.62), 0.012, 'iron')
             if i % 2 == 1:
-                piece('sign board', c - 1.2, c + 1.2, 0, 0.05, z0 + 3.0, z0 + 3.42, 'sign')
-                (x, y) = at(c, 0.06); text(NAMES[(i + seed) % len(NAMES)], x, y, z0 + 3.2, {('x', -1): 0, ('x', 1): PI, ('y', 1): PI / 2, ('y', -1): -PI / 2}[(axis, out)], 0.26, 'gold', mirror=True, depth=0.01)
-    piece('cornice', a0 - 0.15, a1 + 0.15, 0, 0.28, z1 - 0.3, z1, 'frame')
+                piece('sign board', c - 1.25, c + 1.25, 0, 0.06, z0 + 3.5, z0 + 3.98, 'sign'); piece('sign edge', c - 1.3, c + 1.3, 0, 0.08, z0 + 3.98, z0 + 4.03, 'gold'); piece('sign edge', c - 1.3, c + 1.3, 0, 0.08, z0 + 3.45, z0 + 3.5, 'gold')
+                (x, y) = at(c, 0.07); text(NAMES[(i + seed) % len(NAMES)], x, y, z0 + 3.74, yaw, 0.27, 'gold', mirror=True, depth=0.012)
+    piece('cornice', a0 - 0.1, a1 + 0.1, 0, 0.12, z1 - 0.52, z1 - 0.3, 'frame'); piece('cornice', a0 - 0.12, a1 + 0.12, 0, 0.2, z1 - 0.3, z1 - 0.16, 'frame')
+    for q in range(int((a1 - a0) / 0.45)): piece('dentil', a0 + 0.1 + q * 0.45, a0 + 0.3 + q * 0.45, 0.12, 0.2, z1 - 0.42, z1 - 0.3, 'frame')
+    piece('cornice', a0 - 0.15, a1 + 0.15, 0, 0.3, z1 - 0.16, z1, 'frame')
 def gable(x0, y0, x1, y1, z, along_x=True, rise=1.6):
     """A tiled pitched roof over a rectangle: two slopes to a ridge along the long way."""
     over = 0.45
@@ -143,7 +176,7 @@ for x in (-26.7, -23.7, -20.7, -17.7, -14.7, -12.3):
 face(-27, -12, -8, 'x', 1, 3.4 - 0.4, AH, seed=6); face(-21, -10.6, -27, 'y', -1, 0, AH, seed=7); face(-21, -10.6, -12, 'y', 1, 0, AH, seed=8); face(-27, -20.5, -21, 'x', -1, 0, AH, seed=9); face(-17.5, -12, -21, 'x', -1, 0, AH, seed=10)
 gable(-27, -21, -12, -8, AH)
 for x, nm in ((-24.2, 'PANADERIA'), (-14.9, 'VINOS')):   # shop fronts inside the arcade
-    deco('arcade shop door', x - 0.55, -10.6, x + 0.55, -10.55, 0, 2.2, 'timber'); deco('arcade shop window', x + 0.9, -10.6, x + 2.6, -10.56, 0.7, 2.3, 'glass'); text(nm, x + 0.6, -10.52, 2.75, PI, 0.24, 'gold', mirror=True, depth=0.01)
+    facade('shop_door', x, -10.58, 0, PI); facade('shop_window', x + 2.0, -10.58, 0, PI); text(nm, x + 0.6, -10.52, 2.75, PI, 0.24, 'gold', mirror=True, depth=0.01)
 box('arcade bench', -23.6, -10.5, -21.8, -10.0, 0, 0.5, 'timber', surface='wood'); prop('wine_barrel_01', -13.2, -10.0, 0, 0.3, 1.1, solid=(0.8, 0.8, 0.95, False))
 for x in (-25.2, -19.0, -13.4): cyl('arcade lamp', x, -9.3, 3.0, 3.38, 0.12, 'lamp', seg=8)
 

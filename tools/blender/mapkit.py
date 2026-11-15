@@ -138,6 +138,18 @@ def card(x, y, h, v, aspect=0.5, mirror=False):
         o.scale = (h * aspect, h, 1); o.rotation_euler = (math.pi / 2, 0, a + x)
         for l in o.data.uv_layers.active.data: l.uv = ((v + l.uv.x) / 2, l.uv.y)
         finish(o, 'firs', mirror, uv=False)
+ATLAS = {}
+def use_atlas(name):
+    """Load a map's facade atlas (made by facade_atlas.py) for facade()."""
+    ATLAS.update(json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), name + '_atlas.json'))))
+def facade(piece, x, y, z, yaw=0, k='atlas', mirror=True):
+    """A window, shutter, door or shop front from the atlas, flat against a wall. (x, y, z) is where the piece's own
+    origin sits (the middle of an opening's foot); yaw 0 faces south, pi/2 east. k: its material (its colour tints it)."""
+    p = ATLAS[piece]; (ox, oz), (w, h), (u0, v0, u1, v1) = p['origin'], p['size'], p['uv']
+    bpy.ops.mesh.primitive_plane_add(size=1); o = bpy.context.object; o.name = piece; o.scale = (w, h, 1); o.rotation_euler = (math.pi / 2, 0, yaw)
+    c, s_ = math.cos(yaw), math.sin(yaw); a = ox + w / 2; o.location = (x + c * a, y + s_ * a, z + oz + h / 2)
+    for l in o.data.uv_layers.active.data: l.uv = (u0 + l.uv.x * (u1 - u0), v0 + l.uv.y * (v1 - v0))
+    finish(o, k, mirror, uv=False)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)
