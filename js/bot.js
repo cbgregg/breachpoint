@@ -905,7 +905,10 @@ export class BotBrain {
   // is the body blocked a little way along this direction? (ignores low steps)
   blockedDir(x, z, dist = 0.55) {
     const b = this.bot, ph = this.game.physics;
-    return !!ph.overlap(b.pos.x + x * dist, b.pos.y + PLAYER.stepHeight + 0.02, b.pos.z + z * dist, b.radius * 0.95, Math.max(0.4, b.height - PLAYER.stepHeight - 0.05));
+    if (ph.overlap(b.pos.x + x * dist, b.pos.y + PLAYER.stepHeight + 0.02, b.pos.z + z * dist, b.radius * 0.95, Math.max(0.4, b.height - PLAYER.stepHeight - 0.05))) return true;
+    // on a map with no ground (floating islands), a step toward a drop counts as blocked while fighting or
+    // shaking loose (a planned path keeps to the floor on its own): nothing to stand on within 1.6 m below
+    return !!(this.game.world.noGround && b.onGround && (this.visible || this.unstickT > 0) && !ph.overlap(b.pos.x + x * (dist + 0.25), b.pos.y - 1.6, b.pos.z + z * (dist + 0.25), 0.15, 1.65));
   }
 
   // bend the wanted direction around corners and props the grid doesn't see

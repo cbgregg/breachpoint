@@ -171,6 +171,33 @@ def tri(name, pts, k, mirror=True):
     me = bpy.data.meshes.new(name); me.from_pydata([tuple(p) for p in pts], [], [(0, 1, 2), (2, 1, 0)]); me.update()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o)
     return finish(o, k, mirror, uv=False)
+def ico(name, x, y, z, sx, sy, sz, k, mirror=True, sub=2, rot=(0, 0, 0)):
+    """A smooth blob (a boulder, a cloud, a canopy): an icosphere scaled to sx, sy, sz radii."""
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=sub, radius=1, location=(x, y, z)); o = bpy.context.object; o.name = name; o.scale = (sx, sy, sz); o.rotation_euler = rot
+    bpy.ops.object.shade_smooth()
+    return finish(o, k, mirror, uv=False)
+def void(rects, half, step=0.5, depth=-30):
+    """A map with no ground (floating islands): rects = the [x0, y0, x1, y1] you can stand on at z = 0 (this half's and
+    their twins are both taken). Everywhere else gets a strip far below that only tells bots not to walk there."""
+    hx, hy = half; nx, ny = int(2 * hx / step), int(2 * hy / step)
+    both = list(rects) + [[-r[2], -r[3], -r[0], -r[1]] for r in rects]
+    solid = lambda cx, cy: any(r[0] - 0.01 <= cx <= r[2] + 0.01 and r[1] - 0.01 <= cy <= r[3] + 0.01 for r in both)
+    rows = []
+    for j in range(ny):
+        cy = -hy + (j + 0.5) * step; runs = []; i = 0
+        while i < nx:
+            if solid(-hx + (i + 0.5) * step, cy): i += 1; continue
+            i0 = i
+            while i < nx and not solid(-hx + (i + 0.5) * step, cy): i += 1
+            runs.append((i0, i))
+        rows.append(runs)
+    j = 0
+    while j < ny:   # merge identical neighbouring rows
+        j0 = j
+        while j < ny and rows[j] == rows[j0]: j += 1
+        for i0, i1 in rows[j0]:
+            x0, x1, y0, y1 = -hx + i0 * step, -hx + i1 * step, -hy + j0 * step, -hy + j * step
+            boxes.append([round(x0, 3), depth, round(-y1, 3), round(x1, 3), depth + 0.1, round(-y0, 3), 'ground', 0, 1])
 def collide(x0, y0, x1, y1, z0, z1, surface='wood', soft=0, mirror=True):
     """Collision alone, for something drawn with other pieces (and its twin's)."""
     for s in ((1, -1) if mirror else (1,)):

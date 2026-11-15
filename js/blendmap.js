@@ -21,7 +21,7 @@ export function blendMap(DATA, o) {
   const [HX, HZ] = DATA.half, dir = `assets/textures/${o.id}/`, scale = { ...GAME_SCALE, ...(o.scale || {}) };
   function build(ctx) {
     const { solid, group, tex, put, B, M, vehMat } = ctx;
-    for (const [x0, y0, z0, x1, y1, z1, surface, soft] of DATA.boxes) { const b = solid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1 - y0, y0, surface); if (soft) b.pass = true; }   // (soft: stops you, not bullets)
+    for (const [x0, y0, z0, x1, y1, z1, surface, soft, nav] of DATA.boxes) { const b = solid((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1 - y0, y0, surface); if (soft) b.pass = true; if (nav) b.navBlock = true; }   // (soft: stops you, not bullets; nav: only tells bots there's no floor here)
     // parked vehicles: the game's own models on the scene's footprints, collision fitted to what's drawn
     (DATA.vehicles || []).forEach((v, i) => {
       const along = Math.abs(Math.sin(v.yaw)) < 0.5, len = Math.max(v.w, v.d);
@@ -65,12 +65,13 @@ export function blendMap(DATA, o) {
     }).catch(e => console.warn(o.name + ': the map scene failed to load', e));
     return {
       upper: DATA.upper,
+      noGround: !!DATA.holes,   // (bots mind the edges)
       groundSurface: o.groundSurface || 'concrete',
       indoorAt: () => 0,
       menuCam(t, cam) { cam.position.set(Math.cos(t * 0.4) * HX * 0.9, 14 + Math.sin(t * 0.3) * 2, Math.sin(t * 0.4) * HZ); cam.lookAt(0, 1, 0); },
       ...(o.extra || {}),
     };
   }
-  return { id: o.id, name: o.name, blurb: o.blurb, bounds: { hx: HX, hz: HZ }, skyline: false, look: o.look, spawns: DATA.spawns,
+  return { id: o.id, name: o.name, blurb: o.blurb, bounds: { hx: HX, hz: HZ }, skyline: false, look: o.look, spawns: DATA.spawns, holes: DATA.holes,   // (holes: where there's no ground at all)
     pickups: (DATA.pickups || []).map(([type, x, y, z]) => ({ type, pos: [x, y, z] })), build };
 }
