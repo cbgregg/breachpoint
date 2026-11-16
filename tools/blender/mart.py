@@ -192,7 +192,7 @@ for i in range(15): x = -10.1 + i * 0.48; deco('price card', x, 9.69, x + 0.14, 
 # meats
 for i, (x, y, L, r) in enumerate(((-10.0, 9.85, 0.5, 0.05), (-10.0, 10.02, 0.45, 0.055), (-9.35, 9.83, 0.4, 0.045), (-9.3, 10.1, 0.55, 0.06), (-8.75, 9.9, 0.2, 0.05))):
     cyl('salami', x + L / 2, y, 1.03 + r - L / 2, 1.03 + r + L / 2, r, 'salami', seg=10, rot=(0, PI / 2, 0)); cyl('salami end', x + L + 0.004, y, 1.03 + r - 0.004, 1.03 + r + 0.004, r * 0.92, 'fat', seg=10, rot=(0, PI / 2, 0))
-for x, y in ((-9.75, 10.2), (-8.95, 10.15), (-8.7, 10.18)): ico('ham', x, y, 1.12, 0.17, 0.12, 0.1, 'ham', sub=1); deco('ham board', x - 0.2, y - 0.14, x + 0.2, y + 0.14, 1.03, 1.045, 'counter')
+for x, y in ((-9.75, 10.2), (-8.95, 10.15), (-8.7, 10.18)): ico('ham', x, y, 1.12, 0.17, 0.12, 0.1, 'ham', sub=2); deco('ham board', x - 0.2, y - 0.14, x + 0.2, y + 0.14, 1.03, 1.045, 'counter')
 for i in range(8): cyl('sausage', -9.65 + (i % 4) * 0.07, 9.84 + (i // 4) * 0.02, 1.05 + (i // 4) * 0.04, 1.09 + (i // 4) * 0.04, 0.018, 'roast', seg=6, rot=(PI / 2, 0, 0.3))
 # cheese
 for i, (x, y, r, h, k) in enumerate(((-8.1, 9.95, 0.17, 0.11, 'cheese'), (-7.65, 10.1, 0.14, 0.09, 'cheddar'), (-7.25, 9.9, 0.12, 0.14, 'rind'), (-6.9, 10.12, 0.15, 0.08, 'cheese'), (-8.05, 10.2, 0.09, 0.07, 'slaw'))):
@@ -222,10 +222,10 @@ for i, z in enumerate((1.5, 1.95, 2.4)):   # bread wall
     slab('bread shelf', -8.15, 13.38, z, 3.9, 0.42, 0.03, (-0.3, 0, 0), 'counter'); deco('shelf lip', -10.1, 13.17, -6.2, 13.2, z - 0.08, z - 0.01, 'counter')
     for q in range(9):
         x = -9.9 + q * 0.44
-        if (q + i) % 3 == 0: ico('loaf', x, 13.38, z + 0.09, 0.19, 0.1, 0.085, 'crust', sub=1); ico('loaf flour', x, 13.38, z + 0.15, 0.13, 0.05, 0.03, 'slaw', sub=1)
+        if (q + i) % 3 == 0: ico('loaf', x, 13.38, z + 0.09, 0.19, 0.1, 0.085, 'crust', sub=2); ico('loaf flour', x, 13.38, z + 0.15, 0.13, 0.05, 0.03, 'slaw', sub=1)
         elif (q + i) % 3 == 1: prop('hamburger_buns', x, 13.38, z + 0.02, PI / 2 + rnd.uniform(-0.2, 0.2), (0.75, 0.75, 0.9))
         else:
-            for b_ in range(3): ico('baguette', x - 0.1 + b_ * 0.1, 13.38, z + 0.07, 0.04, 0.19, 0.04, 'crust', sub=1, rot=(0.3, 0, rnd.uniform(-0.15, 0.15)))
+            for b_ in range(3): ico('baguette', x - 0.1 + b_ * 0.1, 13.38, z + 0.07, 0.04, 0.19, 0.04, 'crust', sub=2, rot=(0.3, 0, rnd.uniform(-0.15, 0.15)))
 box('deck oven', -5.9, 12.75, -3.9, 13.6, 0, 2.0, 'steel', surface='metal'); deco('oven plinth', -5.92, 12.73, -3.88, 12.75, 0, 0.3, 'dark'); deco('oven flue', -5.2, 13.1, -4.6, 13.55, 2.0, H - 0.3, 'steel')
 for i, z in enumerate((0.4, 0.95, 1.5)):
     deco('oven door', -5.75, 12.72, -4.4, 12.75, z, z + 0.42, 'dark'); deco('oven window', -5.6, 12.715, -4.55, 12.72, z + 0.08, z + 0.34, 'ember'); bar('oven handle', (-5.7, 12.68, z + 0.44), (-4.45, 12.68, z + 0.44), 0.014, 'steel')
@@ -234,14 +234,14 @@ for i, z in enumerate((0.4, 0.95, 1.5)):
 box('rotisserie', -10.6, 13.0, -9.5, 13.55, 0.98, 1.8, 'steel', surface='metal'); deco('rotisserie glow', -10.52, 12.99, -9.58, 13.0, 1.06, 1.72, 'ember'); deco('rotisserie frame', -10.62, 12.97, -9.48, 12.99, 0.98, 1.06, 'dark'); deco('rotisserie frame', -10.62, 12.97, -9.48, 12.99, 1.72, 1.8, 'dark')
 for z in (1.25, 1.55):
     bar('spit', (-10.5, 12.95, z), (-9.6, 12.95, z), 0.008, 'steel')
-    for q in range(3): ico('roast chicken', -10.32 + q * 0.28, 12.95, z, 0.1, 0.075, 0.07, 'roast', sub=1)
+    for q in range(3): ico('roast chicken', -10.32 + q * 0.28, 12.95, z, 0.1, 0.075, 0.07, 'roast', sub=2)
 prop('ph_espresso', -7.0, 13.25, 0.98, 0, 0.3); deco('slicer base', -8.5, 13.0, -8.0, 13.45, 0.98, 1.08, 'steel'); cyl('slicer blade', -8.25, 13.2, 1.08, 1.4, 0.16, 'steel', seg=18, rot=(PI / 2, 0, 0.3)); deco('scales', -9.2, 13.05, -8.75, 13.4, 0.98, 1.2, 'case'); deco('scales pan', -9.22, 13.03, -8.73, 13.42, 1.2, 1.22, 'steel')
 for i in range(4): cyl('cup stack', -6.45, 13.1 + i * 0.1, 0.98, 1.2, 0.035, 'slaw', seg=8)
 bar('salami rail', (-10.5, 12.55, 2.45), (-6.2, 12.55, 2.45), 0.015, 'steel')
 for x in (-10.4, -8.3, -6.3): bar('rail hanger', (x, 12.55, 2.45), (x, 12.55, H - 0.4), 0.008, 'steel')
 for i in range(13):
     x = -10.3 + i * 0.33; L = 0.3 + (i * 7 % 3) * 0.08
-    if i % 5 == 2: ico('hanging ham', x, 12.55, 2.08, 0.1, 0.1, 0.2, 'ham', sub=1); bar('ham string', (x, 12.55, 2.26), (x, 12.55, 2.45), 0.004, 'slaw')
+    if i % 5 == 2: ico('hanging ham', x, 12.55, 2.08, 0.1, 0.1, 0.2, 'ham', sub=2); bar('ham string', (x, 12.55, 2.26), (x, 12.55, 2.45), 0.004, 'slaw')
     else: cyl('hanging salami', x, 12.55, 2.36 - L, 2.36, 0.035 + (i % 2) * 0.008, 'salami' if i % 3 else 'roast', seg=8); bar('salami string', (x, 12.55, 2.36), (x, 12.55, 2.45), 0.004, 'slaw')
 # the boards over it all, the canopy over the counter, pendant lamps
 for i, (head, lines) in enumerate((('BAKERY', ('SOURDOUGH  4.50', 'BAGUETTE  2.20', 'CROISSANT  1.80')), ('DELI', ('SALAMI  2.90', 'ROAST HAM  2.40', 'CHICKEN  8.00')), ('CHEESE', ('CHEDDAR  1.70', 'GOUDA  2.10', 'BRIE  2.60')))):
@@ -266,7 +266,7 @@ cyl('cake table', -4.0, 8.7, 0.72, 0.76, 0.5, 'counter', seg=20); cyl('cake tabl
 for i in range(5): a_ = i * 1.257; cyl('cake plate', -4.0 + math.cos(a_) * 0.3, 8.7 + math.sin(a_) * 0.3, 0.76, 0.775, 0.13, 'case', seg=14); prop('carrot_cake' if i % 2 else 'strawberry_chocolate_cake', -4.0 + math.cos(a_) * 0.3, 8.7 + math.sin(a_) * 0.3, 0.775, a_, 1.05)
 for x in (-7.5, -6.9):
     cyl('baguette basket', x, 8.75, 0, 0.7, 0.2, 'basket', seg=12, r2=0.25); collide(x - 0.25, 8.5, x + 0.25, 9.0, 0, 0.9, 'wood', soft=1)
-    for q in range(7): a_ = q * 0.9; ico('baguette', x + math.cos(a_) * 0.11, 8.75 + math.sin(a_) * 0.11, 0.78, 0.04, 0.04, 0.3, 'crust', sub=1, rot=(math.cos(a_) * 0.15, math.sin(a_) * 0.15, 0))
+    for q in range(7): a_ = q * 0.9; ico('baguette', x + math.cos(a_) * 0.11, 8.75 + math.sin(a_) * 0.11, 0.78, 0.04, 0.04, 0.3, 'crust', sub=2, rot=(math.cos(a_) * 0.15, math.sin(a_) * 0.15, 0))
 # the prep room behind
 for i in range(5): ico('flour sack', -1.0 + (i % 2) * 0.5, 14.3 + (i // 2) * 0.4, 0.2 + (0.3 if i == 4 else 0), 0.3, 0.2, 0.17, 'slaw', sub=1)
 for i in range(4): prop('cardboard_box_01', -2.6 + (i % 2) * 0.45, 15.2, 0.02 + (i // 2) * 0.34, 0.1 * i, 1.0)
