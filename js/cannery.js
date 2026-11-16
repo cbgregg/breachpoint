@@ -117,6 +117,6 @@ export const CANNERY = {
   lower: [hallUp, officeUp, officeUpM],
   bounds: { hx: 50, hz: 46 },
   facadeFloors: 2,
-  look: { photo: { url: 'assets/sky/abandoned_slipway.jpg', u: 0.3042, gain: 1.2 }, sunElev: 26, fog: 0.0042, fogColor: 0x8a8e8c, sun: 2.8, sunColor: 0xfff0e0, hemi: 1.0, exposure: 0.98 },
+  look: { photo: { cut: 26, url: 'assets/sky/abandoned_slipway.jpg', u: 0.3042, gain: 1.2 }, sunElev: 26, fog: 0.0042, fogColor: 0x8a8e8c, sun: 2.8, sunColor: 0xfff0e0, hemi: 1.0, exposure: 0.98 },
   photos: ['assets/loading/cannery-1.jpg', 'assets/loading/cannery-2.jpg', 'assets/loading/cannery-3.jpg'],
 };

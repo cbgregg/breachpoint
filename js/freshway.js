@@ -4,6 +4,7 @@
 // stockroom (dock door, staff door) along the other. The earlier Freshway is still in the list as 'Freshway (classic)'.
 import { blendMap } from './blendmap.js';
 import DATA from './maps/mart.data.js';
+import { makeSmoker } from './supermarket.js';
 
 const inside = (x, z) => Math.abs(x) < 24 && Math.abs(z) < 16;
 // doors (js/doors.js): x, z = middle of the doorway; axis = the wall's direction. Each is listed for one end of the
@@ -20,16 +21,18 @@ export const FRESHWAY = blendMap(DATA, {
   id: 'mart',
   name: 'Freshway',
   blurb: 'A supermarket between two car parks: grocery aisles down the middle, produce and dairy by the checkouts, the deli and a stockroom behind, doors that open and close, a delivery yard at each end',
-  scale: { v_hedge: 1.3, plaster: 3, brick: 1.6, paint: 2, storefloor: 2.4, concrete: 3, asphalt: 6, cement: 3, metal: 2, wood: 1.5, marble: 2, whitetile: 1.2, rubber: 1, woodold: 1.4, dirt: 2 },
-  noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck|floor light|lot light|^steel$/,
+  scale: { v_hedge: 1.3, v_grass: 4.5, plaster: 3, brick: 1.6, paint: 2, storefloor: 2.4, concrete: 3, asphalt: 6, cement: 3, metal: 2, wood: 1.5, marble: 2, whitetile: 1.2, rubber: 1, woodold: 1.4, dirt: 2 },
+  noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck|floor light|lot light|^steel$|verge|road|far building/,
+  smooth: /apple|lemon|lime|pomegranate|avocado|onion|potato|pear|croissant|bun|food/i,
   groundSurface: 'concrete',
   lightmap: 2.6,
   // under the roof the light is the sky's fill and the sun through the skylights: more fill, a little less exposure
-  look: { photo: { url: 'assets/sky/suburban_parking_area.jpg', u: 0.6001, gain: 1.2 }, sunElev: 58, fog: 0.004, fogColor: 0x9a9c8c, sun: 4.0, hemi: 0.22, hemiSky: 0xe8eef8, ground: 0xb0aca4, exposure: 0.95, env: 0.22 },
-  extra: {
+  look: { photo: { url: 'assets/sky/kloofendal_48d_partly_cloudy_puresky.jpg', u: 0.5923, gain: 1.2 }, sunElev: 52, fog: 0.0065, fogColor: 0xb6c0cc, bloom: 0.12, sun: 4.0, hemi: 0.22, hemiSky: 0xe8eef8, ground: 0x8a9478, exposure: 0.95, env: 0.22 },
+  extra: (group) => { const smoker = makeSmoker(group, -24.9, -10.3, Math.PI / 2 + 0.3); return {   // (the smoker: on his break by the staff door, looking out over the car park)
+    update(dt, time) { if (smoker) smoker.update(dt, time); },
     ambient: { music: 'muzak', inside },
     doors: [...DOORS, ...DOORS.map(d => ({ ...d, x: -d.x, z: -d.z }))],
     indoorAt: (p) => (inside(p.x, p.z) && p.y < 5.6 ? 1 : 0),
     menuCam(t, cam) { cam.position.set(Math.cos(t * 0.4) * 44, 13 + Math.sin(t * 0.3) * 2, Math.sin(t * 0.4) * 34); cam.lookAt(0, 1.5, 0); },
-  },
+  }; },
 });

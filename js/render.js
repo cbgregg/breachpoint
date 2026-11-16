@@ -240,12 +240,17 @@ export class Renderer {
     // the sun in the photo sits where the map's sunlight comes from.
     this.photoMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { map: { value: null }, yaw: { value: 0 }, gain: { value: 1 } },
+      uniforms: { map: { value: null }, yaw: { value: 0 }, gain: { value: 1 }, cut: { value: -9 }, haze: { value: new THREE.Color(0xb6c0cc) } },
       vertexShader: 'varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }',
-      fragmentShader: `uniform sampler2D map; uniform float yaw, gain; varying vec3 vDir;
+      fragmentShader: `uniform sampler2D map; uniform float yaw, gain, cut; uniform vec3 haze; varying vec3 vDir;
         void main(){ vec3 d = normalize(vDir);
           float u = fract((atan(d.z, d.x) + yaw) * 0.15915494 + 0.5), v = asin(clamp(d.y, -1.0, 1.0)) * 0.31830989 + 0.5;
-          gl_FragColor = vec4(texture2D(map, vec2(u, v)).rgb * gain, 1.0);
+          vec3 c = texture2D(map, vec2(u, v)).rgb;
+          // a location photo's ground-level clutter (houses, trees, parked cars: all the wrong size and place for the
+          // map) fades into haze below 'cut': the photo's own sky colour from just above it, drawn down and greyed
+          if (cut > -3.0) { float el = asin(clamp(d.y, -1.0, 1.0)); vec3 up = texture2D(map, vec2(u, (cut + 0.16) * 0.31830989 + 0.5), 6.0).rgb;
+            c = mix(mix(up, haze, 0.5), c, smoothstep(cut, cut + 0.14, el)); }
+          gl_FragColor = vec4(c * gain, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
@@ -258,10 +263,11 @@ export class Renderer {
   }
 
   // load (once) the photo sky for a map, then show it and light the map from it
-  usePhoto(url, yaw, gain, groundCol) {
+  usePhoto(url, yaw, gain, groundCol, cut = null, haze = 0xb6c0cc) {
     const show = (tex) => {
       if (this.photoWant !== url) return;   // another map was picked meanwhile
       this.photoMat.uniforms.map.value = tex; this.photoMat.uniforms.yaw.value = yaw; this.photoMat.uniforms.gain.value = gain;
+      this.photoMat.uniforms.cut.value = cut == null ? -9 : THREE.MathUtils.degToRad(cut); this.photoMat.uniforms.haze.value.set(haze);
       this.photoSky.visible = true; this.sky.visible = false; this.dome.visible = false; this.clouds.visible = false;
       this.makeEnv(groundCol);
     };
@@ -315,10 +321,11 @@ export class Renderer {
       // the photo's sun (photo.u: its column, 0..1; photo.elev: degrees) moved onto the map's sun direction
       const P = L.photo, az = THREE.MathUtils.degToRad(L.sunAz ?? 222), el = THREE.MathUtils.degToRad(L.sunElev ?? 32);
       const sunA = Math.atan2(Math.sin(Math.PI / 2 - el) * Math.cos(az), Math.sin(Math.PI / 2 - el) * Math.sin(az));
-      this.usePhoto(P.url, (P.u - 0.5) * Math.PI * 2 - sunA, P.gain ?? 1, L.ground);
+      this.usePhoto(P.url, (P.u - 0.5) * Math.PI * 2 - sunA, P.gain ?? 1, L.ground, P.cut, L.fogColor);
     }
     this.makeEnv(L.ground);
     this.scene.fog.density = L.fog; this.scene.fog.color.set(L.fogColor);
+    this.bloomPass.strength = L.bloom ?? 0.38;   // (a map under bright lamps can turn the glow down)
     // maps can move the sun (a low dusk sun); the default is SUN_DIR
     const sd = L.sunElev != null ? new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAz ?? 222)) : SUN_DIR;
     u.sunPosition.value.copy(sd);

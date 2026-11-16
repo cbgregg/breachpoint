@@ -23,7 +23,7 @@ export const DRIVEIN = {
   bounds: { hx: HX, hz: HZ },
   skyline: false,
   // dusk: the sun just down behind the trees, a violet sky, the lot lit by lamps, neon and the screens
-  look: { photo: { url: 'assets/sky/rooftop_night.jpg', u: 0.5874, gain: 1.2 }, dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 14, sunAz: 205,
+  look: { photo: { cut: 16, url: 'assets/sky/rooftop_night.jpg', u: 0.5874, gain: 1.2 }, dome: [0x141a44, 0x4a3f78, 0xe0865a], fog: 0.0055, fogColor: 0x463e66, sun: 1.1, sunColor: 0xff9a66, sunElev: 14, sunAz: 205,
     hemi: 1.0, hemiSky: 0x7a7ab8, ground: 0x3a3028, exposure: 1.05, env: 0.55 },
   spawns: DRIVEIN_SPAWNS,
   pickups: [

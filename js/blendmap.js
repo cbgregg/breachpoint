@@ -59,6 +59,7 @@ export function blendMap(DATA, o) {
       const s = scene.clone(true);
       s.traverse(ob => {
         if (!ob.isMesh) return;
+        if (o.smooth && o.smooth.test(ob.material.name || ob.name)) ob.geometry.computeVertexNormals();   // (a slimmed model's facets rounded off)
         let m = ob.material.clone();
         const named = (m.name || '').includes(':'), [setName, what = ''] = named ? m.name.split(':') : ['', ''];
         // soft things (cloud, a cotton-ball canopy): a velvety sheen, so their edges catch the light
@@ -75,6 +76,8 @@ export function blendMap(DATA, o) {
           if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.09; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.5; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
         if (lm && ob.geometry.attributes.uv1 && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
+        // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
+        else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = o.fill ?? 0.3; }
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
         m.needsUpdate = true; ob.material = m;
@@ -88,7 +91,7 @@ export function blendMap(DATA, o) {
       groundSurface: o.groundSurface || 'concrete',
       indoorAt: () => 0,
       menuCam(t, cam) { cam.position.set(Math.cos(t * 0.4) * HX * 0.9, 14 + Math.sin(t * 0.3) * 2, Math.sin(t * 0.4) * HZ); cam.lookAt(0, 1, 0); },
-      ...(o.extra || {}),
+      ...(typeof o.extra === 'function' ? o.extra(group, ctx) : o.extra || {}),
     };
   }
   return { id: o.id, name: o.name, blurb: o.blurb, bounds: { hx: HX, hz: HZ }, skyline: false, look: o.look, spawns: DATA.spawns, photos: [1, 2, 3].map(n => `assets/loading/${o.id}-${n}.jpg`), holes: DATA.holes,   // (holes: where there's no ground at all)

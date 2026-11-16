@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mapkit import *
 
 HX, HY, H, T, PI = 40, 28, 5.6, 0.4, math.pi
+UP = 3.2                 # the offices over each stockroom
 setup({
     'shell': ('plaster:store wall', 0xf0ece0), 'inner': ('flat:partition', 0xe9e9e4), 'brick': ('brick:brick base', 0xd8c8b8), 'fascia': ('paint:green fascia', 0x2f7a4e), 'stripe': ('paint:fascia stripe', 0xf2e8c8),
     'floor': ('storefloor:shop floor', 0xe9e5dc), 'slab': ('concrete:back floor', 0xc8c8c4), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('concrete:pavement', 0xe6e2d8), 'kerb': ('concrete:kerb', 0xd8d8d0),
@@ -22,7 +23,8 @@ setup({
     'gondola': ('flat:gondola', 0xdcdcd8), 'case': ('flat:case', 0xf2f2f0), 'cardboard': ('flat:cardboard', 0xb48c5a), 'counter': ('wood:counter', 0xc8a070), 'top': ('marble:counter top', 0xf0f0f0), 'tile': ('whitetile:wall tile', 0xffffff), 'belt': ('rubber:belt', 0x30302e),
     'wood': ('woodold:pallet', 0xd8c0a0), 'atlas': ('atlas:store', 0xffffff), 'glass': ('flat:glass', 0x9ab8c4), 'dark': ('flat:dark', 0x18181a), 'line': ('flat:paint line', 0xf0f0e8), 'yellow': ('flat:yellow paint', 0xe8c020),
     'green': ('paint:dumpster', 0x2c5a40), 'hedge': ('v_hedge:hedge', 0xf0f0f0), 'shadow': ('soft:shadow', 0x000000), 'pool': ('soft:floor light', 0xf0f4ff), 'warm': ('soft:lot light', 0xffe0b0), 'soil': ('dirt:soil', 0x8a7460), 'sign': ('flat:sign white', 0xf8f8f4), 'red': ('flat:sign red', 0xc8281e), 'fence': ('metal:fence', 0x8a9096),
-    'frame': ('metal:door frame', 0x8a9096), 'cover': ('flat:cover', 0xc8731a), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x7c8a70), 'decal': ('decal:ground wear', 0xffffff), 'cart': ('metal:trolley', 0xd0d4d8),
+    'frame': ('metal:door frame', 0x8a9096), 'cover': ('flat:cover', 0xc8731a), 'grass': ('v_grass:verge', 0xe0e8d8), 'road': ('asphalt:road', 0xb8b8b8), 'far a': ('flat:far building a', 0xc8b8a0), 'far b': ('flat:far building b', 0xa8b0b8), 'far c': ('flat:far building c', 0xb89888), 'far roof': ('flat:far building roof', 0x5a5450), 'far glass': ('flat:far building glass', 0x2a3640),
+    'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x7c8a70), 'decal': ('decal:ground wear', 0xffffff), 'cart': ('metal:trolley', 0xd0d4d8),
     'tomato': ('flat:tomato', 0xc8322a), 'orange f': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58), 'melon': ('flat:melon', 0x3f7a3a),
 }, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0}, rough={'glass': 0.08, 'floor': 0.22, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
    shade={'shell': 0xb8b4ac, 'inner': 0xb4b8b8, 'hedge': 0x4a5a44, 'tomato': 0x7a1c1c, 'orange f': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a, 'melon': 0x1f4420, 'gondola': 0xa8a8a8, 'case': 0xb8bcc4, 'cardboard': 0x7a5c38})
@@ -67,7 +69,7 @@ facade('rollup', -11, 16.02, 0, PI); facade('rollup', -6, 16.02, 0, PI)
 for x in (-18.9, -15.1): box('dock bollard', x - 0.12, 16.5, x + 0.12, 16.74, 0, 1.0, 'yellow')
 
 # ---------- inside: partitions ----------
-wall_x('stock wall', 7.8, 8, -23.6, -11, H, [(-15, 2.0, 0, 2.5)], 'inner'); wall_y('deli wall', -11.2, -11, 8, 15.6, H, [(12, 1.6, 0, 2.3)], 'inner')
+wall_x('stock wall', 7.8, 8, -23.6, -11, H, [(-15, 2.0, 0, 2.5), (-20.2, 5.0, UP + 1.0, UP + 2.1)], 'inner'); wall_y('deli wall', -11.2, -11, 8, 15.6, H, [(12, 1.6, 0, 2.3), (9.6, 2.4, UP + 1.0, UP + 2.1)], 'inner')
 wall_x('deli back', 13.6, 13.8, -11, 0, H, [(-1.4, 1.6, 0, 2.3)], 'tile')       # (the prep room behind the counter)
 text('DELI  &  BAKERY', -5.6, 13.56, 3.6, 0, 0.5, 'fascia', mirror=True, depth=0.03)
 # freezers along the stock wall, looking over the checkouts
@@ -95,17 +97,22 @@ pool(0, 4.7, 3.0, 4.0, 'shadow'); pool(0, 0, 2.4, 2.4, 'shadow', mirror=False); 
 for i in range(5): deco('frozen box', -0.7 + (i % 2) * 0.75, 3.5 + i * 0.5, -0.1 + (i % 2) * 0.75, 3.9 + i * 0.5, 0.93, 0.99, ('tomato', 'apple', 'lemon', 'plum', 'orange f')[i])
 
 # ---------- produce (the front half of the side lane) ----------
-def heap(x0, y0, x1, y1, z, kinds, r=0.11):
-    n = int((x1 - x0) / 0.5); m = int((y1 - y0) / 0.45)
-    for i in range(n):
-        k = kinds[i * len(kinds) // n]
-        deco('produce bed', x0 + i * (x1 - x0) / n + 0.02, y0, x0 + (i + 1) * (x1 - x0) / n - 0.02, y1, z, z + 0.1, 'dark')
-        for j in range(m):
-            for q in range(3):
-                ico('produce', x0 + (i + 0.3 + 0.4 * (q % 2)) * (x1 - x0) / n, y0 + (j + 0.3 + 0.2 * q) * (y1 - y0) / m, z + 0.16 + 0.07 * (q == 2), r, r, r * 0.9, k, sub=1)
+FRUIT = {'apple': ('food_apple_01', 0), 'pomegranate': ('food_pomegranate_01', 0), 'lemon': ('lemon', 0.05), 'lime': ('food_lime_01', 0), 'avocado': ('food_avocado_01', 0), 'onion': ('yellow_onion', 0), 'potato': ('sweet_potato', 0.05), 'pear': ('food_pears_asian_01', 0)}
+def fruit(kind, x, y, z, k=1.7):
+    name, lift = FRUIT[kind]; prop(name, x, y, z + lift * k, rnd.uniform(0, 2 * PI), k * rnd.uniform(0.9, 1.1))
+def heap(x0, y0, x1, y1, z, kinds):
+    """A produce table's load: a bay of each kind, the fruit laid in rows with a second, looser layer heaped on top."""
+    n = len(kinds); bw = (x1 - x0) / n
+    for i, k in enumerate(kinds):
+        a, b = x0 + i * bw + 0.03, x0 + (i + 1) * bw - 0.03; deco('produce bed', a, y0, b, y1, z, z + 0.08, 'dark'); deco('bay divider', b, y0, b + 0.06, y1, z, z + 0.2, 'counter')
+        step = 0.3 if k == 'pear' else 0.2; nx, ny = max(1, int((b - a) / step)), int((y1 - y0) / step)
+        for ix in range(nx):
+            for iy in range(ny):
+                fruit(k, a + (ix + 0.5) * (b - a) / nx + rnd.uniform(-0.02, 0.02), y0 + (iy + 0.5) * (y1 - y0) / ny + rnd.uniform(-0.02, 0.02), z + 0.08)
+                if k != 'pear' and (ix + iy) % 3 == 0 and 0 < iy < ny - 1: fruit(k, a + (ix + 0.5) * (b - a) / nx + 0.08, y0 + (iy + 0.5) * (y1 - y0) / ny + 0.08, z + 0.2)
 for x in (-12.5, -7.2):
     pool(x, -11.6, 5.0, 3.2, 'shadow'); box('produce table', x - 1.9, -12.6, x + 1.9, -10.6, 0, 0.85, 'counter', surface='wood'); deco('table skirt', x - 1.95, -12.65, x + 1.95, -10.55, 0.1, 0.3, 'fascia')
-    heap(x - 1.8, -12.5, x + 1.8, -10.7, 0.85, ('tomato', 'apple', 'orange f', 'lemon', 'plum', 'melon') if x < -10 else ('melon', 'lemon', 'apple', 'tomato', 'orange f', 'plum'))
+    heap(x - 1.8, -12.5, x + 1.8, -10.7, 0.85, ('apple', 'lemon', 'pomegranate', 'lime', 'pear') if x < -10 else ('avocado', 'onion', 'apple', 'potato', 'lemon'))
     deco('price board', x - 0.5, -11.62, x + 0.5, -11.58, 1.25, 1.6, 'sign'); bar('board post', (x, -11.6, 0.85), (x, -11.6, 1.25), 0.012, 'steel')
 facade('poster_c', -4.5, -15.58, 1.3, PI); prop('potted_plant_04', -3.6, -14.6, 0, 0.4, 1.3, solid=(0.6, 0.6, 1.2, True)); prop('WetFloorSign_01', -5.6, -8.6, 0.02, 0.6, 1.0)
 
@@ -143,12 +150,14 @@ for i in range(2): facade(SH[i], 0.46, 8.8 + i * 1.2, 0, PI / 2); facade(SH[i + 
 def bin_(x, y, kinds, s=0.45):
     """A promo bin: a low cardboard dump bin heaped with one thing, a price card over it."""
     box('promo bin', x - s, y - s, x + s, y + s, 0, 0.8, 'cardboard', surface='wood'); deco('bin band', x - s - 0.01, y - s - 0.01, x + s + 0.01, y + s + 0.01, 0.45, 0.7, kinds[0])
-    for i in range(9): ico('bin goods', x - 0.28 + (i % 3) * 0.28, y - 0.28 + (i // 3) * 0.28, 0.84 + 0.05 * ((i * 7) % 3), 0.13, 0.13, 0.11, kinds[i % len(kinds)], sub=1)
+    deco('bin bed', x - s + 0.04, y - s + 0.04, x + s - 0.04, y + s - 0.04, 0.74, 0.8, 'dark')
+    for i in range(16): fruit(kinds[1], x - 0.3 + (i % 4) * 0.2, y - 0.3 + (i // 4) * 0.2, 0.8)
+    for i in range(5): fruit(kinds[1], x - 0.2 + (i % 3) * 0.2, y - 0.15 + (i // 3) * 0.25, 0.92)
     bar('price post', (x, y, 0.8), (x, y, 1.45), 0.012, 'steel'); deco('price card', x - 0.25, y - 0.015, x + 0.25, y + 0.015, 1.45, 1.8, 'yellow')
-for (x, y), k in (((-15.5, -3.35), ('orange f', 'lemon')), ((-15.5, 0), ('tomato', 'apple')), ((-15.5, 3.35), ('melon', 'apple')), ((-18.6, -8.0), ('plum', 'tomato')), ((-1.9, -12.9), ('lemon', 'melon'))): bin_(x, y, k)
+for (x, y), k in (((-15.5, -3.35), ('orange f', 'lemon')), ((-15.5, 0), ('tomato', 'apple')), ((-15.5, 3.35), ('melon', 'lime')), ((-18.6, -8.0), ('plum', 'pomegranate')), ((-1.9, -12.9), ('lemon', 'onion'))): bin_(x, y, k)
 for x in (-9.5, -5.5):   # bakery tables in front of the deli
     box('bakery table', x - 1.2, 7.1, x + 1.2, 7.9, 0, 0.85, 'counter', surface='wood'); deco('table shelf', x - 1.1, 7.3, x + 1.1, 7.7, 0.85, 1.15, 'counter')
-    for i in range(7): ico('loaf', x - 1.0 + i * 0.33, 7.2, 0.92, 0.15, 0.09, 0.07, ('counter', 'lemon', 'orange f')[i % 3], sub=1); ico('loaf', x - 1.0 + i * 0.33, 7.5, 1.22, 0.15, 0.09, 0.07, ('orange f', 'counter')[i % 2], sub=1)
+    for i in range(7): prop('croissant', x - 1.0 + i * 0.33, 7.22, 0.85, rnd.uniform(-0.5, 0.5), 1.5); prop('hamburger_buns', x - 0.96 + i * 0.32, 7.5, 1.15, PI / 2 + rnd.uniform(-0.2, 0.2), 0.75)
     deco('table sign', x - 0.4, 7.48, x + 0.4, 7.52, 1.45, 1.75, 'fascia'); bar('sign post', (x, 7.5, 1.15), (x, 7.5, 1.45), 0.012, 'steel')
 carton_stack(-18.2, -12.6, 1.34); carton_stack(-2.0, 13.0 - 5.5, 1.0, 'cartons_b'); carton_stack(-20.6, 6.2, 1.0, 'cartons_b')
 box('kiosk', -23.5, -6.4, -22.6, -5.0, 0, 1.15, 'gondola'); deco('kiosk top', -23.55, -6.45, -22.55, -4.95, 1.15, 1.2, 'top'); deco('kiosk screen', -23.3, -5.9, -23.2, -5.5, 1.2, 1.6, 'dark'); facade('poster_b', -23.58, -5.7, 1.5, PI / 2)
@@ -170,25 +179,41 @@ box('skip', -37.5, -25.5, -33.5, -23.5, 0, 1.5, 'rack', surface='metal'); deco('
 # ---------- deli counter and prep room ----------
 pool(-6.4, 10.0, 8.6, 2.0, 'shadow'); pool(-16.9, -14.6, 14.4, 2.6, 'shadow'); pool(-20.2, 7.0, 7.6, 2.2, 'shadow'); box('deli counter', -10.2, 9.6, -2.6, 10.5, 0, 0.95, 'counter', surface='wood'); deco('counter top', -10.25, 9.55, -2.55, 10.55, 0.95, 1.0, 'top')
 deco('deli case glass', -10.1, 9.62, -2.7, 9.66, 1.0, 1.42, 'glass'); deco('deli case top', -10.1, 9.62, -2.7, 10.2, 1.42, 1.46, 'steel'); deco('case glow', -10.0, 9.7, -2.8, 10.15, 1.38, 1.4, 'glow')
-for i in range(12): ico('loaf', -9.7 + i * 0.6, 9.9, 1.07, 0.2, 0.11, 0.08, ('counter', 'lemon', 'orange f')[i % 3], sub=1)
+for i in range(12): prop('croissant' if i % 2 else 'hamburger_buns', -9.7 + i * 0.6, 9.92, 1.0, rnd.uniform(-0.4, 0.4) + (0 if i % 2 else PI / 2), 1.5 if i % 2 else 0.8)
 box('back counter', -10.8, 12.9, -3.0, 13.6, 0, 0.95, 'steel', surface='metal'); deco('scales', -8.2, 13.0, -7.7, 13.4, 0.95, 1.2, 'case'); deco('slicer', -5.6, 13.0, -5.0, 13.45, 0.95, 1.3, 'steel')
 for i in range(3): deco('menu board', -9.8 + i * 2.6, 13.56, -7.6 + i * 2.6, 13.6, 2.2, 3.1, 'dark'); text(('BREAD', 'MEATS', 'CHEESE')[i], -8.7 + i * 2.6, 13.55, 2.8, 0, 0.24, 'sign', mirror=True, depth=0.01)
 box('prep table', -9.5, 14.4, -5.5, 15.2, 0, 0.9, 'steel', surface='metal'); box('prep fridge', -4.6, 14.7, -3.2, 15.6, 0, 2.0, 'steel', surface='metal'); prop('plastic_crate_02', -10.3, 14.6, 0.02, 0.2, 1.0); prop('plastic_crate_02', -10.3, 14.6, 0.34, 0.5, 1.0)
 
 # ---------- stockroom ----------
-def racking(x0, x1, y):
+def racking(x0, x1, y, top=4.2):
     for x in (x0, x1 - 0.08):
-        for dy in (-0.5, 0.42): deco('rack upright', x, y + dy, x + 0.08, y + dy + 0.08, 0, 4.2, 'rack')
-    for z in (1.4, 2.8, 4.1): deco('rack beam', x0, y - 0.5, x1, y - 0.42, z - 0.1, z, 'orange'); deco('rack beam', x0, y + 0.42, x1, y + 0.5, z - 0.1, z, 'orange'); deco('rack deck', x0, y - 0.5, x1, y + 0.5, z, z + 0.03, 'wood')
+        for dy in (-0.5, 0.42): deco('rack upright', x, y + dy, x + 0.08, y + dy + 0.08, 0, top, 'rack')
+    for z in [q for q in (1.4, 2.8, 4.1) if q < top]: deco('rack beam', x0, y - 0.5, x1, y - 0.42, z - 0.1, z, 'orange'); deco('rack beam', x0, y + 0.42, x1, y + 0.5, z - 0.1, z, 'orange'); deco('rack deck', x0, y - 0.5, x1, y + 0.5, z, z + 0.03, 'wood')
     n = int((x1 - x0) / 1.25)
-    for z in (0, 1.43, 2.83):
+    for z in [q for q in (0, 1.43, 2.83) if q + 1.25 < top]:
         for i in range(n):
             if (i + int(z)) % 4 == 3: continue
             cx = x0 + 0.15 + (i + 0.5) * (x1 - x0 - 0.3) / n; deco('pallet', cx - 0.58, y - 0.48, cx + 0.58, y + 0.48, z, z + 0.14, 'wood'); deco('load', cx - 0.56, y - 0.44, cx + 0.56, y + 0.44, z + 0.14, z + 1.2, 'cardboard')
             for sgn, yw in ((-1, 0), (1, PI)): facade('cartons' if (i % 2) else 'cartons_b', cx, y + sgn * 0.45, z, yw)
-    collide(x0, y - 0.5, x1, y + 0.5, 0, 4.2, 'wood'); pool((x0 + x1) / 2, y, x1 - x0 + 1.2, 2.4, 'shadow')
-racking(-23.4, -19.6, 10.3); racking(-14.4, -11.4, 14.9); carton_stack(-22.2, 14.2)
-prop('hand_truck', -13.2, 9.3, 0.02, 1.2, 1.0, solid=(0.6, 0.6, 1.2, True)); prop('wooden_crate_02', -19.5, 14.8, 0.02, 0.3, 1.0, solid=(0.9, 0.9, 0.8, False)); deco('hazard line', -18.6, 14.9, -15.4, 15.0, 0.025, 0.03, 'yellow')
+    collide(x0, y - 0.5, x1, y + 0.5, 0, top, 'wood'); pool((x0 + x1) / 2, y, x1 - x0 + 1.2, 2.4, 'shadow')
+racking(-23.4, -19.6, 10.3, top=2.95); carton_stack(-22.2, 14.2)
+# the offices upstairs: a floor over the stockroom, a stair up through it, windows over the shop and the deli
+for x0, y0, x1, y1 in ((-23.6, 8, -19.4, 15.6), (-19.4, 8, -11.2, 12.6), (-19.4, 13.8, -11.2, 15.6), (-13, 12.6, -11.2, 13.8)): box('office floor', x0, y0, x1, y1, UP - 0.2, UP, 'slab')
+for i in range(32): box('office stairs', -13.2 - 0.2 * i, 12.6, -13.0 - 0.2 * i, 13.8, 0, (i + 1) * UP / 32, 'slab')
+for y in (12.6, 13.8):
+    bar('stair rail', (-13, y, 1.0), (-19.4, y, UP + 1.0), 0.025, 'steel'); bar('well rail', (-19.4, y, UP + 1.0), (-13, y, UP + 1.0), 0.025, 'steel'); bar('well rail', (-19.4, y, UP + 0.5), (-13, y, UP + 0.5), 0.02, 'steel')
+    for x in (-19.4, -17.3, -15.1, -13): bar('well post', (x, y, UP), (x, y, UP + 1.0), 0.025, 'steel')
+    collide(-19.2, y - 0.05, -13, y + 0.05, UP, UP + 1.0, 'metal', soft=1)
+bar('well rail', (-13, 12.6, UP + 1.0), (-13, 13.8, UP + 1.0), 0.025, 'steel'); collide(-13.05, 12.6, -12.95, 13.8, UP, UP + 1.0, 'metal', soft=1)
+for x, y in ((-21, 9.6), (-21, 14.6), (-16, 10.2), (-16, 14.9), (-12.2, 10.4)): deco('stock light', x - 0.6, y - 0.08, x + 0.6, y + 0.08, UP - 0.27, UP - 0.2, 'lamp')
+for x0, y0, x1, y1 in ((-23.4, 8.3, -21.6, 9.1), (-18.6, 8.3, -16.8, 9.1), (-14.8, 8.3, -13.0, 9.1)):   # desks under the window over the shop
+    box('desk', x0, y0, x1, y1, UP, UP + 0.75, 'counter', surface='wood'); deco('monitor', x0 + 0.6, y0 + 0.5, x0 + 1.2, y0 + 0.54, UP + 0.85, UP + 1.25, 'dark'); deco('monitor glow', x0 + 0.63, y0 + 0.54, x0 + 1.17, y0 + 0.545, UP + 0.88, UP + 1.22, 'glow'); deco('monitor stand', x0 + 0.85, y0 + 0.48, x0 + 0.95, y0 + 0.56, UP + 0.75, UP + 0.86, 'dark')
+    prop('plastic_monobloc_chair_01', (x0 + x1) / 2, y1 + 0.55, UP, PI, 1.0, solid=(0.5, 0.5, 0.8, True))
+box('filing cabinets', -23.5, 14.9, -20.5, 15.5, UP, UP + 1.35, 'steel', surface='metal'); box('lockers', -15.6, 15.0, -12.0, 15.5, UP, UP + 1.9, 'rack', surface='metal')
+box('sofa', -23.5, 10.6, -22.7, 13.0, UP, UP + 0.45, 'fascia', surface='wood'); deco('sofa back', -23.55, 10.6, -23.3, 13.0, UP + 0.45, UP + 0.95, 'fascia'); box('coffee table', -22.1, 11.3, -21.5, 12.3, UP, UP + 0.42, 'counter', surface='wood')
+prop('television_02', -11.6, 11.2, UP + 0.6, PI / 2, 1.0); box('tv stand', -11.9, 10.6, -11.4, 11.8, UP, UP + 0.6, 'counter', surface='wood'); prop('potted_plant_04', -20.0, 15.0, UP, 0.3, 1.2, solid=(0.5, 0.5, 1.1, True)); facade('poster_b', -17.5, 15.58, UP + 0.6, PI)
+prop('wooden_crate_02', -17.5, 9.2, 0.02, 0.3, 1.0, solid=(0.9, 0.9, 0.8, False))
+prop('hand_truck', -12.2, 9.3, 0.02, 1.2, 1.0, solid=(0.6, 0.6, 1.2, True)); deco('hazard line', -18.6, 14.9, -15.4, 15.0, 0.025, 0.03, 'yellow')
 for a, b in ((-23.6, -16.6), (-13.4, -11.2)): deco('stock stripe', a, 8.0, b, 8.02, 1.0, 1.15, 'yellow')
 
 # ---------- the yard (behind the stockroom) and the side strip ----------
@@ -208,12 +233,32 @@ for y in (-14, 0, 14):
 # the fence round it all, trees beyond
 for x0, y0, x1, y1 in ((-HX, -HY, -HX + 0.1, HY), (-HX, HY - 0.1, 0, HY), (-HX, -HY, 0, -HY + 0.1)):
     box('fence', x0, y0, x1, y1, 0, 2.6, 'fence'); deco('fence base', x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.05, 0, 0.4, 'kerb')
-for i in range(44):
-    a = rnd.uniform(0, 2 * PI); d = rnd.uniform(50, 84); card(math.cos(a) * d, math.sin(a) * d * 0.8, rnd.uniform(11, 17), i % 2)
+# beyond the fence: a verge, the road past each car park, a line of trees, and the neighbours, fading into the haze
+deco('verge', -170, -150, 0, 150, -0.12, -0.06, 'grass'); deco('road', -52, -150, -44, 150, -0.06, -0.03, 'road'); deco('road kerb', -43.9, -150, -43.6, 150, -0.06, 0.1, 'kerb')
+for y in range(-146, 150, 8): deco('road line', -48.1, y, -47.9, y + 3.5, -0.03, -0.02, 'line')
+def far_building(x, y, w, d, h, k, floors):
+    deco('far building', x - w / 2, y - d / 2, x + w / 2, y + d / 2, 0, h, k); deco('far roof', x - w / 2 - 0.4, y - d / 2 - 0.4, x + w / 2 + 0.4, y + d / 2 + 0.4, h, h + 0.5, 'far roof')
+    for f in range(floors):
+        z = 1.2 + f * (h - 1.0) / floors
+        for sx in (-1, 1): deco('far windows', x + sx * w / 2 - 0.05, y - d / 2 + 1, x + sx * w / 2 + 0.05, y + d / 2 - 1, z, z + 1.3, 'far glass')
+        for sy in (-1, 1): deco('far windows', x - w / 2 + 1, y + sy * d / 2 - 0.05, x + w / 2 - 1, y + sy * d / 2 + 0.05, z, z + 1.3, 'far glass')
+for x, y, w, d, h, k, fl in ((-66, -30, 16, 30, 9, 'far a', 2), (-68, 14, 14, 22, 13, 'far b', 3), (-64, 52, 18, 20, 8, 'far c', 2), (-30, 50, 26, 14, 10, 'far b', 3), (-2, -52, 30, 16, 12, 'far a', 3), (-36, -48, 18, 14, 7, 'far c', 2), (-70, -70, 20, 20, 15, 'far b', 4), (-8, 56, 16, 14, 14, 'far c', 4)):
+    far_building(x, y, w, d, h, k, fl)
+for i in range(70):   # trees: a close line just past the fence and the road, a looser one behind
+    t = i / 70 * 2 * PI; rx, ry = (HX + 4.5, HY + 4.5) if i % 2 else (HX + 16, HY + 13)
+    x, y = math.cos(t) * rx * 1.25, math.sin(t) * ry * 1.25; x = max(-rx, min(rx, x)) + rnd.uniform(-1.5, 1.5); y = max(-ry, min(ry, y)) + rnd.uniform(-1.5, 1.5)
+    if abs(abs(x) - 48) < 4.5: continue   # (not on the road)
+    card(x, y, rnd.uniform(9, 15), i % 2)
+for i in range(40):
+    a = rnd.uniform(0, 2 * PI); d = rnd.uniform(62, 110); card(math.cos(a) * d, math.sin(a) * d * 0.85, rnd.uniform(12, 19), i % 2)
 
+def stair(s):
+    xs, zs = sorted((s * -19.4, s * -13.0)), sorted((s * -13.8, s * -12.6))
+    return {'rect': [xs[0], zs[0], xs[1], zs[1]], 'climb': [[s * -12.4, 0, s * -13.2], [s * -13.1, 0.1, s * -13.2], [s * -16.2, UP / 2, s * -13.2], [s * -19.4, UP, s * -13.2], [s * -20.6, UP, s * -13.2]]}
 export('mart', {
     'half': [HX, HY], 'roof': H,
+    'upper': [{'y': UP, 'bounds': {'minX': -24, 'maxX': -11, 'minZ': -16, 'maxZ': -8}, 'portals': [stair(1)]}, {'y': UP, 'bounds': {'minX': 11, 'maxX': 24, 'minZ': 8, 'maxZ': 16}, 'portals': [stair(-1)]}],
     'spawns': [[37, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],
-    'pickups': [['health', 0, 0, 1.6], ['health', 0, 0, -1.6], ['ammo', -20, 0, -12], ['ammo', 20, 0, 12], ['ammo', -9.8, 0, 13.6], ['ammo', 9.8, 0, -13.6], ['health', -6, 0, -11.8], ['health', 6, 0, 11.8], ['ammo', -28, 0, -22], ['ammo', 28, 0, 22]],
+    'pickups': [['health', 0, 0, 1.6], ['health', 0, 0, -1.6], ['ammo', -20, 0, -12], ['ammo', 20, 0, 12], ['ammo', -9.8, 0, 13.6], ['ammo', 9.8, 0, -13.6], ['health', -6, 0, -11.8], ['health', 6, 0, 11.8], ['ammo', -28, 0, -22], ['ammo', 28, 0, 22], ['health', -22, UP, -14.6], ['health', 22, UP, 14.6]],
 }, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), emit_k=4,
-            only='wall|partition|floor|car park|pavement|kerb|roof deck|gondola|case|counter|tile|brick|fascia|pallet|cardboard|dumpster|hedge|soil|fence|store|belt|racking'))
+            only='wall|partition|floor|verge|road|car park|pavement|kerb|roof deck|gondola|case|counter|tile|brick|fascia|pallet|cardboard|dumpster|hedge|soil|fence|store|belt|racking'))
