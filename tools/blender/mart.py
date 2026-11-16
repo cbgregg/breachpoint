@@ -18,15 +18,17 @@ HX, HY, H, T, PI = 40, 28, 5.6, 0.4, math.pi
 UP = 3.2                 # the offices over each stockroom
 setup({
     'shell': ('plaster:store wall', 0xf0ece0), 'inner': ('flat:partition', 0xe9e9e4), 'brick': ('brick:brick base', 0xd8c8b8), 'fascia': ('paint:green fascia', 0x2f7a4e), 'stripe': ('paint:fascia stripe', 0xf2e8c8),
-    'floor': ('storefloor:shop floor', 0xe9e5dc), 'slab': ('concrete:back floor', 0xc8c8c4), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('concrete:pavement', 0xe6e2d8), 'kerb': ('concrete:kerb', 0xd8d8d0),
+    'floor': ('storefloor:shop floor', 0xe9e5dc), 'slab': ('flat:back floor', 0xa6a6a1), 'lot': ('asphalt:car park', 0xd0d0d0), 'walk': ('flat:pavement', 0xb4b1a9), 'kerb': ('flat:kerb', 0xc2c0b8),
     'roof': ('metal:roof deck', 0xe4e6e8), 'truss': ('metal:truss', 0x9aa0a6), 'steel': ('metal:steel', 0xc4c8cc), 'rack': ('paint:racking', 0x2c5a9a), 'orange': ('paint:rack beam', 0xe07a1c),
     'gondola': ('flat:gondola', 0xdcdcd8), 'case': ('flat:case', 0xf2f2f0), 'cardboard': ('flat:cardboard', 0xb48c5a), 'counter': ('wood:counter', 0xc8a070), 'top': ('marble:counter top', 0xf0f0f0), 'tile': ('whitetile:wall tile', 0xffffff), 'belt': ('rubber:belt', 0x30302e),
     'wood': ('woodold:pallet', 0xd8c0a0), 'atlas': ('atlas:store', 0xffffff), 'glass': ('flat:glass', 0x9ab8c4), 'dark': ('flat:dark', 0x18181a), 'line': ('flat:paint line', 0xf0f0e8), 'yellow': ('flat:yellow paint', 0xe8c020),
     'green': ('paint:dumpster', 0x2c5a40), 'hedge': ('v_hedge:hedge', 0xf0f0f0), 'shadow': ('soft:shadow', 0x000000), 'pool': ('soft:floor light', 0xf0f4ff), 'warm': ('soft:lot light', 0xffe0b0), 'soil': ('dirt:soil', 0x8a7460), 'sign': ('flat:sign white', 0xf8f8f4), 'red': ('flat:sign red', 0xc8281e), 'fence': ('metal:fence', 0x8a9096),
     'frame': ('metal:door frame', 0x8a9096), 'cover': ('flat:cover', 0xc8731a), 'grass': ('v_grass:verge', 0xe0e8d8), 'road': ('asphalt:road', 0xb8b8b8), 'far a': ('flat:far building a', 0xc8b8a0), 'far b': ('flat:far building b', 0xa8b0b8), 'far c': ('flat:far building c', 0xb89888), 'far roof': ('flat:far building roof', 0x5a5450), 'far glass': ('flat:far building glass', 0x2a3640),
+    'tread': ('flat:stair tread', 0x4c5054), 'carpet': ('flat:office carpet', 0x55606c), 'checker': ('checker:deli floor', 0xffffff), 'salami': ('flat:salami', 0x7a2420), 'fat': ('flat:fat', 0xf0e4d8), 'ham': ('flat:ham', 0xe08a8c), 'cheese': ('flat:cheese', 0xf0c850), 'rind': ('flat:rind', 0xc8501e), 'cheddar': ('flat:cheddar', 0xf09a30),
+    'salad': ('flat:salad', 0x5a9a3c), 'slaw': ('flat:slaw', 0xf0e8c8), 'beet': ('flat:beet', 0x7a2450), 'pasta': ('flat:pasta', 0xf0d070), 'olive': ('flat:olive', 0x3a4a24), 'roast': ('flat:roast', 0xb86a24), 'crust': ('flat:crust', 0xc88a40), 'basket': ('flat:basket', 0xb08850), 'chalk': ('flat:chalkboard', 0x1c2420), 'chalky': ('flat:chalk yellow', 0xf0e090), 'gold': ('flat:gold', 0xd8b050),
     'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x7c8a70), 'decal': ('decal:ground wear', 0xffffff), 'cart': ('metal:trolley', 0xd0d4d8),
     'tomato': ('flat:tomato', 0xc8322a), 'orange f': ('flat:orange', 0xe88a24), 'lemon': ('flat:lemon', 0xe8d040), 'apple': ('flat:apple', 0x78a838), 'plum': ('flat:plum', 0x5a2c58), 'melon': ('flat:melon', 0x3f7a3a),
-}, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0}, rough={'glass': 0.08, 'floor': 0.22, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
+}, emit={'lamp': 0xf4f8ff, 'glow': 0xdcecff, 'neon': 0x40e070, 'ember': 0xffa850}, emit_strength={'lamp': 3.0, 'glow': 1.6, 'neon': 3.0, 'ember': 2.6}, rough={'glass': 0.08, 'floor': 0.22, 'top': 0.3}, metal={'steel': 0.6, 'cart': 0.8, 'truss': 0.5}, default='shell',
    shade={'shell': 0xb8b4ac, 'inner': 0xb4b8b8, 'hedge': 0x4a5a44, 'tomato': 0x7a1c1c, 'orange f': 0x9a5418, 'lemon': 0x9a8a2a, 'apple': 0x4a6a24, 'plum': 0x32183a, 'melon': 0x1f4420, 'gondola': 0xa8a8a8, 'case': 0xb8bcc4, 'cardboard': 0x7a5c38})
 use_atlas('mart'); rnd = random.Random(7); POOLS[0] = False   # (the light is baked: see the export at the foot)
 SH = ('shelf_a', 'shelf_b', 'shelf_c', 'shelf_d', 'shelf_e')
@@ -169,19 +171,106 @@ for (x, y, w, yaw), (top, col) in zip(((-16.0, -9.0, 2.6, PI / 2), (-1.0, -9.5, 
     for sgn in (-1, 1): text(top, x + (0 if yaw == 0 else sgn * 0.03), y + (sgn * -0.03 if yaw == 0 else 0), 3.85, (0 if sgn > 0 else PI) if yaw == 0 else (PI / 2 if sgn > 0 else -PI / 2), 0.26 if len(top) > 8 else 0.4, 'sign', mirror=True, depth=0.01)
 # outside: more cars, bollards along the pavement, bins and a bike rack
 vehicle('sedan', -36.6, -2.45, -32.4, -0.55, 1.4, PI); vehicle('van', -36.8, -11.6, -32.2, -9.4, 2.3, 0); vehicle('sedan', -30.2, 8.0, -28.3, 12.2, 1.4, PI / 2); vehicle('sedan', -30.2, -19.2, -26.0, -17.3, 1.4, 0)
-for y in [q for q in range(-15, 16, 2) if not -13 < q < -5]: box('bollard', -26.42, y - 0.1, -26.22, y + 0.1, 0.12, 1.0, 'yellow')
+for y in [q for q in range(-15, 16, 2) if not -13 < q < -5 and not 10 < q < 14]: box('bollard', -26.42, y - 0.1, -26.22, y + 0.1, 0.12, 1.0, 'yellow')
 for y in (-4.2, 8.6): box('litter bin', -25.0, y - 0.3, -24.4, y + 0.3, 0.12, 1.05, 'green', surface='metal'); deco('bin lid', -25.03, y - 0.33, -24.37, y + 0.33, 1.05, 1.1, 'dark')
-for i in range(5): bar('bike hoop', (-25.6, 12.0 + i * 0.7, 0.12), (-25.6, 12.0 + i * 0.7, 0.95), 0.025, 'steel'); bar('bike hoop', (-24.9, 12.0 + i * 0.7, 0.12), (-24.9, 12.0 + i * 0.7, 0.95), 0.025, 'steel'); bar('bike hoop', (-25.6, 12.0 + i * 0.7, 0.95), (-24.9, 12.0 + i * 0.7, 0.95), 0.025, 'steel')
-collide(-25.7, 11.9, -24.8, 14.9, 0.12, 0.95, 'metal', soft=1)
+for i in range(4):   # (north of the staff door, clear of it)
+    y = 13.9 + i * 0.55
+    for x in (-25.6, -24.9): bar('bike hoop', (x, y, 0.12), (x, y, 0.95), 0.025, 'steel')
+    bar('bike hoop', (-25.6, y, 0.95), (-24.9, y, 0.95), 0.025, 'steel')
+collide(-25.7, 13.8, -24.8, 15.7, 0.12, 0.95, 'metal', soft=1)
 for x, y in ((-34, 20), (-36, 23.5), (-33, -22.5), (-12, -26)): carton_stack(x, y, 1.3, 'cartons_b', name='yard pallet')
 box('skip', -37.5, -25.5, -33.5, -23.5, 0, 1.5, 'rack', surface='metal'); deco('skip rim', -37.6, -25.6, -33.4, -23.4, 1.5, 1.6, 'dark')
 
 # ---------- deli counter and prep room ----------
-pool(-6.4, 10.0, 8.6, 2.0, 'shadow'); pool(-16.9, -14.6, 14.4, 2.6, 'shadow'); pool(-20.2, 7.0, 7.6, 2.2, 'shadow'); box('deli counter', -10.2, 9.6, -2.6, 10.5, 0, 0.95, 'counter', surface='wood'); deco('counter top', -10.25, 9.55, -2.55, 10.55, 0.95, 1.0, 'top')
-deco('deli case glass', -10.1, 9.62, -2.7, 9.66, 1.0, 1.42, 'glass'); deco('deli case top', -10.1, 9.62, -2.7, 10.2, 1.42, 1.46, 'steel'); deco('case glow', -10.0, 9.7, -2.8, 10.15, 1.38, 1.4, 'glow')
-for i in range(12): prop('croissant' if i % 2 else 'hamburger_buns', -9.7 + i * 0.6, 9.92, 1.0, rnd.uniform(-0.4, 0.4) + (0 if i % 2 else PI / 2), 1.5 if i % 2 else 0.8)
-box('back counter', -10.8, 12.9, -3.0, 13.6, 0, 0.95, 'steel', surface='metal'); deco('scales', -8.2, 13.0, -7.7, 13.4, 0.95, 1.2, 'case'); deco('slicer', -5.6, 13.0, -5.0, 13.45, 0.95, 1.3, 'steel')
-for i in range(3): deco('menu board', -9.8 + i * 2.6, 13.56, -7.6 + i * 2.6, 13.6, 2.2, 3.1, 'dark'); text(('BREAD', 'MEATS', 'CHEESE')[i], -8.7 + i * 2.6, 13.55, 2.8, 0, 0.24, 'sign', mirror=True, depth=0.01)
+pool(-6.4, 10.0, 8.6, 2.0, 'shadow'); pool(-16.9, -14.6, 14.4, 2.6, 'shadow'); pool(-20.2, 7.0, 7.6, 2.2, 'shadow'); deco('deli floor', -11, 8.0, -0.5, 13.6, 0.02, 0.03, 'checker'); deco('prep floor', -11, 13.8, -0.02, 15.6, 0.02, 0.03, 'checker')
+# the counter: a long front run with a glazed, lit case over it, and a return for the till
+box('deli counter', -10.4, 9.6, -3.0, 10.5, 0, 0.95, 'counter', surface='wood'); box('deli counter', -3.0, 9.6, -2.1, 12.0, 0, 0.95, 'counter', surface='wood')
+deco('counter plinth', -10.45, 9.55, -2.05, 9.6, 0, 0.14, 'fascia'); deco('counter band', -10.45, 9.57, -2.05, 9.6, 0.78, 0.9, 'fascia'); deco('counter top', -10.45, 9.55, -2.05, 10.55, 0.95, 1.0, 'top'); deco('counter top', -3.05, 10.55, -2.05, 12.05, 0.95, 1.0, 'top')
+deco('case deck', -10.3, 9.68, -3.1, 10.3, 1.0, 1.03, 'steel'); slab('case glass', -6.7, 9.7, 1.24, 7.2, 0.012, 0.5, (0.32, 0, 0), 'glass'); deco('case top', -10.3, 9.78, -3.1, 10.3, 1.46, 1.49, 'steel'); deco('case glow', -10.2, 9.86, -3.2, 9.9, 1.43, 1.46, 'glow')
+for x in (-10.3, -8.45, -6.6, -4.75, -3.12): deco('case end', x, 9.68, x + 0.02, 10.3, 1.03, 1.46, 'glass')
+for i in range(15): x = -10.1 + i * 0.48; deco('price card', x, 9.69, x + 0.14, 9.7, 1.035, 1.11, 'yellow' if i % 4 else 'sign')
+# meats
+for i, (x, y, L, r) in enumerate(((-10.0, 9.85, 0.5, 0.05), (-10.0, 10.02, 0.45, 0.055), (-9.35, 9.83, 0.4, 0.045), (-9.3, 10.1, 0.55, 0.06), (-8.75, 9.9, 0.2, 0.05))):
+    cyl('salami', x + L / 2, y, 1.03 + r - L / 2, 1.03 + r + L / 2, r, 'salami', seg=10, rot=(0, PI / 2, 0)); cyl('salami end', x + L + 0.004, y, 1.03 + r - 0.004, 1.03 + r + 0.004, r * 0.92, 'fat', seg=10, rot=(0, PI / 2, 0))
+for x, y in ((-9.75, 10.2), (-8.95, 10.15), (-8.7, 10.18)): ico('ham', x, y, 1.12, 0.17, 0.12, 0.1, 'ham', sub=1); deco('ham board', x - 0.2, y - 0.14, x + 0.2, y + 0.14, 1.03, 1.045, 'counter')
+for i in range(8): cyl('sausage', -9.65 + (i % 4) * 0.07, 9.84 + (i // 4) * 0.02, 1.05 + (i // 4) * 0.04, 1.09 + (i // 4) * 0.04, 0.018, 'roast', seg=6, rot=(PI / 2, 0, 0.3))
+# cheese
+for i, (x, y, r, h, k) in enumerate(((-8.1, 9.95, 0.17, 0.11, 'cheese'), (-7.65, 10.1, 0.14, 0.09, 'cheddar'), (-7.25, 9.9, 0.12, 0.14, 'rind'), (-6.9, 10.12, 0.15, 0.08, 'cheese'), (-8.05, 10.2, 0.09, 0.07, 'slaw'))):
+    cyl('cheese wheel', x, y, 1.03, 1.03 + h, r, k, seg=16); cyl('cheese rind', x, y, 1.03, 1.03 + h * 0.96, r + 0.004, 'rind' if k != 'rind' else 'salami', seg=16); cyl('cheese face', x, y, 1.03 + h * 0.96, 1.03 + h + 0.002, r * 0.97, k if k != 'rind' else 'cheese', seg=16)
+for i in range(5): slab('cheese wedge', -7.75 + i * 0.2, 9.82, 1.07, 0.14, 0.09, 0.07, (0, 0, 0.5 + i * 0.3), ('cheddar', 'cheese', 'slaw')[i % 3])
+# salads in steel pans
+for i in range(6):
+    x, y = -6.45 + (i % 3) * 0.55, 9.8 + (i // 3) * 0.27
+    deco('salad pan', x, y, x + 0.5, y + 0.24, 1.03, 1.1, 'steel'); deco('salad', x + 0.02, y + 0.02, x + 0.48, y + 0.22, 1.09, 1.12, ('salad', 'slaw', 'beet', 'pasta', 'tomato', 'olive')[i])
+    for q in range(6): ico('salad heap', x + 0.08 + (q % 3) * 0.16, y + 0.07 + (q // 3) * 0.1, 1.125, 0.07, 0.05, 0.025, ('salad', 'slaw', 'beet', 'pasta', 'tomato', 'olive')[i], sub=1)
+# cakes and pastries
+for i in range(6):
+    x, y = -4.5 + (i % 3) * 0.5, 9.85 + (i // 3) * 0.28
+    cyl('cake plate', x, y, 1.03, 1.045, 0.15, 'case', seg=16); prop('carrot_cake' if (i + i // 3) % 2 else 'strawberry_chocolate_cake', x, y, 1.045, i * 0.7, 1.15)
+# on top of the case and the counter
+for i, x in enumerate((-9.6, -7.6, -5.6)):
+    prop('wicker_basket_01', x, 10.05, 1.49, 0.1 * i, 1.25)
+    for q in range(5): prop('croissant' if i != 1 else 'hamburger_buns', x - 0.14 + (q % 3) * 0.14, 10.0 + (q // 3) * 0.1, 1.56 + 0.03 * (q // 3), rnd.uniform(0, 3), 1.1 if i != 1 else 0.5)
+cyl('cake stand', -3.9, 10.05, 1.49, 1.66, 0.03, 'steel', seg=8); cyl('cake stand top', -3.9, 10.05, 1.66, 1.68, 0.2, 'case', seg=18); prop('strawberry_chocolate_cake', -3.9, 10.05, 1.68, 0.4, 1.3)
+cyl('ticket dispenser', -8.6, 9.68, 1.5, 1.72, 0.06, 'red', seg=10); cyl('ticket post', -8.6, 9.68, 1.49, 1.5, 0.08, 'steel', seg=10)
+box('till', -2.85, 10.9, -2.3, 11.4, 1.0, 1.18, 'dark'); deco('till screen', -2.75, 11.0, -2.4, 11.04, 1.18, 1.5, 'dark'); deco('till glow', -2.72, 10.995, -2.43, 11.0, 1.22, 1.46, 'glow'); prop('wine_bottles_01', -2.9, 11.75, 1.0, PI / 2, 1.0); prop('ph_jug', -2.5, 10.7, 1.0, 1.0, 1.0)
+for i in range(5): deco('paper bags', -2.85, 9.75 + i * 0.012, -2.55, 9.76 + i * 0.012, 1.0, 1.32, 'cardboard')
+for y in (10.8, 11.5): prop('metal_stool_01', -1.78, y, 0.02, 0.3, 0.85, solid=(0.35, 0.35, 0.75, True))
+# the back wall: bread shelves, the deck oven, a rotisserie, the coffee machine, salamis on a rail
+box('back counter', -10.8, 12.9, -6.1, 13.6, 0, 0.95, 'steel', surface='metal'); deco('back counter top', -10.82, 12.86, -6.08, 13.6, 0.95, 0.98, 'top')
+for i, z in enumerate((1.5, 1.95, 2.4)):   # bread wall
+    slab('bread shelf', -8.15, 13.38, z, 3.9, 0.42, 0.03, (-0.3, 0, 0), 'counter'); deco('shelf lip', -10.1, 13.17, -6.2, 13.2, z - 0.08, z - 0.01, 'counter')
+    for q in range(9):
+        x = -9.9 + q * 0.44
+        if (q + i) % 3 == 0: ico('loaf', x, 13.38, z + 0.09, 0.19, 0.1, 0.085, 'crust', sub=1); ico('loaf flour', x, 13.38, z + 0.15, 0.13, 0.05, 0.03, 'slaw', sub=1)
+        elif (q + i) % 3 == 1: prop('hamburger_buns', x, 13.38, z + 0.02, PI / 2 + rnd.uniform(-0.2, 0.2), (0.75, 0.75, 0.9))
+        else:
+            for b_ in range(3): ico('baguette', x - 0.1 + b_ * 0.1, 13.38, z + 0.07, 0.04, 0.19, 0.04, 'crust', sub=1, rot=(0.3, 0, rnd.uniform(-0.15, 0.15)))
+box('deck oven', -5.9, 12.75, -3.9, 13.6, 0, 2.0, 'steel', surface='metal'); deco('oven plinth', -5.92, 12.73, -3.88, 12.75, 0, 0.3, 'dark'); deco('oven flue', -5.2, 13.1, -4.6, 13.55, 2.0, H - 0.3, 'steel')
+for i, z in enumerate((0.4, 0.95, 1.5)):
+    deco('oven door', -5.75, 12.72, -4.4, 12.75, z, z + 0.42, 'dark'); deco('oven window', -5.6, 12.715, -4.55, 12.72, z + 0.08, z + 0.34, 'ember'); bar('oven handle', (-5.7, 12.68, z + 0.44), (-4.45, 12.68, z + 0.44), 0.014, 'steel')
+    for q in range(3): cyl('oven knob', -4.2 + q * 0.1, 12.74, z + 0.2, z + 0.24, 0.025, 'dark', seg=8, rot=(PI / 2, 0, 0))
+    deco('oven lamp', -4.25, 12.745, -4.0, 12.75, z + 0.32, z + 0.36, 'neon' if i else 'ember')
+box('rotisserie', -10.6, 13.0, -9.5, 13.55, 0.98, 1.8, 'steel', surface='metal'); deco('rotisserie glow', -10.52, 12.99, -9.58, 13.0, 1.06, 1.72, 'ember'); deco('rotisserie frame', -10.62, 12.97, -9.48, 12.99, 0.98, 1.06, 'dark'); deco('rotisserie frame', -10.62, 12.97, -9.48, 12.99, 1.72, 1.8, 'dark')
+for z in (1.25, 1.55):
+    bar('spit', (-10.5, 12.95, z), (-9.6, 12.95, z), 0.008, 'steel')
+    for q in range(3): ico('roast chicken', -10.32 + q * 0.28, 12.95, z, 0.1, 0.075, 0.07, 'roast', sub=1)
+prop('ph_espresso', -7.0, 13.25, 0.98, 0, 0.3); deco('slicer base', -8.5, 13.0, -8.0, 13.45, 0.98, 1.08, 'steel'); cyl('slicer blade', -8.25, 13.2, 1.08, 1.4, 0.16, 'steel', seg=18, rot=(PI / 2, 0, 0.3)); deco('scales', -9.2, 13.05, -8.75, 13.4, 0.98, 1.2, 'case'); deco('scales pan', -9.22, 13.03, -8.73, 13.42, 1.2, 1.22, 'steel')
+for i in range(4): cyl('cup stack', -6.45, 13.1 + i * 0.1, 0.98, 1.2, 0.035, 'slaw', seg=8)
+bar('salami rail', (-10.5, 12.55, 2.45), (-6.2, 12.55, 2.45), 0.015, 'steel')
+for x in (-10.4, -8.3, -6.3): bar('rail hanger', (x, 12.55, 2.45), (x, 12.55, H - 0.4), 0.008, 'steel')
+for i in range(13):
+    x = -10.3 + i * 0.33; L = 0.3 + (i * 7 % 3) * 0.08
+    if i % 5 == 2: ico('hanging ham', x, 12.55, 2.08, 0.1, 0.1, 0.2, 'ham', sub=1); bar('ham string', (x, 12.55, 2.26), (x, 12.55, 2.45), 0.004, 'slaw')
+    else: cyl('hanging salami', x, 12.55, 2.36 - L, 2.36, 0.035 + (i % 2) * 0.008, 'salami' if i % 3 else 'roast', seg=8); bar('salami string', (x, 12.55, 2.36), (x, 12.55, 2.45), 0.004, 'slaw')
+# the boards over it all, the canopy over the counter, pendant lamps
+for i, (head, lines) in enumerate((('BAKERY', ('SOURDOUGH  4.50', 'BAGUETTE  2.20', 'CROISSANT  1.80')), ('DELI', ('SALAMI  2.90', 'ROAST HAM  2.40', 'CHICKEN  8.00')), ('CHEESE', ('CHEDDAR  1.70', 'GOUDA  2.10', 'BRIE  2.60')))):
+    x = -9.6 + i * 3.1; deco('menu board', x - 1.4, 13.55, x + 1.4, 13.6, 2.75, 3.95, 'chalk'); deco('menu frame', x - 1.45, 13.57, x + 1.45, 13.6, 2.7, 4.0, 'counter')
+    text(head, x, 13.54, 3.75, 0, 0.22, 'chalky', mirror=True, depth=0.006); deco('menu rule', x - 1.2, 13.545, x + 1.2, 13.55, 3.6, 3.615, 'chalky')
+    for q, ln in enumerate(lines): text(ln, x, 13.54, 3.4 - q * 0.22, 0, 0.13, 'sign', mirror=True, depth=0.005)
+box('canopy board', -10.6, 9.3, -2.0, 9.46, 2.75, 3.3, 'fascia', mirror=True); deco('canopy return', -2.16, 9.46, -2.0, 12.0, 2.75, 3.3, 'fascia'); deco('canopy trim', -10.62, 9.28, -1.98, 9.3, 3.3, 3.36, 'gold'); deco('canopy trim', -10.62, 9.28, -1.98, 9.3, 2.75, 2.79, 'gold')
+for i in range(21): deco('valance', -10.6 + i * 0.41, 9.3, -10.6 + (i + 1) * 0.41, 9.32, 2.5 + (0.04 if i % 2 else 0), 2.75, 'stripe' if i % 2 else 'fascia')
+text('DELICATESSEN', -8.3, 9.28, 3.03, 0, 0.3, 'gold', mirror=True, depth=0.02); text('BAKERY', -4.0, 9.28, 3.03, 0, 0.3, 'gold', mirror=True, depth=0.02); text('fresh every day', -6.2, 9.28, 2.9, 0, 0.11, 'stripe', mirror=True, depth=0.01)
+for x in (-10.4, -6.3, -2.2): bar('canopy rod', (x, 9.38, 3.3), (x, 9.38, H - 0.4), 0.012, 'steel')
+for x in (-9.3, -7.5, -5.7, -3.9):
+    prop('hanging_industrial_lamp', x, 10.05, 3.55, x, 0.65); bar('lamp cord', (x, 10.05, 3.55), (x, 10.05, H - 0.4), 0.006, 'dark'); ico('lamp bulb', x, 10.05, 2.78, 0.06, 0.06, 0.07, 'ember', sub=1)
+# the customer side: a baker's rack, the specials board, a cake table, baskets of baguettes
+collide(-2.35, 8.25, -1.5, 9.0, 0, 1.8, 'metal')
+for x in (-2.33, -1.54):
+    for y in (8.27, 8.96): bar('rack post', (x, y, 0.08), (x, y, 1.8), 0.015, 'steel'); cyl('rack castor', x, y, 0.0, 0.08, 0.04, 'dark', seg=6)
+for i in range(6):
+    z = 0.3 + i * 0.27; deco('rack tray', -2.33, 8.27, -1.52, 8.98, z, z + 0.02, 'steel')
+    for q in range(6): prop('hamburger_buns' if i % 2 else 'croissant', -2.15 + (q % 2) * 0.42, 8.4 + (q // 2) * 0.22, z + 0.02, PI / 2 + rnd.uniform(-0.3, 0.3), 0.55 if i % 2 else 1.1)
+prop('standing_chalkboard_01', -10.3, 8.75, 0.02, 0.5, 0.85, solid=(0.7, 0.6, 1.2, True))
+cyl('cake table', -4.0, 8.7, 0.72, 0.76, 0.5, 'counter', seg=20); cyl('cake table leg', -4.0, 8.7, 0, 0.72, 0.05, 'steel', seg=8); cyl('cake table foot', -4.0, 8.7, 0, 0.03, 0.3, 'steel', seg=14); collide(-4.45, 8.25, -3.55, 9.15, 0, 0.76, 'wood')
+for i in range(5): a_ = i * 1.257; cyl('cake plate', -4.0 + math.cos(a_) * 0.3, 8.7 + math.sin(a_) * 0.3, 0.76, 0.775, 0.13, 'case', seg=14); prop('carrot_cake' if i % 2 else 'strawberry_chocolate_cake', -4.0 + math.cos(a_) * 0.3, 8.7 + math.sin(a_) * 0.3, 0.775, a_, 1.05)
+for x in (-7.5, -6.9):
+    cyl('baguette basket', x, 8.75, 0, 0.7, 0.2, 'basket', seg=12, r2=0.25); collide(x - 0.25, 8.5, x + 0.25, 9.0, 0, 0.9, 'wood', soft=1)
+    for q in range(7): a_ = q * 0.9; ico('baguette', x + math.cos(a_) * 0.11, 8.75 + math.sin(a_) * 0.11, 0.78, 0.04, 0.04, 0.3, 'crust', sub=1, rot=(math.cos(a_) * 0.15, math.sin(a_) * 0.15, 0))
+# the prep room behind
+for i in range(5): ico('flour sack', -1.0 + (i % 2) * 0.5, 14.3 + (i // 2) * 0.4, 0.2 + (0.3 if i == 4 else 0), 0.3, 0.2, 0.17, 'slaw', sub=1)
+for i in range(4): prop('cardboard_box_01', -2.6 + (i % 2) * 0.45, 15.2, 0.02 + (i // 2) * 0.34, 0.1 * i, 1.0)
+for i in range(4): deco('dough tray', -9.3 + i * 0.9, 14.5, -8.6 + i * 0.9, 15.1, 0.9, 0.94, 'steel'); [ico('dough', -9.15 + i * 0.9 + (q % 2) * 0.35, 14.65 + (q // 2) * 0.3, 0.97, 0.11, 0.11, 0.05, 'slaw', sub=1) for q in range(4)]
 box('prep table', -9.5, 14.4, -5.5, 15.2, 0, 0.9, 'steel', surface='metal'); box('prep fridge', -4.6, 14.7, -3.2, 15.6, 0, 2.0, 'steel', surface='metal'); prop('plastic_crate_02', -10.3, 14.6, 0.02, 0.2, 1.0); prop('plastic_crate_02', -10.3, 14.6, 0.34, 0.5, 1.0)
 
 # ---------- stockroom ----------
@@ -199,25 +288,43 @@ def racking(x0, x1, y, top=4.2):
 racking(-23.4, -19.6, 10.3, top=2.95); carton_stack(-22.2, 14.2)
 # the offices upstairs: a floor over the stockroom, a stair up through it, windows over the shop and the deli
 for x0, y0, x1, y1 in ((-23.6, 8, -19.4, 15.6), (-19.4, 8, -11.2, 12.6), (-19.4, 13.8, -11.2, 15.6), (-13, 12.6, -11.2, 13.8)): box('office floor', x0, y0, x1, y1, UP - 0.2, UP, 'slab')
-for i in range(32): box('office stairs', -13.2 - 0.2 * i, 12.6, -13.0 - 0.2 * i, 13.8, 0, (i + 1) * UP / 32, 'slab')
-for y in (12.6, 13.8):
-    bar('stair rail', (-13, y, 1.0), (-19.4, y, UP + 1.0), 0.025, 'steel'); bar('well rail', (-19.4, y, UP + 1.0), (-13, y, UP + 1.0), 0.025, 'steel'); bar('well rail', (-19.4, y, UP + 0.5), (-13, y, UP + 0.5), 0.02, 'steel')
-    for x in (-19.4, -17.3, -15.1, -13): bar('well post', (x, y, UP), (x, y, UP + 1.0), 0.025, 'steel')
-    collide(-19.2, y - 0.05, -13, y + 0.05, UP, UP + 1.0, 'metal', soft=1)
-bar('well rail', (-13, 12.6, UP + 1.0), (-13, 13.8, UP + 1.0), 0.025, 'steel'); collide(-13.05, 12.6, -12.95, 13.8, UP, UP + 1.0, 'metal', soft=1)
+NS, RUN = 20, 0.32
+for i in range(NS):
+    xa, xb, top = -13.0 - RUN * (i + 1), -13.0 - RUN * i, (i + 1) * UP / NS
+    box('office stairs', xa, 12.6, xb, 13.8, 0, top, 'tread', surface='metal'); deco('nosing', xb - 0.05, 12.6, xb + 0.01, 13.8, top - 0.03, top + 0.005, 'yellow')
+    for y in (12.56, 13.8): deco('stair side', xa, y, xb, y + 0.04, 0, top + 0.12, 'gondola')
+for y in (12.58, 13.82):
+    bar('stair rail', (-13.0, y, 1.05), (-19.4, y, UP + 1.05), 0.028, 'steel'); bar('stair rail', (-13.0, y, 0.55), (-19.4, y, UP + 0.55), 0.018, 'steel')
+    for i in range(0, NS + 1, 4): x = -13.0 - RUN * i; bar('stair post', (x, y, i * UP / NS), (x, y, i * UP / NS + 1.05), 0.022, 'steel')
+    bar('well rail', (-19.4, y, UP + 1.05), (-13, y, UP + 1.05), 0.028, 'steel'); bar('well rail', (-19.4, y, UP + 0.55), (-13, y, UP + 0.55), 0.018, 'steel'); deco('well kick', -19.4, y - 0.02, -13, y + 0.02, UP, UP + 0.12, 'tread')
+    for x in (-17.3, -15.1, -13): bar('well post', (x, y, UP), (x, y, UP + 1.05), 0.022, 'steel')
+    collide(-19.1, y - 0.05, -13, y + 0.05, UP, UP + 1.05, 'metal', soft=1)
+bar('well rail', (-13, 12.58, UP + 1.05), (-13, 13.82, UP + 1.05), 0.028, 'steel'); bar('well rail', (-13, 12.58, UP + 0.55), (-13, 13.82, UP + 0.55), 0.018, 'steel'); collide(-13.05, 12.6, -12.95, 13.8, UP, UP + 1.05, 'metal', soft=1)
 for x, y in ((-21, 9.6), (-21, 14.6), (-16, 10.2), (-16, 14.9), (-12.2, 10.4)): deco('stock light', x - 0.6, y - 0.08, x + 0.6, y + 0.08, UP - 0.27, UP - 0.2, 'lamp')
-for x0, y0, x1, y1 in ((-23.4, 8.3, -21.6, 9.1), (-18.6, 8.3, -16.8, 9.1), (-14.8, 8.3, -13.0, 9.1)):   # desks under the window over the shop
-    box('desk', x0, y0, x1, y1, UP, UP + 0.75, 'counter', surface='wood'); deco('monitor', x0 + 0.6, y0 + 0.5, x0 + 1.2, y0 + 0.54, UP + 0.85, UP + 1.25, 'dark'); deco('monitor glow', x0 + 0.63, y0 + 0.54, x0 + 1.17, y0 + 0.545, UP + 0.88, UP + 1.22, 'glow'); deco('monitor stand', x0 + 0.85, y0 + 0.48, x0 + 0.95, y0 + 0.56, UP + 0.75, UP + 0.86, 'dark')
-    prop('plastic_monobloc_chair_01', (x0 + x1) / 2, y1 + 0.55, UP, PI, 1.0, solid=(0.5, 0.5, 0.8, True))
-box('filing cabinets', -23.5, 14.9, -20.5, 15.5, UP, UP + 1.35, 'steel', surface='metal'); box('lockers', -15.6, 15.0, -12.0, 15.5, UP, UP + 1.9, 'rack', surface='metal')
-box('sofa', -23.5, 10.6, -22.7, 13.0, UP, UP + 0.45, 'fascia', surface='wood'); deco('sofa back', -23.55, 10.6, -23.3, 13.0, UP + 0.45, UP + 0.95, 'fascia'); box('coffee table', -22.1, 11.3, -21.5, 12.3, UP, UP + 0.42, 'counter', surface='wood')
-prop('television_02', -11.6, 11.2, UP + 0.6, PI / 2, 1.0); box('tv stand', -11.9, 10.6, -11.4, 11.8, UP, UP + 0.6, 'counter', surface='wood'); prop('potted_plant_04', -20.0, 15.0, UP, 0.3, 1.2, solid=(0.5, 0.5, 1.1, True)); facade('poster_b', -17.5, 15.58, UP + 0.6, PI)
+for x0, y0, x1, y1 in ((-23.6, 8, -19.4, 15.6), (-19.4, 8, -11.2, 12.56), (-19.4, 13.86, -11.2, 15.6), (-13, 12.56, -11.2, 13.86)): deco('carpet', x0, y0, x1, y1, UP, UP + 0.012, 'carpet')
+def workplace(x, k):
+    """A desk under the window over the shop: laptop, lamp, papers, a chair."""
+    prop('metal_office_desk', x, 8.72, UP, 0, 1.0, solid=(2.0, 0.95, 0.8, False)); prop('classic_laptop', x - 0.15, 8.62, UP + 0.79, PI + rnd.uniform(-0.2, 0.2), 0.55); prop('desk_lamp_arm_01', x + 0.75, 8.45, UP + 0.84, 0.5, 0.6)
+    prop('office_notepads', x - 0.65, 8.8, UP + 0.79, 0.2, 0.3); prop('clipboard' if k % 2 else 'binder_notebook', x + 0.45, 8.9, UP + 0.79, -0.4, 0.8 if k % 2 else 0.6); prop('modern_arm_chair_01', x + rnd.uniform(-0.2, 0.2), 9.75, UP, PI + rnd.uniform(-0.4, 0.4), 0.85, solid=(0.6, 0.6, 0.85, True))
+for k, x in enumerate((-22.2, -18.6, -14.6)): workplace(x, k)
+# the lounge corner, cabinets, the kitchenette, things on the walls
+prop('sofa_03', -15.9, 15.05, UP, 0, 0.8, solid=(2.2, 0.75, 0.8, False)); prop('modern_coffee_table_01', -22.3, 11.6, UP, PI / 2, 0.9, solid=(1.0, 0.55, 0.38, True)); prop('office_notepads', -22.3, 11.6, UP + 0.36, 1.0, 0.25)
+prop('modern_arm_chair_01', -23.05, 11.6, UP, -PI / 2, 0.9, solid=(0.6, 0.6, 0.85, True)); prop('modern_arm_chair_01', -22.3, 10.7, UP, PI, 0.9, solid=(0.6, 0.6, 0.85, True)); prop('potted_plant_04', -23.15, 10.5, UP, 0.3, 1.2)
+prop('drawer_cabinet', -23.3, 14.2, UP - 0.22, PI / 2, 1.0, solid=(0.5, 1.15, 1.55, False)); prop('drawer_cabinet', -11.5, 11.45, UP - 0.22, -PI / 2, 1.0, solid=(0.5, 1.15, 1.55, False)); prop('wooden_bookshelf_worn', -11.55, 13.2, UP, -PI / 2, 0.85, solid=(0.5, 1.2, 1.75, False))
+box('lockers', -22.9, 15.05, -20.3, 15.55, UP, UP + 1.9, 'rack', surface='metal')
+for i in range(5): deco('locker door', -22.86 + i * 0.52, 15.03, -22.4 + i * 0.52, 15.05, UP + 0.06, UP + 1.86, 'rack'); deco('locker vent', -22.78 + i * 0.52, 15.02, -22.48 + i * 0.52, 15.03, UP + 1.5, UP + 1.7, 'dark'); deco('locker handle', -22.46 + i * 0.52, 15.0, -22.43 + i * 0.52, 15.03, UP + 0.95, UP + 1.1, 'steel')
+for i, (x, y, yaw) in enumerate(((-19.9, 15.1, 0.2), (-19.8, 15.15, 1.4), (-20.0, 14.6, 0.9))): prop('cardboard_box_01', x, y, UP + (0.33 if i == 1 else 0), yaw, 1.0)
+box('kitchenette', -13.2, 15.0, -11.3, 15.55, UP, UP + 0.9, 'gondola'); deco('kitchenette top', -13.25, 14.96, -11.25, 15.55, UP + 0.9, UP + 0.94, 'top'); prop('vintage_microwave', -12.75, 15.28, UP + 0.94, 0, 0.5); prop('vintage_electric_kettle', -12.0, 15.25, UP + 0.94, 0.6, 1.0); prop('ph_jug', -11.6, 15.25, UP + 0.94, 0.3, 1.0)
+deco('sink', -12.35, 15.08, -11.85, 15.45, UP + 0.93, UP + 0.95, 'steel'); deco('wall cupboard', -13.2, 15.25, -11.3, 15.58, UP + 1.5, UP + 2.1, 'gondola')
+prop('wall_clock', -17.5, 15.56, UP + 1.95, 0, 1.0); prop('dartboard', -14.0, 15.56, UP + 1.6, 0, 1.0); facade('poster_b', -18.9, 15.58, UP + 0.75, PI); facade('poster_c', -23.58, 12.0, UP + 0.8, PI / 2)
+deco('whiteboard', -23.58, 8.9, -23.54, 10.1, UP + 0.95, UP + 1.95, 'sign'); deco('whiteboard frame', -23.6, 8.85, -23.56, 10.15, UP + 0.9, UP + 2.0, 'steel'); text('ROTA', -23.53, 9.5, UP + 1.75, PI / 2, 0.14, 'rack', mirror=True, depth=0.004)
+for i in range(4): deco('rota line', -23.535, 9.0, -23.53, 9.0 + (0.9, 0.6, 1.0, 0.75)[i], UP + 1.5 - i * 0.14, UP + 1.52 - i * 0.14, 'dark')
 prop('wooden_crate_02', -17.5, 9.2, 0.02, 0.3, 1.0, solid=(0.9, 0.9, 0.8, False))
 prop('hand_truck', -12.2, 9.3, 0.02, 1.2, 1.0, solid=(0.6, 0.6, 1.2, True)); deco('hazard line', -18.6, 14.9, -15.4, 15.0, 0.025, 0.03, 'yellow')
 for a, b in ((-23.6, -16.6), (-13.4, -11.2)): deco('stock stripe', a, 8.0, b, 8.02, 1.0, 1.15, 'yellow')
 
 # ---------- the yard (behind the stockroom) and the side strip ----------
-vehicle('boxtruck', -18.6, 18.4, -15.4, 25.6, 3.0, -PI / 2); vehicle('sedan', -36.6, -8.6, -32.4, -6.7, 1.4, 0); vehicle('van', -36.8, 3.3, -32.2, 5.5, 2.3, PI); vehicle('sedan', -36.6, 9.5, -32.4, 11.4, 1.4, 0)
+vehicle('boxtruck', -18.6, 19.9, -15.4, 27.1, 3.0, -PI / 2); vehicle('sedan', -36.6, -8.6, -32.4, -6.7, 1.4, 0); vehicle('van', -36.8, 3.3, -32.2, 5.5, 2.3, PI); vehicle('sedan', -36.6, 9.5, -32.4, 11.4, 1.4, 0)
 for x0, x1 in ((-9.4, -6.6), (-5.8, -3.4)): box('dumpster', x0, 17.0, x1, 18.6, 0, 1.5, 'green', surface='metal'); deco('dumpster lid', x0 - 0.05, 16.95, x1 + 0.05, 18.65, 1.5, 1.58, 'dark')
 for x, y in ((-24.5, 20.5), (-23.0, 24.0), (-11, 23.5)): carton_stack(x, y, 1.3, 'cartons_b', name='yard pallet')
 prop('trashbag', -2.6, 17.3, 0, 0.4, 1.0); prop('trashbag', -2.0, 17.8, 0, 2.0, 1.0); prop('propane_tank', -26.2, 17.2, 0, 0.3, 1.0, solid=(0.5, 0.5, 1.2, False)); prop('security_light', -17, 16.1, 3.6, PI / 2, 1.0)
@@ -261,4 +368,4 @@ export('mart', {
     'spawns': [[37, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],
     'pickups': [['health', 0, 0, 1.6], ['health', 0, 0, -1.6], ['ammo', -20, 0, -12], ['ammo', 20, 0, 12], ['ammo', -9.8, 0, 13.6], ['ammo', 9.8, 0, -13.6], ['health', -6, 0, -11.8], ['health', 6, 0, 11.8], ['ammo', -28, 0, -22], ['ammo', 28, 0, 22], ['health', -22, UP, -14.6], ['health', 22, UP, 14.6]],
 }, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), emit_k=4,
-            only='wall|partition|floor|verge|road|car park|pavement|kerb|roof deck|gondola|case|counter|tile|brick|fascia|pallet|cardboard|dumpster|hedge|soil|fence|store|belt|racking'))
+            only='wall|partition|floor|verge|road|carpet|tread|car park|pavement|kerb|roof deck|gondola|case|counter|tile|brick|fascia|pallet|cardboard|dumpster|hedge|soil|fence|store|belt|racking'))

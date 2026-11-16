@@ -113,7 +113,7 @@ def bar(name, a, b, r, k, mirror=True):
 def text(body, x, y, z, yaw, size, k, mirror=False, depth=0.03, half_turn=False):
     """Lettering standing upright, centred on (x, y, z), reading left to right for someone it faces (yaw 0 faces south)."""
     bpy.ops.object.text_add(location=(0, 0, 0))
-    o = bpy.context.object; o.data.body = body; o.data.size = size; o.data.extrude = depth; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
+    o = bpy.context.object; o.data.body = body; o.data.resolution_u = 2; o.data.size = size; o.data.extrude = depth; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
     bpy.ops.object.convert(target='MESH'); o = bpy.context.object; o.name = 'text ' + body
     o.matrix_world = (HALF_TURN if half_turn else Matrix.Identity(4)) @ Matrix.Translation((x, y, z)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'X')
     return finish(o, k, mirror, uv=False)
@@ -133,7 +133,7 @@ def prop(name, x, y, z=0, yaw=0, scale=1, mirror=True, solid=None, only=None):
     """A model from tools/blender/kit (CC0, Poly Haven), base at (x, y, z). solid = (w, d, h, soft): its collision, centred
     here; soft stops players but not bullets (a chair, a plant)."""
     for s in ((1, -1) if mirror else (1,)):
-        m4 = (HALF_TURN if s < 0 else Matrix.Identity(4)) @ Matrix.Translation((x, y, z)) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Scale(scale, 4)
+        m4 = (HALF_TURN if s < 0 else Matrix.Identity(4)) @ Matrix.Translation((x, y, z)) @ Matrix.Rotation(yaw, 4, 'Z') @ (Matrix.Diagonal((*scale, 1)) if isinstance(scale, tuple) else Matrix.Scale(scale, 4))
         for o, mw in kit(name):
             if only and not re.search(only, o.name): continue
             c = o.copy(); c.data = o.data.copy(); del c['kit']; bpy.context.collection.objects.link(c); c.parent = None; c.matrix_world = m4 @ mw
@@ -172,7 +172,7 @@ def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     finish(o, 'decal', mirror, uv=False)
 def paint(body, x, y, yaw, size, mirror=True):
     """Lettering painted flat on the ground, read from the south when yaw is 0."""
-    bpy.ops.object.text_add(location=(0, 0, 0)); o = bpy.context.object; o.data.body = body; o.data.size = size; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
+    bpy.ops.object.text_add(location=(0, 0, 0)); o = bpy.context.object; o.data.body = body; o.data.resolution_u = 2; o.data.size = size; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
     bpy.ops.object.convert(target='MESH'); o = bpy.context.object; o.name = 'painted ' + body
     o.matrix_world = Matrix.Translation((x, y, 0.013)) @ Matrix.Rotation(yaw, 4, 'Z')
     finish(o, 'line', mirror, uv=False)

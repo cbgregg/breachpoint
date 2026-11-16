@@ -79,7 +79,7 @@ export function blendMap(DATA, o) {
         if (o.glow != null && m.emissiveIntensity > 0 && m.emissive.getHex() && !m.lightMap && !m.emissiveMap) m.emissiveIntensity *= o.glow;
         if (lm && ob.geometry.attributes.uv1 && !(o.nolm && o.nolm.test(what)) && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
         // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
-        else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = o.fill ?? 0.3; }
+        else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = named ? o.fill ?? 0.3 : o.fillKit ?? o.fill ?? 0.3; }   // (fillKit: the models, which have no baked light at all)
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
         m.needsUpdate = true; ob.material = m;
