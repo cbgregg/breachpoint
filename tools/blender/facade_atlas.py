@@ -104,22 +104,75 @@ def colour():
     import colorsys; q = rnd.random()
     if q < 0.3: return mat('pack', rnd.choice(((0.86, 0.85, 0.8), (0.8, 0.74, 0.6), (0.5, 0.38, 0.24), (0.08, 0.08, 0.09), (0.7, 0.72, 0.74), (0.9, 0.88, 0.7))), 0.5)
     return mat('pack', colorsys.hsv_to_rgb(rnd.choice((0.0, 0.03, 0.08, 0.12, 0.3, 0.36, 0.58, 0.62, 0.66, 0.98)) + rnd.uniform(-0.02, 0.02), rnd.uniform(0.35, 0.85), rnd.uniform(0.3, 0.85)), 0.45)
+# printed packaging: a made-up brand, the product's name and a small picture, drawn per product and used as its label
+from PIL import ImageDraw, ImageFont
+def font(px):
+    try: return ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', max(6, int(px)))
+    except OSError: return ImageFont.load_default()
+BRANDS = ('SUNNY', 'HARVEST', 'ALPINE', 'KETTLE', 'ORCHARD', 'BRIGHT', 'OAKS', 'MARINA', 'GOLDEN', 'NORTH', 'DAILY', 'PRIMA', 'VERDE', 'LUNA', 'FARMHOUSE', 'TIPTOP', 'MAPLE', 'CORAL')
+WORDS = {'fruit': ('JAM', 'JUICE', 'APPLE', 'PEACH', 'CHERRY'), 'wheat': ('OATS', 'FLOUR', 'PASTA', 'CEREAL', 'MUESLI'), 'bowl': ('SOUP', 'NOODLES', 'RICE', 'PORRIDGE'), 'sun': ('OIL', 'CORN', 'HONEY', 'SYRUP'),
+         'fish': ('TUNA', 'SARDINES', 'SALMON'), 'drop': ('WATER', 'MILK', 'SODA', 'VINEGAR', 'CREAM'), 'beans': ('BEANS', 'COFFEE', 'COCOA', 'LENTILS'), 'leaf': ('TEA', 'HERBS', 'PESTO', 'OLIVES'), 'cup': ('COFFEE', 'TEA', 'COCOA')}
+PICS = {'box': ('wheat', 'bowl', 'leaf', 'cup', 'beans', 'fruit'), 'can': ('fish', 'bowl', 'beans', 'fruit', 'sun'), 'bottle': ('drop', 'fruit', 'sun', 'leaf'), 'jar': ('fruit', 'beans', 'leaf', 'sun')}
+def picture(d, pic, cx, cy, R, ink):
+    e = lambda x0, y0, x1, y1, c: d.ellipse((cx + x0 * R, cy + y0 * R, cx + x1 * R, cy + y1 * R), fill=c)
+    if pic == 'fruit': c = rnd.choice(((214, 40, 40), (240, 140, 30), (236, 200, 40), (150, 40, 110))); e(-0.8, -0.6, 0.8, 1.0, c); e(-0.45, -0.3, -0.05, 0.1, tuple(min(255, v + 60) for v in c)); e(0.0, -1.0, 0.6, -0.5, (70, 150, 60)); d.line((cx, cy - 0.6 * R, cx + 0.1 * R, cy - 0.95 * R), fill=(90, 60, 30), width=max(1, int(R / 9)))
+    elif pic == 'wheat':
+        d.line((cx, cy + R, cx, cy - 0.9 * R), fill=(170, 120, 40), width=max(1, int(R / 8)))
+        for i in range(5): yy = -0.8 + i * 0.32; e(-0.55, yy, -0.05, yy + 0.3, (226, 170, 60)); e(0.05, yy, 0.55, yy + 0.3, (226, 170, 60))
+    elif pic == 'bowl':
+        d.pieslice((cx - R, cy - R * 0.9, cx + R, cy + R * 0.9), 0, 180, fill=ink); e(-0.9, -0.2, 0.9, 0.2, (240, 200, 110))
+        for i in (-0.4, 0, 0.4): d.arc((cx + i * R - R * 0.15, cy - R, cx + i * R + R * 0.15, cy - R * 0.35), 90, 270, fill=ink, width=max(1, int(R / 10)))
+    elif pic == 'sun':
+        for i in range(12): a = i * math.pi / 6; d.line((cx + math.cos(a) * R * 0.6, cy + math.sin(a) * R * 0.6, cx + math.cos(a) * R, cy + math.sin(a) * R), fill=(240, 180, 30), width=max(1, int(R / 7)))
+        e(-0.5, -0.5, 0.5, 0.5, (246, 200, 40))
+    elif pic == 'fish': e(-0.9, -0.4, 0.5, 0.4, (70, 130, 190)); d.polygon(((cx + 0.4 * R, cy), (cx + R, cy - 0.5 * R), (cx + R, cy + 0.5 * R)), fill=(70, 130, 190)); e(-0.7, -0.15, -0.55, 0.0, (255, 255, 255))
+    elif pic == 'drop': c = rnd.choice(((60, 140, 220), (250, 250, 250), (200, 60, 50))); d.polygon(((cx, cy - R), (cx - 0.6 * R, cy + 0.2 * R), (cx + 0.6 * R, cy + 0.2 * R)), fill=c, outline=ink); d.ellipse((cx - 0.62 * R, cy - 0.25 * R, cx + 0.62 * R, cy + R), fill=c, outline=ink)
+    elif pic == 'beans':
+        for (bx, by) in ((-0.45, -0.3), (0.35, -0.1), (-0.1, 0.45)): e(bx - 0.4, by - 0.25, bx + 0.4, by + 0.25, (110, 66, 36)); d.line((cx + (bx - 0.25) * R, cy + by * R, cx + (bx + 0.25) * R, cy + by * R), fill=(60, 34, 18), width=max(1, int(R / 12)))
+    elif pic == 'leaf': e(-0.8, -0.45, 0.8, 0.45, (70, 150, 60)); d.line((cx - 0.8 * R, cy, cx + 0.8 * R, cy), fill=(30, 90, 40), width=max(1, int(R / 10)))
+    else: d.rectangle((cx - 0.6 * R, cy - 0.5 * R, cx + 0.4 * R, cy + 0.8 * R), fill=ink); d.arc((cx + 0.2 * R, cy - 0.3 * R, cx + 0.9 * R, cy + 0.5 * R), 270, 90, fill=ink, width=max(2, int(R / 6))); e(-0.5, -0.65, 0.3, -0.4, (120, 70, 40))
+ARTN = [0]
+def art(kind, w, h):
+    """A product's printed face as a material: w x h metres, drawn at about 1000 px to the metre."""
+    W = max(40, int(w * 1000)); Hh = max(36, int(h * 1000)); pic = rnd.choice(PICS[kind]); brand = rnd.choice(BRANDS); word = rnd.choice(WORDS[pic])
+    light = rnd.random() < 0.55; import colorsys
+    acc = tuple(int(v * 255) for v in colorsys.hsv_to_rgb(rnd.choice((0.0, 0.03, 0.08, 0.12, 0.3, 0.36, 0.56, 0.62, 0.7, 0.95)), rnd.uniform(0.55, 0.9), rnd.uniform(0.4, 0.8)))
+    bg = rnd.choice(((246, 243, 232), (252, 252, 250), (236, 224, 196))) if light else acc; band = acc if light else tuple(int(v * 0.55) for v in acc); ink = (40, 34, 30) if light else (252, 250, 240)
+    im = Image.new('RGB', (W, Hh), bg); d = ImageDraw.Draw(im); bh = int(Hh * (0.24 if Hh > W * 0.8 else 0.36))
+    d.rectangle((0, 0, W, bh), fill=band); f = font(min(bh * 0.62, W * 1.22 / max(4, len(brand)))); d.text((W / 2, bh / 2), brand, font=f, fill=(255, 255, 255), anchor='mm')
+    d.line((0, bh, W, bh), fill=(240, 200, 60), width=max(1, Hh // 60))
+    if Hh > W * 0.8:   # tall: picture in the middle, the name under it
+        R_ = min(W, Hh) * 0.26; picture(d, pic, W / 2, bh + (Hh - bh) * 0.4, R_, ink); f2 = font(min(Hh * 0.11, W * 1.5 / max(4, len(word)))); d.text((W / 2, Hh * 0.8), word, font=f2, fill=ink, anchor='mm')
+        d.text((W / 2, Hh * 0.92), rnd.choice(('500 g', '750 g', '1 kg', '12 pack', '400 g', '1 L')), font=font(Hh * 0.05), fill=ink, anchor='mm')
+        if rnd.random() < 0.3: d.ellipse((W * 0.66, bh + 4, W * 0.96, bh + 4 + W * 0.3), fill=(220, 40, 40)); d.text((W * 0.81, bh + 4 + W * 0.15), 'NEW', font=font(W * 0.1), fill=(255, 255, 255), anchor='mm')
+    else:              # wide: picture left, name right
+        R_ = (Hh - bh) * 0.36; picture(d, pic, W * 0.2, bh + (Hh - bh) * 0.5, R_, ink); f2 = font(min((Hh - bh) * 0.5, W * 0.9 / max(4, len(word)))); d.text((W * 0.63, bh + (Hh - bh) * 0.5), word, font=f2, fill=ink, anchor='mm')
+    d.rectangle((0, Hh - max(2, Hh // 30), W, Hh), fill=band)
+    ARTN[0] += 1; fn = os.path.join(ARTDIR, 'art%d.png' % ARTN[0]); im.save(fn)
+    m = bpy.data.materials.new('art'); m.use_nodes = True; t = m.node_tree.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(fn); b = m.node_tree.nodes['Principled BSDF']; m.node_tree.links.new(t.outputs['Color'], b.inputs['Base Color']); b.inputs['Roughness'].default_value = 0.5
+    return m
+ARTDIR = tempfile.mkdtemp()
+def P(x0, x1, z0, z1, y, m):
+    """A flat printed face looking out of the shelf, its picture upright."""
+    me = bpy.data.meshes.new('print'); me.from_pydata([(x0, y, z0), (x1, y, z0), (x1, y, z1), (x0, y, z1)], [], [(0, 1, 2, 3)]); uv = me.uv_layers.new(name='UVMap')
+    for l, c in zip(uv.data, ((0, 0), (1, 0), (1, 1), (0, 1))): l.uv = c
+    me.materials.append(m); me.update(); o = bpy.data.objects.new('print', me); bpy.context.collection.objects.link(o); return o
 def C(x, z0, h, r, y, m): bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=r, depth=h, location=(x, y, z0 + h / 2)); o = bpy.context.object; o.data.materials.append(m); bpy.ops.object.shade_smooth(); return o
 def stock(x0, x1, z, room, y=0.06, kinds=('box', 'can', 'bottle', 'jar')):
     """A shelf's worth of goods between x0 and x1 standing on z: runs of one product several facings wide."""
     x = x0 + 0.02
     while x < x1 - 0.1:
-        kind = rnd.choice(kinds); m = colour(); lab = colour() if rnd.random() < 0.7 else WHITE; n = rnd.randint(2, 5)
+        kind = rnd.choice(kinds); m = colour(); lab = colour() if rnd.random() < 0.7 else WHITE; n = rnd.randint(2, 5); face = None
         if kind == 'box':
             w = rnd.uniform(0.11, 0.2); h = min(room - 0.03, rnd.uniform(0.2, 0.32))
             for i in range(n):
                 if x + w > x1: break
-                B(x, x + w - 0.008, z, z + h, y, y + 0.3, m, 0.004); B(x + 0.015, x + w - 0.023, z + h * 0.35, z + h * 0.8, y - 0.002, y + 0.01, lab, 0); x += w
+                face = face or art('box', w - 0.008, h); B(x, x + w - 0.008, z, z + h, y, y + 0.3, m, 0.004); P(x, x + w - 0.008, z, z + h, y - 0.002, face); x += w
         elif kind == 'can':
             r = rnd.uniform(0.035, 0.05); h = rnd.uniform(0.09, 0.13)
             for i in range(n + 1):
                 if x + 2 * r > x1: break
-                for t in range(max(1, min(3, int((room - 0.02) / h)))): C(x + r, z + t * h, h - 0.004, r, y + r + 0.01, STEEL if t < 0 else m); B(x + r * 0.25, x + r * 1.75, z + t * h + h * 0.2, z + t * h + h * 0.8, y + 0.004, y + 0.02, lab, 0)
+                for t in range(max(1, min(3, int((room - 0.02) / h)))): face = face or art('can', r * 1.6, h * 0.7); C(x + r, z + t * h, h - 0.004, r, y + r + 0.01, STEEL if t < 0 else m); P(x + r * 0.2, x + r * 1.8, z + t * h + h * 0.14, z + t * h + h * 0.84, y + 0.004, face)
                 x += 2 * r + 0.006
         else:
             r = rnd.uniform(0.035, 0.048); h = min(room - 0.04, rnd.uniform(0.2, 0.3)) if kind == 'bottle' else rnd.uniform(0.12, 0.17)
@@ -128,7 +181,7 @@ def stock(x0, x1, z, room, y=0.06, kinds=('box', 'can', 'bottle', 'jar')):
                 C(x + r, z, h * (0.68 if kind == 'bottle' else 0.9), r, y + r + 0.01, m)
                 if kind == 'bottle': C(x + r, z + h * 0.68, h * 0.26, r * 0.4, y + r + 0.01, m); C(x + r, z + h * 0.94, h * 0.06, r * 0.45, y + r + 0.01, lab)
                 else: C(x + r, z + h * 0.9, h * 0.1, r * 1.02, y + r + 0.01, lab)
-                B(x + r * 0.2, x + r * 1.8, z + h * 0.18, z + h * 0.5, y + 0.002, y + 0.02, lab, 0); x += 2 * r + 0.008
+                face = face or art(kind, r * 1.7, h * (0.36 if kind == 'bottle' else 0.6)); P(x + r * 0.15, x + r * 1.85, z + h * (0.16 if kind == 'bottle' else 0.14), z + h * (0.52 if kind == 'bottle' else 0.74), y + 0.004, face); x += 2 * r + 0.008
         x += rnd.uniform(0.0, 0.03)
 def shelf(kinds=('box', 'can', 'bottle', 'jar')):
     def build():
@@ -192,17 +245,18 @@ if MAP == 'mart':
 else: order = [('window', window), ('shutter', shutter), ('house_door', house_door), ('house_door2', lambda: house_door((0.3, 0.05, 0.05))), ('balcony_door', balcony_door), ('shop_window', shop_window), ('shop_door', shop_door), ('window_small', window_small)]
 for i, (n, f) in enumerate(order): piece(n, i * 6.0, f)
 # the wall behind everything (not rendered into the pieces: they are cut out by their bounds), light, camera
-sc = bpy.context.scene; sc.render.engine = 'CYCLES'; sc.cycles.samples = 96; sc.cycles.device = 'CPU'; sc.cycles.use_denoising = True
+sc = bpy.context.scene; sc.render.engine = 'CYCLES'; sc.cycles.samples = 36 if MAP == 'mart' else 96; sc.cycles.device = 'CPU'; sc.cycles.use_denoising = True
 sc.render.film_transparent = True; sc.render.image_settings.color_mode = 'RGBA'; sc.render.image_settings.file_format = 'PNG'; sc.view_settings.view_transform = 'Standard'
 w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True; w.node_tree.nodes['Background'].inputs[0].default_value = (0.78, 0.84, 0.95, 1); w.node_tree.nodes['Background'].inputs[1].default_value = 0.55
 sun = bpy.data.lights.new('sun', 'SUN'); sun.energy = 1.7; sun.angle = 0.2; so = bpy.data.objects.new('sun', sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(52), 0, math.radians(-28))
 cam = bpy.data.cameras.new('c'); cam.type = 'ORTHO'; co = bpy.data.objects.new('cam', cam); sc.collection.objects.link(co); sc.camera = co; co.rotation_euler = (math.pi / 2, 0, 0)
 tmp = tempfile.mkdtemp(); shots = {}
 for n, (x0, x1, z0, z1) in PIECES.items():
-    wd, ht = x1 - x0, z1 - z0; sc.render.resolution_x = round(wd * PPM); sc.render.resolution_y = round(ht * PPM); cam.ortho_scale = max(wd, ht)
+    ppm = PPM * (2 if n.startswith(('shelf', 'cooler', 'freezer')) else 1)   # (packaging is read up close: twice the detail)
+    wd, ht = x1 - x0, z1 - z0; sc.render.resolution_x = round(wd * ppm); sc.render.resolution_y = round(ht * ppm); cam.ortho_scale = max(wd, ht)
     co.location = ((x0 + x1) / 2, -8, (z0 + z1) / 2); sc.render.filepath = os.path.join(tmp, n + '.png'); bpy.ops.render.render(write_still=True); shots[n] = (wd, ht)
 # pack into one picture, left to right in rows
-ims = {n: Image.open(os.path.join(tmp, n + '.png')).convert('RGBA') for n in shots}; W = 2048; x = y = rowh = 0; place = {}
+ims = {n: Image.open(os.path.join(tmp, n + '.png')).convert('RGBA') for n in shots}; W = 4096 if MAP == 'mart' else 2048; x = y = rowh = 0; place = {}
 for n, im in ims.items():
     if x + im.width + 4 > W: x = 0; y += rowh + 4; rowh = 0
     place[n] = (x, y); x += im.width + 4; rowh = max(rowh, im.height)
