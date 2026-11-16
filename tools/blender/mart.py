@@ -134,6 +134,39 @@ for y in (1.6, 4.0):
     for x in (-30.0, -28.8): bar('corral post', (x, y, 0), (x, y, 1.1), 0.03, 'steel')
 collide(-30.05, 1.5, -28.75, 4.1, 0, 1.1, 'metal', soft=1); deco('corral sign', -29.9, 2.75, -28.9, 2.8, 1.5, 1.9, 'fascia'); bar('corral sign post', (-29.4, 2.78, 0), (-29.4, 2.78, 1.5), 0.02, 'steel')
 
+# ---------- filling the floor: a fifth aisle run, island shelving, bakery tables, bins, a kiosk, banners ----------
+pool(-8.4, -8.3, 11.6, 2.3, 'shadow'); box('gondola', -13.2, -8.75, -3.6, -7.85, 0, 2.0, 'gondola'); deco('gondola top', -13.25, -8.8, -3.55, -7.8, 2.0, 2.06, 'gondola')
+for i in range(8): facade(SH[(i + 3) % 5], -12.6 + i * 1.2, -8.76, 0, 0); facade(SH[(i + 1) % 5], -12.6 + i * 1.2, -7.84, 0, PI)
+for x, yaw, o in ((-13.7, -PI / 2, -0.26), (-3.1, PI / 2, 0.26)): box('end cap', x - 0.25, -8.9, x + 0.25, -7.7, 0, 2.0, 'gondola'); facade(SH[2 if o > 0 else 4], x + o, -8.3, 0, yaw)
+box('island shelving', -0.45, 8.2, 0.45, 10.6, 0, 2.0, 'gondola'); deco('gondola top', -0.5, 8.15, 0.5, 10.65, 2.0, 2.06, 'gondola')     # in the cross aisle, by the deli
+for i in range(2): facade(SH[i], 0.46, 8.8 + i * 1.2, 0, PI / 2); facade(SH[i + 2], -0.46, 8.8 + i * 1.2, 0, -PI / 2)
+def bin_(x, y, kinds, s=0.45):
+    """A promo bin: a low cardboard dump bin heaped with one thing, a price card over it."""
+    box('promo bin', x - s, y - s, x + s, y + s, 0, 0.8, 'cardboard', surface='wood'); deco('bin band', x - s - 0.01, y - s - 0.01, x + s + 0.01, y + s + 0.01, 0.45, 0.7, kinds[0])
+    for i in range(9): ico('bin goods', x - 0.28 + (i % 3) * 0.28, y - 0.28 + (i // 3) * 0.28, 0.84 + 0.05 * ((i * 7) % 3), 0.13, 0.13, 0.11, kinds[i % len(kinds)], sub=1)
+    bar('price post', (x, y, 0.8), (x, y, 1.45), 0.012, 'steel'); deco('price card', x - 0.25, y - 0.015, x + 0.25, y + 0.015, 1.45, 1.8, 'yellow')
+for (x, y), k in (((-15.5, -3.35), ('orange f', 'lemon')), ((-15.5, 0), ('tomato', 'apple')), ((-15.5, 3.35), ('melon', 'apple')), ((-18.6, -8.0), ('plum', 'tomato')), ((-1.9, -12.9), ('lemon', 'melon'))): bin_(x, y, k)
+for x in (-9.5, -5.5):   # bakery tables in front of the deli
+    box('bakery table', x - 1.2, 7.1, x + 1.2, 7.9, 0, 0.85, 'counter', surface='wood'); deco('table shelf', x - 1.1, 7.3, x + 1.1, 7.7, 0.85, 1.15, 'counter')
+    for i in range(7): ico('loaf', x - 1.0 + i * 0.33, 7.2, 0.92, 0.15, 0.09, 0.07, ('counter', 'lemon', 'orange f')[i % 3], sub=1); ico('loaf', x - 1.0 + i * 0.33, 7.5, 1.22, 0.15, 0.09, 0.07, ('orange f', 'counter')[i % 2], sub=1)
+    deco('table sign', x - 0.4, 7.48, x + 0.4, 7.52, 1.45, 1.75, 'fascia'); bar('sign post', (x, 7.5, 1.15), (x, 7.5, 1.45), 0.012, 'steel')
+carton_stack(-18.2, -12.6, 1.34); carton_stack(-2.0, 13.0 - 5.5, 1.0, 'cartons_b'); carton_stack(-20.6, 6.2, 1.0, 'cartons_b')
+box('kiosk', -23.5, -6.4, -22.6, -5.0, 0, 1.15, 'gondola'); deco('kiosk top', -23.55, -6.45, -22.55, -4.95, 1.15, 1.2, 'top'); deco('kiosk screen', -23.3, -5.9, -23.2, -5.5, 1.2, 1.6, 'dark'); facade('poster_b', -23.58, -5.7, 1.5, PI / 2)
+prop('wine_barrel_01', -16.6, -13.6, 0.02, 0.4, 1.0, solid=(0.8, 0.8, 0.95, False)); prop('wine_barrel_01', -15.7, -13.9, 0.02, 1.3, 1.0, solid=(0.8, 0.8, 0.95, False)); prop('wooden_crate_02', -20.6, -9.6, 0.02, 0.3, 1.0, solid=(0.9, 0.9, 0.8, False)); prop('potted_plant_04', -22.9, -7.4, 0.02, 0.8, 1.2, solid=(0.5, 0.5, 1.1, True))
+for (x, y, w, yaw), (top, col) in zip(((-16.0, -9.0, 2.6, PI / 2), (-1.0, -9.5, 2.6, 0), (-16.0, 6.4, 2.6, PI / 2), (-6.0, 8.6, 3.0, 0), (-8.4, -6.5, 2.4, 0)), (('FRESH PRODUCE', 'fascia'), ('WEEKLY DEALS', 'red'), ('FROZEN', 'rack'), ('BAKERY', 'orange'), ('PANTRY', 'fascia'))):
+    dx, dy = (w / 2, 0.02) if yaw == 0 else (0.02, w / 2)   # banners hung from the trusses
+    deco('banner', x - dx, y - dy, x + dx, y + dy, 3.4, 4.3, col)
+    for e in (-0.9, 0.9): bar('banner wire', (x + (e * w / 2.2 if yaw == 0 else 0), y + (0 if yaw == 0 else e * w / 2.2), 4.3), (x + (e * w / 2.2 if yaw == 0 else 0), y + (0 if yaw == 0 else e * w / 2.2), H - 0.4), 0.006, 'steel')
+    for sgn in (-1, 1): text(top, x + (0 if yaw == 0 else sgn * 0.03), y + (sgn * -0.03 if yaw == 0 else 0), 3.85, (0 if sgn > 0 else PI) if yaw == 0 else (PI / 2 if sgn > 0 else -PI / 2), 0.26 if len(top) > 8 else 0.4, 'sign', mirror=True, depth=0.01)
+# outside: more cars, bollards along the pavement, bins and a bike rack
+vehicle('sedan', -36.6, -2.45, -32.4, -0.55, 1.4, PI); vehicle('van', -36.8, -11.6, -32.2, -9.4, 2.3, 0); vehicle('sedan', -30.2, 8.0, -28.3, 12.2, 1.4, PI / 2); vehicle('sedan', -30.2, -19.2, -26.0, -17.3, 1.4, 0)
+for y in [q for q in range(-15, 16, 2) if not -13 < q < -5]: box('bollard', -26.42, y - 0.1, -26.22, y + 0.1, 0.12, 1.0, 'yellow')
+for y in (-4.2, 8.6): box('litter bin', -25.0, y - 0.3, -24.4, y + 0.3, 0.12, 1.05, 'green', surface='metal'); deco('bin lid', -25.03, y - 0.33, -24.37, y + 0.33, 1.05, 1.1, 'dark')
+for i in range(5): bar('bike hoop', (-25.6, 12.0 + i * 0.7, 0.12), (-25.6, 12.0 + i * 0.7, 0.95), 0.025, 'steel'); bar('bike hoop', (-24.9, 12.0 + i * 0.7, 0.12), (-24.9, 12.0 + i * 0.7, 0.95), 0.025, 'steel'); bar('bike hoop', (-25.6, 12.0 + i * 0.7, 0.95), (-24.9, 12.0 + i * 0.7, 0.95), 0.025, 'steel')
+collide(-25.7, 11.9, -24.8, 14.9, 0.12, 0.95, 'metal', soft=1)
+for x, y in ((-34, 20), (-36, 23.5), (-33, -22.5), (-12, -26)): carton_stack(x, y, 1.3, 'cartons_b', name='yard pallet')
+box('skip', -37.5, -25.5, -33.5, -23.5, 0, 1.5, 'rack', surface='metal'); deco('skip rim', -37.6, -25.6, -33.4, -23.4, 1.5, 1.6, 'dark')
+
 # ---------- deli counter and prep room ----------
 pool(-6.4, 10.0, 8.6, 2.0, 'shadow'); pool(-16.9, -14.6, 14.4, 2.6, 'shadow'); pool(-20.2, 7.0, 7.6, 2.2, 'shadow'); box('deli counter', -10.2, 9.6, -2.6, 10.5, 0, 0.95, 'counter', surface='wood'); deco('counter top', -10.25, 9.55, -2.55, 10.55, 0.95, 1.0, 'top')
 deco('deli case glass', -10.1, 9.62, -2.7, 9.66, 1.0, 1.42, 'glass'); deco('deli case top', -10.1, 9.62, -2.7, 10.2, 1.42, 1.46, 'steel'); deco('case glow', -10.0, 9.7, -2.8, 10.15, 1.38, 1.4, 'glow')
