@@ -75,6 +75,8 @@ export function blendMap(DATA, o) {
         if (setName === 'soft') { m.map = once('soft', () => own('soft.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; m.metalness = 0; m.vertexColors = false;
           if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.09; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.5; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
+        if (o.tint && o.tint[what] != null) m.color.set(o.tint[what]);   // (a map can recolour a material without a re-export)
+        if (o.glow != null && m.emissiveIntensity > 0 && m.emissive.getHex() && !m.lightMap && !m.emissiveMap) m.emissiveIntensity *= o.glow;
         if (lm && ob.geometry.attributes.uv1 && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
         // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
         else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = o.fill ?? 0.3; }
