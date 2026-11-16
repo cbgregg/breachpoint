@@ -59,7 +59,7 @@ export function blendMap(DATA, o) {
       const s = scene.clone(true);
       s.traverse(ob => {
         if (!ob.isMesh) return;
-        if (o.smooth && o.smooth.test(ob.material.name || ob.name)) ob.geometry.computeVertexNormals();   // (a slimmed model's facets rounded off)
+        if (o.smooth && o.smooth.test(ob.material.name || ob.name)) { ob.geometry.deleteAttribute('normal'); ob.geometry.computeVertexNormals(); }   // (a slimmed model's facets rounded off; the packed file's normals are small integers, so they are rebuilt as floats)
         let m = ob.material.clone();
         const named = (m.name || '').includes(':'), [setName, what = ''] = named ? m.name.split(':') : ['', ''];
         // soft things (cloud, a cotton-ball canopy): a velvety sheen, so their edges catch the light
@@ -80,6 +80,7 @@ export function blendMap(DATA, o) {
         if (lm && ob.geometry.attributes.uv1 && !(o.nolm && o.nolm.test(what)) && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
         // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
         else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = named ? o.fill ?? 0.3 : o.fillKit ?? o.fill ?? 0.3; }   // (fillKit: the models, which have no baked light at all)
+        if (o.clear && o.clear.test(what)) { m.transparent = true; m.opacity = 0.22; m.depthWrite = false; m.roughness = 0.06; m.lightMap = null; m.emissiveIntensity = 0; }   // (see-through glass: a display case, a skylight)
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
         m.needsUpdate = true; ob.material = m;

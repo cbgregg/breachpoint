@@ -25,6 +25,7 @@ export const FRESHWAY = blendMap(DATA, {
   noShadow: /car park|shop floor|back floor|pavement|paint line|ground wear|lamp|glow|neon|glass|truss|roof deck|floor light|lot light|^steel$|verge|road|far building/,
   smooth: /apple|lemon|lime|pomegranate|avocado|onion|potato|pear|croissant|bun|food/i,
   groundSurface: 'concrete',
+  clear: /^glass$/,
   nolm: /stripe/,   // (thin trim: too small on the light map to bake cleanly)
   lightmap: 1.5, fill: 0.2, fillKit: 0.3, glow: 0.45,
   tint: { 'shop floor': 0xbdb7ab, 'partition': 0xd2d2cc, 'store wall': 0xd9d4c8, 'case': 0xdcdcd8, 'gondola': 0xc6c6c2 },
