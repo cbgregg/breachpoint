@@ -182,9 +182,8 @@ def fir(x, y, h, k='fir', bark='bark', mirror=False, seed=0, detail=1):
             a = a0 + i * 2 * math.pi / n + r.uniform(-0.25, 0.25); Lb = L * r.uniform(0.78, 1.12); wd = Lb * 0.5; drop = Lb * r.uniform(0.12, 0.45) * (1 - f * 0.5); roll = Lb * r.uniform(-0.12, 0.12); ca, sa = math.cos(a), math.sin(a)
             P = lambda u, v, dz: (x + ca * u - sa * v, y + sa * u + ca * v, z + dz)
             leafquad('fir bough', (P(0.0, -wd, 0.06 - roll), P(Lb, -wd, -drop - roll), P(Lb, wd, -drop + roll), P(0.0, wd, 0.06 + roll)), r.randrange(3), k, mirror)
-    for a in (0.3, 1.87):   # the leader
-        ca, sa = math.cos(a), math.sin(a); wd = h * 0.03 + 0.3
-        leafquad('fir tip', ((x - ca * wd, y - sa * wd, h * 0.9), (x - ca * wd, y - sa * wd, h * 0.9 + wd * 2), (x + ca * wd, y + sa * wd, h * 0.9 + wd * 2), (x + ca * wd, y + sa * wd, h * 0.9)), 2, k, mirror)
+            if detail:   # and the same bough hanging on edge, so it has body seen from the ground
+                hh = Lb * 0.3; leafquad('fir bough', (P(0.0, 0, 0.06 - hh), P(Lb, 0, -drop - hh), P(Lb, 0, -drop + hh * 0.35), P(0.0, 0, 0.06 + hh * 0.35)), r.randrange(3), k, mirror)
 def broadleaf(x, y, h, k='leaf', bark='bark', mirror=False, seed=0, detail=1):
     """A broadleaf in the round: a trunk that forks, and a crown of real leafy sprays set upright all through it, facing every way."""
     r = random.Random(int(x * 13 + y * 29 + seed)); th = h * 0.48; cyl('tree trunk', x, y, 0, th, 0.12 + h * 0.016, bark, mirror=mirror, seg=8, r2=0.08 + h * 0.006)
@@ -192,7 +191,7 @@ def broadleaf(x, y, h, k='leaf', bark='bark', mirror=False, seed=0, detail=1):
     for i in range(4 if detail else 2): a = i * 1.57 + r.uniform(0, 1); bar('tree limb', (x, y, th - 0.3), (x + math.cos(a) * rx * 0.6, y + math.sin(a) * rx * 0.6, cz + r.uniform(-0.1, 0.25) * h), 0.05 + h * 0.004, bark, mirror=mirror)
     for i in range(44 if detail else 20):
         u, v, w = r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1); d = max(1e-3, math.sqrt(u * u + v * v + w * w)); q = r.uniform(0.25, 1.0) / d
-        c = Vector((x + u * q * rx, y + v * q * rx, cz + w * q * rz)); s = h * r.uniform(0.11, 0.17) * (1 if detail else 1.4); a = r.uniform(0, 6.3)
+        c = Vector((x + u * q * rx, y + v * q * rx, cz + w * q * rz - h * 0.05)); s = h * r.uniform(0.15, 0.22) * (1 if detail else 1.4); a = r.uniform(0, 6.3)
         e1 = Vector((math.cos(a), math.sin(a), r.uniform(-0.2, 0.2))).normalized(); e2 = Vector((r.uniform(-0.45, 0.45), r.uniform(-0.45, 0.45), 1)).normalized()
         leafquad('leaf spray', (c - e1 * s - e2 * s, c + e1 * s - e2 * s, c + e1 * s + e2 * s, c - e1 * s + e2 * s), 3, k, mirror)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
