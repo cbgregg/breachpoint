@@ -31,10 +31,16 @@ jobs:
           sed -i -E "s#(from +['\"]\.{1,2}/[^'\"?]+\.js)(['\"])#\1?v=$V\2#g; s#(import\(['\"]\.{1,2}/[^'\"?]+\.js)(['\"])#\1?v=$V\2#g" js/*.js
           sed -i -E "s#src=\"js/main\.js\"#src=\"js/main.js?v=$V\"#; s#href=\"css/([a-z]+)\.css\"#href=\"css/\1.css?v=$V\"#g" index.html
           grep -c "?v=$V" js/main.js index.html
+      - name: Leave out what the game never loads (Blender scenes, the map tools and their source models)
+        run: |
+          rm -rf tools assets/maps/*.blend
+          du -sh .
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      - name: Give the upload a moment to register (deploying at once can find no artifact)
+        run: sleep 15
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
