@@ -20,7 +20,7 @@ setup({
     'brick': ('v_brick:brick wall', 0xe4d8cc), 'roof': ('v_conc:roof slab', 0xc0c0b8), 'plaster': ('v_plaster:hut wall', 0xe0e0d4), 'rust': ('v_rust:tank', 0xe0d4c8), 'rustd': ('v_rust:tank band', 0x9a8878),
     'corr': ('v_corr:container', 0xd0d8d8), 'corr b': ('v_corr:container blue', 0x7a9ab0), 'corr r': ('v_corr:container red', 0xb47a68), 'sheet': ('v_corr:roof sheet', 0xc8c4bc), 'pump': ('v_paint:pump', 0xd8e0d4), 'pipe': ('v_paint:pipe', 0xc8d0c4),
     'bark': ('v_bark:trunk', 0xd8d0c4), 'steel': ('flat:steel', 0x4a4640), 'tread': ('flat:stairs', 0x56524a), 'dark': ('flat:dark', 0x141412), 'frame': ('v_rust:frame', 0x8a7868), 'yellow': ('flat:faded yellow', 0xb89a3a), 'sign': ('flat:sign', 0xd8d4c4),
-    'red': ('flat:valve red', 0x8a2a20), 'water': ('flat:water', 0x2c4438), 'moss': ('flat:moss', 0x4a6a30), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x8a9a78), 'decal': ('decal:ground wear', 0xffffff),
+    'red': ('flat:valve red', 0x8a2a20), 'water': ('flat:water', 0x2c4438), 'moss': ('flat:moss', 0x4a6a30), 'fir': ('foliage:fir', 0xc8d4c4), 'leaf': ('foliage:leaf', 0xd4dcc0), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x8a9a78), 'decal': ('decal:ground wear', 0xffffff),
 }, rough={'water': 0.05, 'steel': 0.6}, metal={'steel': 0.5}, default='brick',
    shade={'brick': 0xa89c94, 'plaster': 0xa4a89c, 'wall': 0x90968a, 'moss': 0x2a3e1c})
 rnd = random.Random(11); POOLS[0] = False
@@ -163,7 +163,7 @@ for i in range(18): y = -26 + i * 3.0; ivy(-HX, y, E_, 3.0, 3.3 + (i % 3) * 0.5,
 
 # ---------- trees inside the wall, and everything that grows ----------
 for x, y, h, v in ((-36.5, 21.0, 15, 0), (-5.0, 20.5, 13, 1), (-21.0, -23.5, 14, 0), (-37.0, -3.6, 12, 1), (-8.0, -13.5, 11, 1), (-25.5, 15.0, 13, 0), (-3.2, 9.5, 10, 1), (-17.0, 20.2, 12, 0), (-30.0, -8.0, 11, 1)):
-    cyl('tree trunk', x, y, 0, h * 0.5, 0.26 + h * 0.012, 'bark', seg=10, r2=0.14); cyl('tree foot', x, y, 0, 0.5, 0.5 + h * 0.012, 'bark', seg=10, r2=0.3 + h * 0.012); collide(x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 6, 'wood'); card(x, y, h, v, mirror=True); keep(x - 0.6, y - 0.6, x + 0.6, y + 0.6)
+    (broadleaf if v else fir)(x, y, h, mirror=True); cyl('tree foot', x, y, 0, 0.5, 0.42 + h * 0.012, 'bark', seg=8, r2=0.2 + h * 0.012); collide(x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 6, 'wood'); keep(x - 0.6, y - 0.6, x + 0.6, y + 0.6)
 n = 0
 while n < 46:    # fern patches and shrubs
     x, y = rnd.uniform(-39, -0.5), rnd.uniform(-27, 27)
@@ -185,7 +185,7 @@ for i in range(5): prop('nettle_plant', -9.4 + i * 0.0, -6.3 - i * 0.0 + (i - 2)
 for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 4, HY + 4, 56, 12, 19), (HX + 11, HY + 10, 60, 14, 22), (HX + 22, HY + 20, 64, 16, 26), (HX + 40, HY + 36, 60, 18, 28))):
     for i in range(cnt):
         t = (i + ring * 0.37) / cnt * 2 * PI; x, y = math.cos(t) * rx * 1.3, math.sin(t) * ry * 1.3; x = max(-rx, min(rx, x)) + rnd.uniform(-2.2, 2.2); y = max(-ry, min(ry, y)) + rnd.uniform(-2.2, 2.2)
-        card(x, y, rnd.uniform(hmin, hmax), 0 if (i + ring) % 3 else 1)
+        (fir if (i + ring) % 4 else broadleaf)(x, y, rnd.uniform(hmin, hmax) * (1 if (i + ring) % 4 else 0.7), seed=i)
 
 def stair(s):
     xs, zs = sorted((s * -8.3, s * -1.9)), sorted((s * -6.4, s * -5.3))
@@ -195,5 +195,5 @@ export('overgrowth', {
     'spawns': [[36.5, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],
     'upper': [{'y': R + 0.25, 'bounds': {'minX': -8.3, 'maxX': 8.3, 'minZ': -6.4, 'maxZ': 6.4}, 'portals': [stair(1), stair(-1)]}],
     'pickups': [['health', -4.2, 0, 0.6], ['ammo', 4.2, 0, -0.6], ['health', -3, R + 0.25, 2], ['ammo', 3, R + 0.25, -2], ['health', -22, 0, 0], ['health', 22, 0, 0], ['ammo', -31, 0, -7.3], ['ammo', 31, 0, 7.3], ['ammo', -14, 0, 16], ['ammo', 14, 0, -16]],
-}, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), sky=(0.8, 0.86, 0.9), sky_k=1.0,
+}, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), sky=(0.8, 0.86, 0.9), sky_k=1.0, skip=('card', 'decal', 'soft', 'cutout', 'foliage'),
             only='ground$|track|pad|brick wall|roof slab|hut wall|^tank$|container|roof sheet|perimeter wall|stairs|pump$'))

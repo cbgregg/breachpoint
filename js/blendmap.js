@@ -67,17 +67,20 @@ export function blendMap(DATA, o) {
           const pm = new THREE.MeshPhysicalMaterial({ color: m.color, vertexColors: m.vertexColors, roughness: 1, metalness: 0, sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(o.softTint || 0xffffff) });
           pm.name = m.name; m = pm;
         }
-        const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setName !== 'cutout' && setName !== 'atlas' && setName !== 'soft' && setFor(setName);
+        const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setName !== 'cutout' && setName !== 'atlas' && setName !== 'soft' && setName !== 'foliage' && setFor(setName);
         if (set) { m.map = set.map; m.normalMap = set.normalMap; m.roughnessMap = set.roughnessMap; m.roughness = 1; }
         if (setName === 'card') { m.map = once('card', () => own('cards.png', true)); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }
         if (setName === 'cutout') { m.map = once('cutout', () => own('cutouts.png', true)); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
+        // trees in the round (mapkit fir / broadleaf): cut-out boughs and leaf clusters, lit as if every one faced the sky, so a crown is bright on top and dark beneath
+        if (setName === 'foliage') { m.map = once('foliage', () => own('foliage.png', true)); m.alphaTest = 0.45; m.side = THREE.DoubleSide; m.roughness = 1; m.metalness = 0;
+          const g = ob.geometry, nn = new Float32Array(g.attributes.position.count * 3); for (let i = 1; i < nn.length; i += 3) nn[i] = 1; g.setAttribute('normal', new THREE.BufferAttribute(nn, 3)); }
         if (setName === 'atlas') { m.map = once('atlas', () => own('atlas.webp', true)); m.alphaTest = 0.5; m.roughness = 0.75; m.metalness = 0; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1; }
         if (setName === 'soft') { m.map = once('soft', () => own('soft.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; m.metalness = 0; m.vertexColors = false;
           if (/light/.test(what)) { m.blending = THREE.AdditiveBlending; m.opacity = 0.09; m.emissive = m.color.clone(); m.emissiveMap = m.map; m.color.set(0); } else m.opacity = 0.5; }
         if (setName === 'decal') { m.map = once('decal', () => own('decals.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; }
         if (o.tint && o.tint[what] != null) m.color.set(o.tint[what]);   // (a map can recolour a material without a re-export)
         if (o.glow != null && m.emissiveIntensity > 0 && m.emissive.getHex() && !m.lightMap && !m.emissiveMap) m.emissiveIntensity *= o.glow;
-        if (lm && ob.geometry.attributes.uv1 && !(o.nolm && o.nolm.test(what)) && !['card', 'decal', 'soft', 'cutout'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
+        if (lm && ob.geometry.attributes.uv1 && !(o.nolm && o.nolm.test(what)) && !['card', 'decal', 'soft', 'cutout', 'foliage'].includes(setName) && !(m.emissiveIntensity > 0 && m.emissive.getHex())) { m.lightMap = lm; m.lightMapIntensity = o.lightmap; }
         // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
         else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = named ? o.fill ?? 0.3 : o.fillKit ?? o.fill ?? 0.3; }   // (fillKit: the models, which have no baked light at all)
         if (o.clear && o.clear.test(what)) { m.transparent = true; m.opacity = 0.22; m.depthWrite = false; m.roughness = 0.06; m.lightMap = null; m.emissiveIntensity = 0; }   // (see-through glass: a display case, a skylight)

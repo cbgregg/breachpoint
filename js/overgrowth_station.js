@@ -12,7 +12,7 @@ export const OVERGROWTH_STATION = blendMap(DATA, {
   blurb: 'A pumping station taken back by the forest: the brick pump house and its roof in the middle, a pipe bridge over the track, tanks, a settling basin, the control hut and a water tower in ferns, ivy and firs',
   // the map's own texture sets (assets/textures/overgrowth, CC0 from Poly Haven): metres per repeat
   scale: { v_forest: 4, v_gravel: 3, v_pad: 3, v_brick: 2.2, v_rust: 3, v_corr: 2.4, v_paint: 2, v_bark: 1.6, v_plaster: 3, v_conc: 3 },
-  noShadow: /ground$|outer forest floor|track|ground wear|water|puddle/,
+  noShadow: /ground$|outer forest floor|track|ground wear|water|puddle|limb/,
   groundSurface: 'dirt',
   smooth: /rock|stump|trunk|root|tyre|barrel/i,
   clear: /^water$/,
