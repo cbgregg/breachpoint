@@ -27,14 +27,14 @@ def bounds(o):
     ps = [o.matrix_world @ Vector(c) for c in o.bound_box]; return [min(p[i] for p in ps) for i in range(3)], [max(p[i] for p in ps) for i in range(3)]
 tmp = tempfile.mkdtemp(); cells = []
 sc, cam, co = load(FIR, FIR_A, 'twig')
-tree = min((o for o in bpy.data.objects if o.type == 'MESH'), key=lambda o: len(o.data.polygons))   # (the smallest of the set)
+tree = max((o for o in bpy.data.objects if o.type == 'MESH'), key=lambda o: len(o.data.polygons))   # (the fullest of the set)
 for o in bpy.data.objects:
     if o.type == 'MESH' and o is not tree: o.hide_render = True
 lo, hi = bounds(tree); cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2; H = hi[2] - lo[2]; rad = max(hi[0] - lo[0], hi[1] - lo[1]) / 2
 print('fir', H, rad)
-for i, (f, a) in enumerate(((0.3, 0.4), (0.45, 2.5), (0.6, 4.4))):
-    S = rad * (1 - f * 0.75) * 0.95; z = lo[2] + H * f
-    cam.ortho_scale = S; cam.clip_start = 6 - 0.55; cam.clip_end = 6 + 0.55; co.location = (cx + math.cos(a) * S / 2, cy + math.sin(a) * S / 2, z + 6); co.rotation_euler = (0, 0, a)
+for i, (f, a) in enumerate(((0.5, 0.4), (0.62, 2.5), (0.74, 4.4))):   # (above the bare lower branches)
+    S = rad * (1 - f * 0.8) * 1.15; z = lo[2] + H * f
+    cam.ortho_scale = S; cam.clip_start = 6 - 0.8; cam.clip_end = 6 + 0.8; co.location = (cx + math.cos(a) * S / 2, cy + math.sin(a) * S / 2, z + 6); co.rotation_euler = (0, 0, a)
     sc.render.filepath = os.path.join(tmp, 'c%d.png' % i); bpy.ops.render.render(write_still=True); cells.append(sc.render.filepath)
 sc, cam, co = load(LEAF, LEAF_A, 'leaves')
 tree = max((o for o in bpy.data.objects if o.type == 'MESH'), key=lambda o: len(o.data.polygons)); lo, hi = bounds(tree); H = hi[2] - lo[2]
