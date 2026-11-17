@@ -134,6 +134,11 @@ export class Renderer {
     this.aoPass.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 8 });
     this.aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
     this.aoPass.blendIntensity = 0.9;
+    // cut-outs (foliage, ivy, tree cards) sit out the occlusion pass: it draws every mesh as a solid, so a leafy quad
+    // would shade its surroundings as the rectangle it is cut from (a map registers them in globalThis.__noAO)
+    const aoRender = this.aoPass.render.bind(this.aoPass);
+    this.aoPass.render = (...a) => { const set = globalThis.__noAO, hid = []; if (set) for (const o of set) if (o.visible) { o.visible = false; hid.push(o); }
+      try { aoRender(...a); } finally { for (const o of hid) o.visible = true; } };
     // ambient occlusion is soft too: its normal/depth pass, the occlusion and the denoise all run at half
     // resolution (a quarter of the pixels; the composite reads it back filtered)
     const aoSize = this.aoPass.setSize.bind(this.aoPass);

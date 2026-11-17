@@ -175,11 +175,11 @@ def fir(x, y, h, k='fir', bark='bark', mirror=False, seed=0):
     """A fir in the round: a tapering trunk, and tier on tier of boughs drooping from it all the way up, each tier
     turned against the last, so it has depth from every side and from above. About 130 triangles."""
     r = random.Random(int(x * 31 + y * 17 + seed)); cyl('fir trunk', x, y, 0, h * 0.96, 0.1 + h * 0.014, bark, mirror=mirror, seg=7, r2=0.03)
-    tiers = max(5, int(h / 1.25)); z0 = h * r.uniform(0.16, 0.26); rmax = h * r.uniform(0.17, 0.22)
+    tiers = max(6, int(h / 1.0)); z0 = h * r.uniform(0.16, 0.26); rmax = h * r.uniform(0.17, 0.22)
     for t in range(tiers):
         f = t / (tiers - 1); z = z0 + (h * 0.97 - z0) * f; L = rmax * (1 - f) ** 0.85 + 0.35; n = 6 if f < 0.6 else 5; a0 = r.uniform(0, 6.3)
         for i in range(n):
-            a = a0 + i * 2 * math.pi / n + r.uniform(-0.2, 0.2); Lb = L * r.uniform(0.82, 1.1); wd = Lb * 0.5; drop = Lb * r.uniform(0.28, 0.5) * (1 - f * 0.6); ca, sa = math.cos(a), math.sin(a)
+            a = a0 + i * 2 * math.pi / n + r.uniform(-0.2, 0.2); Lb = L * r.uniform(0.82, 1.1); wd = Lb * 0.56; drop = Lb * r.uniform(0.25, 0.55) * (1 - f * 0.6); ca, sa = math.cos(a), math.sin(a)
             P = lambda u, v, dz: (x + ca * u - sa * v, y + sa * u + ca * v, z + dz)
             leafquad('fir bough', (P(0.02, -wd, 0.1), P(Lb, -wd, -drop), P(Lb, wd, -drop), P(0.02, wd, 0.1)), 0, k, mirror)
     for a in (0.3, 1.87):   # the leader

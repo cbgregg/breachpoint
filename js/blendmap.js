@@ -55,6 +55,7 @@ export function blendMap(DATA, o) {
     });
     // a baked light map (light.jpg on the scene's second UV set: tools/blender/mapkit.py bake_light), o.lightmap its strength
     const lm = o.lightmap ? own('light.jpg', true) : null; if (lm) lm.channel = 1;
+    if (globalThis.__noAO) globalThis.__noAO.clear();
     preloadBlendScene(o.id); scenes.get(o.id).then((scene) => {
       const s = scene.clone(true);
       s.traverse(ob => {
@@ -72,7 +73,8 @@ export function blendMap(DATA, o) {
         if (setName === 'card') { m.map = once('card', () => own('cards.png', true)); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }
         if (setName === 'cutout') { m.map = once('cutout', () => own('cutouts.png', true)); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
         // trees in the round (mapkit fir / broadleaf): cut-out boughs and leaf clusters, lit as if every one faced the sky, so a crown is bright on top and dark beneath
-        if (setName === 'foliage') { m.map = once('foliage', () => own('foliage.png', true)); m.alphaTest = 0.45; m.side = THREE.DoubleSide; m.roughness = 1; m.metalness = 0;
+        if (setName === 'foliage') { m.map = once('foliage', () => { const t = own('foliage.png', true); t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; return t; }); m.alphaTest = 0.4;   // (no mipmaps: a cut-out's small copies lose their leaves, and far trees go bare)
+          m.side = THREE.DoubleSide; m.roughness = 1; m.metalness = 0;
           const g = ob.geometry, nn = new Float32Array(g.attributes.position.count * 3); for (let i = 1; i < nn.length; i += 3) nn[i] = 1; g.setAttribute('normal', new THREE.BufferAttribute(nn, 3)); }
         if (setName === 'atlas') { m.map = once('atlas', () => own('atlas.webp', true)); m.alphaTest = 0.5; m.roughness = 0.75; m.metalness = 0; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1; }
         if (setName === 'soft') { m.map = once('soft', () => own('soft.png', true)); m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; m.roughness = 1; m.metalness = 0; m.vertexColors = false;
@@ -86,6 +88,8 @@ export function blendMap(DATA, o) {
         if (o.clear && o.clear.test(what)) { m.transparent = true; m.opacity = 0.22; m.depthWrite = false; m.roughness = 0.06; m.lightMap = null; m.emissiveIntensity = 0; }   // (see-through glass: a display case, a skylight)
         if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
         if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
+        if (['card', 'cutout', 'foliage', 'decal', 'soft'].includes(setName) || m.alphaTest > 0) (globalThis.__noAO || (globalThis.__noAO = new Set())).add(ob);
+        if (setName === 'foliage' && m.emissiveIntensity) m.emissiveIntensity = o.fillLeaf ?? 0.42;   // (the shaded side of a crown is lit by the leaves around it)
         m.needsUpdate = true; ob.material = m;
         ob.receiveShadow = true; ob.castShadow = !(setName === 'card' || setName === 'atlas' || setName === 'soft' || setName === 'decal' || setName === 'cutout' || (o.noShadow && o.noShadow.test(what)));
       });
