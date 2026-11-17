@@ -42,7 +42,7 @@ export const MODE_IDS = Object.keys(MODES);
 
 // bomb sites on team 1's side (+x); team 0's are point-mirrored, like the maps themselves
 // (about 30 m from the defenders' spawn and 45 m from the attackers': both teams reach them at nearly the same time)
-const SITES = { zenith: [[4, 20], [26, -4]], castle: [[25, 18.3], [2.2, 13.5]], vacancy: [[15, -11.5], [9.5, 3.5]], tarsa: [[19, 14.5], [4.8, 2.6]], tarsa_classic: [[20, -34.5], [22, 35]], shuran: [[9, -16], [9, 17]], pioneer: [[27, 22], [28, -6]], drivein: [[22, 29.5], [26, -29]], overgrowth: [[17, 7.5], [20.5, -18]], cannery: [[30, 21], [24, -22]], afterhours: [[16, 6], [20, -10]] }; // Tarsa: inside the two market halls
+const SITES = { zenith: [[4, 20], [26, -4]], castle: [[25, 18.3], [2.2, 13.5]], vacancy: [[15, -11.5], [9.5, 3.5]], tarsa: [[19, 14.5], [4.8, 2.6]], tarsa_classic: [[20, -34.5], [22, 35]], shuran: [[9, -16], [9, 17]], pioneer: [[27, 22], [28, -6]], drivein: [[22, 29.5], [26, -29]], overgrowth: [[17, 7.5], [10, -22]], overgrowth_classic: [[17, 7.5], [20.5, -18]], cannery: [[30, 21], [24, -22]], afterhours: [[16, 6], [20, -10]] }; // Tarsa: inside the two market halls
 const BOMB = { carried: 0, dropped: 1, planted: 2, defused: 3, exploded: 4 };
 const PHASE = ['pre', 'live', 'post'];
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();

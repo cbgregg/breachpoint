@@ -14,6 +14,7 @@ import { CASTLE } from './castle.js';
 import { ZENITH } from './zenith.js';
 import { TARSA } from './tarsa.js';
 import { FRESHWAY } from './freshway.js';
+import { OVERGROWTH_STATION } from './overgrowth_station.js';
 import { CANNERY } from './cannery.js';
 import { AFTERHOURS } from './afterhours.js';
 import { LINKLOOP } from './linkloop.js';
@@ -429,7 +430,8 @@ export const MAPS = {
   mart: FRESHWAY,   // (rebuilt in Blender; the earlier one follows)
   mart_classic: { ...MART, id: 'mart_classic', name: 'Freshway (classic)', photos: [1, 2, 3].map(n => `assets/loading/mart_classic-${n}.jpg`) },
   drivein: DRIVEIN,
-  overgrowth: OVERGROWTH,
+  overgrowth: OVERGROWTH_STATION,   // (rebuilt in Blender; the earlier one follows)
+  overgrowth_classic: { ...OVERGROWTH, id: 'overgrowth_classic', name: 'Overgrowth (classic)', photos: [1, 2, 3].map(n => `assets/loading/overgrowth_classic-${n}.jpg`) },
   vacancy: VACANCY,
   castle: CASTLE,
   zenith: ZENITH,
