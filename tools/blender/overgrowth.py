@@ -185,7 +185,7 @@ for i in range(5): prop('nettle_plant', -9.4 + i * 0.0, -6.3 - i * 0.0 + (i - 2)
 for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 4, HY + 4, 56, 12, 19), (HX + 11, HY + 10, 60, 14, 22), (HX + 22, HY + 20, 64, 16, 26), (HX + 40, HY + 36, 60, 18, 28))):
     for i in range(cnt):
         t = (i + ring * 0.37) / cnt * 2 * PI; x, y = math.cos(t) * rx * 1.3, math.sin(t) * ry * 1.3; x = max(-rx, min(rx, x)) + rnd.uniform(-2.2, 2.2); y = max(-ry, min(ry, y)) + rnd.uniform(-2.2, 2.2)
-        (fir if (i + ring) % 4 else broadleaf)(x, y, rnd.uniform(hmin, hmax) * (1 if (i + ring) % 4 else 0.7), seed=i)
+        (fir if (i + ring) % 5 else broadleaf)(x, y, rnd.uniform(hmin, hmax) * (1 if (i + ring) % 5 else 0.7), seed=i, detail=1 if ring == 0 else 0)
 
 def stair(s):
     xs, zs = sorted((s * -8.3, s * -1.9)), sorted((s * -6.4, s * -5.3))

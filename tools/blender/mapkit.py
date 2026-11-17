@@ -165,36 +165,36 @@ def pool(x, y, w, d, k, z=0.03, yaw=0, mirror=True):
     piece of furniture, or a pool of light under a lamp, by its material k ('soft:shadow' / 'soft:... light')."""
     if not POOLS[0]: return
     o = quad('soft'); o.location = (x, y, z); o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw); finish(o, k, mirror, uv=False)
-def leafquad(name, pts, half, k, mirror):
-    """One cut-out from the foliage atlas (assets/textures/<map>/foliage.png: a fir bough in its left half, lying
-    along u from the trunk to the tip; a cluster of leaves in its right half) on the quad pts."""
+def leafquad(name, pts, cell, k, mirror):
+    """One cut-out from the foliage atlas (assets/textures/<map>/foliage.png, four cells: tools/blender/tree_atlas.py)
+    on the quad pts: cells 0-2 a fir bough lying along u from the trunk to the tip, cell 3 a spray of broadleaf branches, upright."""
     me = bpy.data.meshes.new(name); me.from_pydata([tuple(p) for p in pts], [], [(0, 1, 2, 3)]); uv = me.uv_layers.new(name='UVMap')
-    for l, c in zip(uv.data, ((0, 0), (1, 0), (1, 1), (0, 1))): l.uv = ((half + c[0]) / 2, c[1])
+    for l, c in zip(uv.data, ((0, 0), (1, 0), (1, 1), (0, 1))): l.uv = ((cell % 2 + 0.004 + c[0] * 0.992) / 2, (cell // 2 + 0.004 + c[1] * 0.992) / 2)
     me.update(); o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); finish(o, k, mirror, uv=False)
-def fir(x, y, h, k='fir', bark='bark', mirror=False, seed=0):
-    """A fir in the round: a tapering trunk, and tier on tier of boughs drooping from it all the way up, each tier
-    turned against the last, so it has depth from every side and from above. About 130 triangles."""
-    r = random.Random(int(x * 31 + y * 17 + seed)); cyl('fir trunk', x, y, 0, h * 0.96, 0.1 + h * 0.014, bark, mirror=mirror, seg=7, r2=0.03)
-    tiers = max(6, int(h / 1.0)); z0 = h * r.uniform(0.16, 0.26); rmax = h * r.uniform(0.17, 0.22)
+def fir(x, y, h, k='fir', bark='bark', mirror=False, seed=0, detail=1):
+    """A fir in the round: a tapering trunk and whorl on whorl of real boughs (photographed from above) drooping from
+    it all the way up, each whorl turned against the last. detail 1: a whorl every 0.6 m (near trees); 0: half that."""
+    r = random.Random(int(x * 31 + y * 17 + seed)); cyl('fir trunk', x, y, 0, h * 0.97, 0.1 + h * 0.013, bark, mirror=mirror, seg=7, r2=0.03)
+    step, n = (0.6, 7) if detail else (1.2, 5); z0 = h * r.uniform(0.13, 0.22); rmax = h * r.uniform(0.16, 0.2); tiers = max(5, int((h * 0.97 - z0) / step))
     for t in range(tiers):
-        f = t / (tiers - 1); z = z0 + (h * 0.97 - z0) * f; L = rmax * (1 - f) ** 0.85 + 0.35; n = 6 if f < 0.6 else 5; a0 = r.uniform(0, 6.3)
+        f = t / (tiers - 1); z = z0 + (h * 0.97 - z0) * f; L = rmax * (1 - f) ** 0.9 + 0.35; a0 = r.uniform(0, 6.3)
         for i in range(n):
-            a = a0 + i * 2 * math.pi / n + r.uniform(-0.2, 0.2); Lb = L * r.uniform(0.82, 1.1); wd = Lb * 0.56; drop = Lb * r.uniform(0.25, 0.55) * (1 - f * 0.6); ca, sa = math.cos(a), math.sin(a)
+            a = a0 + i * 2 * math.pi / n + r.uniform(-0.25, 0.25); Lb = L * r.uniform(0.78, 1.12); wd = Lb * 0.5; drop = Lb * r.uniform(0.12, 0.45) * (1 - f * 0.5); roll = Lb * r.uniform(-0.12, 0.12); ca, sa = math.cos(a), math.sin(a)
             P = lambda u, v, dz: (x + ca * u - sa * v, y + sa * u + ca * v, z + dz)
-            leafquad('fir bough', (P(0.02, -wd, 0.1), P(Lb, -wd, -drop), P(Lb, wd, -drop), P(0.02, wd, 0.1)), 0, k, mirror)
+            leafquad('fir bough', (P(0.0, -wd, 0.06 - roll), P(Lb, -wd, -drop - roll), P(Lb, wd, -drop + roll), P(0.0, wd, 0.06 + roll)), r.randrange(3), k, mirror)
     for a in (0.3, 1.87):   # the leader
-        ca, sa = math.cos(a), math.sin(a); wd = h * 0.035 + 0.25
-        leafquad('fir tip', ((x - ca * wd, y - sa * wd, h * 0.86), (x - ca * wd, y - sa * wd, h * 1.04), (x + ca * wd, y + sa * wd, h * 1.04), (x + ca * wd, y + sa * wd, h * 0.86)), 0, k, mirror)
-def broadleaf(x, y, h, k='leaf', bark='bark', mirror=False, seed=0):
-    """A broadleaf in the round: a trunk that forks, and a crown of leaf clusters turned every way."""
-    r = random.Random(int(x * 13 + y * 29 + seed)); th = h * 0.5; cyl('tree trunk', x, y, 0, th, 0.12 + h * 0.016, bark, mirror=mirror, seg=8, r2=0.08 + h * 0.006)
-    cz, rx, rz = h * 0.7, h * 0.3, h * 0.26
-    for i in range(4): a = i * 1.57 + r.uniform(0, 1); bar('tree limb', (x, y, th - 0.3), (x + math.cos(a) * rx * 0.6, y + math.sin(a) * rx * 0.6, cz + r.uniform(-0.1, 0.25) * h), 0.05 + h * 0.004, bark, mirror=mirror)
-    for i in range(26):
-        u, v, w = r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1); d = max(1e-3, math.sqrt(u * u + v * v + w * w)); q = r.uniform(0.35, 1.0) / d
-        c = Vector((x + u * q * rx, y + v * q * rx, cz + w * q * rz)); s = h * r.uniform(0.15, 0.22)
-        e1 = Vector((r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-0.5, 0.5))).normalized(); e2 = e1.cross(Vector((r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1))).normalized()).normalized()
-        leafquad('leaf cluster', (c - e1 * s - e2 * s, c + e1 * s - e2 * s, c + e1 * s + e2 * s, c - e1 * s + e2 * s), 1, k, mirror)
+        ca, sa = math.cos(a), math.sin(a); wd = h * 0.03 + 0.3
+        leafquad('fir tip', ((x - ca * wd, y - sa * wd, h * 0.9), (x - ca * wd, y - sa * wd, h * 0.9 + wd * 2), (x + ca * wd, y + sa * wd, h * 0.9 + wd * 2), (x + ca * wd, y + sa * wd, h * 0.9)), 2, k, mirror)
+def broadleaf(x, y, h, k='leaf', bark='bark', mirror=False, seed=0, detail=1):
+    """A broadleaf in the round: a trunk that forks, and a crown of real leafy sprays set upright all through it, facing every way."""
+    r = random.Random(int(x * 13 + y * 29 + seed)); th = h * 0.48; cyl('tree trunk', x, y, 0, th, 0.12 + h * 0.016, bark, mirror=mirror, seg=8, r2=0.08 + h * 0.006)
+    cz, rx, rz = h * 0.7, h * 0.3, h * 0.27
+    for i in range(4 if detail else 2): a = i * 1.57 + r.uniform(0, 1); bar('tree limb', (x, y, th - 0.3), (x + math.cos(a) * rx * 0.6, y + math.sin(a) * rx * 0.6, cz + r.uniform(-0.1, 0.25) * h), 0.05 + h * 0.004, bark, mirror=mirror)
+    for i in range(44 if detail else 20):
+        u, v, w = r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1); d = max(1e-3, math.sqrt(u * u + v * v + w * w)); q = r.uniform(0.25, 1.0) / d
+        c = Vector((x + u * q * rx, y + v * q * rx, cz + w * q * rz)); s = h * r.uniform(0.11, 0.17) * (1 if detail else 1.4); a = r.uniform(0, 6.3)
+        e1 = Vector((math.cos(a), math.sin(a), r.uniform(-0.2, 0.2))).normalized(); e2 = Vector((r.uniform(-0.45, 0.45), r.uniform(-0.45, 0.45), 1)).normalized()
+        leafquad('leaf spray', (c - e1 * s - e2 * s, c + e1 * s - e2 * s, c + e1 * s + e2 * s, c - e1 * s + e2 * s), 3, k, mirror)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)
