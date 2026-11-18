@@ -99,7 +99,16 @@ def tube(name, seg, r1, r2, depth, loc):
     ring = lambda r, z: [(r * math.cos(2 * math.pi * i / seg), r * math.sin(2 * math.pi * i / seg), z) for i in range(seg)]
     v = ring(r1, -depth / 2) + ring(max(r2, 1e-4), depth / 2)
     f = [(i, (i + 1) % seg, seg + (i + 1) % seg, seg + i) for i in range(seg)] + [tuple(range(seg - 1, -1, -1)), tuple(range(seg, 2 * seg))]
-    me = bpy.data.meshes.new(name); me.from_pydata(v, [], f); me.uv_layers.new(name='UVMap'); me.update()
+    me = bpy.data.meshes.new(name); me.from_pydata(v, [], f); uv = me.uv_layers.new(name='UVMap')
+    # texture coordinates in metres: round the side by arc length, up it by height; the ends mapped flat
+    circ = math.pi * (r1 + max(r2, 1e-4)); li = 0
+    for fi, face in enumerate(me.polygons):
+        for k, vi in enumerate(face.vertices):
+            if fi < seg:
+                col = (fi + (1 if k in (1, 2) else 0)) / seg; uv.data[face.loop_indices[k]].uv = (col * circ, 0 if k < 2 else depth)
+            else:
+                co = v[vi]; uv.data[face.loop_indices[k]].uv = (co[0], co[1])
+    me.update()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); o.location = loc; return o
 def cyl(name, x, y, z0, z1, r, k, mirror=True, seg=10, r2=None, rot=None):
     o = tube(name, seg, r, r if r2 is None else r2, z1 - z0, (x, y, (z0 + z1) / 2))
@@ -194,6 +203,9 @@ def broadleaf(x, y, h, k='leaf', bark='bark', mirror=False, seed=0, detail=1):
         c = Vector((x + u * q * rx, y + v * q * rx, cz + w * q * rz - h * 0.05)); s = h * r.uniform(0.15, 0.22) * (1 if detail else 1.4); a = r.uniform(0, 6.3)
         e1 = Vector((math.cos(a), math.sin(a), r.uniform(-0.2, 0.2))).normalized(); e2 = Vector((r.uniform(-0.45, 0.45), r.uniform(-0.45, 0.45), 1)).normalized()
         leafquad('leaf spray', (c - e1 * s - e2 * s, c + e1 * s - e2 * s, c + e1 * s + e2 * s, c - e1 * s + e2 * s), 3, k, mirror)
+def clump(kind, x, y, w, h, yaw=0, mirror=True, z0=-0.03):
+    """A plant from the greenery atlas standing in the round: three cards turned 60 degrees apart (kind as for cut)."""
+    for i in range(3): cut(kind, x, y, z0, w, h, yaw + i * math.pi / 3, mirror, off=0)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)

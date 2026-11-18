@@ -165,22 +165,15 @@ for i in range(18): y = -26 + i * 3.0; ivy(-HX, y, E_, 3.0, 3.3 + (i % 3) * 0.5,
 for x, y, h, v in ((-36.5, 21.0, 15, 0), (-5.0, 20.5, 13, 1), (-21.0, -23.5, 14, 0), (-37.0, -3.6, 12, 1), (-8.0, -13.5, 11, 1), (-25.5, 15.0, 13, 0), (-3.2, 9.5, 10, 1), (-17.0, 20.2, 12, 0), (-30.0, -8.0, 11, 1)):
     (broadleaf if v else fir)(x, y, h, mirror=True); cyl('tree foot', x, y, 0, 0.5, 0.42 + h * 0.012, 'bark', seg=8, r2=0.2 + h * 0.012); collide(x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 6, 'wood'); keep(x - 0.6, y - 0.6, x + 0.6, y + 0.6)
 n = 0
-while n < 46:    # fern patches and shrubs
+while n < 70:    # ferns, the odd leafy shrub
     x, y = rnd.uniform(-39, -0.5), rnd.uniform(-27, 27)
-    if not free(x, y, 1.2) or abs(y) < 2.9 and x < -8: continue
-    q = n % 5
-    if q < 2: prop('fern_02', x, y, 0, rnd.uniform(0, 6.3), rnd.uniform(0.8, 1.3))
-    elif q == 2: prop('shrub_01', x, y, 0, rnd.uniform(0, 6.3), rnd.uniform(0.8, 1.2))
-    elif q == 3: prop('shrub_03', x, y, 0, rnd.uniform(0, 6.3), rnd.uniform(1.0, 1.6))
-    else: prop('grass_medium_01', x, y, 0, rnd.uniform(0, 6.3), rnd.uniform(0.7, 1.0))
-    n += 1
+    if not free(x, y, 0.9) or abs(y) < 2.9 and x < -8: continue
+    s_ = rnd.uniform(0.9, 1.6); clump(2, x, y, s_ * 1.5, s_, rnd.uniform(0, 6.3)); n += 1
 n = 0
-while n < 150:   # tall grass, saplings and bushes on cards
+while n < 260:   # grass and weeds, thickest along walls and round the pads
     x, y = rnd.uniform(-39.5, -0.3), rnd.uniform(-27.5, 27.5)
-    if not free(x, y, 0.3) or abs(y) < 2.4 and x < -8: continue
-    k = 3 if n % 4 else 2; h = rnd.uniform(0.7, 1.3) if k == 3 else rnd.uniform(1.2, 2.2); a = rnd.uniform(0, PI)
-    cut(k, x, y, -0.03, h * 1.3, h, a, off=0); cut(k, x, y, -0.03, h * 1.3, h, a + PI / 2, off=0); n += 1
-for i in range(5): prop('nettle_plant', -9.4 + i * 0.0, -6.3 - i * 0.0 + (i - 2) * 0.01, 0, i, 1.0) if i == 0 else None
+    if not free(x, y, 0.25) or abs(y) < 2.4 and x < -8: continue
+    h = rnd.uniform(0.45, 0.95); clump(3, x, y, h * 1.6, h, rnd.uniform(0, 6.3)); n += 1
 # the forest beyond: three rings of firs and broadleaves, thinning into the mist
 for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 4, HY + 4, 56, 12, 19), (HX + 11, HY + 10, 60, 14, 22), (HX + 22, HY + 20, 64, 16, 26), (HX + 40, HY + 36, 60, 18, 28))):
     for i in range(cnt):
