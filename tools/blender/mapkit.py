@@ -45,6 +45,19 @@ def cube(name, loc, scale, rot=(0, 0, 0)):
     me = bpy.data.meshes.new(name); me.from_pydata(CUBE_V, [], CUBE_F); me.uv_layers.new(name='UVMap'); me.update()
     o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); o.location = loc; o.scale = scale; o.rotation_euler = rot
     return o
+BATCH = {}
+def batch_quad(pts, uvs, k, mirror):
+    """A flat quad (four corners and their texture coordinates) added to its material's batch (made into one mesh at export)."""
+    b = BATCH.setdefault(k, ([], [], []))
+    for P in ([tuple(p) for p in pts],) + (([(-p[0], -p[1], p[2]) for p in pts],) if mirror else ()):
+        i0 = len(b[0]); b[0].extend(P); b[1].append((i0, i0 + 1, i0 + 2, i0 + 3)); b[2].extend(uvs)
+def flush_batches():
+    for k, (v, f, u) in BATCH.items():
+        me = bpy.data.meshes.new('batch ' + k); me.from_pydata(v, [], f); uv = me.uv_layers.new(name='UVMap')
+        for poly in me.polygons:
+            for li, vi in zip(poly.loop_indices, poly.vertices): uv.data[li].uv = u[vi]
+        me.update(); o = bpy.data.objects.new('batch ' + k, me); bpy.context.collection.objects.link(o); o.data.materials.append(m_(k))
+    BATCH.clear()
 def quad(name):
     """A unit square in the xy plane with 0..1 UVs, made directly as mesh data (see cube)."""
     me = bpy.data.meshes.new(name); me.from_pydata([(-.5, -.5, 0), (.5, -.5, 0), (.5, .5, 0), (-.5, .5, 0)], [], [(0, 1, 2, 3)]); uv = me.uv_layers.new(name='UVMap')
@@ -177,9 +190,7 @@ def pool(x, y, w, d, k, z=0.03, yaw=0, mirror=True):
 def leafquad(name, pts, cell, k, mirror):
     """One cut-out from the foliage atlas (assets/textures/<map>/foliage.png, four cells: tools/blender/tree_atlas.py)
     on the quad pts: cells 0-2 a fir bough lying along u from the trunk to the tip, cell 3 a spray of broadleaf branches, upright."""
-    me = bpy.data.meshes.new(name); me.from_pydata([tuple(p) for p in pts], [], [(0, 1, 2, 3)]); uv = me.uv_layers.new(name='UVMap')
-    for l, c in zip(uv.data, ((0, 0), (1, 0), (1, 1), (0, 1))): l.uv = ((cell % 2 + 0.004 + c[0] * 0.992) / 2, (cell // 2 + 0.004 + c[1] * 0.992) / 2)
-    me.update(); o = bpy.data.objects.new(name, me); bpy.context.collection.objects.link(o); finish(o, k, mirror, uv=False)
+    batch_quad(pts, [((cell % 2 + 0.004 + c[0] * 0.992) / 2, (cell // 2 + 0.004 + c[1] * 0.992) / 2) for c in ((0, 0), (1, 0), (1, 1), (0, 1))], k, mirror)
 def fir(x, y, h, k='fir', bark='bark', mirror=False, seed=0, detail=1):
     """A fir in the round: a tapering trunk and whorl on whorl of real boughs (photographed from above) drooping from
     it all the way up, each whorl turned against the last. detail 1: a whorl every 0.6 m (near trees); 0: half that."""
@@ -208,9 +219,8 @@ def clump(kind, x, y, w, h, yaw=0, mirror=True, z0=-0.03):
     for i in range(3): cut(kind, x, y, z0, w, h, yaw + i * math.pi / 3, mirror, off=0)
 def wear(kind, x, y, w, d, yaw=0, z=0.006, mirror=True):
     """Ground wear from the atlas (assets/textures/vacancy/decals.png): 0 oil stain, 1 cracks, 2 tar patch, 3 tyre marks."""
-    bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.object; o.name = 'wear'; o.scale = (w, d, 1); o.rotation_euler = (0, 0, yaw)
-    for l in o.data.uv_layers.active.data: l.uv = ((kind % 2 + l.uv.x) / 2, 1 - (kind // 2 + 1 - l.uv.y) / 2)
-    finish(o, 'decal', mirror, uv=False)
+    c, s_ = math.cos(yaw), math.sin(yaw); C = ((-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5))
+    batch_quad([(x + lx * w * c - ly * d * s_, y + lx * w * s_ + ly * d * c, z) for lx, ly in C], [((kind % 2 + lx + 0.5) / 2, 1 - (kind // 2 + 0.5 - ly) / 2) for lx, ly in C], 'decal', mirror)
 def paint(body, x, y, yaw, size, mirror=True):
     """Lettering painted flat on the ground, read from the south when yaw is 0."""
     bpy.ops.object.text_add(location=(0, 0, 0)); o = bpy.context.object; o.data.body = body; o.data.resolution_u = 2; o.data.size = size; o.data.align_x = 'CENTER'; o.data.align_y = 'CENTER'
@@ -252,10 +262,9 @@ def vehicle(slot, x0, y0, x1, y1, h, yaw):
 def cut(kind, x, y, z0, w, h, yaw=0, mirror=True, off=0.03):
     """A cut-out from the map's greenery atlas (assets/textures/<map>/cutouts.png: 0 ivy, 1 hanging vines, 2 a shrub,
     3 tall grass), standing upright with its foot at z0, facing south at yaw 0 and `off` metres proud of (x, y)."""
-    o = quad('greenery')
-    for l in o.data.uv_layers.active.data: l.uv = ((kind % 2 + l.uv.x) / 2, 1 - (kind // 2 + 1 - l.uv.y) / 2)
-    o.location = (x + math.sin(yaw) * off, y - math.cos(yaw) * off, z0 + h / 2); o.rotation_euler = (math.pi / 2, 0, yaw); o.scale = (w, h, 1)
-    return finish(o, 'cut', mirror, uv=False)
+    cx, cy, c, s_ = x + math.sin(yaw) * off, y - math.cos(yaw) * off, math.cos(yaw), math.sin(yaw)
+    pts = [(cx + lx * w * c, cy + lx * w * s_, z0 + (ly + 0.5) * h) for lx, ly in ((-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5))]
+    batch_quad(pts, [((kind % 2 + u) / 2, 1 - (kind // 2 + 1 - v) / 2) for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))], 'cut', mirror)
 def slab(name, cx, cy, cz, sx, sy, sz, rot, k, mirror=True):
     """A box turned any way (rot: Euler angles), drawn only: a sloped roof, an awning, a brace."""
     o = cube(name, (cx, cy, cz), (sx, sy, sz), rot)
@@ -338,6 +347,7 @@ def bake_light(name, size=2048, samples=32, sky=(0.78, 0.86, 1.0), sky_k=1.0, em
     for o in bake: o.data.uv_layers.active = o.data.uv_layers[0]; o.data.uv_layers[0].active_render = True
 def export(name, data, bake=None):
     """Save the editable scene, export the game's copy (one mesh per material) and its data module."""
+    flush_batches()
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, 'assets', 'maps', name + '.blend'))   # (keeps every named piece)
     try: os.remove(os.path.join(ROOT, 'assets', 'maps', name + '.blend1'))
     except OSError: pass

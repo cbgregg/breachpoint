@@ -102,8 +102,8 @@ export function blendMap(DATA, o) {
         // what the bake leaves out (small parts, trees, the far surroundings) gets some of its own colour back, in place of the fill light a baked map turns down
         else if (lm && !(m.emissiveIntensity > 0 && m.emissive.getHex()) && setName !== 'soft' && setName !== 'decal') { m.emissive = m.color.clone(); m.emissiveMap = m.map || null; m.emissiveIntensity = named ? o.fill ?? 0.3 : o.fillKit ?? o.fill ?? 0.3; }   // (fillKit: the models, which have no baked light at all)
         if (o.clear && o.clear.test(what)) { m.transparent = true; m.opacity = 0.22; m.depthWrite = false; m.roughness = 0.06; m.lightMap = null; m.emissiveIntensity = 0; }   // (see-through glass: a display case, a skylight)
-        if (what === 'water') { m.transparent = true; m.opacity = 0.62; m.depthWrite = false; }
-        if (what === 'glass' || what === 'water') m.envMapIntensity = 1.6;
+        if (what === 'water') { m.transparent = true; m.opacity = o.waterOpacity ?? 0.62; m.depthWrite = false; }
+        if (what === 'glass' || what === 'water') m.envMapIntensity = what === 'water' ? o.waterEnv ?? 1.6 : 1.6;
         if (['card', 'cutout', 'foliage', 'decal', 'soft'].includes(setName) || m.alphaTest > 0) (globalThis.__noAO || (globalThis.__noAO = new Set())).add(ob);
         if (setName === 'foliage' && m.emissiveIntensity) m.emissiveIntensity = o.fillLeaf ?? 0.42;   // (the shaded side of a crown is lit by the leaves around it)
         m.needsUpdate = true; ob.material = m;

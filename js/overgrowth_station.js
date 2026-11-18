@@ -15,6 +15,7 @@ export const OVERGROWTH_STATION = blendMap(DATA, {
   noShadow: /ground$|outer forest floor|track|ground wear|water|puddle|limb|basin mud/,
   groundSurface: 'dirt',
   smooth: /rock|stump|trunk|root|tyre|barrel/i,
+  waterOpacity: 0.9, waterEnv: 0.45,
   lightmap: 1.5, fill: 0.3, fillKit: 0.34,
   // an overcast morning in the foothills: a soft sun through broken cloud, cool grey haze in the trees
   look: { photo: { url: 'assets/sky/kloofendal_overcast_puresky.jpg', u: 0.5859, gain: 1.1 }, sunElev: 24, fog: 0.0075, fogColor: 0x8a9196, sun: 2.6, sunColor: 0xfff2dc, hemi: 0.3, hemiSky: 0xcfdcd4,
