@@ -17,7 +17,7 @@ export const OVERGROWTH_STATION = blendMap(DATA, {
   smooth: /rock|stump|trunk|root|tyre|barrel/i,
   waterOpacity: 0.9, waterEnv: 0.45,
   lightmap: 1.5, fill: 0.3, fillKit: 0.34,
-  // an overcast morning in the foothills: a soft sun through broken cloud, cool grey haze in the trees
-  look: { photo: { url: 'assets/sky/kloofendal_overcast_puresky.jpg', u: 0.5859, gain: 1.1 }, sunElev: 24, fog: 0.0075, fogColor: 0x8a9196, sun: 2.6, sunColor: 0xfff2dc, hemi: 0.3, hemiSky: 0xcfdcd4,
+  // a late morning in the foothills: sun and broken cloud over the forest, a little haze in the trees
+  look: { photo: { url: 'assets/sky/kloofendal_38d_partly_cloudy_puresky.jpg', u: 0.5991, gain: 1.0 }, sunElev: 42, fog: 0.0062, fogColor: 0x98a2a4, sun: 2.6, sunColor: 0xfff2dc, hemi: 0.3, hemiSky: 0xcfdcd4,
     ground: 0x4c5a3a, exposure: 0.88, env: 0.3, bloom: 0.16 },
 });

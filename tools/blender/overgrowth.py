@@ -162,8 +162,9 @@ for i in range(13):
 for i in range(18): y = -26 + i * 3.0; ivy(-HX, y, E_, 3.0, 3.3 + (i % 3) * 0.5, i % 5 == 2 and 1 or 0, 0.9 if i % 5 == 2 else 0)
 
 # ---------- trees inside the wall, and everything that grows ----------
-for x, y, h, v in ((-36.5, 21.0, 15, 0), (-5.0, 20.5, 13, 1), (-21.0, -23.5, 14, 0), (-37.0, -3.6, 12, 1), (-8.0, -13.5, 11, 1), (-25.5, 15.0, 13, 0), (-3.2, 9.5, 10, 1), (-17.0, 20.2, 12, 0), (-30.0, -8.0, 11, 1)):
+for x, y, h, v in ((-36.5, 21.0, 15, 0), (-5.0, 20.5, 13, 1), (-21.0, -23.5, 14, 0), (-38.0, -24.6, 12, 1), (-8.0, -13.5, 11, 1), (-25.5, 15.0, 13, 0), (-3.2, 9.5, 10, 1), (-17.0, 20.2, 12, 0), (-30.0, -8.0, 11, 1)):
     (broadleaf if v else fir)(x, y, h, mirror=True); cyl('tree foot', x, y, 0, 0.5, 0.42 + h * 0.012, 'bark', seg=8, r2=0.2 + h * 0.012); collide(x - 0.3, y - 0.3, x + 0.3, y + 0.3, 0, 6, 'wood'); keep(x - 0.6, y - 0.6, x + 0.6, y + 0.6)
+keep(-39.6, -9.8, -37.2, 9.8)   # the spawn strip along the end wall stays clear
 n = 0
 while n < 70:    # ferns, the odd leafy shrub
     x, y = rnd.uniform(-39, -0.5), rnd.uniform(-27, 27)
@@ -195,7 +196,7 @@ def stair(s):
     return {'rect': [xs[0], zs[0], xs[1], zs[1]], 'climb': [[s * -9.0, 0, s * -5.85], [s * -8.2, 0.2, s * -5.85], [s * -5.1, (R + 0.25) / 2, s * -5.85], [s * -1.9, R + 0.25, s * -5.85], [s * -1.0, R + 0.25, s * -5.85], [s * -1.0, R + 0.25, s * -4.2]]}
 export('overgrowth', {
     'half': [HX, HY], 'roof': R + 0.25,
-    'spawns': [[36.5, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],
+    'spawns': [[38.2, z] for z in (-9, -7, -5, -3, -1, 1, 3, 5, 7, 9)],   # (a clear strip along the end wall: nothing grows on it)
     'upper': [{'y': R + 0.25, 'bounds': {'minX': -8.3, 'maxX': 8.3, 'minZ': -6.4, 'maxZ': 6.4}, 'portals': [stair(1), stair(-1)]}],
     'pickups': [['health', -4.2, 0, 0.6], ['ammo', 4.2, 0, -0.6], ['health', -3, R + 0.25, 2], ['ammo', 3, R + 0.25, -2], ['health', -22, 0, 0], ['health', 22, 0, 0], ['ammo', -31, 0, -7.3], ['ammo', 31, 0, 7.3], ['ammo', -14, 0, 16], ['ammo', 14, 0, -16]],
 }, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), sky=(0.8, 0.86, 0.9), sky_k=1.0, skip=('card', 'decal', 'soft', 'cutout', 'foliage'),
