@@ -173,7 +173,7 @@ n = 0
 while n < 260:   # grass and weeds, thickest along walls and round the pads
     x, y = rnd.uniform(-39.5, -0.3), rnd.uniform(-27.5, 27.5)
     if not free(x, y, 0.25) or abs(y) < 2.4 and x < -8: continue
-    h = rnd.uniform(0.45, 0.95); clump(3, x, y, h * 1.6, h, rnd.uniform(0, 6.3)); n += 1
+    h = rnd.uniform(0.45, 0.95); clump(3, x, y, h, h, rnd.uniform(0, 6.3)); n += 1
 # the forest beyond: three rings of firs and broadleaves, thinning into the mist
 for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 4, HY + 4, 56, 12, 19), (HX + 11, HY + 10, 60, 14, 22), (HX + 22, HY + 20, 64, 16, 26), (HX + 40, HY + 36, 60, 18, 28))):
     for i in range(cnt):

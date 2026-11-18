@@ -22,6 +22,22 @@ export const preloadBlendScene = (id) => { if (!scenes.has(id)) scenes.set(id, n
 
 // o: { id, name, blurb, look, scale: { v_set: metres }, noShadow: RegExp over a material's 'what', soft: RegExp (those get a
 // sheen), softTint, extra: build()'s return }
+// a cut-out's smaller copies, each with its mask thickened a little: left to the usual averaging, fine leaves and
+// needles fade below the cut-off with distance, and plants and far trees go bare
+function thickMips(t) {
+  t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
+            const build = () => {
+              const im = t.image; if (!im || !im.width) return setTimeout(build, 60);
+              const mips = []; let w = im.width, h = im.height, src = im, lvl = 0;
+              while (true) {
+                const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, w, h);
+                if (lvl) { const d = g.getImageData(0, 0, w, h), px = d.data, k = 1 + 0.42 * lvl; for (let i = 3; i < px.length; i += 4) px[i] = Math.min(255, px[i] * k); g.putImageData(d, 0, 0); }
+                mips.push(c); if (w === 1 && h === 1) break; src = c; w = Math.max(1, w >> 1); h = Math.max(1, h >> 1); lvl++;
+              }
+              t.image = mips[0]; t.mipmaps = mips; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true;
+            };
+  build(); return t;
+}
 export function blendMap(DATA, o) {
   const [HX, HZ] = DATA.half, dir = `assets/textures/${o.id}/`, scale = { ...GAME_SCALE, ...(o.scale || {}) };
   function build(ctx) {
@@ -71,23 +87,9 @@ export function blendMap(DATA, o) {
         const set = named && setName !== 'flat' && setName !== 'card' && setName !== 'decal' && setName !== 'cutout' && setName !== 'atlas' && setName !== 'soft' && setName !== 'foliage' && setFor(setName);
         if (set) { m.map = set.map; m.normalMap = set.normalMap; m.roughnessMap = set.roughnessMap; m.roughness = 1; }
         if (setName === 'card') { m.map = once('card', () => own('cards.png', true)); m.alphaTest = 0.42; m.side = THREE.DoubleSide; m.roughness = 1; m.color.set(0xd8e0d0); }
-        if (setName === 'cutout') { m.map = once('cutout', () => own('cutouts.png', true)); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
+        if (setName === 'cutout') { m.map = once('cutout', () => thickMips(own('cutouts.png', true))); m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.roughness = 1; }
         // trees in the round (mapkit fir / broadleaf): cut-out boughs and leaf clusters, lit as if every one faced the sky, so a crown is bright on top and dark beneath
-        if (setName === 'foliage') { m.map = once('foliage', () => {
-            // its smaller copies are made here, each with its cut-out thickened a little: left to the usual averaging, a
-            // bough's needles fade below the cut-off with distance and far trees go bare
-            const t = own('foliage.png', true); t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
-            const build = () => {
-              const im = t.image; if (!im || !im.width) return setTimeout(build, 60);
-              const mips = []; let w = im.width, h = im.height, src = im, lvl = 0;
-              while (true) {
-                const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, w, h);
-                if (lvl) { const d = g.getImageData(0, 0, w, h), px = d.data, k = 1 + 0.42 * lvl; for (let i = 3; i < px.length; i += 4) px[i] = Math.min(255, px[i] * k); g.putImageData(d, 0, 0); }
-                mips.push(c); if (w === 1 && h === 1) break; src = c; w = Math.max(1, w >> 1); h = Math.max(1, h >> 1); lvl++;
-              }
-              t.image = mips[0]; t.mipmaps = mips; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true;
-            };
-            build(); return t; }); m.alphaTest = 0.4;
+        if (setName === 'foliage') { m.map = once('foliage', () => thickMips(own('foliage.png', true))); m.alphaTest = 0.4;
           m.side = THREE.DoubleSide; m.roughness = 1; m.metalness = 0;
           const g = ob.geometry, nn = new Float32Array(g.attributes.position.count * 3); for (let i = 1; i < nn.length; i += 3) nn[i] = 1; g.setAttribute('normal', new THREE.BufferAttribute(nn, 3)); }
         if (setName === 'atlas') { m.map = once('atlas', () => own('atlas.webp', true)); m.alphaTest = 0.5; m.roughness = 0.75; m.metalness = 0; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1; }
