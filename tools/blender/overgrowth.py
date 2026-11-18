@@ -16,11 +16,11 @@ from mapkit import *
 HX, HY, T, PI = 40, 28, 0.4, math.pi
 R = 4.0                  # the pump house roof (walkable)
 setup({
-    'ground': ('v_forest:ground', 0x9ea68c), 'outer': ('v_forest:outer forest floor', 0x8a9478), 'track': ('v_gravel:track', 0x8e9a9c), 'pad': ('v_pad:pad', 0xdcdcd4), 'wall': ('v_conc:perimeter wall', 0xd4d4cc),
+    'ground': ('v_forest:ground', 0x8e9878), 'outer': ('v_forest:outer forest floor', 0x8a9478), 'track': ('v_gravel:track', 0x8e9a9c), 'pad': ('v_pad:pad', 0xdcdcd4), 'wall': ('v_conc:perimeter wall', 0xd4d4cc),
     'brick': ('v_brick:brick wall', 0xe4d8cc), 'roof': ('v_conc:roof slab', 0xc0c0b8), 'plaster': ('v_plaster:hut wall', 0xe0e0d4), 'rust': ('v_rust:tank', 0xe0d4c8), 'rustd': ('v_rust:tank band', 0x9a8878),
     'corr': ('v_corr:container', 0xd0d8d8), 'corr b': ('v_corr:container blue', 0x7a9ab0), 'corr r': ('v_corr:container red', 0xb47a68), 'sheet': ('v_corr:roof sheet', 0xc8c4bc), 'pump': ('v_paint:pump', 0xd8e0d4), 'pipe': ('v_paint:pipe', 0xc8d0c4),
     'bark': ('v_bark:trunk', 0xd8d0c4), 'steel': ('flat:steel', 0x4a4640), 'tread': ('flat:stairs', 0x56524a), 'dark': ('flat:dark', 0x141412), 'frame': ('v_rust:frame', 0x8a7868), 'yellow': ('flat:faded yellow', 0xb89a3a), 'sign': ('flat:sign', 0xd8d4c4),
-    'red': ('flat:valve red', 0x8a2a20), 'water': ('flat:water', 0x2c4438), 'moss': ('flat:moss', 0x4a6a30), 'fir': ('foliage:fir', 0xc8d4c4), 'leaf': ('foliage:leaf', 0xd4dcc0), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x8a9a78), 'decal': ('decal:ground wear', 0xffffff),
+    'red': ('flat:valve red', 0x8a2a20), 'water': ('flat:water', 0x1a2420), 'mud': ('flat:basin mud', 0x2a2a1e), 'moss': ('flat:moss', 0x4a6a30), 'fir': ('foliage:fir', 0xc8d4c4), 'leaf': ('foliage:leaf', 0xd4dcc0), 'firs': ('card:tree', 0xffffff), 'cut': ('cutout:greenery', 0x8a9a78), 'decal': ('decal:ground wear', 0xffffff),
 }, rough={'water': 0.05, 'steel': 0.6}, metal={'steel': 0.5}, default='brick',
    shade={'brick': 0xa89c94, 'plaster': 0xa4a89c, 'wall': 0x90968a, 'moss': 0x2a3e1c})
 rnd = random.Random(11); POOLS[0] = False
@@ -120,7 +120,7 @@ for y0, y1 in ((-19.2, 14.0),):
 # ---------- the settling basin and the control hut ----------
 BX0, BY0, BX1, BY1 = -26.5, 3.6, -18, 11.4
 for x0, y0, x1, y1 in ((BX0, BY0, BX1, BY0 + 0.35), (BX0, BY1 - 0.35, BX1, BY1), (BX0, BY0, BX0 + 0.35, BY1), (BX1 - 0.35, BY0, BX1, BY1)): box('basin wall', x0, y0, x1, y1, 0, 1.0, 'wall')
-deco('basin water', BX0 + 0.3, BY0 + 0.3, BX1 - 0.3, BY1 - 0.3, 0.5, 0.52, 'water'); collide(BX0 + 0.35, BY0 + 0.35, BX1 - 0.35, BY1 - 0.35, 0, 0.5, 'concrete', soft=0); keep(BX0 - 0.2, BY0 - 0.2, BX1 + 0.2, BY1 + 0.2)
+deco('basin mud', BX0 + 0.3, BY0 + 0.3, BX1 - 0.3, BY1 - 0.3, 0.0, 0.06, 'mud'); deco('basin water', BX0 + 0.3, BY0 + 0.3, BX1 - 0.3, BY1 - 0.3, 0.5, 0.52, 'water'); collide(BX0 + 0.35, BY0 + 0.35, BX1 - 0.35, BY1 - 0.35, 0, 0.5, 'concrete', soft=0); keep(BX0 - 0.2, BY0 - 0.2, BX1 + 0.2, BY1 + 0.2)
 deco('basin walkway', BX0, 7.1, BX1, 7.9, 1.0, 1.06, 'steel'); collide(BX0, 7.1, BX1, 7.9, 0.9, 1.06, 'metal'); bar('walkway rail', (BX0, 7.12, 2.0), (BX1, 7.12, 2.0), 0.025, 'steel')
 for x in (BX0 + 0.2, -22.2, BX1 - 0.2): bar('walkway post', (x, 7.12, 1.06), (x, 7.12, 2.0), 0.025, 'steel')
 bar('basin inlet', (BX1 - 0.2, 9.8, 0.8), (-13.0, 9.8, 0.8), 0.2, 'pipe'); collide(-18, 9.55, -13.0, 10.05, 0, 1.0, 'metal'); keep(-18, 9.4, -13, 10.2)
@@ -170,10 +170,20 @@ while n < 70:    # ferns, the odd leafy shrub
     if not free(x, y, 0.9) or abs(y) < 2.9 and x < -8: continue
     s_ = rnd.uniform(0.9, 1.6); clump(2, x, y, s_ * 1.5, s_, rnd.uniform(0, 6.3)); n += 1
 n = 0
-while n < 260:   # grass and weeds, thickest along walls and round the pads
-    x, y = rnd.uniform(-39.5, -0.3), rnd.uniform(-27.5, 27.5)
+while n < 700:   # grass and weeds, thickest along walls and round the pads
+    if n % 3 == 0:   # every third hugs the foot of something solid, where a mower never reached
+        a_, b_, c_, d_ = rnd.choice(SOLID); side = rnd.randrange(4); t = rnd.random()
+        x, y = ((a_ + (c_ - a_) * t, b_ - 0.25), (a_ + (c_ - a_) * t, d_ + 0.25), (a_ - 0.25, b_ + (d_ - b_) * t), (c_ + 0.25, b_ + (d_ - b_) * t))[side]
+    else: x, y = rnd.uniform(-39.5, -0.3), rnd.uniform(-27.5, 27.5)
     if not free(x, y, 0.25) or abs(y) < 2.4 and x < -8: continue
     h = rnd.uniform(0.45, 0.95); clump(3, x, y, h, h, rnd.uniform(0, 6.3)); n += 1
+n = 0
+while n < 90:    # the ground: patches of leaf litter, mud, mossy old concrete and muddy leaves through the grass
+    x, y = rnd.uniform(-39, -0.5), rnd.uniform(-27, 27)
+    if abs(y) < 2.8 and x < -8: continue
+    s_ = rnd.uniform(1.6, 4.5); wear(rnd.choice((0, 0, 1, 2, 3, 3)), x, y, s_ * rnd.uniform(0.8, 1.3), s_, rnd.uniform(0, 6.3), z=0.012 + (n % 4) * 0.002); n += 1
+for i in range(26):   # the track's edges: mud and fallen leaves where the gravel meets the grass
+    x = -39 + i * 1.2; wear(1 if i % 3 else 3, x, rnd.choice((-2.7, 2.7)), rnd.uniform(1.4, 2.4), rnd.uniform(0.9, 1.4), rnd.uniform(-0.3, 0.3), z=0.024)
 # the forest beyond: three rings of firs and broadleaves, thinning into the mist
 for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 4, HY + 4, 56, 12, 19), (HX + 11, HY + 10, 60, 14, 22), (HX + 22, HY + 20, 64, 16, 26), (HX + 40, HY + 36, 60, 18, 28))):
     for i in range(cnt):
