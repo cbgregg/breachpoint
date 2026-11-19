@@ -7,6 +7,10 @@
 // Search & Destroy: one team attacks with a bomb, the other defends two sites (A and B). Plant takes
 // 5 s, the bomb goes off 45 s later, defusing takes 7.5 s. Sides switch at halftime.
 //
+// Domination: three flags, A near one team's spawn, B in the middle, C near the other's. Stand in a flag's ring to
+// take it (an enemy flag must be neutralised first, then captured; more of you take it faster; both teams in the
+// ring hold it). Every 5 s each flag a team holds scores it a point. Respawns on. First to 150 wins.
+//
 // The host (or the local game vs bots) runs the rules; guests get the state in every snapshot and
 // banner events through the event stream, and only draw.
 import * as THREE from 'three';
@@ -31,6 +35,10 @@ export const MODES = {
     id: 'infected', name: 'Infected', short: 'INFECTED', infected: true, timeLimit: 5,
     blurb: 'One player starts infected. Anyone they kill joins them. Survive 5 minutes, or be the last one standing.',
   },
+  dom: {
+    id: 'dom', name: 'Domination', short: 'DOM', objective: true, scoreLimit: 150, tick: 5, capTime: 7, capRadius: 3.6,
+    blurb: 'Capture and hold flags A, B and C. Every flag you hold scores a point every few seconds. Respawns on. First to 150 wins.',
+  },
   gungame: {
     id: 'gungame', name: 'Gun Game', short: 'GUN GAME', ladder: true, ffa: true,
     blurb: 'Free-for-all. Every kill moves you up to the next gun; a knife kill sends the victim back one. The last one is the knife slingshot: one clean hit with it wins.',
@@ -49,7 +57,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 export function createMode(id, game) {
   const cfg = MODES[id];
-  return cfg && cfg.rounds ? new RoundMode(game, cfg) : null;
+  return cfg && cfg.rounds ? new RoundMode(game, cfg) : cfg && id === 'dom' ? new DomMode(game, cfg) : null;
 }
 
 class RoundMode {
@@ -724,6 +732,206 @@ class RoundMode {
     }
     for (const [k, el] of this.marks) if (!seen.has(k)) { el.remove(); this.marks.delete(k); }
   }
+}
+
+// ---------- Domination ----------
+const FLAG_NAMES = ['A', 'B', 'C'];
+class DomMode {
+  constructor(game, cfg) {
+    this.g = game; this.cfg = cfg; this.id = cfg.id;
+    this.flags = [0, 1, 2].map(i => ({ i, pos: new THREE.Vector3(), owner: -1, cap: -1, p: 0, n: 0, contested: false }));
+    this.tickT = cfg.tick; this.progress = 0; this.progressKind = ''; this.progressId = -1;
+    this.buildSpots(); this.buildVisuals(); this.buildUI();
+  }
+  get authority() { return this.g.mode !== 'guest'; }
+  get noRespawn() { return false; }
+  get fixedLoadout() { return false; }
+  useZone() { return null; }
+  guestZone() { return null; }
+  onJoin() {}
+
+  // A near team 0's spawn, C near team 1's (point-mirrored, like the maps), B at the middle. A map can list its own (world.domFlags).
+  buildSpots() {
+    const w = this.g.world, nav = w.nav;
+    const roomy = (x, z) => nav.isOpenAt(x, z) && nav.isOpenAt(x + 1.6, z) && nav.isOpenAt(x - 1.6, z) && nav.isOpenAt(x, z + 1.6) && nav.isOpenAt(x, z - 1.6);
+    const near = (x, z) => {
+      let best = null, bd = Infinity;
+      for (let r = 0; r <= 14 && !best; r += 1) for (let k = 0; k < Math.max(1, r * 8); k++) {
+        const a = k / Math.max(1, r * 8) * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        if (!roomy(px, pz)) continue;
+        const d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = [px, pz]; }
+      }
+      if (!best) { const ij = nav.nearestOpen(nav.ci(x), nav.cj(z)); best = ij ? [nav.cx(ij[0]), nav.cz(ij[1])] : [x, z]; }
+      return new THREE.Vector3(best[0], 0, best[1]);
+    };
+    if (w.domFlags) { w.domFlags.forEach(([x, z], i) => this.flags[i].pos.copy(near(x, z))); return; }
+    const avg = (list) => list.reduce((s, p) => s.add(_w.set(p.x, 0, p.z)), new THREE.Vector3()).multiplyScalar(1 / Math.max(1, list.length));
+    const s0 = avg(w.spawns[0]), s1 = avg(w.spawns[1]);
+    const a = near(s0.x + (s1.x - s0.x) * 0.28, s0.z + (s1.z - s0.z) * 0.28);
+    this.flags[0].pos.copy(a);
+    this.flags[2].pos.copy(near(-a.x, -a.z));
+    this.flags[1].pos.copy(near((s0.x + s1.x) / 2, (s0.z + s1.z) / 2));
+  }
+
+  buildVisuals() {
+    this.group = new THREE.Group(); const R_ = this.cfg.capRadius;
+    for (const f of this.flags) {
+      const gr = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 3.0, 8), new THREE.MeshStandardMaterial({ color: 0x8a8a84, metalness: 0.7, roughness: 0.4 }));
+      pole.position.y = 1.5; pole.castShadow = true;
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.62, 6, 1), new THREE.MeshStandardMaterial({ color: 0xe8e4da, side: THREE.DoubleSide, roughness: 0.9 }));
+      cloth.position.set(0.52, 2.62, 0); cloth.castShadow = true;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(R_ - 0.14, R_, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(R_ - 0.14, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+      fill.rotation.x = -Math.PI / 2; fill.position.y = 0.045;
+      gr.add(pole, cloth, ring, fill); gr.position.copy(f.pos);
+      f.mesh = gr; f.cloth = cloth; f.ring = ring; f.fill = fill;
+      this.group.add(gr);
+    }
+    this.g.scene.add(this.group);
+  }
+
+  buildUI() {
+    const el = document.createElement('div'); el.id = 'gm';
+    el.innerHTML = `<div class="dom-flags" id="dom-flags">${FLAG_NAMES.map(n => `<span id="dom-${n}"><b>${n}</b><i><u></u></i></span>`).join('')}</div>
+      <div class="gm-bar" id="gm-bar"><span id="gm-bar-l"></span><i><b id="gm-bar-f"></b></i></div>
+      <div class="gm-banner" id="gm-banner"><b id="gm-bt"></b><span id="gm-bs"></span></div>
+      <div class="gm-marks" id="gm-marks"></div>`;
+    document.getElementById('hud').appendChild(el);
+    this.ui = el; this.marks = new Map();
+  }
+
+  dispose() {
+    this.g.scene.remove(this.group);
+    this.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    if (this.ui) this.ui.remove();
+  }
+
+  start() {
+    this.g.scores = [0, 0]; this.tickT = this.cfg.tick;
+    for (const f of this.flags) { f.owner = -1; f.cap = -1; f.p = 0; }
+    this.announce('dstart');
+  }
+
+  // ---------- rules (authority) ----------
+  update(dt) {
+    const g = this.g, cfg = this.cfg;
+    if (g.frozen || g.state !== 'playing') return;
+    for (const f of this.flags) {
+      const inside = [[], []];
+      for (const c of g.characters) if (c.alive && Math.hypot(c.pos.x - f.pos.x, c.pos.z - f.pos.z) < cfg.capRadius && Math.abs(c.pos.y - f.pos.y) < 2.2) inside[c.team].push(c);
+      f.contested = !!(inside[0].length && inside[1].length);
+      const T = inside[0].length && !inside[1].length ? 0 : inside[1].length && !inside[0].length ? 1 : -1;
+      f.n = T >= 0 ? inside[T].length : 0;
+      if (T >= 0 && f.owner !== T) {
+        const rate = (1 + 0.5 * Math.min(2, f.n - 1)) / cfg.capTime;
+        if (f.cap !== T && f.p > 0) { f.p -= rate * dt; if (f.p <= 0) { f.p = 0; f.cap = T; } }   // wind back the other team's progress first
+        else {
+          f.cap = T; f.p += rate * dt;
+          if (f.p >= 1) {
+            f.p = 0;
+            if (f.owner === -1) {   // captured
+              f.owner = T; f.cap = -1;
+              for (const c of inside[T]) { c.score += 150; if (!c.isBot) g.notify(c, 'score', `CAPTURED ${FLAG_NAMES[f.i]}`, 150); }
+              this.announce('dcap', f.i, T);
+            } else {                 // an enemy flag: neutralised, now take it
+              const was = f.owner; f.owner = -1;
+              for (const c of inside[T]) { c.score += 50; if (!c.isBot) g.notify(c, 'score', 'NEUTRALIZED', 50); }
+              this.announce('dneut', f.i, was);
+            }
+          }
+        }
+      } else if (T < 0 && !f.contested && f.p > 0) { f.p = Math.max(0, f.p - dt * 0.2); if (f.p === 0) f.cap = -1; }
+      else if (T >= 0 && f.owner === T) { f.p = Math.max(0, f.p - dt * 0.5); if (f.p === 0) f.cap = -1; }
+    }
+    // the score: a point per flag held, every few seconds
+    this.tickT -= dt;
+    if (this.tickT <= 0) {
+      this.tickT += cfg.tick;
+      for (const f of this.flags) if (f.owner >= 0) g.scores[f.owner]++;
+      const lim = g.settings.scoreLimit, win = g.scores[0] >= lim ? 0 : g.scores[1] >= lim ? 1 : -1;
+      if (win >= 0 && g.endT <= 0) { g.endT = 1.4; if (g.player) g.hud.medal(win === g.player.team ? 'VICTORY' : 'DEFEAT', 'SCORE LIMIT REACHED'); }
+    }
+  }
+
+  onKill(killer, victim) {
+    // a kill in or near a flag your team holds: defending it
+    if (!killer || killer === victim || killer.team === victim.team || killer.isBot) return;
+    for (const f of this.flags) if (f.owner === killer.team && Math.hypot(victim.pos.x - f.pos.x, victim.pos.z - f.pos.z) < this.cfg.capRadius + 4) { killer.score += 50; this.g.notify(killer, 'score', 'DEFENDED', 50); break; }
+  }
+
+  // ---------- bots ----------
+  botGoal(brain, b) {
+    const g = this.g, T = b.team, R_ = this.cfg.capRadius;
+    if (g.frozen) return null;
+    const mine = this.flags.filter(f => f.owner === T), theirs = this.flags.filter(f => f.owner !== T);
+    if (!brain.domT || g.time > brain.domT) {   // a fresh plan every so often: which flag, attack or hold
+      brain.domT = g.time + 8 + Math.random() * 10;
+      brain.domHold = mine.length && Math.random() < (theirs.length ? 0.25 : 0.9);
+      const heading = (f) => { let n = 0; for (const [c, br] of g.brains) if (c !== b && c.team === T && br.domFlag === f.i) n++; return n; };
+      const pool = brain.domHold ? mine : theirs.length ? theirs : mine;
+      let best = null, bs = Infinity;
+      for (const f of pool) { const s = Math.hypot(b.pos.x - f.pos.x, b.pos.z - f.pos.z) + heading(f) * 14 + (f.owner === -1 ? -6 : 0) + Math.random() * 10; if (s < bs) { bs = s; best = f; } }
+      brain.domFlag = best ? best.i : 1;
+    }
+    const f = this.flags[brain.domFlag ?? 1];
+    if (f.owner === T && !brain.domHold) { brain.domT = 0; return null; }   // taken: pick again next time
+    const d = Math.hypot(b.pos.x - f.pos.x, b.pos.z - f.pos.z);
+    if (f.owner === T) return { pos: this.patrol(brain, f.pos, 3, 11), kind: 'guard' };
+    if (d < R_ + 6) return { pos: this.patrol(brain, f.pos, 0.4, R_ - 0.9, 2, 4), kind: 'flag' };   // in the ring: stay in it, moving about
+    return { pos: f.pos, kind: d < 26 ? 'flag' : 'push' };
+  }
+  patrol(brain, p, rMin, rMax, tMin = 5, tMax = 11) { return RoundMode.prototype.patrol.call(this, brain, p, rMin, rMax, tMin, tMax); }
+
+  // ---------- network ----------
+  netState() { const a = []; for (const f of this.flags) a.push(f.owner, f.cap, +f.p.toFixed(3), f.contested ? 1 : 0, f.n); a.push(+this.tickT.toFixed(2)); return a; }
+  applyNet(a) {
+    if (!Array.isArray(a) || a.length < 16 || !a.every(Number.isFinite)) return;
+    this.flags.forEach((f, i) => { const o = i * 5; f.owner = a[o] | 0; f.cap = a[o + 1] | 0; f.p = Math.max(0, Math.min(1, a[o + 2])); f.contested = !!a[o + 3]; f.n = a[o + 4] | 0; });
+    this.tickT = a[15];
+  }
+  announce(type, ...args) { this.onEvent(type, ...args); this.g.emit(['gm', type, ...args]); }
+  onEvent(type, a, b) {
+    const g = this.g, me = g.player; if (!me) return;
+    const L = FLAG_NAMES[a] || '';
+    if (type === 'dstart') this.banner('DOMINATION', 'CAPTURE AND HOLD FLAGS A, B AND C', '');
+    else if (type === 'dcap') { const ours = b === me.team; g.hud.message(ours ? `WE CAPTURED ${L}` : `ENEMY CAPTURED ${L}`); if (ours) g.announce('flag_captured'); g.audio.play('beep', null, { ui: true, freq: ours ? 990 : 440 }); }
+    else if (type === 'dneut') { if (b === me.team) { g.hud.message(`WE'RE LOSING ${L}`); g.audio.play('beep', null, { ui: true, freq: 520 }); } }
+  }
+  banner(title, sub, cls) { return RoundMode.prototype.banner.call(this, title, sub, cls); }
+
+  // ---------- per frame (everyone) ----------
+  frame(dt) {
+    const g = this.g, me = g.player; if (!me) return;
+    const col = (t) => t === me.team ? [0.31, 0.7, 1] : t >= 0 ? [1, 0.3, 0.3] : [0.93, 0.91, 0.86];
+    for (const f of this.flags) {
+      const c = col(f.owner), k = f.cap >= 0 && f.p > 0 ? col(f.cap) : c;
+      f.cloth.material.color.setRGB(...c);
+      f.ring.material.color.setRGB(k[0] * 2, k[1] * 2, k[2] * 2);
+      f.fill.material.color.setRGB(...k); f.fill.material.opacity = 0.06 + 0.22 * f.p;
+      f.cloth.rotation.y = Math.sin(g.time * 2.1 + f.i) * 0.28;
+    }
+    // HUD: the three flags, the bar while you're in a ring
+    const $ = (id) => this.ui.querySelector('#' + id);
+    for (const f of this.flags) {
+      const el = $('dom-' + FLAG_NAMES[f.i]), cls = `${f.owner === me.team ? 'mine' : f.owner >= 0 ? 'enemy' : ''}${f.contested ? ' contested' : f.p > 0 ? ' taking' : ''}`;
+      if (el.className !== cls) el.className = cls;
+      const u = el.querySelector('u'); u.style.width = `${(f.p * 100).toFixed(0)}%`; u.className = f.cap === me.team ? 'mine' : f.cap >= 0 ? 'enemy' : '';
+    }
+    const here = me.alive ? this.flags.find(f => Math.hypot(me.pos.x - f.pos.x, me.pos.z - f.pos.z) < this.cfg.capRadius && Math.abs(me.pos.y - f.pos.y) < 2.2) : null;
+    const bar = $('gm-bar'), showBar = !!here && (here.owner !== me.team || here.contested);
+    bar.classList.toggle('on', showBar);
+    if (showBar) {
+      const L = FLAG_NAMES[here.i];
+      set($('gm-bar-l'), here.contested ? `CONTESTED ${L}` : here.cap === me.team || here.p === 0 ? (here.owner >= 0 ? `NEUTRALIZING ${L}` : `CAPTURING ${L}`) : `ENEMY CAPTURING ${L}`);
+      $('gm-bar-f').style.width = `${(here.p * 100).toFixed(1)}%`;
+      bar.classList.toggle('enemy', here.cap >= 0 && here.cap !== me.team);
+    }
+    g.hud.objPrompt = ''; g.hud.objKind = '';
+    this.drawMarks(this.flags.map(f => [`f${f.i}`, f.pos, FLAG_NAMES[f.i], f.contested ? 'hot' : f.owner === me.team ? 'mine' : f.owner >= 0 ? 'enemy' : '']));
+  }
+  drawMarks(want) { return RoundMode.prototype.drawMarks.call(this, want); }
 }
 
 function set(el, html) { if (el && el.__h !== html) { el.__h = html; el.innerHTML = html; } }

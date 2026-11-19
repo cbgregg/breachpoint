@@ -806,7 +806,7 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
 // Level 1 is a column of playlist tiles; each opens its own page (Back returns). Offline the tiles are the
 // game modes and open the match setup; online they're Quick Play, Private Match, Friends and Combat Training.
 let playView = 'root', tileSel = null;
-const TILE_ART = { modes: 'shuran-2', tdm: 'tarsa-2', gunfight: 'shuran-3', snd: 'pioneer-3', gungame: 'mart-2', ffa: 'drivein-2', infected: 'link-2', browser: 'tarsa-3', quick: 'drivein-1', private: 'pioneer-2', friends: 'link-1', training: 'mart-3', online: 'link-4' };
+const TILE_ART = { modes: 'shuran-2', tdm: 'tarsa-2', dom: 'overgrowth-2', gunfight: 'shuran-3', snd: 'pioneer-3', gungame: 'mart-2', ffa: 'drivein-2', infected: 'link-2', browser: 'tarsa-3', quick: 'drivein-1', private: 'pioneer-2', friends: 'link-1', training: 'mart-3', online: 'link-4' };
 function playTiles() {
   if (playMode === 'online') return [
     { id: 'quick', k: `PUBLIC · ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}`, t: 'QUICK MATCH', d: 'Drop into a public match in your modes. If none is open within 10 seconds, a lobby starts and counts down with a map vote while players drop in.' },
@@ -816,7 +816,7 @@ function playTiles() {
     { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
     { id: 'training', k: 'OFFLINE · VERSUS BOTS', t: 'COMBAT TRAINING', d: 'Switch to offline matches against bots. No account needed.' },
   ];
-  return [...['tdm', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
+  return [...['tdm', 'dom', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'].map(id => ({ id, k: 'VERSUS BOTS', t: MODES[id].name.toUpperCase(), d: MODES[id].blurb })),
     { id: 'online', k: 'ONLINE · PLAYERS', t: 'MULTIPLAYER', d: 'Quick play with anyone, or a private match with friends. Sign in with your email, no password.' }];
 }
 function tilePreview(t) {

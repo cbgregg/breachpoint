@@ -608,7 +608,18 @@ body.mode-online #pane-play .rows::before { content: 'PRIVATE MATCH SETTINGS (WH
 .gm-mark.bomb b { font-size: 11px; letter-spacing: 0.1em; border-color: var(--amber); color: var(--amber); }
 body.rounds #death-respawn { display: none; }
 body.rounds.fixed-loadout #death-loadout, body.rounds.fixed-loadout #spawn-hint { display: none !important; }
-@media (max-width: 760px) { .gm-top { top: 70px; } }
+/* Domination: the three flags under the score */
+.dom-flags { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.dom-flags span { position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(236, 233, 225, 0.55); background: rgba(10, 12, 14, 0.45); }
+.dom-flags span b { font-size: 18px; font-weight: 700; color: var(--ink); }
+.dom-flags span i { position: absolute; left: 2px; right: 2px; bottom: 2px; height: 4px; background: rgba(236, 233, 225, 0.15); }
+.dom-flags span u { display: block; height: 100%; width: 0; background: var(--ink); }
+.dom-flags span u.mine { background: var(--friendly); } .dom-flags span u.enemy { background: var(--enemy); }
+.dom-flags span.mine { border-color: var(--friendly); background: rgba(80, 170, 255, 0.28); } .dom-flags span.mine b { color: #dff1ff; }
+.dom-flags span.enemy { border-color: var(--enemy); background: rgba(255, 80, 70, 0.28); } .dom-flags span.enemy b { color: #ffe1de; }
+.dom-flags span.contested, .dom-flags span.taking { animation: pulse 0.8s ease-in-out infinite; }
+.gm-mark.enemy b { border-color: var(--enemy); color: var(--enemy); }
+@media (max-width: 760px) { .gm-top, .dom-flags { top: 70px; } }
 body[data-gmode="gungame"] .row:has(#opt-score) { display: none; }
 body[data-gmode="gunfight"] .tdm-snd, body[data-gmode="gunfight"] .tdm-only, body[data-gmode="snd"] .tdm-only { display: none; }
 body[data-gmode="infected"] .tdm-only, body[data-gmode="infected"] .row:has(#opt-score), body[data-gmode="infected"] .row:has(#opt-time) { display: none; }   /* Infected: 5 minutes, no score limit */

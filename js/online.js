@@ -1255,7 +1255,7 @@ export class GuestSession {
       case 'gm': {
         // mode banners: only known types, plain values
         const [, type, a, b, c] = ev;
-        if (!g.gm || !['round', 'half', 'ot', 'end', 'planted', 'drop', 'pickup'].includes(type)) return;
+        if (!g.gm || !['round', 'half', 'ot', 'end', 'planted', 'drop', 'pickup', 'dstart', 'dcap', 'dneut'].includes(type)) return;
         const ok = (v) => v === undefined || fin(v) || (typeof v === 'string' && v.length < 12);
         if (ok(a) && ok(b) && ok(c)) g.gm.onEvent(type, a, b, c);
         break;

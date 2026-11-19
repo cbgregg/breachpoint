@@ -223,7 +223,7 @@ export class PlayerController {
       // respawn early: X / R, A / Space, a fresh click — after a short moment so you see who got you
       const fireEdge = inp.fire && !this.prevDeadFire;
       this.prevDeadFire = inp.fire;
-      if (g.gm) {
+      if (g.rounds) {
         // round modes: no respawn. After the kill cam, watch a living teammate (jump / fire / X: next one)
         const next = g.time - c.deathT > 2.5 && (inp.action('reload') || inp.action('jump') || fireEdge);
         if (this.specCam(dt, next)) return;

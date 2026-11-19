@@ -230,6 +230,7 @@ export class Game {
     if (!MODES[this.settings.mode]) this.settings.mode = 'tdm';
     const modeCfg = MODES[this.settings.mode];
     if (modeCfg.rounds) this.settings.scoreLimit = modeCfg.winRounds;
+    else if (modeCfg.objective) this.settings.scoreLimit = modeCfg.scoreLimit;   // Domination scores flags, not kills
     this.gg = !!modeCfg.ladder;   // Gun Game: every kill is the next gun; first to finish the ladder wins
     this.ffa = !!modeCfg.ffa;     // Free-for-All and Gun Game: everyone for themselves
     this.inf = !!modeCfg.infected;  // Infected: survivors (team 0) against the infected (team 1), who grow with every kill
@@ -256,7 +257,7 @@ export class Game {
     if (this.gm) this.gm.dispose();
     this.gm = createMode(this.settings.mode, this);
     // round modes: no health or ammo pickups
-    if (this.gm) for (const p of this.pickups) { p.active = false; p.mesh.visible = false; p.timer = Infinity; }
+    if (this.rounds) for (const p of this.pickups) { p.active = false; p.mesh.visible = false; p.timer = Infinity; }
     this.effects.clear();
     this.brains.clear();
     this.grenadeSeq = 0;
@@ -410,7 +411,9 @@ export class Game {
 
   // Free-for-All spawns: spread over the whole map (the team spawns plus open ground everywhere players can
   // walk to), at least 7 m apart
-  anywhere() { return this.ffa || (!!this.world.randomSpawns && !this.gm); }
+  anywhere() { return this.ffa || (!!this.world.randomSpawns && !this.rounds); }
+  // a round mode (Gunfight, Search & Destroy): one life, rounds; Domination is a mode too, but plays like Team Deathmatch
+  get rounds() { return !!(this.gm && this.gm.cfg.rounds); }
   buildFfaSpawns() {
     const nav = this.world.nav, V = (x, z) => new THREE.Vector3(x, 0, z), ok = this.world.spawnOk || (() => true);
     const many = this.world.randomSpawns ? 110 : 70, apart = (p, pts) => pts.every(o => o.distanceTo(p) > 7);
@@ -703,9 +706,9 @@ export class Game {
       }
       this.hud.countdown(Math.max(0, n), this.intro);
     } else {
-      if (this.timeLeft > 60 && this.timeLeft - dt <= 60 && !this.gm) this.announce('one_minute');
+      if (this.timeLeft > 60 && this.timeLeft - dt <= 60 && !this.rounds) this.announce('one_minute');
       this.timeLeft = Math.max(0, this.timeLeft - dt);
-      if (this.timeLeft <= 0 && !guest && !this.gm) {
+      if (this.timeLeft <= 0 && !guest && !this.rounds) {
         if (this.inf) this.hud.medal(this.player.team === 0 && !this.player.infectNext ? 'VICTORY' : 'DEFEAT', 'THE SURVIVORS HELD OUT');
         this.endMatch(); return;
       }
@@ -730,7 +733,7 @@ export class Game {
         // before moving, or the train's collision box would first shove them up onto its roof
         if (c.alive && this.world.trainHit && this.world.trainHit(c.pos)) c.takeDamage(999, null, 'train', false, c.pos);
         c.updateCommon(dt);
-        if (!c.alive && this.live && !this.gm) {
+        if (!c.alive && this.live && !this.rounds) {
           c.respawnT -= dt;
           if (c.respawnT <= 0) this.respawn(c);
         }
@@ -933,7 +936,7 @@ export class Game {
   // respawn now (after a short minimum) instead of waiting out the timer
   requestRespawn() {
     const p = this.player;
-    if (!p || p.alive || !this.live || this.gm || this.time - p.deathT < PLAYER.respawnMin) return;
+    if (!p || p.alive || !this.live || this.rounds || this.time - p.deathT < PLAYER.respawnMin) return;
     if (this.mode === 'guest') { this.session?.sendRespawn(); return; }
     p.respawnT = Math.min(p.respawnT, 0);
   }
@@ -1569,7 +1572,7 @@ export class Game {
     if (enemyKill && killer && killer.isBot) { this.callout(killer, 'enemy_down', 0.15); this.brains.get(killer)?.onKill(victim); }
     if (!this.ffa) {
       // round modes: the last one left on a team says so; otherwise a teammate nearby calls the loss
-      const left = this.gm ? this.characters.filter(c => c.alive && c !== victim && c.team === victim.team) : [];
+      const left = this.rounds ? this.characters.filter(c => c.alive && c !== victim && c.team === victim.team) : [];
       if (left.length === 1 && left[0].isBot) this.callout(left[0], 'last_alive', 0.9, false, true);
       else { const mate = this.characters.find(c => c.isBot && c.alive && c !== victim && c.team === victim.team && c.pos.distanceTo(victim.pos) < 25); if (mate) this.callout(mate, 'man_down', 0.4); }
       // the trade: the nearest bot teammate who isn't already fighting goes for the killer (most of the time)
@@ -1586,7 +1589,7 @@ export class Game {
       this.leadTeam = lead;
     }
     if (this.gm) this.gm.onKill(killer, victim);
-    else if (Math.random() < 0.5 && !(this.inf && victim.team === 1)) this.dropAmmo(victim.pos);
+    if (!this.rounds && Math.random() < 0.5 && !(this.inf && victim.team === 1)) this.dropAmmo(victim.pos);
     const reached = this.ffa ? (this.gg ? killer && killer.ggLevel : killer && killer.kills) >= this.settings.scoreLimit : killer && this.scores[killer.team] >= this.settings.scoreLimit;
     if (!this.gm && !this.inf && enemyKill && reached && this.endT <= 0) {
       this.endT = 1.4;
@@ -1675,7 +1678,7 @@ export class Game {
   // is, whether an enemy can see the point (much worse if they're looking that way), recent deaths
   // there, and how close friendlies are. The yaw to face comes back in this.spawnYawOut.
   chooseSpawn(team) {
-    const flip = !this.gm;
+    const flip = !this.rounds;
     const sets = this.anywhere() ? ['ffa'] : flip ? [team, 1 - team] : [this.gm.sideOf ? this.gm.sideOf(team) : team];
     let best = null, bestScore = -Infinity, bestYaw = this.world.spawnYaw[team];
     this.recentDeaths = (this.recentDeaths || []).filter(d => this.time - d.t < 8);

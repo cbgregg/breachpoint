@@ -205,9 +205,9 @@ export class HUD {
     document.body.classList.toggle('dead', dead && g.state === 'playing');
     if (dead) {
       const since = g.time - p.deathT;
-      this.txt('death-timer', g.gm ? 'NO RESPAWNS THIS ROUND' : `RESPAWNING IN ${Math.max(0, PLAYER.respawnDelay - since).toFixed(1)}`);
+      this.txt('death-timer', g.rounds ? 'NO RESPAWNS THIS ROUND' : `RESPAWNING IN ${Math.max(0, PLAYER.respawnDelay - since).toFixed(1)}`);
       // round modes: the card gives way to spectating after the kill cam
-      if (g.gm) this.cls('death', 'on', since < 2.5 || !(g.playerCtl && g.playerCtl.specTarget));
+      if (g.rounds) this.cls('death', 'on', since < 2.5 || !(g.playerCtl && g.playerCtl.specTarget));
       this.cls('death-respawn', 'wait', since < PLAYER.respawnMin);
     }
     // frag cook timer
