@@ -753,12 +753,12 @@ class DomMode {
   // A near team 0's spawn, C near team 1's (point-mirrored, like the maps), B at the middle. A map can list its own (world.domFlags).
   buildSpots() {
     const w = this.g.world, nav = w.nav;
-    const roomy = (x, z) => nav.isOpenAt(x, z) && nav.isOpenAt(x + 1.6, z) && nav.isOpenAt(x - 1.6, z) && nav.isOpenAt(x, z + 1.6) && nav.isOpenAt(x, z - 1.6);
-    const near = (x, z) => {
+    const roomy = (x, z, m) => nav.isOpenAt(x, z) && nav.isOpenAt(x + m, z) && nav.isOpenAt(x - m, z) && nav.isOpenAt(x, z + m) && nav.isOpenAt(x, z - m);
+    const near = (x, z, m = 1.6) => {
       let best = null, bd = Infinity;
       for (let r = 0; r <= 14 && !best; r += 1) for (let k = 0; k < Math.max(1, r * 8); k++) {
         const a = k / Math.max(1, r * 8) * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-        if (!roomy(px, pz)) continue;
+        if (!roomy(px, pz, m)) continue;
         const d = Math.hypot(px - x, pz - z); if (d < bd) { bd = d; best = [px, pz]; }
       }
       if (!best) { const ij = nav.nearestOpen(nav.ci(x), nav.cj(z)); best = ij ? [nav.cx(ij[0]), nav.cz(ij[1])] : [x, z]; }
@@ -770,7 +770,7 @@ class DomMode {
     const a = near(s0.x + (s1.x - s0.x) * 0.28, s0.z + (s1.z - s0.z) * 0.28);
     this.flags[0].pos.copy(a);
     this.flags[2].pos.copy(near(-a.x, -a.z));
-    this.flags[1].pos.copy(near((s0.x + s1.x) / 2, (s0.z + s1.z) / 2));
+    this.flags[1].pos.copy(near((s0.x + s1.x) / 2, (s0.z + s1.z) / 2, 0.9));   // (the middle: as near the centre as there's room to stand, so neither team is closer)
   }
 
   buildVisuals() {
