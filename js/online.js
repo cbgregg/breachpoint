@@ -22,7 +22,7 @@ import { GUN_LADDER } from './modes.js';
 
 export const MAX_HUMANS = 8;
 export const PROTO = 1;
-export const QUICK_MODES = ['tdm', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'];
+export const QUICK_MODES = ['tdm', 'dom', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'];
 export const QUICK_SEARCH_MS = 10000;   // look for an open lobby this long, then open one
 export const QUICK_COUNTDOWN = 30;      // a new public lobby counts down (with the map vote) this many seconds
 const SNAP_HZ = 30;

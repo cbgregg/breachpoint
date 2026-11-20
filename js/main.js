@@ -54,6 +54,8 @@ function saveSettings(s) {
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
 }
 const settings = loadSettings();
+// a mode added since your playlist was saved joins it, if you'd ticked everything there was then (Domination, added after the first six)
+if (Array.isArray(settings.quickModes) && !settings.quickModes.includes('dom') && ['tdm', 'ffa', 'gunfight', 'snd', 'gungame', 'infected'].every(m => settings.quickModes.includes(m))) settings.quickModes = [...settings.quickModes.slice(0, 1), 'dom', ...settings.quickModes.slice(1)];
 // Safe mode: if the game didn't finish starting the last two times (or the page was opened with ?safe), start on
 // the lightest graphics with the picture menu, and say so. Cleared once the menu is up.
 const BOOTS = 'breachpoint.boots';
@@ -810,7 +812,7 @@ const TILE_ART = { modes: 'shuran-2', tdm: 'tarsa-2', dom: 'overgrowth-2', gunfi
 function playTiles() {
   if (playMode === 'online') return [
     { id: 'quick', k: `PUBLIC · ${quickModesLabel() === 'ALL' ? 'ALL MODES' : quickModesLabel()}`, t: 'QUICK MATCH', d: 'Drop into a public match in your modes. If none is open within 10 seconds, a lobby starts and counts down with a map vote while players drop in.' },
-    { id: 'modes', k: 'QUICK MATCH PLAYLIST', t: 'EDIT MODES', d: 'Choose which game modes Quick Match looks for: any or all of Team Deathmatch, Free-for-All, Gunfight, Search & Destroy and Gun Game.' },
+    { id: 'modes', k: 'QUICK MATCH PLAYLIST', t: 'EDIT MODES', d: 'Choose which game modes Quick Match looks for: any or all of Team Deathmatch, Domination, Free-for-All, Gunfight, Search & Destroy, Gun Game and Infected.' },
     { id: 'browser', k: 'EVERY PUBLIC MATCH', t: 'MATCH BROWSER', d: 'See the public matches being played right now, with their mode, map and players, and join one.' },
     { id: 'private', k: 'FRIENDS · 6-DIGIT CODE', t: 'PRIVATE MATCH', d: 'Host a match and share the code, or join a friend\'s. You choose the map, mode and rules; bots fill empty slots.' },
     { id: 'friends', k: 'PARTY · INVITES', t: 'FRIENDS', d: 'Your friends list, friend requests and your friend code.' },
