@@ -24,6 +24,10 @@ const SHOTS = {
 // how loud each recorded effect plays (the files are peak-normalized per kind by tools/gen_sfx.py)
 const SAMPLE_VOL = { shot: 0.9, explosion: 1, headshot: 0.75, hit: 0.6, kill: 0.7, hurt: 0.7, impact: 0.45, step: 0.5, casing: 0.35, whiz: 0.6, jump: 0.5, land: 0.6, slide: 0.55, melee: 0.7, meleehit: 0.8, pin: 0.6, bounce: 0.6, switch: 0.55, pickup: 0.6, dry: 0.6, doorkick: 0.9, shatter: 0.85 };
 
+// the distance (m) at which each sound has faded out completely (sprinting footsteps carry 1.6 times as far)
+const RANGE = { step: 20, land: 24, jump: 16, slide: 22, casing: 9, dry: 10, switch: 10, reload: 12, pin: 16, bounce: 24, melee: 14, meleehit: 16,
+  hurt: 30, breath: 8, pickup: 10, impact: 40, door: 26, doorslide: 26, doorshut: 26, doorbash: 36, doorkick: 40, shatter: 50, whiz: 20 };
+
 export class GameAudio {
   constructor() {
     this.ctx = null;
@@ -295,6 +299,10 @@ export class GameAudio {
     const sp = opts.ui ? { gain: 1, pan: 0, dist: 0 } : this.spatial(pos);
     if (opts.occl !== undefined) sp.gain *= opts.occl;   // heard through a floor or a wall
     if (!opts.ui && pos && this.areaGain) sp.gain *= this.areaGain(pos);   // a place you're leaving, or not in
+    // how far each kind of sound carries: footsteps, kit and small impacts fade out within a room or a street's width
+    // instead of across the map (gunfire, explosions and voices aren't listed: they carry)
+    const range = !opts.ui && pos && !opts.self && RANGE[name];
+    if (range) { const k = 1 - Math.min(1, sp.dist / (name === 'step' && opts.run ? range * 1.6 : range)); sp.gain *= k * k; }
     if (sp.gain < 0.05) return;
     // voice lines: recordings only; announcer lines wait their turn instead of talking over each other
     if (name === 'vo') {
