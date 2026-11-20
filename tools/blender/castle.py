@@ -20,7 +20,7 @@ setup({
     'flag': ('v_flag:hall floor', 0xd0c8bc), 'timber': ('v_timber:timber', 0xb89a78), 'frame': ('v_timber:door frame', 0x7a6248), 'slate': ('v_slate:roof', 0xb8b4ac),
     'thatch': ('v_thatch:thatch', 0xd8c890), 'hay': ('cloth:hay', 0xd8b452), 'dark': ('flat:dark', 0x141312), 'iron': ('flat:iron', 0x2a2c2e),
     'red': ('cloth:banner red', 0x8a1c1c), 'gold': ('flat:gold', 0xc8a040), 'water': ('flat:water', 0x2a4a50), 'sack': ('cloth:sack', 0xb8a480), 'rope': ('flat:rope', 0x8a7450),
-    'firs': ('card:fir', 0xffffff), 'cover': ('flat:cover', 0xc8731a), 'coal': ('flat:coal', 0x1a1412), 'cut': ('cutout:greenery', 0x6c7862),
+    'fir': ('foliage:fir', 0xc8d4c4), 'leaf': ('foliage:leaf', 0xd4dcc0), 'bark': ('v_timber:bark', 0x6a5a48), 'decal': ('decal:ground wear', 0xffffff), 'meadow': ('v_grass:meadow', 0xb8c4a0), 'pen red': ('cloth:pennant red', 0x8a1c1c), 'pen gold': ('cloth:pennant gold', 0xc8a040), 'pen blue': ('cloth:pennant blue', 0x24407a), 'pen cream': ('cloth:pennant cream', 0xe8dcc0), 'cover': ('flat:cover', 0xc8731a), 'coal': ('flat:coal', 0x1a1412), 'cut': ('cutout:greenery', 0x6c7862),
     'grass': ('v_grass:lawn', 0xc8d4b0), 'plaster': ('plaster:whitewash', 0xf2e8d0), 'plank': ('v_timber:floorboards', 0xd8b890), 'carpet': ('cloth:carpet', 0x7a1818),
     'blue': ('cloth:blue cloth', 0x24407a), 'cream': ('cloth:cream cloth', 0xe8dcc0), 'green': ('cloth:green cloth', 0x2f5a3a), 'bread': ('flat:bread', 0xb88a50),
 }, emit={'flame': 0xff9a2e, 'ember': 0xff5a1a}, rough={'water': 0.08, 'iron': 0.45, 'gold': 0.35}, metal={'iron': 0.8, 'gold': 0.9}, emit_strength={'flame': 6.0, 'ember': 3.0}, default='wall')
@@ -45,7 +45,7 @@ def merlons(x0, y0, x1, y1, z, along_x, step=2.0, w=1.0, h=0.9):
         else: a = y0 + (i + 0.25) * step; deco('merlon', x0, a, x1, a + w, z, z + h, 'wall')
 
 # ---------- ground ----------
-deco('earth', -HX - 70, -HY - 70, HX + 70, HY + 70, -0.2, -0.02, 'mud', mirror=False)
+deco('earth', -HX - 3, -HY - 3, HX + 3, HY + 3, -0.2, -0.02, 'mud', mirror=False)   # (inside the walls and a strip round them: the meadow beyond)
 deco('ward lawn', -31, -21, 31, 21, -0.1, 0, 'grass', mirror=False)
 deco('keep court cobbles', -10.5, -21, 10.5, 21, 0, 0.012, 'cobble', mirror=False)        # round the keep and both small wards
 deco('gate road', -30, -2.2, -10.5, 2.2, 0, 0.012, 'cobble'); deco('ward path', -13, 2.2, -10.5, 16.5, 0, 0.012, 'cobble'); deco('ward path', -13, -12.5, -10.5, -2.2, 0, 0.012, 'cobble')
@@ -163,14 +163,14 @@ torch(-31, -12, 2.6, 1, 0); torch(-31, 12, 2.6, 1, 0)
 def sack(x, y, z=0, a=0, mirror=True):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1, location=(x, y, z + 0.2)); o = bpy.context.object; o.name = 'sack'; o.scale = (0.36, 0.26, 0.2); o.rotation_euler = (0, 0, a); bpy.ops.object.shade_smooth(); finish(o, 'sack', mirror, uv=False)
 def shrub(x, y, size=1.3, kind=2, mirror=True):
-    for a in (0.3 + x, 0.3 + x + PI / 2): cut(kind, x, y, 0, size, size * (0.8 if kind == 2 else 0.6), a, mirror, off=0)
+    clump(kind, x, y, size * (1.2 if kind == 2 else 0.8), size * (0.8 if kind == 2 else 0.6), 0.3 + x, mirror)
 def bunting(a, b, sag=1.2, mirror=True):
     """A line of pennants strung from a to b."""
     a, b = Vector(a), Vector(b); n = max(6, int((b - a).length / 0.75)); pts = [a.lerp(b, t / n) - Vector((0, 0, sag * math.sin(PI * t / n))) for t in range(n + 1)]
     d = (b - a).normalized()
     for i, (p, q) in enumerate(zip(pts, pts[1:])):
         bar('bunting line', p, q, 0.008, 'rope', mirror)
-        m = (p + q) / 2; tri('pennant', (m - d * 0.2, m + d * 0.2, m - Vector((0, 0, 0.5))), ('red', 'gold', 'blue', 'cream')[i % 4], mirror)
+        m = (p + q) / 2; tri('pennant', (m - d * 0.2, m + d * 0.2, m - Vector((0, 0, 0.5))), ('pen red', 'pen gold', 'pen blue', 'pen cream')[i % 4], mirror)
 def front_e(x, y0, y1, h=4.0):
     """A half-timbered lean-to built against a wall whose face at x looks east: whitewash between dark beams, a door,
     shuttered windows, a slate pentice roof. Half a metre deep."""
@@ -211,11 +211,7 @@ for x in (-24, -10, 12, 20): cut(1, x, 21, WW - 2.4, 2.4, 2.4, S_)
 for x, y, k in ((-29.5, -13.5, 1.5), (-20.5, -13.8, 1.2), (-27.5, 13.2, 1.3), (-17.8, 16.6, 1.2), (-10.2, 18.4, 1.4), (-10.0, -17.6, 1.5), (-18.5, 9.2, 1.1), (-24.6, -8.2, 1.3), (-10.4, -6.6, 1.2), (-10.4, 7.2, 1.2)): shrub(x, y, k)
 for i, (x, y) in enumerate(((-26, 8), (-23.2, 9.6), (-17, -5.6), (-15, -8), (-27.2, -9), (-20, 11.5), (-15.4, 9.4), (-12.6, -9.6), (-28.6, 5.4), (-28.8, -6), (-18, -15), (-23, -13), (-25, 12.4), (-14.2, 17.6), (-19.8, -7.4), (-16.6, 13.4))): shrub(x, y, 1.0 + (i % 3) * 0.25, 3)
 for x, y in ((-3.4, 11.8), (-0.9, 15.0), (-4.0, 15.2), (7.0, 20.2), (-7.2, 7.0)): shrub(x, y, 1.0, 2)
-cyl('fir trunk', -24.6, -11.0, 0, 3.0, 0.22, 'frame', seg=8); collide(-24.9, -11.3, -24.3, -10.7, 0, 3.0)
-for a in (0.2, 0.2 + PI / 2):
-    bpy.ops.mesh.primitive_plane_add(size=1, location=(-24.6, -11.0, 5.2)); o = bpy.context.object; o.name = 'ward fir'; o.scale = (5.0, 10.0, 1); o.rotation_euler = (PI / 2, 0, a)
-    for l in o.data.uv_layers.active.data: l.uv = (l.uv.x / 2, l.uv.y)
-    finish(o, 'firs', True, uv=False)
+fir(-24.6, -11.0, 10.5, bark='bark', mirror=True); collide(-24.9, -11.3, -24.3, -10.7, 0, 3.0)
 # a striped pavilion in each ward
 cyl('pavilion wall', -14.4, -15.2, 0, 1.75, 1.85, 'cream', seg=12); cyl('pavilion roof', -14.4, -15.2, 1.75, 3.6, 2.15, 'red', seg=12, r2=0.06); cyl('pavilion valance', -14.4, -15.2, 1.6, 1.78, 2.17, 'gold', seg=12)
 cyl('pavilion pole', -14.4, -15.2, 3.6, 4.3, 0.03, 'frame', seg=6); tri('pavilion pennant', ((-14.4, -15.2, 4.3), (-14.4, -15.2, 3.95), (-13.7, -15.2, 4.12)), 'gold')
@@ -288,10 +284,23 @@ for x, y in ((-6.9, 8.4), (-6.0, 9.2), (-5.3, 8.5), (-6.4, 8.9)): shrub(x, y, 0.
 
 # ---------- beyond the walls: firs ----------
 rnd = random.Random(3)
-for i in range(64):
-    side = i % 4; t = rnd.uniform(-1, 1)
-    x, y = ((t * (HX + 24), HY + rnd.uniform(8, 30)), (t * (HX + 24), -HY - rnd.uniform(8, 30)), (HX + rnd.uniform(8, 30), t * (HY + 18)), (-HX - rnd.uniform(8, 30), t * (HY + 18)))[side]
-    card(x, y, rnd.uniform(12, 20), i % 2)
+# a meadow round the castle out to the trees, then the forest in rings fading into the haze
+deco('meadow', -170, -150, 170, 150, -0.24, -0.2, 'meadow', mirror=False)
+for k_ in range(40):   # worn tracks and bare patches in the meadow
+    a = rnd.uniform(0, 2 * PI); d = rnd.uniform(HX + 4, HX + 26); wear(rnd.choice((1, 3, 0)), math.cos(a) * d, math.sin(a) * d * 0.75, rnd.uniform(3, 7), rnd.uniform(2, 5), a, z=-0.03, mirror=False)
+for ring, (rx, ry, cnt, hmin, hmax) in enumerate(((HX + 22, HY + 20, 48, 13, 19), (HX + 34, HY + 30, 56, 15, 22), (HX + 50, HY + 44, 60, 16, 25), (HX + 72, HY + 62, 64, 18, 28))):
+    for i in range(cnt):
+        t = (i + ring * 0.37) / cnt * 2 * PI; x, y = math.cos(t) * rx * 1.3, math.sin(t) * ry * 1.3; x = max(-rx, min(rx, x)) + rnd.uniform(-3, 3); y = max(-ry, min(ry, y)) + rnd.uniform(-3, 3)
+        (fir if (i + ring) % 4 else broadleaf)(x, y, rnd.uniform(hmin, hmax) * (1 if (i + ring) % 4 else 0.75), bark='bark', seed=i, detail=1 if ring == 0 else 0)
+# the lawns and yards: mud, leaf litter and moss underfoot, long grass at the foot of the walls
+for i in range(34):
+    x, y = rnd.uniform(-30, -9), rnd.uniform(-20, 20)
+    s_ = rnd.uniform(1.2, 3.2); wear(rnd.choice((0, 1, 3, 3)), x, y, s_ * rnd.uniform(0.8, 1.3), s_, rnd.uniform(0, 6.3), z=0.016 + (i % 4) * 0.002)
+for i in range(150):
+    side = i % 4; t = rnd.uniform(0.05, 0.95)
+    x, y = ((-31 + 21.5 * t, 20.75), (-31 + 21.5 * t, -20.75), (-30.75, -20 + 40 * t), (-8.4, -20 + 40 * t))[side]
+    if side == 3 and -6.2 < y < 6.4: continue   # (not across the keep's doors)
+    h = rnd.uniform(0.35, 0.8); clump(3, x + rnd.uniform(-0.15, 0.15), y + rnd.uniform(-0.15, 0.15), h, h, rnd.uniform(0, 6.3))
 
 # ---------- export ----------
 def stair(s, sy):
@@ -306,4 +315,6 @@ export('castle', {
               {'y': WW, 'bounds': {'minX': -28, 'maxX': 28, 'minZ': 21, 'maxZ': 23.4}, 'portals': [stair(1, -1), stair(-1, -1)]}],
     'pickups': [['health', 0, 0, 2.2], ['health', 0, 0, -2.2], ['ammo', -25, 0, 18], ['ammo', 25, 0, -18], ['ammo', 2, 0, -15.5], ['ammo', -2, 0, 15.5],
                 ['health', 0, WW, -22.2], ['health', 0, WW, 22.2], ['ammo', -24, 0, -18.5], ['ammo', 24, 0, 18.5]],
-})
+}, bake=dict(size=int(os.environ.get('LM', 2048)), samples=int(os.environ.get('LMS', 24)), sky=(0.82, 0.88, 0.96), sky_k=1.0, emit_k=3,
+            skip=('card', 'decal', 'soft', 'cutout', 'foliage'),
+            only='curtain wall|keep$|ward$|earth|hall floor|^timber$|door frame|^roof$|thatch|lawn|whitewash|floorboards|meadow'))
